@@ -1,0 +1,172 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\unlock">
+      <UniqueIdentifier>{e34718ee-5344-4296-a04e-8c9e8198aaaa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\page">
+      <UniqueIdentifier>{c5c3b27a-a45b-4c05-8f38-e7d76a832d65}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\kmd_core">
+      <UniqueIdentifier>{62ec3c7b-fa66-4ed4-84ef-2f9469ebe84c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\file">
+      <UniqueIdentifier>{c98e896d-5c0c-40f2-a538-e208e64a07ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\exec">
+      <UniqueIdentifier>{6247613d-5996-48a0-86bf-0670af977875}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\driver">
+      <UniqueIdentifier>{6f2a8f51-7e58-4913-9be5-0efa279dbe3a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ax64_common.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lx64_common.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_common.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ax64_unlock.c">
+      <Filter>Source Files\unlock</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_unlock.c">
+      <Filter>Source Files\unlock</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_pagesignature.c">
+      <Filter>Source Files\page</Filter>
+    </ClCompile>
+    <ClCompile Include="ax64_stage3_c.c">
+      <Filter>Source Files\kmd_core</Filter>
+    </ClCompile>
+    <ClCompile Include="lx64_stage3_c.c">
+      <Filter>Source Files\kmd_core</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_stage3_c.c">
+      <Filter>Source Files\kmd_core</Filter>
+    </ClCompile>
+    <ClCompile Include="ax64_filepull.c">
+      <Filter>Source Files\file</Filter>
+    </ClCompile>
+    <ClCompile Include="ax64_filepush.c">
+      <Filter>Source Files\file</Filter>
+    </ClCompile>
+    <ClCompile Include="lx64_filedelete.c">
+      <Filter>Source Files\file</Filter>
+    </ClCompile>
+    <ClCompile Include="lx64_filepull.c">
+      <Filter>Source Files\file</Filter>
+    </ClCompile>
+    <ClCompile Include="lx64_filepush.c">
+      <Filter>Source Files\file</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_filepull.c">
+      <Filter>Source Files\file</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_filepush.c">
+      <Filter>Source Files\file</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_exec_user_c.c">
+      <Filter>Source Files\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_pscreate.c">
+      <Filter>Source Files\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_pskill.c">
+      <Filter>Source Files\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_pslist.c">
+      <Filter>Source Files\exec</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_driverinfo.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_driverunload.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ax64_common_a.asm">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="lx64_common_a.asm">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="wx64_common_a.asm">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="wx64_pageinfo.asm">
+      <Filter>Source Files\page</Filter>
+    </None>
+    <None Include="ax64_stage2.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="ax64_stage3.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="lx64_stage2.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="lx64_stage3.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="lx64_stage3_pre.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="wx64_stage1.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="wx64_stage2.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="wx64_stage3.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="wx64_stage3_pre.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="wx64_exec_user.asm">
+      <Filter>Source Files\exec</Filter>
+    </None>
+    <None Include="wx64_psblue.asm">
+      <Filter>Source Files\exec</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ax64_common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lx64_common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="wx64_common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ax64_info.txt">
+      <Filter>Source Files\kmd_core</Filter>
+    </Text>
+    <Text Include="lx64_info.txt">
+      <Filter>Source Files\kmd_core</Filter>
+    </Text>
+    <Text Include="wx64_info.txt">
+      <Filter>Source Files\kmd_core</Filter>
+    </Text>
+  </ItemGroup>
+</Project>
