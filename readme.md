@@ -11,7 +11,7 @@ PCILeech is dependant on the PLX Technologies USB3380 chip. The actual chip can 
 http://www.bplus.com.tw/PLX.html
 
 The hardware confirmed working is:
-* USB3380-EVB mini-PCIe card. Including adapters to PCIe and ExpressCard.
+* USB3380-EVB mini-PCIe card. Including using PE3B (mPCIe 2 ExpressCard).
 * PP3380-AB PCIe card. Including adapter to ExpressCard.
 * Sonnet Echo ExpressCard Pro Thunderbolt to ExpressCard adapter.
 
