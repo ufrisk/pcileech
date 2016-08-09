@@ -6,16 +6,23 @@ The software is written in visual studio and runs on Windows 7/Windows 10. Suppo
 
 Hardware:
 =========
-PCILeech is dependant on the PLX Technologies USB3380 chip. The actual chip can be purchased for around $15, but it's more convenient to purchase a development board on which the chip is already mounted. Development boards can be purchased from BPlus Technology, or on eBay / Ali Express.
+PCILeech is dependant on the PLX Technologies USB3380 chip. The actual chip can be purchased for around $15, but it's more convenient to purchase a development board on which the chip is already mounted. Development boards can be purchased from BPlus Technology, or on eBay / Ali Express. Please note that adapters may be required too depending on your requirements.
 
 http://www.bplus.com.tw/PLX.html
 
 The hardware confirmed working is:
-* USB3380-EVB mini-PCIe card. Including adapters to PCIe and ExpressCard.
-* PP3380-AB PCIe card. Including adapter to ExpressCard.
-* Sonnet Echo ExpressCard Pro Thunderbolt to ExpressCard adapter.
+* USB3380-EVB mini-PCIe card.
+* PP3380-AB PCIe card.
 
 Please note that the ExpressCard EC3380-AB is not working!
+
+Recommended adapters:
+* PE3B - ExpressCard to mini-PCIe.
+* PE3A - ExpressCard to PCIe.
+* ADP - PCIe to mini-PCIe.
+* Sonnet Echo ExpressCard Pro - Thunderbolt to ExpressCard.
+
+Please note that other adapters may also work.
 
 Flashing Hardware:
 ==================
