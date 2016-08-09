@@ -104,3 +104,11 @@ Dump all memory from the target system given that a kernel module is loaded at a
 Building:
 =========
 The binaries are found in the pcileech_files folder. If one wish to build an own version it is possible to do so. Compile the pcileech and pcileech_gensig projects from within Visual Studio. Tested with Visual Studio 2015. To compile kernel- and shellcode, located in the pcileech_shellcode project, please look into the individual files for instructions. These files are usually compiled command line.
+
+Changelog:
+==========
+v1.0
+* Initial release.
+
+latest
+* New implant: load unsigned drivers into Windows kernel [wx64_driverload_svc].

@@ -60,6 +60,7 @@
     <ClCompile Include="lx64_stage3_c.c" />
     <ClCompile Include="wx64_common.c" />
     <ClCompile Include="wx64_driverinfo.c" />
+    <ClCompile Include="wx64_driverload_svc.c" />
     <ClCompile Include="wx64_driverunload.c" />
     <ClCompile Include="wx64_exec_user_c.c" />
     <ClCompile Include="wx64_filepull.c" />

@@ -94,10 +94,13 @@
       <Filter>Source Files\exec</Filter>
     </ClCompile>
     <ClCompile Include="wx64_driverinfo.c">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\driver</Filter>
     </ClCompile>
     <ClCompile Include="wx64_driverunload.c">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\driver</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_driverload_svc.c">
+      <Filter>Source Files\driver</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
