@@ -24,9 +24,23 @@ Recommended adapters:
 
 Please note that other adapters may also work.
 
-Flashing Hardware:
-==================
-In order to turn the USB3380 development board into a PCILeech device it needs to be flashed. The image to flash is found in pcileech_files and is named: firmware_pcileech.bin. In order to flash the image please download the PLX SDK from: http://www.plxtech.com/products/sdk/ (Linux version). You need to register to get access. The card must be connected to the Linux system doing the flashing via PCIe.
+Flashing Hardware - option #1:
+===============================
+In order to turn the USB3380 development board into a PCILeech device it needs to be flashed. Flashing must be done in Linux as root. Download the source code for the flash kernel module to build. The files are found in the pcileech_flash folder and are named: pcileech_flash.c and Makefile. The card must be connected to the Linux system doing the flashing via PCIe.
+
+NB! If flashing the PP3380 PCIe card the J3 jumper must be bridged to connect the EEPROM. This is not necessary for the USB3380-EVB mini-PCIe card.
+
+* cd /pathtofiles
+* make
+* [ insert USB3380 hardware into computer ]
+* insmod pcileech_flash.ko
+* dmesg
+
+Module insertion should always fail even though flashing is successful. If it says 'Connection reset by peer' it is most probably successful. Please check the dmesg message to see if flashing was successful. If successful it should read 'PCILEECH FLASH: SUCCESS'. If it's not working try 2-3 times in a row.
+
+Flashing Hardware - option #2:
+==============================
+If the flash method decribed on option #1 failed please try this original option. The image to flash is found in pcileech_files and is named: firmware_pcileech.bin. In order to flash the image please download the PLX SDK from: http://www.plxtech.com/products/sdk/ (Linux version). You need to register to get access. The card must be connected to the Linux system doing the flashing via PCIe.
 
 * unzip and untar
 * export PLX_SDK_DIR=/pathtofiles/PlxSdk
@@ -119,3 +133,4 @@ v1.0
 
 latest
 * New implant: load unsigned drivers into Windows kernel [wx64_driverload_svc].
+* Added firmware flash support without PLX SDK.

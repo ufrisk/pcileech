@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.25123.0
+VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcileech", "pcileech\pcileech.vcxproj", "{DFFA1B4C-279B-4356-ADB1-08A6F4795931}"
 EndProject
@@ -13,6 +13,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		LICENSE = LICENSE
 		readme.md = readme.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "pcileech_flash", "pcileech_flash", "{C8566802-6336-4B4B-A3F8-B08452CEBDAE}"
+	ProjectSection(SolutionItems) = preProject
+		pcileech_flash\Makefile = pcileech_flash\Makefile
+		pcileech_flash\pcileech_flash.c = pcileech_flash\pcileech_flash.c
+		pcileech_flash\readme_flash.txt = pcileech_flash\readme_flash.txt
 	EndProjectSection
 EndProject
 Global
