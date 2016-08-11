@@ -34,9 +34,8 @@ NB! If flashing the PP3380 PCIe card the J3 jumper must be bridged to connect th
 * make
 * [ insert USB3380 hardware into computer ]
 * insmod pcileech_flash.ko
-* dmesg
 
-Module insertion should always fail even though flashing is successful. If it says 'Connection reset by peer' it is most probably successful. Please check the dmesg message to see if flashing was successful. If successful it should read 'PCILEECH FLASH: SUCCESS'. If it's not working try 2-3 times in a row.
+If module insertion is successful flashing is also successful. In order to activate the flashed PCILeech device it must be power-cycled. Re-inserting it in the computer will achieve this. If one wish to flash more devices then unload the pcileech_flash kernel module by issuing the command: 'rmmod pcileech_flash'. If there is an error flashing is unsuccessful. Please try again and check any debug error messages by issing the command: 'dmsg'.
 
 Flashing Hardware - option #2:
 ==============================
