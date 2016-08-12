@@ -24,7 +24,7 @@ Recommended adapters:
 
 Please note that other adapters may also work.
 
-Flashing Hardware - option #1:
+Flashing Hardware:
 ===============================
 In order to turn the USB3380 development board into a PCILeech device it needs to be flashed. Flashing must be done in Linux as root. Download the source code for the flash kernel module to build. The files are found in the pcileech_flash folder and are named: pcileech_flash.c and Makefile. The card must be connected to the Linux system doing the flashing via PCIe.
 
@@ -36,31 +36,6 @@ NB! If flashing the PP3380 PCIe card the J3 jumper must be bridged to connect th
 * insmod pcileech_flash.ko
 
 If module insertion is successful flashing is also successful. In order to activate the flashed PCILeech device it must be power-cycled. Re-inserting it in the computer will achieve this. If one wish to flash more devices then unload the pcileech_flash kernel module by issuing the command: 'rmmod pcileech_flash'. If there is an error flashing is unsuccessful. Please try again and check any debug error messages by issing the command: 'dmsg'.
-
-Flashing Hardware - option #2:
-==============================
-If the flash method decribed on option #1 failed please try this original option. The image to flash is found in pcileech_files and is named: firmware_pcileech.bin. In order to flash the image please download the PLX SDK from: http://www.plxtech.com/products/sdk/ (Linux version). You need to register to get access. The card must be connected to the Linux system doing the flashing via PCIe.
-
-* unzip and untar
-* export PLX_SDK_DIR=/pathtofiles/PlxSdk
-* cd /pathtofiles/PlxSdk/PlxApi
-* make
-* cd ../Driver
-* ./builddriver Svc
-* ./Plx_load Svc
-
-To load the firmware onto the USB3380-EVB mini PCIe card run:
-* cd /pathtofiles/PlxSdk/Samples/PlxCm
-* make
-* ./App/PlxCm
-* eep_load firmware_pcileech.bin
-
-To load the firmware onto the PP3380 PCIe card run:
-
-(the J3 jumper must be bridged to connect the EEPROM)
-* cd Samples/PlxEep
-* make
-* ./App/PlxEep -w 2 -l firmware_pcileech.bin
 
 Installing PCILeech:
 ====================
@@ -133,3 +108,4 @@ v1.0
 latest
 * New implant: load unsigned drivers into Windows kernel [wx64_driverload_svc].
 * Added firmware flash support without PLX SDK.
+* Added some linux unlock signatures.
