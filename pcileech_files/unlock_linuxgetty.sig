@@ -1,3 +1,5 @@
+# Contributed by: github.com/blunden
+#
 # unlock signatures for Linux Getty x86 and x64
 # syntax: see signature_info.txt for more information.
 #
