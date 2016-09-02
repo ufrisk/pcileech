@@ -111,3 +111,4 @@ latest
 * New implant: load unsigned drivers into Windows kernel [wx64_driverload_svc].
 * Added firmware flash support without PLX SDK.
 * Added linux unlock signatures.
+* New kernel module signature [win10x64_ntfs_20160820].
