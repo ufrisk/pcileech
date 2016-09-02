@@ -100,6 +100,9 @@ typedef struct tdKMDDATA {
 #define STATUS_FAIL_FILE_SIZE				0xf0000003
 #define STATUS_FAIL_INPPARAMS_BAD			0xf0000004
 #define STATUS_FAIL_ACTION					0xf0000005
+#define STATUS_FAIL_SIGNATURE_NOT_FOUND		0xf0000006
+#define STATUS_FAIL_OUTOFMEMORY				0xf0000007
+#define STATUS_FAIL_MEMORYMAP_NOT_FOUND		0xf0000008
 
 //-------------------------------------------------------------------------------
 // Function definitions below.
