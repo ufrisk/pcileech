@@ -22,62 +22,6 @@ VOID MemoryDump_FileWriteAsync_Thread(PFILE_WRITE_ASYNC_BUFFER pfb)
 	pfb->isExecuting = FALSE;
 }
 
-VOID MemoryDump_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer1M, _In_ QWORD qwBaseAddress, _Inout_ PPAGE_STATISTICS pPageStat)
-{
-	QWORD o, p;
-	// try read 1M in 128k chunks
-	for(o = 0; o < 0x00100000; o += 0x00020000) {
-		if((qwBaseAddress + o + 0x00020000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer1M + o, 0x00020000)) {
-			pPageStat->cPageSuccess += 32;
-		} else {
-			// try read 128k in 4k (page) chunks
-			for(p = 0; p < 0x00020000; p += 0x1000) {
-				if(!(qwBaseAddress + o + p + 0x1000 <= pCfg->qwAddrMax)) {
-					return;
-				}
-				if(DeviceReadMEM(pDeviceData, qwBaseAddress + o + p, pbBuffer1M + o + p, 0x1000)) {
-					pPageStat->cPageSuccess++;
-				} else {
-					pPageStat->cPageFail++;
-				}
-			}
-		}
-	}
-}
-
-BOOL MemoryDump_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_ PPAGE_STATISTICS pPageStat)
-{
-	BOOL isSuccess[4] = { FALSE, FALSE, FALSE, FALSE };
-	QWORD i, o, qwOffset;
-	// try read 16M
-	if((qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress, pbBuffer16M, 0x01000000)) {
-		pPageStat->cPageSuccess += 4096;
-		return TRUE;
-	}
-	// try read 16M in 4M chunks
-	for(i = 0; i < 4; i++) {
-		o = 0x00400000 * i;
-		isSuccess[i] = (qwBaseAddress + o + 0x00400000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer16M + o, 0x00400000);
-	}
-	// DMA mode + all memory inside scope + and all 4M reads fail => fail
-	if(!pDeviceData->KMDHandle && qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax && !isSuccess[0] && !isSuccess[1] && !isSuccess[2] && !isSuccess[3]) {
-		pPageStat->cPageFail += 4096;
-		return FALSE;
-	}
-	// try read failed 4M chunks in 1M chunks
-	for(i = 0; i < 4; i++) {
-		if(isSuccess[i]) {
-			pPageStat->cPageSuccess += 1024;
-		} else {
-			qwOffset = 0x00400000 * i;
-			for(o = 0; o < 0x00400000; o += 0x00100000) {
-				MemoryDump_Read1M(pCfg, pDeviceData, pbBuffer16M + qwOffset + o, qwBaseAddress + qwOffset + o, pPageStat);
-			}
-		}
-	}
-	return TRUE;
-}
-
 VOID MemoryDump_SetOutFileName(_Inout_ PCONFIG pCfg)
 {
 	SYSTEMTIME st;
@@ -130,7 +74,7 @@ VOID ActionMemoryDump(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	// 2: start dump in 16MB blocks
 	qwCurrentAddress = pCfg->qwAddrMin;
 	while(qwCurrentAddress < pCfg->qwAddrMax) {
-		result = MemoryDump_Read16M(pCfg, pDeviceData, pbMemoryDump, qwCurrentAddress, &pageStat);
+		result = Util_Read16M(pCfg, pDeviceData, pbMemoryDump, qwCurrentAddress, &pageStat);
 		ShowUpdatePageRead(pCfg, qwCurrentAddress, &pageStat);
 		if(!result) {
 			printf("Memory Dump: Failed. Cannot dump any sequential data in 16MB - terminating.\n");

@@ -149,6 +149,9 @@
     <None Include="wx64_psblue.asm">
       <Filter>Source Files\exec</Filter>
     </None>
+    <None Include="wx64_stage2_hal.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ax64_common.h">

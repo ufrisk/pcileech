@@ -239,7 +239,15 @@ BOOL Util_ParseSignatureLine(_In_ PSTR szLine, _In_ DWORD cSignatureChunks, _Out
 		szLine = NULL;
 		if(!szToken) { return FALSE; }
 		if(i % 2 == 0) {
-			pChunk->cbOffset = strtoul(szToken, NULL, 16);
+			if(szToken[0] == '*') {
+				pChunk->tpOffset = SIGNATURE_CHUNK_TP_OFFSET_ANY;
+			} else {
+				if(szToken[0] == 'r') {
+					pChunk->tpOffset = SIGNATURE_CHUNK_TP_OFFSET_RELATIVE;
+					szToken = &szToken[1];
+				}
+				pChunk->cbOffset = strtoul(szToken, NULL, 16);
+			}
 		} else {
 			result = Util_ParseHexFileBuiltin(szToken, pChunk->pb, sizeof(pChunk->pb), &pChunk->cb);
 			if(!result) { return FALSE; }
@@ -396,4 +404,78 @@ VOID Util_CreateSignatureAppleGeneric(_In_ DWORD paKernelBase, _In_ DWORD paFunc
 	pSignature->chunk[4].cbOffset = paKernelBase;
 	pSignature->chunk[0].qwAddress = pSignature->chunk[0].cbOffset & ~0xfff;
 	pSignature->chunk[1].qwAddress = pSignature->chunk[1].cbOffset & ~0xfff;
+}
+
+VOID Util_CreateSignatureWindowsHalGeneric(_Out_ PSIGNATURE pSignature)
+{
+	memset(pSignature, 0, sizeof(SIGNATURE));
+	memcpy(pSignature->chunk[3].pb, WINX64_STAGE2_HAL_BIN, sizeof(WINX64_STAGE2_HAL_BIN));
+	memcpy(pSignature->chunk[4].pb, WINX64_STAGE3_BIN, sizeof(WINX64_STAGE3_BIN));
+	pSignature->chunk[3].cb = sizeof(WINX64_STAGE2_HAL_BIN);
+	pSignature->chunk[4].cb = sizeof(WINX64_STAGE3_BIN);
+}
+
+VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATURE pSignature)
+{
+	memset(pSignature, 0, sizeof(SIGNATURE));
+	pSignature->chunk[0].tpOffset = SIGNATURE_CHUNK_TP_OFFSET_ANY;
+	pSignature->chunk[0].cb = cb < 0x1000 ? cb : 0x1000;
+	memcpy(pSignature->chunk[0].pb, pb, pSignature->chunk[0].cb);
+}
+
+VOID Util_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer1M, _In_ QWORD qwBaseAddress, _Inout_ PPAGE_STATISTICS pPageStat)
+{
+	QWORD o, p;
+	// try read 1M in 128k chunks
+	for(o = 0; o < 0x00100000; o += 0x00020000) {
+		if((qwBaseAddress + o + 0x00020000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer1M + o, 0x00020000)) {
+			pPageStat->cPageSuccess += 32;
+		} else {
+			// try read 128k in 4k (page) chunks
+			for(p = 0; p < 0x00020000; p += 0x1000) {
+				if(!(qwBaseAddress + o + p + 0x1000 <= pCfg->qwAddrMax)) {
+					return;
+				}
+				if(DeviceReadMEM(pDeviceData, qwBaseAddress + o + p, pbBuffer1M + o + p, 0x1000)) {
+					pPageStat->cPageSuccess++;
+				} else {
+					pPageStat->cPageFail++;
+				}
+			}
+		}
+	}
+}
+
+BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_ PPAGE_STATISTICS pPageStat)
+{
+	BOOL isSuccess[4] = { FALSE, FALSE, FALSE, FALSE };
+	QWORD i, o, qwOffset;
+	// try read 16M
+	if((qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress, pbBuffer16M, 0x01000000)) {
+		pPageStat->cPageSuccess += 4096;
+		return TRUE;
+	}
+	// try read 16M in 4M chunks
+	memset(pbBuffer16M, 0, 0x01000000);
+	for(i = 0; i < 4; i++) {
+		o = 0x00400000 * i;
+		isSuccess[i] = (qwBaseAddress + o + 0x00400000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer16M + o, 0x00400000);
+	}
+	// DMA mode + all memory inside scope + and all 4M reads fail => fail
+	if(!pDeviceData->KMDHandle && qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax && !isSuccess[0] && !isSuccess[1] && !isSuccess[2] && !isSuccess[3]) {
+		pPageStat->cPageFail += 4096;
+		return FALSE;
+	}
+	// try read failed 4M chunks in 1M chunks
+	for(i = 0; i < 4; i++) {
+		if(isSuccess[i]) {
+			pPageStat->cPageSuccess += 1024;
+		} else {
+			qwOffset = 0x00400000 * i;
+			for(o = 0; o < 0x00400000; o += 0x00100000) {
+				Util_Read1M(pCfg, pDeviceData, pbBuffer16M + qwOffset + o, qwBaseAddress + qwOffset + o, pPageStat);
+			}
+		}
+	}
+	return TRUE;
 }

@@ -105,7 +105,7 @@ BOOL DeviceReadDMA(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32, _Out_ 
 	DWORD i, dwChunk;
 	if(cb % 0x1000) { return FALSE; }
 	if(cb > 0x01000000) { return FALSE; }
-	if(_DeviceIsInReservedMemoryRange(dwAddrPci32, cb)) { return FALSE; }
+	if(_DeviceIsInReservedMemoryRange(dwAddrPci32, cb) && !pDeviceData->IsAllowedAccessReservedAddress) { return FALSE; }
 	ZeroMemory(td, sizeof(THREAD_DATA_READ_EP) * 3);
 	if(cb < 0x00300000 || !pDeviceData->IsAllowedMultiThreadDMA) {
 		if(cb > 0x00800000) { // read max 8MB at a time.
@@ -291,7 +291,7 @@ VOID DeviceOpen_SetPipePolicy(_In_ PDEVICE_DATA pDeviceData)
 	WinUsb_SetPipePolicy(pDeviceData->WinusbHandle, pDeviceData->PipeDmaIn3, PIPE_TRANSFER_TIMEOUT, (ULONG)sizeof(BOOL), &ulTIMEOUT);
 }
 
-BOOL DeviceOpen(_Out_ PDEVICE_DATA pDeviceData)
+BOOL DeviceOpen(_In_ PCONFIG pCfg, _Out_ PDEVICE_DATA pDeviceData)
 {
 	BOOL result;
 	pDeviceData->HandlesOpen = FALSE;
@@ -326,6 +326,7 @@ BOOL DeviceOpen(_Out_ PDEVICE_DATA pDeviceData)
 	DeviceOpen_SetPipePolicy(pDeviceData);
 	pDeviceData->HandlesOpen = TRUE;
 	pDeviceData->IsAllowedMultiThreadDMA = IsWindows8OrGreater(); // multi threaded DMA read fails on WIN7.
+	pDeviceData->IsAllowedAccessReservedAddress = pCfg->fForceRW;
 	return TRUE;
 }
 

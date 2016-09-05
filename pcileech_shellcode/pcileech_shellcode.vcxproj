@@ -86,6 +86,7 @@
     <None Include="wx64_psblue.asm" />
     <None Include="wx64_stage1.asm" />
     <None Include="wx64_stage2.asm" />
+    <None Include="wx64_stage2_hal.asm" />
     <None Include="wx64_stage3.asm" />
     <None Include="wx64_stage3_pre.asm" />
   </ItemGroup>

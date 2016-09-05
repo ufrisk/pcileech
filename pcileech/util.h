@@ -47,8 +47,8 @@ BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension,
 /*
 * Retrieve the full file path to the file name specified. Path is relative to
 * directory of running executable.
-* szPath = buffer to receive the full path result.
-* szFileName = a file name in the current directory.
+* -- szPath = buffer to receive the full path result.
+* -- szFileName = a file name in the current directory.
 */
 VOID Util_GetFileInDirectory(_Out_ CHAR szPath[MAX_PATH], _In_ LPSTR szFileName);
 
@@ -68,8 +68,8 @@ DWORD Util_memcmpEx(_In_ PBYTE pb1, _In_ PBYTE pb2, _In_ DWORD cb);
 
 /*
 * Simple random number function.
-* --pb = buffer to receive random data.
-* --cb = length of random data to create.
+* -- pb = buffer to receive random data.
+* -- cb = length of random data to create.
 */
 VOID Util_GenRandom(_Out_ PBYTE pb, _In_ DWORD cb);
 
@@ -120,5 +120,34 @@ VOID Util_CreateSignatureLinuxGeneric(_In_ DWORD paBase, _In_ DWORD paSzKallsyms
 * -- pSignature = ptr to signature struct to place the result in.
 */
 VOID Util_CreateSignatureAppleGeneric(_In_ DWORD paKernelBase, _In_ DWORD paFunctionHook, _In_ DWORD paStage2, _Out_ PSIGNATURE pSignature);
+
+
+/*
+* Load the stage2 and stage3 code for the Hal.dll injection technique into
+* the supplied signature.
+* -- pSignature = ptr to signature struct to place the result in.
+*/
+VOID Util_CreateSignatureWindowsHalGeneric(_Out_ PSIGNATURE pSignature);
+
+/*
+* Create a search signature that searches all memory for the signature given in
+* the supplied pb and cb parameters.
+* -- pb = signature.
+* -- cb
+* -- pSignature = ptr to signature struct to place the result in.
+*/
+VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATURE pSignature);
+
+/*
+* Read a 16MB data chunk from the target and place it in the pbBuffer16M buffer.
+* Any data that failed to read within the 16MB buffer is set to zero.
+* -- pCfg
+* -- pDeviceData
+* -- pbBuffer16M = the already allocated 16MB buffer to place the content in.
+* -- qwBaseAddress = the base address to start reading from.
+* -- pPageStat = statistics struct to update on progress (pages success/fail).
+* -- return = TRUE if at least one 4k page could be read; FALSE if all pages failed.
+*/
+BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_ PPAGE_STATISTICS pPageStat);
 
 #endif /* __UTIL_H__ */

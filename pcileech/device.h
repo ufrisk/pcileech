@@ -40,7 +40,7 @@
 * -- pDeviceData = ptr to DeviceData to receive values on success.
 * -- result
 */
-BOOL DeviceOpen(_Out_ PDEVICE_DATA pDeviceData);
+BOOL DeviceOpen(_In_ PCONFIG pCfg, _Out_ PDEVICE_DATA pDeviceData);
 
 /*
 * Clean up various device related stuff and deallocate some meoory buffers.

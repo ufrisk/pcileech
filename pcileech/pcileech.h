@@ -28,6 +28,7 @@ DEFINE_GUID(GUID_DEVINTERFACE_android, 0xF72FE0D4, 0xCBCB, 0x407d, 0x88, 0x14, 0
 typedef struct _DEVICE_DATA {
 	BOOL HandlesOpen;
 	BOOL IsAllowedMultiThreadDMA;
+	BOOL IsAllowedAccessReservedAddress;
 	WINUSB_INTERFACE_HANDLE WinusbHandle;
 	HANDLE DeviceHandle;
 	WCHAR DevicePath[MAX_PATH];
@@ -63,6 +64,7 @@ typedef enum tdActionType {
 	DUMP,
 	WRITE,
 	PATCH,
+	SEARCH,
 	FLASH,
 	START8051,
 	STOP8051,
@@ -91,6 +93,9 @@ typedef struct tdConfig {
 	CHAR szShellcodeName[MAX_PATH];
 	BOOL fPageStat;
 	BOOL fPageTableScan;
+	BOOL fPatchAll;
+	BOOL fForceRW;
+	BOOL fShowHelp;
 } CONFIG, *PCONFIG;
 
 typedef struct tdPageStatistics {
@@ -102,10 +107,14 @@ typedef struct tdPageStatistics {
 	LPSTR szCurrentAction;
 } PAGE_STATISTICS, *PPAGE_STATISTICS;
 
+#define SIGNATURE_CHUNK_TP_OFFSET_FIXED		0
+#define SIGNATURE_CHUNK_TP_OFFSET_RELATIVE	1
+#define SIGNATURE_CHUNK_TP_OFFSET_ANY		2
 typedef struct tdSignatureChunk {
 	QWORD qwAddress;
 	DWORD cbOffset;
 	DWORD cb;
+	BYTE tpOffset;
 	BYTE pb[4096];
 } SIGNATURE_CHUNK, *PSIGNATURE_CHUNK;
 
