@@ -173,12 +173,13 @@ BOOL DeviceWriteDMA(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32, _In_ 
 BOOL DeviceWriteDMAVerify(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32, _In_ PBYTE pb, _In_ DWORD cb)
 {
 	PBYTE pbV;
-	BOOL result = DeviceWriteDMA(pDeviceData, dwAddrPci32, pb, cb);
+	BOOL result = DeviceWriteDMA_Retry(pDeviceData, dwAddrPci32, pb, cb);
 	if(!result) { return FALSE; }
-	pbV = LocalAlloc(0, cb);
+	pbV = LocalAlloc(0, cb + 0x2000);
 	if(!pbV) { return FALSE; }
-	result = DeviceReadDMA(pDeviceData, dwAddrPci32, pbV, cb);
-	result = result & (0 == memcmp(pb, pbV, cb));
+	result = 
+		DeviceReadDMARetryOnFail(pDeviceData, dwAddrPci32 & ~0xfff, pbV, (cb + 0xfff + (dwAddrPci32 & 0xfff)) & ~0xfff) &&
+		(0 == memcmp(pb, pbV + (dwAddrPci32 & 0xfff), cb));
 	LocalFree(pbV);
 	return result;
 }

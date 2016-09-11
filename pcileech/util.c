@@ -86,7 +86,7 @@ BOOL Util_PageTable_FindSignatureBase_CachedReadDMA(_In_ PDEVICE_DATA pDeviceDat
 	return DeviceReadDMARetryOnFail(pDeviceData, dwAddrPci32, pbPage, 4096);
 }
 
-BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase)
+BOOL Util_PageTable_FindSignatureBase_Search(_In_ PDEVICE_DATA pDeviceData, _Inout_ PBYTE pbCache, _In_ QWORD qwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase)
 {
 	// win8  kernel modules start at even  1-page boundaries (0x1000)
 	// win10 kernel modules start at even 16-page boundaries (0x10000)
@@ -98,98 +98,120 @@ BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevi
 	QWORD cPTE = 0, cPTEPages = 0, PTE, qwA;
 	QWORD qwPageTableData;
 	WORD wSignature;
-	QWORD qwRegCR3, qwRegCR3Min, qwRegCR3Max;
-	PBYTE pbCache;
-	if(pCfg->fPageTableScan) {
-		qwRegCR3Min = 0x100000;
-		qwRegCR3Max = 0x1000000;
-		pbCache = LocalAlloc(LMEM_ZEROINIT, 0x01000000);
-	} else {
-		qwRegCR3Min = *pqwCR3;
-		qwRegCR3Max = *pqwCR3 + 0x1000;
-		pbCache = NULL; // cache reads may fail if whole region isn't readable.
-	}
-	for(qwRegCR3 = qwRegCR3Min; qwRegCR3 < qwRegCR3Max; qwRegCR3 += 0x1000) {
-		result = Util_PageTable_FindSignatureBase_CachedReadDMA(pDeviceData, qwRegCR3 & 0xfffff000, (PBYTE)PML4, pbCache);
-		if(!result) { return FALSE; }
-		qwA = 0x0fffff80000000000;
-		while(qwA > 0x07fffffffffffffff) {
-			if(PML4_idx != (0x1ff & (qwA >> 39))) { // PML4
-				PML4_idx = 0x1ff & (qwA >> 39);
-				qwPageTableData = PML4[PML4_idx];
-				if(!Util_PageTable_FindSignatureBase_IsPageTableDataValid(qwPageTableData)) {
-					qwA += 0x0000008000000000;
-					qwA &= 0xffffff8000000000;
-					continue;
-				}
-				result = Util_PageTable_FindSignatureBase_CachedReadDMA(pDeviceData, qwPageTableData & 0xfffff000, (PBYTE)PDPT, pbCache);
-				if(!result) {
-					qwA += 0x0000008000000000;
-					qwA &= 0xffffff8000000000;
-					continue;
-				}
-				PDPT_idx = 0xfff;
-				PD_idx = 0xfff;
-			}
-			if(PDPT_idx != (0x1ff & (qwA >> 30))) { // PDPT(Page-Directory Pointer Table)
-				PDPT_idx = 0x1ff & (qwA >> 30);
-				qwPageTableData = PDPT[PDPT_idx];
-				if(!Util_PageTable_FindSignatureBase_IsPageTableDataValid(qwPageTableData)) {
-					qwA += 0x0000000040000000;
-					qwA &= 0xffffffffC0000000;
-					continue;
-				}
-				result = Util_PageTable_FindSignatureBase_CachedReadDMA(pDeviceData, qwPageTableData & 0xfffff000, (PBYTE)PD, pbCache);
-				if(!result) {
-					qwA += 0x0000000040000000;
-					qwA &= 0xffffffffC0000000;
-					continue;
-				}
-				PD_idx = 0xfff;
-			}
-			if(PD_idx != (0x1ff & (qwA >> 21))) { // PD (Page Directory)
-				PD_idx = 0x1ff & (qwA >> 21);
-				qwPageTableData = PD[PD_idx];
-				if(!Util_PageTable_FindSignatureBase_IsPageTableDataValid(qwPageTableData)) {
-					qwA += 0x0000000000200000;
-					qwA &= 0xffffffffffE00000;
-					continue;
-				}
-				result = Util_PageTable_FindSignatureBase_CachedReadDMA(pDeviceData, qwPageTableData & 0xfffff000, (PBYTE)PT, pbCache);
-				if(!result) {
-					qwA += 0x0000000000200000;
-					qwA &= 0xffffffffffE00000;
-					continue;
-				}
-			}
-			PTE = PT[0x1ff & (qwA >> 12)];
-			wSignature = (PTE & 0x07) | ((PTE >> 48) & 0x8000);
-			if(wSignature != pPTE->wSignature) { // signature do not match
-				qwA += 0x0000000000001000;
-				qwA &= 0xfffffffffffff000;
-				pPTE = pPTEs;
-				cPTE = 0;
-				cPTEPages = 0;
+	result = Util_PageTable_FindSignatureBase_CachedReadDMA(pDeviceData, qwCR3 & 0xfffff000, (PBYTE)PML4, pbCache);
+	if(!result) { return FALSE; }
+	qwA = 0x0fffff80000000000;
+	while(qwA > 0x07fffffffffffffff) {
+		if(PML4_idx != (0x1ff & (qwA >> 39))) { // PML4
+			PML4_idx = 0x1ff & (qwA >> 39);
+			qwPageTableData = PML4[PML4_idx];
+			if(!Util_PageTable_FindSignatureBase_IsPageTableDataValid(qwPageTableData)) {
+				qwA += 0x0000008000000000;
+				qwA &= 0xffffff8000000000;
 				continue;
 			}
-			if(cPTE == 0 && cPTEPages == 0) {
-				*pqwSignatureBase = qwA;
+			result = Util_PageTable_FindSignatureBase_CachedReadDMA(pDeviceData, qwPageTableData & 0xfffff000, (PBYTE)PDPT, pbCache);
+			if(!result) {
+				qwA += 0x0000008000000000;
+				qwA &= 0xffffff8000000000;
+				continue;
 			}
-			cPTEPages++;
-			if(cPTEPages == pPTE->cPages) { // next page section
-				cPTE++;
-				pPTE = pPTEs + cPTE;
-				cPTEPages = 0;
-				if(pPTE->cPages == 0 || cPTE == cPTEs) { // found
-					LocalFree(pbCache);
-					*pqwCR3 = qwRegCR3;
-					return TRUE;
-				}
-			}
-			qwA += 0x1000;
+			PDPT_idx = 0xfff;
+			PD_idx = 0xfff;
 		}
+		if(PDPT_idx != (0x1ff & (qwA >> 30))) { // PDPT(Page-Directory Pointer Table)
+			PDPT_idx = 0x1ff & (qwA >> 30);
+			qwPageTableData = PDPT[PDPT_idx];
+			if(!Util_PageTable_FindSignatureBase_IsPageTableDataValid(qwPageTableData)) {
+				qwA += 0x0000000040000000;
+				qwA &= 0xffffffffC0000000;
+				continue;
+			}
+			result = Util_PageTable_FindSignatureBase_CachedReadDMA(pDeviceData, qwPageTableData & 0xfffff000, (PBYTE)PD, pbCache);
+			if(!result) {
+				qwA += 0x0000000040000000;
+				qwA &= 0xffffffffC0000000;
+				continue;
+			}
+			PD_idx = 0xfff;
+		}
+		if(PD_idx != (0x1ff & (qwA >> 21))) { // PD (Page Directory)
+			PD_idx = 0x1ff & (qwA >> 21);
+			qwPageTableData = PD[PD_idx];
+			if(!Util_PageTable_FindSignatureBase_IsPageTableDataValid(qwPageTableData)) {
+				qwA += 0x0000000000200000;
+				qwA &= 0xffffffffffE00000;
+				continue;
+			}
+			result = Util_PageTable_FindSignatureBase_CachedReadDMA(pDeviceData, qwPageTableData & 0xfffff000, (PBYTE)PT, pbCache);
+			if(!result) {
+				qwA += 0x0000000000200000;
+				qwA &= 0xffffffffffE00000;
+				continue;
+			}
+		}
+		PTE = PT[0x1ff & (qwA >> 12)];
+		wSignature = (PTE & 0x07) | ((PTE >> 48) & 0x8000);
+		if(wSignature != pPTE->wSignature) { // signature do not match
+			qwA += 0x0000000000001000;
+			qwA &= 0xfffffffffffff000;
+			pPTE = pPTEs;
+			cPTE = 0;
+			cPTEPages = 0;
+			continue;
+		}
+		if(cPTE == 0 && cPTEPages == 0) {
+			*pqwSignatureBase = qwA;
+		}
+		cPTEPages++;
+		if(cPTEPages == pPTE->cPages) { // next page section
+			cPTE++;
+			pPTE = pPTEs + cPTE;
+			cPTEPages = 0;
+			if(pPTE->cPages == 0 || cPTE == cPTEs) { // found
+				return TRUE;
+			}
+		}
+		qwA += 0x1000;
 	}
 	*pqwSignatureBase = 0;
+	return FALSE;
+}
+
+BOOL Util_PageTable_WindowsHintPML4(_In_ PDEVICE_DATA pDeviceData, _Out_ PQWORD pqwCR3)
+{
+	BYTE pb[0x1000];
+	return
+		DeviceReadMEM(pDeviceData, 0x1000, pb, 0x1000) &&
+		((*(PQWORD)(pb + 0x78) & 0xfffffffffff00fff) == 0xffffffffffd00000) &&
+		((*(PQWORD)(pb + 0xa0) & 0xffffffff00000fff) == 0) &&
+		(*pqwCR3 = *(PQWORD)(pb + 0xa0));
+	return FALSE;
+}
+
+BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase)
+{
+	BOOL result;
+	QWORD qwRegCR3;
+	PBYTE pbCache;
+	// if page base (CR3) is specified -> use it.
+	if(!pCfg->fPageTableScan) {
+		return Util_PageTable_FindSignatureBase_Search(pDeviceData, NULL, *pqwCR3, pPTEs, cPTEs, pqwSignatureBase);
+	}
+	// try CR3/PML4 hint at PA 0x1000 on windows 8.1/10.
+	result = 
+		Util_PageTable_WindowsHintPML4(pDeviceData, pqwCR3) && 
+		Util_PageTable_FindSignatureBase_Search(pDeviceData, NULL, *pqwCR3, pPTEs, cPTEs, pqwSignatureBase);
+	if(result) { return TRUE; }
+	// page table scan guessing common CR3 base addresses.
+	pbCache = LocalAlloc(LMEM_ZEROINIT, 0x01000000);
+	for(qwRegCR3 = 0x100000; qwRegCR3 < 0x1000000; qwRegCR3 += 0x1000) {
+		if(Util_PageTable_FindSignatureBase_Search(pDeviceData, pbCache, qwRegCR3, pPTEs, cPTEs, pqwSignatureBase)) {
+			*pqwCR3 = qwRegCR3;
+			LocalFree(pbCache);
+			return TRUE;
+		}
+	}
 	LocalFree(pbCache);
 	return FALSE;
 }
@@ -420,6 +442,7 @@ VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATUR
 	memset(pSignature, 0, sizeof(SIGNATURE));
 	pSignature->chunk[0].tpOffset = SIGNATURE_CHUNK_TP_OFFSET_ANY;
 	pSignature->chunk[0].cb = cb < 0x1000 ? cb : 0x1000;
+	pSignature->chunk[2].tpOffset = SIGNATURE_CHUNK_TP_OFFSET_RELATIVE;
 	memcpy(pSignature->chunk[0].pb, pb, pSignature->chunk[0].cb);
 }
 

@@ -126,3 +126,6 @@ v1.1
 * signature: Linux unlock added.
 * other: firmware flash support without PLX SDK.
 * other: various bug fixes.
+
+latest
+* core: stability improvements and fixes.

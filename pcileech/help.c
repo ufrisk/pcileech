@@ -107,7 +107,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016 Ulf Frisk                                                   \n" \
-		" Version: 1.1                                                                  \n" \
+		" Version: 1.1.1                                                                \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or later.                           \n" \
