@@ -7,7 +7,7 @@
 // cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_common.c
 // cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_pagesignature.c
 // ml64.exe wx64_common_a.asm /Fewx64_pagesignature.exe /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main wx64_pagesignature.obj wx64_common.obj
-// shellcode64.exe -o wx64_pagesignature.exe "MODULE SIGNATURE INFORMATION\n============================\nSyntax: pcileech.exe -s <modulename.sys>\n  MODULE    : %s \n  BASE PHYS : %016llX\n  BASE VIRT : %016llX\n  SIZE      : %016llX\n  NO OF SIGNATURE CUNKS: %i\n  IRP_MJ_CREATE: %016llX\n  SIGNATURE IS SHOWN BELOW:\n"
+// shellcode64.exe -o wx64_pagesignature.exe "MODULE SIGNATURE INFORMATION\n===========================================================\nSyntax: pcileech.exe -s <modulename.sys>\nGENERAL INFORMATION BELOW:\n  MODULE    : %s \n  BASE PHYS : %016llX\n  BASE VIRT : %016llX\n  SIZE      : %016llX\n  #CUNKS    : %i\n  MJ_CREATE : %016llX\nPAGING INFORMATION BELOW:\n  CR3       : %016llX\n  PML4E     : %016llX\n  PDPTE     : %016llX\n  PDE       : %016llX\n  PTE       : %016llX\nSIGNATURE IS SHOWN BELOW:\n"
 //
 #include "wx64_common.h"
 
@@ -73,33 +73,41 @@ VOID InitializeKernelFunctions2(_In_ QWORD qwNtosBase, _Out_ PKERNEL_FUNCTIONS2 
 	}
 }
 
-QWORD GetPTE(_In_ PKERNEL_FUNCTIONS fnk, _In_ QWORD qwVA)
+QWORD GetPTE(_In_ PKERNEL_FUNCTIONS fnk, _In_ QWORD qwVA, _Out_opt_ QWORD qwaPageInfo[5])
 {
-	QWORD buf, paPML4, paPDPT, paPD, paPT, qwPTE;
+	//QWORD buf, paPML4, paPDPT, paPD, paPT, qwPTE;
+	QWORD buf, qwCR3, qwPML4E, qwPDPTE, qwPDE, qwPTE;
 	// pml4 -> pdpt
-	paPML4 = GetCR3() & ~0xfff;
-	buf = (QWORD)fnk->MmMapIoSpace(paPML4, 4096, 0);
+	qwCR3 = GetCR3();
+	buf = (QWORD)fnk->MmMapIoSpace(qwCR3 & ~0xfff, 4096, 0);
 	if(!buf) { return 0; }
-	paPDPT = *(PQWORD)(buf + (((qwVA >> 39) & 0x1FF) << 3)) & ~0xFFF;
+	qwPML4E = *(PQWORD)(buf + (((qwVA >> 39) & 0x1FF) << 3));
 	fnk->MmUnmapIoSpace((PVOID)buf, 4096);
-	if(!paPDPT) { return 0; }
+	if(!(qwPML4E & ~0xFFF)) { return 0; }
 	// pdpt -> pd
-	buf = (QWORD)fnk->MmMapIoSpace(paPDPT, 4096, 0);
+	buf = (QWORD)fnk->MmMapIoSpace(qwPML4E & ~0xFFF, 4096, 0);
 	if(!buf) { return 0; }
-	paPD = *(PQWORD)(buf + (((qwVA >> 30) & 0x1FF) << 3)) & ~0xFFF;
+	qwPDPTE = *(PQWORD)(buf + (((qwVA >> 30) & 0x1FF) << 3));
 	fnk->MmUnmapIoSpace((PVOID)buf, 4096);
-	if(!paPD) { return 0; }
+	if(!(qwPDPTE & ~0xFFF)) { return 0; }
 	// pd -> pt
-	buf = (QWORD)fnk->MmMapIoSpace(paPD, 4096, 0);
+	buf = (QWORD)fnk->MmMapIoSpace(qwPDPTE & ~0xFFF, 4096, 0);
 	if(!buf) { return 0; }
-	paPT = *(PQWORD)(buf + (((qwVA >> 21) & 0x1FF) << 3)) & ~0xFFF;
+	qwPDE = *(PQWORD)(buf + (((qwVA >> 21) & 0x1FF) << 3));
 	fnk->MmUnmapIoSpace((PVOID)buf, 4096);
-	if(!paPT) { return 0; }
+	if(!(qwPDE & ~0xFFF)) { return 0; }
 	// pt -> pte
-	buf = (QWORD)fnk->MmMapIoSpace(paPT, 4096, 0);
+	buf = (QWORD)fnk->MmMapIoSpace(qwPDE & ~0xFFF, 4096, 0);
 	if(!buf) { return 0; }
 	qwPTE = *(PQWORD)(buf + (((qwVA >> 12) & 0x1FF) << 3));
 	fnk->MmUnmapIoSpace((PVOID)buf, 4096);
+	if(qwaPageInfo) {
+		qwaPageInfo[0] = qwCR3;
+		qwaPageInfo[1] = qwPML4E;
+		qwaPageInfo[2] = qwPDPTE;
+		qwaPageInfo[3] = qwPDE;
+		qwaPageInfo[4] = qwPTE;
+	}
 	return qwPTE;
 }
 
@@ -113,7 +121,7 @@ VOID PageTable_CreateSignature(_In_ PKERNEL_FUNCTIONS fnk, _In_ QWORD qwAddressM
 	qwAddressMin &= 0x0fffffffffffff000;
 	qwAddressMax &= 0x0fffffffffffff000;
 	for(qwAddress = qwAddressMin; qwAddress <= qwAddressMax; qwAddress += 0x1000) {
-		qwPTE = GetPTE(fnk, qwAddress);
+		qwPTE = GetPTE(fnk, qwAddress, NULL);
 		wSignature = (qwPTE & 0x07) | ((qwPTE >> 48 ) & 0x8000);
 		if(wSignature == pPTE->wSignature) { // same as previous
 			pPTE->cPages++;
@@ -181,5 +189,6 @@ VOID c_EntryPoint(_In_ PKMDDATA pk)
 		}
 		pk->dataOutExtraLength = cSigPTEs * sizeof(SIGNATUREPTE);
 		fnk.RtlCopyMemory(pk->dataOutStr, pk->dataInStr, MAX_PATH);
+		GetPTE(&fnk, qwModuleBase, &pk->dataOut[5]);
 	}
 }
