@@ -26,7 +26,7 @@ typedef struct tdSIGNATURE{
 	LPSTR szSignatureData;
 } SIGNATURE, *PSIGNATURE;
 
-#define NUMBER_OF_SIGNATURES	10
+#define NUMBER_OF_SIGNATURES	11
 
 const SIGNATURE SIGNATURES[NUMBER_OF_SIGNATURES] = {
 	{
@@ -110,9 +110,9 @@ const SIGNATURE SIGNATURES[NUMBER_OF_SIGNATURES] = {
 		.szSignatureData = ",ca770,DEFAULT_WINX64_STAGE1,4fe38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,010003804f00010023000180080003801400018066010100050000001d000180"
 	},
 	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-07-16 (Windows 10 x64) - anniversary update",
-		.szFileName = "win10x64_ntfs_20160716.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2016-07-16 - anniversary update (MJ_CREATE)",
+		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-07-16 (Windows 10 x64) [10.0.14393.0]",
+		.szFileName = "win10x64_ntfs_20160716_14393.kmd",
+		.szSignatureInfo = "# ntfs.sys signed on 2016-07-16 (MJ_CREATE) [10.0.14393.0]",
 		.dwOffset1 = 0xf6000,
 		.dwOffset2 = 0x53000,
 		.szHash1 = "5cadebe69115cc66e07f7d1e3f97ad0522840c1c648d33b37d8fe9f9a36ae413",
@@ -121,13 +121,23 @@ const SIGNATURE SIGNATURES[NUMBER_OF_SIGNATURES] = {
 	},
 	{
 		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-08-20 (Windows 10 x64) [10.0.14393.103]",
-		.szFileName = "win10x64_ntfs_20160820.kmd",
+		.szFileName = "win10x64_ntfs_20160820_14393.kmd",
 		.szSignatureInfo = "# ntfs.sys signed on 2016-08-20 (MJ_CREATE) [10.0.14393.103]",
 		.dwOffset1 = 0xf6000,
 		.dwOffset2 = 0x53000,
 		.szHash1 = "c6b3a2c6a9d19798b9974704e551a4798d0f2098279a67924eebcb03cee07590",
 		.szHash2 = "04d501dae7a097b649edc0bb68dc02036e31ece8c30ee48ab24ac8fb3095fe46",
 		.szSignatureData = ",f6b70,DEFAULT_WINX64_STAGE1,53e38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,0100038053000100240001800800038014000180760101000500000022000180"
+	},
+	{
+		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-09-07 (Windows 10 x64) [10.0.14393.187]",
+		.szFileName = "win10x64_ntfs_20160907_14393.kmd",
+		.szSignatureInfo = "# ntfs.sys signed on 2016-09-07 (MJ_CREATE) [10.0.14393.187]",
+		.dwOffset1 = 0xf7000,
+		.dwOffset2 = 0x53000,
+		.szHash1 = "e6f94244f8ab0cb45a2509679a15ebbb933c936c23d0c600116124b4aebf67d5",
+		.szHash2 = "04d501dae7a097b649edc0bb68dc02036e31ece8c30ee48ab24ac8fb3095fe46",
+		.szSignatureData = ",f78e0,DEFAULT_WINX64_STAGE1,53e38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,0100038053000100240001800800038014000180760101000500000022000180"
 	}
 };
 

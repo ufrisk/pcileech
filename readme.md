@@ -129,3 +129,4 @@ v1.1
 
 latest
 * core: stability improvements and fixes.
+* signature: Windows 10 updated.
