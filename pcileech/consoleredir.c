@@ -81,7 +81,7 @@ VOID ActionConsoleRedirect(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In
 	pd->pInfoOS = (PUSERSHELL_BUFFER_IO)pd->pbDataOSConsoleBuffer;
 	// read initial buffer and check validity
 	Sleep(250);
-	result = DeviceReadMEM(pDeviceData, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000);
+	result = DeviceReadMEM(pDeviceData, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, 0);
 	if(pd->pInfoOS->qwMagic != USERSHELL_BUFFER_IO_MAGIC) {
 		printf("\nCONSOLE_REDIRECT: Error: Adress 0x%016llX does not contain a valid console buffer.\n", ConsoleBufferAddr_OutputStream);
 		return;
@@ -91,11 +91,11 @@ VOID ActionConsoleRedirect(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In
 	CreateThread(NULL, 0, ConsoleRedirect_ThreadConsoleOutput, pd, 0, NULL);
 	// buffer syncer
 	while(TRUE) {
-		result = DeviceReadMEM(pDeviceData, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000);
+		result = DeviceReadMEM(pDeviceData, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, 0);
 		if(!result || pd->pInfoOS->qwMagic != USERSHELL_BUFFER_IO_MAGIC) {
 			printf("\nCONSOLE_REDIRECT: Error: Adress 0x%016llX does not contain a valid console buffer.\n", ConsoleBufferAddr_OutputStream);
 			return;
 		}
-		DeviceWriteMEM(pDeviceData, ConsoleBufferAddr_InputStream, pd->pbDataISConsoleBuffer, 0x1000);
+		DeviceWriteMEM(pDeviceData, ConsoleBufferAddr_InputStream, pd->pbDataISConsoleBuffer, 0x1000, 0);
 	}
 }

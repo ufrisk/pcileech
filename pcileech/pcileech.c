@@ -129,7 +129,7 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 			strcpy_s(pCfg->szSignatureName, MAX_PATH, argv[i + 1]);
 		} else if(0 == strcmp(argv[i], "-kmd")) {
 			pCfg->qwKMD = strtoull(argv[i + 1], NULL, 16);
-			if(pCfg->qwKMD == 0) {
+			if(pCfg->qwKMD < 0x1000) {
 				strcpy_s(pCfg->szKMDName, MAX_PATH, argv[i + 1]);
 			}
 		} else if(2 == strlen(argv[i]) && '0' <= argv[i][1] && '9' >= argv[i][1]) { // -0..9 param

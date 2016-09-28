@@ -100,7 +100,7 @@ typedef struct tdFNOSX { // function pointers to OSX functions (used in main con
 	QWORD ReservedFutureUse[21];
 } FNOSX, *PFNOSX;
 
-#define KMDDATA_OPERATING_SYSTEM_OSX		0x03
+#define KMDDATA_OPERATING_SYSTEM_MACOS			0x04
 
 /*
 * KMD DATA struct. This struct must be contained in a 4096 byte section (page).
@@ -110,7 +110,7 @@ typedef struct tdFNOSX { // function pointers to OSX functions (used in main con
 */
 typedef struct tdKMDDATA {
 	QWORD MAGIC;					// [0x000] magic number 0x0ff11337711333377.
-	QWORD AddrKernelBase;			// [0x008] pre-filled by stage2, virtual address of KERNEL HEADER (WINDOWS/OSX).
+	QWORD AddrKernelBase;			// [0x008] pre-filled by stage2, virtual address of KERNEL HEADER (WINDOWS/MACOS).
 	QWORD AddrKallsymsLookupName;	// [0x010] pre-filled by stage2, virtual address of kallsyms_lookup_name (LINUX).
 	QWORD DMASizeBuffer;			// [0x018] size of DMA buffer.
 	QWORD DMAAddrPhysical;			// [0x020] physical address of DMA buffer.
@@ -151,7 +151,7 @@ typedef struct tdKMDDATA {
 #define KMD_CMD_READ_VA			6
 #define KMD_CMD_WRITE_VA		7
 
-#define VM_MIN_KERNEL_ADDRESS 0xFFFFFF8000000000UL
+#define VM_MIN_KERNEL_ADDRESS 0xFFFFFF8000000000ULL
 
 //-------------------------------------------------------------------------------
 // Kernel module functions below.
@@ -202,7 +202,7 @@ VOID stage3_c_EntryPoint(PKMDDATA pk)
 	QWORD i, idleCount = 0;
 	// 0: set up symbols and kmd data
 	pk->MAGIC = 0x0ff11337711333377;
-	pk->OperatingSystem = KMDDATA_OPERATING_SYSTEM_OSX;
+	pk->OperatingSystem = KMDDATA_OPERATING_SYSTEM_MACOS;
 	if(!LookupFunctionsDefaultOSX(pk->AddrKernelBase, (QWORD)&pk->fn)) {
 		pk->_status = 0xf0000001;
 		return;

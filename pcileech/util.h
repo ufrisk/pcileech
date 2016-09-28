@@ -112,14 +112,23 @@ QWORD Util_GetNumeric(_In_ LPSTR sz);
 VOID Util_CreateSignatureLinuxGeneric(_In_ DWORD paBase, _In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature);
 
 /*
-* "Create" a static signature for Apple OSX given the supplied parameters. The
+* "Create" a static signature for FreeBSD given the supplied parameters. The
+* function formats the paramerters and put them into the supplied pSignature.
+* -- paStrTab = physical address of the strtab found.
+* -- paFnHijack = physical address of the function to hijack.
+* -- pSignature = ptr to signature struct to place the result in.
+*/
+VOID Util_CreateSignatureFreeBSDGeneric(_In_ DWORD paStrTab, _In_ DWORD paFnHijack, _Out_ PSIGNATURE pSignature);
+
+/*
+* "Create" a static signature for MacOS given the supplied parameters. The
 * function formats the paramerters and put them into the supplied pSignature.
 * -- paKernelBase = memory physical address of kernel macho-o header.
 * -- paFunctionHook = memory physical address of the hook function.
 * -- paStage2 = memory physical address where to place the stage2 shellcode.
 * -- pSignature = ptr to signature struct to place the result in.
 */
-VOID Util_CreateSignatureAppleGeneric(_In_ DWORD paKernelBase, _In_ DWORD paFunctionHook, _In_ DWORD paStage2, _Out_ PSIGNATURE pSignature);
+VOID Util_CreateSignatureMacOSGeneric(_In_ DWORD paKernelBase, _In_ DWORD paFunctionHook, _In_ DWORD paStage2, _Out_ PSIGNATURE pSignature);
 
 
 /*

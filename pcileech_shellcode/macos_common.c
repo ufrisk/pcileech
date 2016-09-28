@@ -1,11 +1,11 @@
-// ax64_common.c : support functions used by OS X KMDs started by stage3 EXEC.
-// Compatible with OS X.
+// macos_common.c : support functions used by macOS KMDs started by stage3 EXEC.
+// Compatible with macOS.
 //
 // (c) Ulf Frisk, 2016
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 
-#include "ax64_common.h"
+#include "macos_common.h"
 
 //-------------------------------------------------------------------------------
 // EFI related defines below.

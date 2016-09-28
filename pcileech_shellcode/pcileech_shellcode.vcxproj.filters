@@ -33,17 +33,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ax64_common.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="lx64_common.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="wx64_common.c">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ax64_unlock.c">
-      <Filter>Source Files\unlock</Filter>
     </ClCompile>
     <ClCompile Include="wx64_unlock.c">
       <Filter>Source Files\unlock</Filter>
@@ -51,20 +45,8 @@
     <ClCompile Include="wx64_pagesignature.c">
       <Filter>Source Files\page</Filter>
     </ClCompile>
-    <ClCompile Include="ax64_stage3_c.c">
-      <Filter>Source Files\kmd_core</Filter>
-    </ClCompile>
     <ClCompile Include="lx64_stage3_c.c">
       <Filter>Source Files\kmd_core</Filter>
-    </ClCompile>
-    <ClCompile Include="wx64_stage3_c.c">
-      <Filter>Source Files\kmd_core</Filter>
-    </ClCompile>
-    <ClCompile Include="ax64_filepull.c">
-      <Filter>Source Files\file</Filter>
-    </ClCompile>
-    <ClCompile Include="ax64_filepush.c">
-      <Filter>Source Files\file</Filter>
     </ClCompile>
     <ClCompile Include="lx64_filedelete.c">
       <Filter>Source Files\file</Filter>
@@ -102,11 +84,35 @@
     <ClCompile Include="wx64_driverload_svc.c">
       <Filter>Source Files\driver</Filter>
     </ClCompile>
+    <ClCompile Include="macos_common.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="macos_unlock.c">
+      <Filter>Source Files\unlock</Filter>
+    </ClCompile>
+    <ClCompile Include="macos_filepull.c">
+      <Filter>Source Files\file</Filter>
+    </ClCompile>
+    <ClCompile Include="macos_filepush.c">
+      <Filter>Source Files\file</Filter>
+    </ClCompile>
+    <ClCompile Include="macos_stage3_c.c">
+      <Filter>Source Files\kmd_core</Filter>
+    </ClCompile>
+    <ClCompile Include="fbsdx64_stage3_c.c">
+      <Filter>Source Files\kmd_core</Filter>
+    </ClCompile>
+    <ClCompile Include="fbsdx64_filepull.c">
+      <Filter>Source Files\file</Filter>
+    </ClCompile>
+    <ClCompile Include="fbsdx64_common.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="wx64_stage3_c.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="ax64_common_a.asm">
-      <Filter>Source Files</Filter>
-    </None>
     <None Include="lx64_common_a.asm">
       <Filter>Source Files</Filter>
     </None>
@@ -115,12 +121,6 @@
     </None>
     <None Include="wx64_pageinfo.asm">
       <Filter>Source Files\page</Filter>
-    </None>
-    <None Include="ax64_stage2.asm">
-      <Filter>Source Files\kmd_core</Filter>
-    </None>
-    <None Include="ax64_stage3.asm">
-      <Filter>Source Files\kmd_core</Filter>
     </None>
     <None Include="lx64_stage2.asm">
       <Filter>Source Files\kmd_core</Filter>
@@ -152,26 +152,53 @@
     <None Include="wx64_stage2_hal.asm">
       <Filter>Source Files\kmd_core</Filter>
     </None>
+    <None Include="macos_common_a.asm">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="macos_stage2.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="macos_stage3.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="fbsdx64_stage2.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="fbsdx64_stage3.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
+    <None Include="fbsdx64_common_a.asm">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ax64_common.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="lx64_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="wx64_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="macos_common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="statuscodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fbsdx64_common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="ax64_info.txt">
-      <Filter>Source Files\kmd_core</Filter>
-    </Text>
     <Text Include="lx64_info.txt">
       <Filter>Source Files\kmd_core</Filter>
     </Text>
     <Text Include="wx64_info.txt">
+      <Filter>Source Files\kmd_core</Filter>
+    </Text>
+    <Text Include="macos_info.txt">
+      <Filter>Source Files\kmd_core</Filter>
+    </Text>
+    <Text Include="fbsdx64_info.txt">
       <Filter>Source Files\kmd_core</Filter>
     </Text>
   </ItemGroup>

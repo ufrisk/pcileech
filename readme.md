@@ -2,7 +2,7 @@ PCILeech Summary:
 =================
 The PCILeech use the USB3380 chip in order to read from and write to the memory of a target system. This is achieved by using DMA over PCI Express. No drivers are needed on the target system. The USB3380 is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel. Reading 8GB of memory from the target system take around one (1) minute. The PCILeech hardware is connected with USB3 to a controlling computer running the PCILeech program.
 PCILeech is also capable of inserting a wide range of kernel modules into the targeted kernels - allowing for pulling and pushing files, remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells.
-The software is written in visual studio and runs on Windows 7/Windows 10. Supported target systems are currently the x64 versions of: Linux, OS X and Windows.
+The software is written in visual studio and runs on Windows 7/Windows 10. Supported target systems are currently the x64 versions of: Linux, FreeBSD, macOS and Windows.
 
 Hardware:
 =========
@@ -49,7 +49,7 @@ The Google Android USB driver also needs to be installed. Download the Google An
 
 Generating Signatures:
 ======================
-PCILeech comes with built in signatures for Linux and OS X. For Windows 8.1 and higher two full pages of driver code is needed to hijack the kernel. In order to avoid copyright issues the end user has to generate these signatures by themselves using the pcileech_gensig.exe program. The user needs to point to a valid ntfs.sys file in order to generate a signature. Alternatively it is possible to use the unstable/experimental win10_x64 generic built-in signature.
+PCILeech comes with built in signatures for Linux, FreeBSD and macOS. For Windows 8.1 and higher two full pages of driver code is needed to hijack the kernel. In order to avoid copyright issues the end user has to generate these signatures by themselves using the pcileech_gensig.exe program. The user needs to point to a valid ntfs.sys file in order to generate a signature. Alternatively it is possible to use the unstable/experimental win10_x64 generic built-in signature.
 
 Capabilities:
 =============
@@ -62,14 +62,14 @@ Users should be able to extend PCILeech easily by writing own kernel shellcode m
 * Spawn system shell [Windows].
 * Spawn any executable [Windows].
 * Load unsigned drivers [Windows].
-* Pull files [Linux, Windows, OS X].
-* Push files [Linux, Windows, OS X].
-* Patch / Unlock (remove password requirement) [Windows, OS X].
+* Pull files [Linux, FreeBSD, Windows, macOS].
+* Push files [Linux, Windows, macOS].
+* Patch / Unlock (remove password requirement) [Windows, macOS].
 
 Limitations/Known Issues:
 =========================
 * Read and write errors on some older hardware. Try "pcileech.exe testmemreadwrite -min 0x1000" in order to test memory reads and writes against the physical address 0x1000 (or any other address) in order to confirm.
-* Does not work if the OS uses the IOMMU/VT-d. This is the default on OS X (unless disabled in recovery mode). Windows 10 Enterprise with Virtuallization based security features enabled does not work fully - this is however not the default setting in Windows 10.
+* Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10 Enterprise with Virtuallization based security features enabled does not work fully - this is however not the default setting in Windows 10.
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * Linux might also not work if some virtualization based features are enabled.
 * Windows Vista: some shellcode modules such as wx64_pscmd does not work.
@@ -77,11 +77,11 @@ Limitations/Known Issues:
 
 Examples:
 =========
-Load OS X kernel module:
-* ` pcileech.exe kmdload -kmd osx_x64 `
+Load macOS kernel module:
+* ` pcileech.exe kmdload -kmd macos `
 
-Remove OS X password requirement, requires that the KMD is loaded at an address. In this example 0x11abc000 is used.
-* ` pcileech.exe ax64_unlock -kmd 0x11abc000 -0 1 `
+Remove macOS password requirement, requires that the KMD is loaded at an address. In this example 0x11abc000 is used.
+* ` pcileech.exe macos_unlock -kmd 0x11abc000 -0 1 `
 
 Retrieve the file /etc/shadow from a Linux system without pre-loading a KMD.
 * ` pcileech.exe lx64_filepull -kmd LINUX_X64 -s /etc/shadow -out c:\temp\shadow `
@@ -127,6 +127,9 @@ v1.1
 * other: firmware flash support without PLX SDK.
 * other: various bug fixes.
 
-latest
-* core: stability improvements and fixes.
+v1.2
+* core: FreeBSD support.
+* implant: pull file from FreeBSD [fbsdx64_filepull]
 * signature: Windows 10 updated.
+* signature: macOS Sierra added.
+* other: various bug fixes and stability improvements.

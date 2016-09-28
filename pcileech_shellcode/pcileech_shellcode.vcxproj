@@ -48,16 +48,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ax64_common.c" />
-    <ClCompile Include="ax64_filepull.c" />
-    <ClCompile Include="ax64_filepush.c" />
-    <ClCompile Include="ax64_stage3_c.c" />
-    <ClCompile Include="ax64_unlock.c" />
+    <ClCompile Include="fbsdx64_common.c" />
+    <ClCompile Include="fbsdx64_filepull.c" />
+    <ClCompile Include="fbsdx64_stage3_c.c" />
     <ClCompile Include="lx64_common.c" />
     <ClCompile Include="lx64_filedelete.c" />
     <ClCompile Include="lx64_filepull.c" />
     <ClCompile Include="lx64_filepush.c" />
     <ClCompile Include="lx64_stage3_c.c" />
+    <ClCompile Include="macos_common.c" />
+    <ClCompile Include="macos_filepull.c" />
+    <ClCompile Include="macos_filepush.c" />
+    <ClCompile Include="macos_stage3_c.c" />
+    <ClCompile Include="macos_unlock.c" />
     <ClCompile Include="wx64_common.c" />
     <ClCompile Include="wx64_driverinfo.c" />
     <ClCompile Include="wx64_driverload_svc.c" />
@@ -73,13 +76,16 @@
     <ClCompile Include="wx64_unlock.c" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="ax64_common_a.asm" />
-    <None Include="ax64_stage2.asm" />
-    <None Include="ax64_stage3.asm" />
+    <None Include="fbsdx64_common_a.asm" />
+    <None Include="fbsdx64_stage2.asm" />
+    <None Include="fbsdx64_stage3.asm" />
     <None Include="lx64_common_a.asm" />
     <None Include="lx64_stage2.asm" />
     <None Include="lx64_stage3.asm" />
     <None Include="lx64_stage3_pre.asm" />
+    <None Include="macos_common_a.asm" />
+    <None Include="macos_stage2.asm" />
+    <None Include="macos_stage3.asm" />
     <None Include="wx64_common_a.asm" />
     <None Include="wx64_exec_user.asm" />
     <None Include="wx64_pageinfo.asm" />
@@ -91,13 +97,16 @@
     <None Include="wx64_stage3_pre.asm" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ax64_common.h" />
+    <ClInclude Include="fbsdx64_common.h" />
     <ClInclude Include="lx64_common.h" />
+    <ClInclude Include="macos_common.h" />
+    <ClInclude Include="statuscodes.h" />
     <ClInclude Include="wx64_common.h" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="ax64_info.txt" />
+    <Text Include="fbsdx64_info.txt" />
     <Text Include="lx64_info.txt" />
+    <Text Include="macos_info.txt" />
     <Text Include="wx64_info.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

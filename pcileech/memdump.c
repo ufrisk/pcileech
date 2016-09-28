@@ -59,7 +59,7 @@ VOID ActionMemoryDump(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		return;
 	}
 	pFileBuffer->hFile = CreateFileA(pCfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
-	if(!pFileBuffer->hFile) {
+	if(!pFileBuffer->hFile || pFileBuffer->hFile == INVALID_HANDLE_VALUE) {
 		printf("Memory Dump: Failed. Error writing to file.\n");
 		return;
 	}
@@ -119,9 +119,9 @@ VOID ActionMemoryPageDisplay(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	QWORD qwAddr = pCfg->qwAddrMin & 0x0fffffffffffff000;
 	BOOL result;
 	printf("Memory Page Read: Page contents for address: 0x%016llX\n", qwAddr);
-	result = DeviceReadMEM(pDeviceData, qwAddr, pb, 4096);
+	result = DeviceReadMEM(pDeviceData, qwAddr, pb, 4096, 0);
 	if(!result) {
-		result = DeviceReadMEM(pDeviceData, qwAddr, pb, 4096);
+		result = DeviceReadMEM(pDeviceData, qwAddr, pb, 4096, 0);
 	}
 	if(!result) {
 		printf("Memory Page Read: Failed.\n");
@@ -141,12 +141,12 @@ VOID ActionMemoryTestReadWrite(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		printf("Memory Test Read: Failed. Memory test may not run in KMD mode.\n");
 		return;
 	}
-	DeviceReadDMA(pDeviceData, dwAddrPci32, pb1, 4096);
+	DeviceReadDMA(pDeviceData, dwAddrPci32, pb1, 4096, 0);
 	// READ DMA
 	printf("Memory Test Read: starting, reading %i times from address: 0x%08x\n", dwRuns, dwAddrPci32);
-	DeviceReadDMA(pDeviceData, dwAddrPci32, pb1, 4096);
+	DeviceReadDMA(pDeviceData, dwAddrPci32, pb1, 4096, 0);
 	for(i = 0; i < dwRuns; i++) {
-		r1 = DeviceReadDMA(pDeviceData, dwAddrPci32, pb2, 4096);
+		r1 = DeviceReadDMA(pDeviceData, dwAddrPci32, pb2, 4096, 0);
 		if(!r1 || (dwOffset = Util_memcmpEx(pb1, pb2, 4096))) {
 			printf("Memory Test Read: Failed. DMA failed / data changed by target computer / memory corruption. Read: %i. Run: %i. Offset: 0x%03x\n", r1, i, (r1 ? --dwOffset : 0));
 			return;
@@ -159,15 +159,15 @@ VOID ActionMemoryTestReadWrite(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		printf("Memory Test Write: starting, reading/writing %i times from address: 0x%08x\n", dwRuns, dwAddrPci32);
 		for(i = 0; i < dwRuns; i++) {
 			Util_GenRandom(pb3, 4096);
-			r1 = DeviceWriteDMA(pDeviceData, dwAddrPci32, pb3, 4096);
-			r2 = DeviceReadDMA(pDeviceData, dwAddrPci32, pb2, 4096);
+			r1 = DeviceWriteDMA(pDeviceData, dwAddrPci32, pb3, 4096, 0);
+			r2 = DeviceReadDMA(pDeviceData, dwAddrPci32, pb2, 4096, 0);
 			if(!r1 || !r2 || (dwOffset = Util_memcmpEx(pb2, pb3, 4096))) {
-				DeviceWriteDMA(pDeviceData, dwAddrPci32, pb1, 4096);
+				DeviceWriteDMA(pDeviceData, dwAddrPci32, pb1, 4096, 0);
 				printf("Memory Test Write: Failed. DMA failed / data changed by target computer / memory corruption. Write: %i. Read: %i. Run: %i. Offset: 0x%03x\n", r1, r2, i, --dwOffset);
 				return;
 			}
 		}
-		DeviceWriteDMA(pDeviceData, dwAddrPci32, pb1, 4096);
+		DeviceWriteDMA(pDeviceData, dwAddrPci32, pb1, 4096, 0);
 		printf("Memory Test Write: Success!\n");
 	}
 }
@@ -183,7 +183,7 @@ VOID ActionMemoryWrite(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		printf("Memory Write: Failed. Data too large: >16MB.\n");
 		return;
 	}
-	result = DeviceWriteMEM(pDeviceData, pCfg->qwAddrMin, pCfg->pbIn, (DWORD)pCfg->cbIn);
+	result = DeviceWriteMEM(pDeviceData, pCfg->qwAddrMin, pCfg->pbIn, (DWORD)pCfg->cbIn, 0);
 	if(!result) {
 		printf("Memory Write: Failed. Write failed (partial memory may be written).\n");
 		return;

