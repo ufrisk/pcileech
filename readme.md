@@ -133,3 +133,6 @@ v1.2
 * signature: Windows 10 updated.
 * signature: macOS Sierra added.
 * other: various bug fixes and stability improvements.
+
+latest
+* new implant: spawn cmd in user context [wx64_pscmd_user]

