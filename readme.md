@@ -72,6 +72,7 @@ Limitations/Known Issues:
 * Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10 Enterprise with Virtuallization based security features enabled does not work fully - this is however not the default setting in Windows 10.
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * Linux might also not work if some virtualization based features are enabled.
+* Linux based on the 4.8 kernel does not work (Ubuntu 16.10).
 * Windows Vista: some shellcode modules such as wx64_pscmd does not work.
 * Windows 7: signatures are not published.
 
