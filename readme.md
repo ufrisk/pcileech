@@ -137,3 +137,4 @@ v1.2
 
 latest
 * new implant: spawn cmd in user context [wx64_pscmd_user]
+* implant: stability improvements for Win8+ [wx64_pscreate, wx64_pscmd, wx64_pscmd_user]

@@ -110,3 +110,9 @@ DWORD PEGetImageSize(_In_ QWORD hModule)
 	if(!ntHeader || ntHeader->Signature != IMAGE_NT_SIGNATURE) { return 0; }
 	return ntHeader->OptionalHeader.SizeOfImage;
 }
+
+VOID CommonSleep(_In_ PKERNEL_FUNCTIONS fnk, _In_ DWORD ms)
+{
+	LONGLONG llTimeToWait = -10000LL * ms;
+	fnk->KeDelayExecutionThread(KernelMode, FALSE, &llTimeToWait);
+}

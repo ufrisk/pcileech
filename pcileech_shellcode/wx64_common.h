@@ -325,6 +325,7 @@ typedef struct tdKERNEL_FUNCTIONS {
 #define H_RtlAnsiStringToUnicodeString			0xeb6c8389
 #define H_RtlCompareMemory						0x770dcef6
 #define H_RtlCopyMemory							0xcf64979b
+#define H_RtlCreateUserThread					0x442f2041
 #define H_RtlFreeUnicodeString					0xa8b2c02a
 #define H_RtlInitAnsiString						0x7cc3283d
 #define H_RtlInitUnicodeString					0x3035d02a
@@ -350,6 +351,7 @@ QWORD PEGetProcAddressH(_In_ QWORD hModule, _In_ DWORD dwProcNameH);
 QWORD KernelGetModuleBase(_In_ PKERNEL_FUNCTIONS fnk, _In_ LPSTR szModuleName);
 VOID InitializeKernelFunctions(_In_ QWORD qwNtosBase, _Out_ PKERNEL_FUNCTIONS fnk);
 DWORD PEGetImageSize(_In_ QWORD hModule);
+VOID CommonSleep(_In_ PKERNEL_FUNCTIONS fnk, _In_ DWORD ms);
 extern QWORD GetCR3();
 
 #endif /* __WX64_COMMON_H__ */
