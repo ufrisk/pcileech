@@ -16,10 +16,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "pcileech_flash", "pcileech_flash", "{C8566802-6336-4B4B-A3F8-B08452CEBDAE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "linux", "linux", "{4F8780C7-8ECD-4A8F-9412-426EE8C9E9C9}"
 	ProjectSection(SolutionItems) = preProject
-		pcileech_flash\Makefile = pcileech_flash\Makefile
-		pcileech_flash\pcileech_flash.c = pcileech_flash\pcileech_flash.c
-		pcileech_flash\readme_flash.txt = pcileech_flash\readme_flash.txt
+		pcileech_flash\linux\Makefile = pcileech_flash\linux\Makefile
+		pcileech_flash\linux\pcileech_flash.c = pcileech_flash\linux\pcileech_flash.c
+		pcileech_flash\linux\readme_flash.txt = pcileech_flash\linux\readme_flash.txt
 	EndProjectSection
 EndProject
 Global
@@ -41,5 +43,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{4F8780C7-8ECD-4A8F-9412-426EE8C9E9C9} = {C8566802-6336-4B4B-A3F8-B08452CEBDAE}
 	EndGlobalSection
 EndGlobal
