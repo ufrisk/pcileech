@@ -25,7 +25,7 @@ VOID MemoryDump_FileWriteAsync_Thread(PFILE_WRITE_ASYNC_BUFFER pfb)
 VOID MemoryDump_SetOutFileName(_Inout_ PCONFIG pCfg)
 {
 	SYSTEMTIME st;
-	if(pCfg->szFileOut[0] == 0) {
+	if(pCfg->fDumpFile && pCfg->szFileOut[0] == 0) {
 		GetLocalTime(&st);
 		_snprintf_s(
 			pCfg->szFileOut,
@@ -51,19 +51,32 @@ VOID ActionMemoryDump(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	PAGE_STATISTICS pageStat;
 	PFILE_WRITE_ASYNC_BUFFER pFileBuffer;
 	// 1: Initialize
-	MemoryDump_SetOutFileName(pCfg);
-	pFileBuffer = LocalAlloc(LMEM_ZEROINIT, sizeof(FILE_WRITE_ASYNC_BUFFER));
 	pbMemoryDump = LocalAlloc(0, 0x01000000); // 16MB Data Buffer
-	if(!pbMemoryDump || !pFileBuffer) {
+	if(!pbMemoryDump) {
 		printf("Memory Dump: Failed. Failed to allocate memory buffers.\n");
 		return;
 	}
-	pFileBuffer->hFile = CreateFileA(pCfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
-	if(!pFileBuffer->hFile || pFileBuffer->hFile == INVALID_HANDLE_VALUE) {
-		printf("Memory Dump: Failed. Error writing to file.\n");
-		return;
+
+	if (pCfg->fDumpFile != FALSE)
+	{
+		MemoryDump_SetOutFileName(pCfg);
+		pFileBuffer = LocalAlloc(LMEM_ZEROINIT, sizeof(FILE_WRITE_ASYNC_BUFFER));
+		if (!pFileBuffer) {
+			printf("Memory Dump: Failed. Failed to allocate memory buffers.\n");
+			return;
+		}
+		pFileBuffer->hFile = CreateFileA(pCfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+		if(!pFileBuffer->hFile || pFileBuffer->hFile == INVALID_HANDLE_VALUE) {
+			printf("Memory Dump: Failed. Error writing to file.\n");
+			return;
+		}
+		pFileBuffer->isSuccess = TRUE;
 	}
-	pFileBuffer->isSuccess = TRUE;
+	else
+	{
+		pFileBuffer = NULL;
+	}
+
 	memset(&pageStat, 0, sizeof(PAGE_STATISTICS));
 	pageStat.cPageTotal = (DWORD)((pCfg->qwAddrMax - pCfg->qwAddrMin + 1) / 4096);
 	pageStat.isAccessModeKMD = pDeviceData->KMDHandle ? TRUE : FALSE;
@@ -76,22 +89,26 @@ VOID ActionMemoryDump(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	while(qwCurrentAddress < pCfg->qwAddrMax) {
 		result = Util_Read16M(pCfg, pDeviceData, pbMemoryDump, qwCurrentAddress, &pageStat);
 		ShowUpdatePageRead(pCfg, qwCurrentAddress, &pageStat);
-		if(!result) {
+		if(!pCfg->fForceRW && !result) {
 			printf("Memory Dump: Failed. Cannot dump any sequential data in 16MB - terminating.\n");
 			goto cleanup;
 		}
-		// write file async
-		if(!pFileBuffer->isSuccess) {
-			printf("Memory Dump: Failed. Failed to write to dump file - terminating.\n");
-			goto cleanup;
+
+		if (pFileBuffer != NULL)
+		{
+			// write file async
+			if(!pFileBuffer->isSuccess) {
+				printf("Memory Dump: Failed. Failed to write to dump file - terminating.\n");
+				goto cleanup;
+			}
+			while(pFileBuffer->isExecuting) {
+				SwitchToThread();
+			}
+			pFileBuffer->cb = (DWORD)min(0x01000000, pCfg->qwAddrMax - qwCurrentAddress);
+			memcpy(pFileBuffer->pb, pbMemoryDump, 0x01000000);
+			pFileBuffer->isExecuting = TRUE;
+			CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)MemoryDump_FileWriteAsync_Thread, pFileBuffer, 0, NULL);
 		}
-		while(pFileBuffer->isExecuting) {
-			Sleep(0);
-		}
-		pFileBuffer->cb = (DWORD)min(0x01000000, pCfg->qwAddrMax - qwCurrentAddress);
-		memcpy(pFileBuffer->pb, pbMemoryDump, 0x01000000);
-		pFileBuffer->isExecuting = TRUE;
-		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)MemoryDump_FileWriteAsync_Thread, pFileBuffer, 0, NULL);
 		// add to address
 		qwCurrentAddress += 0x01000000;
 	}
@@ -103,7 +120,7 @@ cleanup:
 	if(pFileBuffer) {
 		if(pFileBuffer->hFile) { 
 			while(pFileBuffer->isExecuting) {
-				Sleep(0);
+				SwitchToThread();
 			}
 			CloseHandle(pFileBuffer->hFile);
 		}

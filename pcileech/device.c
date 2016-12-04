@@ -305,7 +305,7 @@ BOOL DeviceRetrievePath(_Out_bytecap_(BufLen) LPWSTR wszDevicePath, _In_ ULONG B
 VOID DeviceOpen_SetPipePolicy(_In_ PDEVICE_DATA pDeviceData)
 {
 	BOOL boolTRUE = TRUE;
-	ULONG ulTIMEOUT = 100; // ms
+	ULONG ulTIMEOUT = 500; // ms
 	WinUsb_SetPipePolicy(pDeviceData->WinusbHandle, pDeviceData->PipeDmaOut, AUTO_CLEAR_STALL, (ULONG)sizeof(BOOL), &boolTRUE);
 	WinUsb_SetPipePolicy(pDeviceData->WinusbHandle, pDeviceData->PipeDmaOut, PIPE_TRANSFER_TIMEOUT, (ULONG)sizeof(BOOL), &ulTIMEOUT);
 	WinUsb_SetPipePolicy(pDeviceData->WinusbHandle, pDeviceData->PipeDmaIn1, AUTO_CLEAR_STALL, (ULONG)sizeof(BOOL), &boolTRUE);
