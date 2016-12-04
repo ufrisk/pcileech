@@ -150,7 +150,9 @@ int main(_In_ int argc, _In_ char* argv[])
 			"Installation failed. Could not teporarily insert signer certificate  \n" \
 			"into machine root store. Please reboot and try again, or use Linux   \n" \
 			"flash module.                                                        \n" \
-			"ERROR - Exiting ...                                                  \n");
+			"ERROR - Exiting ...                                                  \n" \
+			"Please press enter to exit.                                          \n");
+		getchar();
 		return 0;
 	}
 	status = DiInstallDriverA(NULL, CONFIG_PATH_INF, 0, FALSE);
@@ -158,7 +160,8 @@ int main(_In_ int argc, _In_ char* argv[])
 		printf(
 			"Installation failed. Could not install the flash driver due to an un-\n" \
 			"known reason. Please reboot and try again, or use Linux flash module.\n" \
-			"ERROR - Exiting ...                                                  \n");
+			"ERROR - Exiting ...                                                  \n" \
+			"Please press enter to exit.                                          \n");
 		goto cleanup;
 	}
 	printf(
@@ -166,10 +169,10 @@ int main(_In_ int argc, _In_ char* argv[])
 		"Driver hopefully installed. Please insert the hardware that should be\n" \
 		"flashed into a PCILeech device. Supported hardware is the USB3380-EVB\n" \
 		"mini PCIe board and the PP3380 PCIe board.  If flashing is successful\n" \
-		"on the USB3380-EVB mini-PCIe board a LED will light up. No indication\n" \
-		"will be given on the PP3380 board. Please insert the PCIe side of the\n" \
-		"hardware into this computer.  The USB side should not be connected at\n" \
-		"this stage.                                                          \n" \
+		"on the USB3380-EVB mini-PCIe board a BLUE LED will light up brightly.\n" \
+		"No indication will be given on the PP3380 board. Insert the PCIe side\n" \
+		"of the hardware into this computer. The USB side should not be       \n" \
+		"connected at this stage.                                             \n" \
 		"                                                                     \n" \
 		"NB! If flashing the PP3380 PCIe card the J3 jumper must be bridged to\n" \
 		"connect the EEPROM.  This is not necessary for the USB3380-EVB board.\n" \
@@ -178,8 +181,8 @@ int main(_In_ int argc, _In_ char* argv[])
 		"the flashed changes to take effect.                                  \n" \
 		"                                                                     \n" \
 		"After flashing is completed please press enter to exit.              \n");
-	getchar();
 	cleanup:
+	getchar();
 	status = DeleteCertificate(pCertSigner);
 	CertFreeCertificateContext(pCertSigner);
 	status = RegistrySetDisableDriver(TRUE);
