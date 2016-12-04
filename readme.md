@@ -26,24 +26,19 @@ Please note that other adapters may also work.
 
 Flashing Hardware:
 ===============================
-In order to turn the USB3380 development board into a PCILeech device it needs to be flashed. Flashing must be done in Linux as root. Download the source code for the flash kernel module to build. The files are found in the pcileech_flash/linux folder and are named: pcileech_flash.c and Makefile. The card must be connected to the Linux system doing the flashing via PCIe.
+In order to turn the USB3380 development board into a PCILeech device it must be flashed. Flashing may be done in Windows 10 (as administrator) or in Linux (as root). The board must be connected to the system via PCIe when performing the initial flash.
 
-NB! If flashing the PP3380 PCIe card the J3 jumper must be bridged to connect the EEPROM. This is not necessary for the USB3380-EVB mini-PCIe card.
+To flash in Windows 10 unzip all contents of the ` flash.zip ` archive found in ` pcileech_files `. Run ` PCILeechFlash_Installer.exe `and follow the instructions.
 
-* ` cd /pathtofiles `
-* ` make `
-* [ insert USB3380 hardware into computer ]
-* ` insmod pcileech_flash.ko `
+Flashing in 32-bit Windows or in Windows 7 is not supported.
 
-The insmod command must be run as root. If compilation fails you might have to install dependencies before you try again. On debian based systems - such as debian, ubuntu and kali, run ` apt-get update && apt-get install gcc make linux-headers-$(uname -r) ` and try again.
-
-If module insertion is successful flashing is also successful. If flashing the USB3380-EVB the blue LED will be lit upon success. In order to activate the flashed PCILeech device it must be power-cycled. Re-inserting it in the computer will achieve this. If one wish to flash more devices then unload the pcileech_flash kernel module by issuing the command: ` rmmod pcileech_flash `. If there is an error flashing is unsuccessful. Please try again and check any debug error messages by issing the command: ` dmsg `.
+If flashing fails or if Linux is preferred please see [pcileech_flash/linux](pcileech_flash/linux) for instructions.
 
 Installing PCILeech:
 ====================
 Please ensure you do have the most recent version of PCILeech by visiting the PCILeech github repository at: https://github.com/ufrisk/pcileech
 
-Clone the PCILeech Github repository. The binaries are found in pcileech_files and should work on Windows 7 and Windows 10 64-bit versions. Please copy all files from pcileech_files since some files contains additional modules and signatures. 
+Clone the PCILeech Github repository. The binaries are found in pcileech_files and should work on Windows 7 and Windows 10 64-bit versions. Please copy all files from pcileech_files since some files contains additional modules and signatures.
 
 The Google Android USB driver also needs to be installed. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver. Open Device Manager. Right click on the computer, choose add legacy hardware. Select install the hardware manually. Click Have Disk. Navigate to the Android Driver, select android_winusb.inf and install. The PCILeech lies about being a Google Glass so that the Android USB driver may be used to access the PCILeech hardware from Windows.
 
@@ -139,3 +134,4 @@ latest
 * new implant: spawn cmd in user context [wx64_pscmd_user]
 * implant: stability improvements for Win8+ [wx64_pscreate, wx64_pscmd, wx64_pscmd_user]
 * other: firmware flash improvements.
+* other: firmware flash support in Windows.
