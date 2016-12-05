@@ -62,11 +62,19 @@ VOID Help_ShowGeneral()
 		"          note that the address must be given in hexadecimal format.           \n" \
 		"   -out : name of output file.                                                 \n" \
 		"          default: pcileech-<minaddr>-<maxaddr>-<date>-<time>.raw              \n" \
+		"          No output file will be created if parameter is set to none or null.  \n" \
 		"   -all : search all memory for signature - do not stop at first occurrence.   \n" \
 		"          Option has no value. Example: -all                                   \n" \
 		"   -force: force reads and writes even though target memory is marked as not   \n" \
 		"          accessible. Dangerous! Affects all modes and commands.               \n" \
 		"          Option has no value. Example: -force                                 \n" \
+		"   -usb2: force USB2 mode. USB2 will reduce transfer speed but may increase    \n" \
+		"          stability. PCILeech device must be power cycled to return to USB3.   \n" \
+		"          Affects all modes and commands.                                      \n" \
+		"          Option has no value. Example: -usb2                                  \n" \
+		"   -iosize: max DMA i/o size. Hardware DMA requests larger than iosize will    \n" \
+		"          be discarded. Affects all modes and commands.                        \n" \
+		"          default: 0x00800000 (8MB)                                            \n" \
 		"   -help: show help about the selected command or implant and then exit        \n" \
 		"          without running the command. Affects all modes and commands.         \n" \
 		"          Option has no value. Example: -help                                  \n" \
@@ -108,7 +116,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016 Ulf Frisk                                                   \n" \
-		" Version: 1.2                                                                  \n" \
+		" Version: 1.2-2                                                                  \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or later.                           \n" \

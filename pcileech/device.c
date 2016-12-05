@@ -16,6 +16,8 @@
 #define CSR_CONFIGSPACE_PCIE				0x00
 #define CSR_CONFIGSPACE_MEMM				0x10
 #define CSR_CONFIGSPACE_8051				0x20
+#define REG_USBSTAT							0x90
+#define REG_USBCTL2							0xc8
 #define REG_DMACTL_0						0x180
 #define REG_DMASTAT_0						0x184
 #define REG_DMACOUNT_0						0x190
@@ -117,6 +119,11 @@ BOOL _DeviceReadDMA_Retry(PTHREAD_DATA_READ_EP ptd)
 VOID _DeviceReadDMA(PTHREAD_DATA_READ_EP ptd)
 {
 	DWORD cbTransferred;
+	if(ptd->cb > ptd->pDeviceData->MaxSizeDmaIo) {
+		ptd->result = FALSE;
+		ptd->isFinished = TRUE;
+		return;
+	}
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rADDR, (DWORD)ptd->qwAddr, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_ADDRESS
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rCOUNT, 0x40000000 | ptd->cb, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_COUNT
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rSTAT, 0x080000c1, CSR_CONFIGSPACE_MEMM | CSR_BYTE0 | CSR_BYTE3); // DMA_START & DMA_CLEAR_ABORT
@@ -169,7 +176,7 @@ BOOL DeviceReadDMA(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE
 			}
 		}
 		while(!td[0].isFinished || !td[1].isFinished || !td[2].isFinished) {
-			Sleep(0);
+			SwitchToThread();
 		}
 		return td[0].result && td[1].result && td[2].result;
 	}
@@ -316,7 +323,7 @@ VOID DeviceOpen_SetPipePolicy(_In_ PDEVICE_DATA pDeviceData)
 	WinUsb_SetPipePolicy(pDeviceData->WinusbHandle, pDeviceData->PipeDmaIn3, PIPE_TRANSFER_TIMEOUT, (ULONG)sizeof(BOOL), &ulTIMEOUT);
 }
 
-BOOL DeviceOpen(_In_ PCONFIG pCfg, _Out_ PDEVICE_DATA pDeviceData)
+BOOL DeviceOpen_Open(_In_ PCONFIG pCfg, _Out_ PDEVICE_DATA pDeviceData)
 {
 	BOOL result;
 	pDeviceData->HandlesOpen = FALSE;
@@ -352,6 +359,7 @@ BOOL DeviceOpen(_In_ PCONFIG pCfg, _Out_ PDEVICE_DATA pDeviceData)
 	pDeviceData->HandlesOpen = TRUE;
 	pDeviceData->IsAllowedMultiThreadDMA = IsWindows8OrGreater(); // multi threaded DMA read fails on WIN7.
 	pDeviceData->IsAllowedAccessReservedAddress = pCfg->fForceRW;
+	pDeviceData->MaxSizeDmaIo = pCfg->qwMaxSizeDmaIo;
 	return TRUE;
 }
 
@@ -363,6 +371,29 @@ VOID DeviceClose(_Inout_ PDEVICE_DATA pDeviceData)
 	WinUsb_Free(pDeviceData->WinusbHandle);
 	CloseHandle(pDeviceData->DeviceHandle);
 	pDeviceData->HandlesOpen = FALSE;
+}
+
+BOOL DeviceOpen(_In_ PCONFIG pCfg, _Out_ PDEVICE_DATA pDeviceData)
+{
+	BOOL result;
+	DWORD dwReg;
+	result = DeviceOpen_Open(pCfg, pDeviceData);
+	if(!result) { return FALSE; }
+	DeviceReadCsr(pDeviceData, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
+	if(pCfg->fForceUsb2 && (dwReg & 0x0100 /* Super-Speed(USB3) */)) {
+		printf("Device Info: Device running at USB3 speed; downgrading to USB2 ...\n");
+		dwReg = 0x04; // USB2=ENABLE, USB3=DISABLE
+		DeviceWriteCsr(pDeviceData, REG_USBCTL2, dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTE0);
+		DeviceClose(pDeviceData);
+		Sleep(1000);
+		result = DeviceOpen_Open(pCfg, pDeviceData);
+		if(!result) { return FALSE; }
+		DeviceReadCsr(pDeviceData, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
+	}
+	if(dwReg & 0xc0 /* Full-Speed(USB1)|High-Speed(USB2) */) {
+		printf("Device Info: Device running at USB2 speed.\n");
+	}
+	return TRUE;
 }
 
 BOOL DeviceWriteMEM(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)

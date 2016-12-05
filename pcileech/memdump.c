@@ -25,7 +25,7 @@ VOID MemoryDump_FileWriteAsync_Thread(PFILE_WRITE_ASYNC_BUFFER pfb)
 VOID MemoryDump_SetOutFileName(_Inout_ PCONFIG pCfg)
 {
 	SYSTEMTIME st;
-	if(pCfg->fDumpFile && pCfg->szFileOut[0] == 0) {
+	if(pCfg->fOutFile && pCfg->szFileOut[0] == 0) {
 		GetLocalTime(&st);
 		_snprintf_s(
 			pCfg->szFileOut,
@@ -57,7 +57,7 @@ VOID ActionMemoryDump(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		return;
 	}
 
-	if (pCfg->fDumpFile != FALSE)
+	if (pCfg->fOutFile != FALSE)
 	{
 		MemoryDump_SetOutFileName(pCfg);
 		pFileBuffer = LocalAlloc(LMEM_ZEROINIT, sizeof(FILE_WRITE_ASYNC_BUFFER));

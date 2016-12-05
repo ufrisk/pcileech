@@ -199,8 +199,8 @@ BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevi
 		return Util_PageTable_FindSignatureBase_Search(pDeviceData, NULL, *pqwCR3, pPTEs, cPTEs, pqwSignatureBase);
 	}
 	// try CR3/PML4 hint at PA 0x1000 on windows 8.1/10.
-	result = 
-		Util_PageTable_WindowsHintPML4(pDeviceData, pqwCR3) && 
+	result =
+		Util_PageTable_WindowsHintPML4(pDeviceData, pqwCR3) &&
 		Util_PageTable_FindSignatureBase_Search(pDeviceData, NULL, *pqwCR3, pPTEs, cPTEs, pqwSignatureBase);
 	if(result) { return TRUE; }
 	// page table scan guessing common CR3 base addresses.
@@ -224,7 +224,7 @@ BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out
 	// 1: try load default
 	if(0 == memcmp("DEFAULT", sz, 7)) {
 		for(i = 0; i < (sizeof(SHELLCODE_DEFAULT) / sizeof(SHELLCODE_DEFAULT_STRUCT)); i++) {
-			if((0 == strcmp(SHELLCODE_DEFAULT[i].sz, sz)) && (SHELLCODE_DEFAULT[i].cb <= cb)) {					
+			if((0 == strcmp(SHELLCODE_DEFAULT[i].sz, sz)) && (SHELLCODE_DEFAULT[i].cb <= cb)) {
 				memcpy(pb, SHELLCODE_DEFAULT[i].pb, SHELLCODE_DEFAULT[i].cb);
 				*pcb = SHELLCODE_DEFAULT[i].cb;
 				return TRUE;
@@ -462,9 +462,8 @@ VOID Util_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE p
 	QWORD o, p;
 	// try read 1M in 128k chunks
 	for(o = 0; o < 0x00100000; o += 0x00020000) {
-		if ((pCfg->fUse128KReads) && ((qwBaseAddress + o + 0x00020000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer1M + o, 0x00020000, 0))) {
+		if((qwBaseAddress + o + 0x00020000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer1M + o, 0x00020000, 0)) {
 			pPageStat->cPageSuccess += 32;
-			pPageStat->c128KReads++;
 		} else {
 			// try read 128k in 4k (page) chunks
 			for(p = 0; p < 0x00020000; p += 0x1000) {
@@ -473,7 +472,6 @@ VOID Util_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE p
 				}
 				if(DeviceReadMEM(pDeviceData, qwBaseAddress + o + p, pbBuffer1M + o + p, 0x1000, 0)) {
 					pPageStat->cPageSuccess++;
-					pPageStat->c4KReads++;
 				} else {
 					pPageStat->cPageFail++;
 				}
@@ -487,38 +485,33 @@ BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE 
 	BOOL isSuccess[4] = { FALSE, FALSE, FALSE, FALSE };
 	QWORD i, o, qwOffset;
 	// try read 16M
-	if (pCfg->fUse16MbReads != FALSE) {
-		if((qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress, pbBuffer16M, 0x01000000, 0)) {
-			pPageStat->cPageSuccess += 4096;
-			pPageStat->c16MbReads++;
-			return TRUE;
-		}
+	if((qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress, pbBuffer16M, 0x01000000, 0)) {
+		pPageStat->cPageSuccess += 4096;
+		return TRUE;
 	}
-
 	// try read 16M in 4M chunks
 	memset(pbBuffer16M, 0, 0x01000000);
-
-	if (pCfg->fUse4MbReads != FALSE) {
-		for(i = 0; i < 4; i++) {
-			o = 0x00400000 * i;
-			isSuccess[i] = (qwBaseAddress + o + 0x00400000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer16M + o, 0x00400000, 0);
-		}
-		// DMA mode + all memory inside scope + and all 4M reads fail => fail
-		if(!pDeviceData->KMDHandle && qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax && !isSuccess[0] && !isSuccess[1] && !isSuccess[2] && !isSuccess[3]) {
-			pPageStat->cPageFail += 4096;
-			return FALSE;
-		}
+	for(i = 0; i < 4; i++) {
+		o = 0x00400000 * i;
+		isSuccess[i] = (qwBaseAddress + o + 0x00400000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer16M + o, 0x00400000, 0);
 	}
-
+	// DMA mode + all memory inside scope + and all 4M reads fail + no force flag => fail
+	if(!pCfg->fForceRW && !pDeviceData->KMDHandle && qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax && !isSuccess[0] && !isSuccess[1] && !isSuccess[2] && !isSuccess[3]) {
+		pPageStat->cPageFail += 4096;
+		return FALSE;
+	}
 	// try read failed 4M chunks in 1M chunks
 	for(i = 0; i < 4; i++) {
 		if(isSuccess[i]) {
 			pPageStat->cPageSuccess += 1024;
-			pPageStat->c4MbReads++;
 		} else {
 			qwOffset = 0x00400000 * i;
 			for(o = 0; o < 0x00400000; o += 0x00100000) {
 				Util_Read1M(pCfg, pDeviceData, pbBuffer16M + qwOffset + o, qwBaseAddress + qwOffset + o, pPageStat);
+				// update stats - failed reads take a long time in DMA mode - leaving the user in the dark if not updated.
+				if(pDeviceData->KMDHandle == NULL) {
+					ShowUpdatePageRead(pCfg, qwBaseAddress + qwOffset + o, pPageStat);
+				}
 			}
 		}
 	}

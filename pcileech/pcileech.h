@@ -29,6 +29,7 @@ typedef struct _DEVICE_DATA {
 	BOOL HandlesOpen;
 	BOOL IsAllowedMultiThreadDMA;
 	BOOL IsAllowedAccessReservedAddress;
+	QWORD MaxSizeDmaIo;
 	WINUSB_INTERFACE_HANDLE WinusbHandle;
 	HANDLE DeviceHandle;
 	WCHAR DevicePath[MAX_PATH];
@@ -91,15 +92,14 @@ typedef struct tdConfig {
 	CHAR szSignatureName[MAX_PATH];
 	CHAR szKMDName[MAX_PATH];
 	CHAR szShellcodeName[MAX_PATH];
+	QWORD qwMaxSizeDmaIo;
 	BOOL fPageStat;
 	BOOL fPageTableScan;
 	BOOL fPatchAll;
 	BOOL fForceRW;
 	BOOL fShowHelp;
-	BOOL fUse16MbReads;
-	BOOL fUse4MbReads;
-	BOOL fUse128KReads;
-	BOOL fDumpFile;
+	BOOL fOutFile;
+	BOOL fForceUsb2;
 } CONFIG, *PCONFIG;
 
 typedef struct tdPageStatistics {
@@ -107,10 +107,6 @@ typedef struct tdPageStatistics {
 	QWORD cPageSuccess;
 	QWORD cPageFail;
 	QWORD qwTickCountStart;
-	QWORD c4KReads;
-	QWORD c128KReads;
-	QWORD c4MbReads;
-	QWORD c16MbReads;
 	BOOL isAccessModeKMD;
 	LPSTR szCurrentAction;
 } PAGE_STATISTICS, *PPAGE_STATISTICS;

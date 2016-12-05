@@ -23,16 +23,15 @@ VOID ShowUpdatePageRead(_In_ PCONFIG pCfg, _In_ QWORD qwCurrentAddress, _Inout_ 
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 	if(pCfg->fPageStat) {
 		GetConsoleScreenBufferInfo(hConsole, &consoleInfo);
-		consoleInfo.dwCursorPosition.Y -= 8;
+		consoleInfo.dwCursorPosition.Y -= 7;
 		SetConsoleCursorPosition(hConsole, consoleInfo.dwCursorPosition);
 	}
-	pCfg->fPageStat = TRUE; 
+	pCfg->fPageStat = TRUE;
 	printf(
 		" Current Action: %s                                \n" \
 		" Access Mode:    %s                                \n" \
 		" Progress:       %i / %i (%i%%)                    \n" \
 		" Speed:          %i MB/s                           \n" \
-		" Reads:          %i 16MB | %i 4MB | %i 128K | %i 4K\n" \
 		" Address:        0x%016llX                         \n" \
 		" Pages read:     %i / %i (%i%%)                    \n" \
 		" Pages failed:   %i (%i%%)                         \n",
@@ -42,7 +41,6 @@ VOID ShowUpdatePageRead(_In_ PCONFIG pCfg, _In_ QWORD qwCurrentAddress, _Inout_ 
 		pPageStat->cPageTotal / 256,
 		qwPercentTotal,
 		qwSpeedMBs,
-		pPageStat->c16MbReads, pPageStat->c4MbReads, pPageStat->c128KReads, pPageStat->c4KReads,
 		qwCurrentAddress,
 		pPageStat->cPageSuccess,
 		pPageStat->cPageTotal,
@@ -80,10 +78,8 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 	// set defaults
 	pCfg->tpAction = NA;
 	pCfg->qwAddrMax = 0x0ffffffffffffffff;
-	pCfg->fUse16MbReads = TRUE;
-	pCfg->fUse4MbReads = TRUE;
-	pCfg->fUse128KReads = TRUE;
-	pCfg->fDumpFile = TRUE;
+	pCfg->fOutFile = TRUE;
+	pCfg->qwMaxSizeDmaIo = 0x00800000;
 	// fetch command line actions/options
 	loop:
 	while(i < argc) {
@@ -117,20 +113,8 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 			pCfg->fShowHelp = TRUE;
 			i++;
 			continue;
-		} else if(0 == strcmp(argv[i], "-no16M")) {
-			pCfg->fUse16MbReads = FALSE;
-			i++;
-			continue;
-		} else if(0 == strcmp(argv[i], "-no4M")) {
-			pCfg->fUse4MbReads = FALSE;
-			i++;
-			continue;
-		} else if(0 == strcmp(argv[i], "-no128K")) {
-			pCfg->fUse128KReads = FALSE;
-			i++;
-			continue;
-		} else if(0 == strcmp(argv[i], "-noout")) {
-			pCfg->fDumpFile = FALSE;
+		} else if(0 == _stricmp(argv[i], "-usb2")) {
+			pCfg->fForceUsb2 = TRUE;
 			i++;
 			continue;
 		} else if(i + 1 >= argc) {
@@ -141,8 +125,14 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 			pCfg->qwAddrMax = Util_GetNumeric(argv[i + 1]);
 		} else if(0 == strcmp(argv[i], "-cr3")) {
 			pCfg->qwCR3 = Util_GetNumeric(argv[i + 1]);
+		} else if(0 == strcmp(argv[i], "-iosize")) {
+			pCfg->qwMaxSizeDmaIo = Util_GetNumeric(argv[i + 1]);
 		} else if(0 == strcmp(argv[i], "-out")) {
-			strcpy_s(pCfg->szFileOut, MAX_PATH, argv[i + 1]);
+			if((0 == _stricmp(argv[i + 1], "none")) || (0 == _stricmp(argv[i + 1], "null"))) {
+				pCfg->fOutFile = FALSE;
+			} else {
+				strcpy_s(pCfg->szFileOut, MAX_PATH, argv[i + 1]);
+			}
 		} else if(0 == strcmp(argv[i], "-in")) {
 			if(!Util_ParseHexFileBuiltin(argv[i + 1], pCfg->pbIn, CONFIG_MAX_INSIZE, (PDWORD)&pCfg->cbIn)) { return E_FAIL; }
 		} else if(0 == strcmp(argv[i], "-s")) {
