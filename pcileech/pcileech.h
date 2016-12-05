@@ -96,6 +96,10 @@ typedef struct tdConfig {
 	BOOL fPatchAll;
 	BOOL fForceRW;
 	BOOL fShowHelp;
+	BOOL fUse16MbReads;
+	BOOL fUse4MbReads;
+	BOOL fUse128KReads;
+	BOOL fDumpFile;
 } CONFIG, *PCONFIG;
 
 typedef struct tdPageStatistics {
@@ -103,6 +107,10 @@ typedef struct tdPageStatistics {
 	QWORD cPageSuccess;
 	QWORD cPageFail;
 	QWORD qwTickCountStart;
+	QWORD c4KReads;
+	QWORD c128KReads;
+	QWORD c4MbReads;
+	QWORD c16MbReads;
 	BOOL isAccessModeKMD;
 	LPSTR szCurrentAction;
 } PAGE_STATISTICS, *PPAGE_STATISTICS;

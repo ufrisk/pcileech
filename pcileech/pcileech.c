@@ -23,24 +23,26 @@ VOID ShowUpdatePageRead(_In_ PCONFIG pCfg, _In_ QWORD qwCurrentAddress, _Inout_ 
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
 	if(pCfg->fPageStat) {
 		GetConsoleScreenBufferInfo(hConsole, &consoleInfo);
-		consoleInfo.dwCursorPosition.Y -= 7;
+		consoleInfo.dwCursorPosition.Y -= 8;
 		SetConsoleCursorPosition(hConsole, consoleInfo.dwCursorPosition);
 	}
 	pCfg->fPageStat = TRUE; 
 	printf(
-		" Current Action: %s                             \n" \
-		" Access Mode:    %s                             \n" \
-		" Progress:       %i / %i (%i%%)                 \n" \
-		" Speed:          %i MB/s                        \n" \
-		" Address:        0x%016llX                      \n" \
-		" Pages read:     %i / %i (%i%%)                 \n" \
-		" Pages fail:     %i (%i%%)                      \n", 
+		" Current Action: %s                                \n" \
+		" Access Mode:    %s                                \n" \
+		" Progress:       %i / %i (%i%%)                    \n" \
+		" Speed:          %i MB/s                           \n" \
+		" Reads:          %i 16MB | %i 4MB | %i 128K | %i 4K\n" \
+		" Address:        0x%016llX                         \n" \
+		" Pages read:     %i / %i (%i%%)                    \n" \
+		" Pages failed:   %i (%i%%)                         \n",
 		pPageStat->szCurrentAction,
 		pPageStat->isAccessModeKMD ? "KMD (kernel module assisted DMA)" : "DMA (hardware only)             ",
 		(pPageStat->cPageSuccess + pPageStat->cPageFail) / 256,
 		pPageStat->cPageTotal / 256,
 		qwPercentTotal,
 		qwSpeedMBs,
+		pPageStat->c16MbReads, pPageStat->c4MbReads, pPageStat->c128KReads, pPageStat->c4KReads,
 		qwCurrentAddress,
 		pPageStat->cPageSuccess,
 		pPageStat->cPageTotal,
@@ -78,6 +80,10 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 	// set defaults
 	pCfg->tpAction = NA;
 	pCfg->qwAddrMax = 0x0ffffffffffffffff;
+	pCfg->fUse16MbReads = TRUE;
+	pCfg->fUse4MbReads = TRUE;
+	pCfg->fUse128KReads = TRUE;
+	pCfg->fDumpFile = TRUE;
 	// fetch command line actions/options
 	loop:
 	while(i < argc) {
@@ -109,6 +115,22 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 			continue;
 		} else if(0 == strcmp(argv[i], "-help")) {
 			pCfg->fShowHelp = TRUE;
+			i++;
+			continue;
+		} else if(0 == strcmp(argv[i], "-no16M")) {
+			pCfg->fUse16MbReads = FALSE;
+			i++;
+			continue;
+		} else if(0 == strcmp(argv[i], "-no4M")) {
+			pCfg->fUse4MbReads = FALSE;
+			i++;
+			continue;
+		} else if(0 == strcmp(argv[i], "-no128K")) {
+			pCfg->fUse128KReads = FALSE;
+			i++;
+			continue;
+		} else if(0 == strcmp(argv[i], "-noout")) {
+			pCfg->fDumpFile = FALSE;
 			i++;
 			continue;
 		} else if(i + 1 >= argc) {
