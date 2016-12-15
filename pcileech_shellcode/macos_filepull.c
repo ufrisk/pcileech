@@ -46,7 +46,8 @@ VOID c_EntryPoint(PKMDDATA pk)
 {
 	FN2 fn2;
 	DWORD status = 0;
-	QWORD uio = 0, vnode = 0, vfs_current;
+	BOOL isModeLargeTransfer = FALSE;
+	QWORD uio = 0, vnode = 0, vfs_current, cbOffset = 0;
 	if(!pk->dataInStr[0]) {
 		pk->dataOut[0] = STATUS_FAIL_INPPARAMS_BAD;
 		return;
@@ -61,19 +62,32 @@ VOID c_EntryPoint(PKMDDATA pk)
 		status = STATUS_FAIL_FILE_CANNOT_OPEN;
 		goto error;
 	}
-	uio = SysVCall(fn2.uio_create, 1 /* count iov */, 0 /* offset */, 2 /* kernel addr */, 0 /* read */);
-	if(SysVCall(fn2.uio_addiov, uio, pk->DMAAddrVirtual + pk->dataOutExtraOffset, pk->dataOutExtraLengthMax)) {
-		status = STATUS_FAIL_FILE_CANNOT_OPEN;
-		goto error;
+	while(TRUE) {
+		uio = SysVCall(fn2.uio_create, 1 /* count iov */, cbOffset /* offset */, 2 /* kernel addr */, 0 /* read */);
+		if(SysVCall(fn2.uio_addiov, uio, pk->DMAAddrVirtual + pk->dataOutExtraOffset, pk->dataOutExtraLengthMax)) {
+			status = STATUS_FAIL_FILE_CANNOT_OPEN;
+			goto error;
+		}
+		if(SysVCall(fn2.VNOP_READ, vnode, uio, 0, vfs_current)) {
+			status = STATUS_FAIL_FILE_CANNOT_OPEN;
+			goto error;
+		}
+		pk->dataOutExtraLength = pk->dataOutExtraLengthMax - SysVCall(fn2.uio_resid, uio);
+		if(uio) {
+			SysVCall(fn2.uio_free, uio);
+			uio = 0;
+		}
+		if(pk->dataOutExtraLength != pk->dataOutExtraLengthMax) { break; }
+		isModeLargeTransfer = TRUE;
+		cbOffset += pk->dataOutExtraLength;
+		if(!WriteLargeOutput_WaitNext(pk)) {
+			pk->dataOutExtraLength = 0;
+			status = STATUS_FAIL_PCILEECH_CORE;
+			goto error;
+		}
 	}
-	if(SysVCall(fn2.VNOP_READ, vnode, uio, 0, vfs_current)) {
-		status = STATUS_FAIL_FILE_CANNOT_OPEN;
-		goto error;
-	}
-	pk->dataOutExtraLength = pk->dataOutExtraLengthMax - SysVCall(fn2.uio_resid, uio);
-	if(pk->dataOutExtraLength == pk->dataOutExtraLengthMax) {
-		status = STATUS_FAIL_FILE_SIZE;
-		goto error;
+	if(isModeLargeTransfer) {
+		WriteLargeOutput_Finish(pk);
 	}
 error:
 	if(uio) {

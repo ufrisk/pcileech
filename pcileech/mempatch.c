@@ -78,15 +78,10 @@ VOID ActionPatchAndSearch(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	// initialize / allocate memory
 	qwAddrBase = pCfg->qwAddrMin;
 	if(!pbBuffer16M) { return; }
-	memset(&pageStat, 0, sizeof(PAGE_STATISTICS));
-	pageStat.cPageTotal = (pCfg->qwAddrMax - qwAddrBase + 1) / 4096;
-	if(!pageStat.cPageTotal) {
+	if(pCfg->qwAddrMax < qwAddrBase + 0xfff) {
 		printf("%s: Failed. Zero or negative memory range specified.\n", szAction);
 		goto cleanup;
 	}
-	pageStat.isAccessModeKMD = pDeviceData->KMDHandle ? TRUE : FALSE;
-	pageStat.szCurrentAction = isModePatch ? "Patching" : "Searching";
-	pageStat.qwTickCountStart = GetTickCount64();
 	// load and verify signatures
 	if(pCfg->cbIn) {
 		Util_CreateSignatureSearchAll(pCfg->pbIn, (DWORD)pCfg->cbIn, oSignatures);
@@ -106,10 +101,11 @@ VOID ActionPatchAndSearch(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		}
 	}
 	// loop patch / unlock
+	PageStatInitialize(&pageStat, qwAddrBase, pCfg->qwAddrMax, isModePatch ? "Patching" : "Searching", pDeviceData->KMDHandle ? TRUE : FALSE, pCfg->fVerbose);
 	for(; qwAddrBase < pCfg->qwAddrMax; qwAddrBase += 0x01000000) {
 		result = Util_Read16M(pCfg, pDeviceData, pbBuffer16M, qwAddrBase, &pageStat);
-		ShowUpdatePageRead(pCfg, qwAddrBase, &pageStat);
-		if(!result) {
+		if(!result && !pCfg->fForceRW && !pDeviceData->KMDHandle) {
+			PageStatClose(&pageStat);
 			printf("%s: Failed. Cannot dump any sequential data in 16MB - terminating.\n", szAction);
 			goto cleanup;
 		}
@@ -123,20 +119,24 @@ VOID ActionPatchAndSearch(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 			}
 			if(result) {
 				if(cPatchList == MAX_NUM_PATCH_LOCATIONS) {
+					PageStatClose(&pageStat);
 					printf("%s: Failed. More than %i signatures found. Location: 0x%llx\n", szAction, MAX_NUM_PATCH_LOCATIONS, qwAddrBase + qwoPages + dwoPatch);
 					goto cleanup;
 				}
 				qwPatchList[cPatchList] = qwAddrBase + qwoPages + dwoPatch;
 				cPatchList++;
 			} else {
+				PageStatClose(&pageStat);
 				printf("%s: Failed. Write memory failed. Location: 0x%llx\n", szAction, qwAddrBase + qwoPages + dwoPatch);
 				goto cleanup;
 			}
 			if(!pCfg->fPatchAll) {
+				PageStatClose(&pageStat);
 				goto cleanup;
 			}
 		}
 	}
+	PageStatClose(&pageStat);
 	if(0 == cPatchList) {
 		printf("%s: Failed. No signature found.\n", szAction);
 	}

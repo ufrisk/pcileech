@@ -29,6 +29,7 @@ VOID c_EntryPoint(_In_ PKMDDATA pk)
 	UNICODE_STRING _su;
 	KERNEL_FUNCTIONS ofnk;
 	PKERNEL_FUNCTIONS fnk;
+	BOOL isModeLargeTransfer = FALSE;
 	if(!pk->dataInStr[0]) {
 		pk->dataOut[0] = (QWORD)STATUS_UNSUCCESSFUL;
 		return;
@@ -57,13 +58,18 @@ VOID c_EntryPoint(_In_ PKMDDATA pk)
 		pk->dataOut[0] = nt;
 		goto cleanup;
 	}
-	nt = fnk->ZwReadFile(hFile, NULL, NULL, NULL, &_io, (PVOID)(pk->DMAAddrVirtual + pk->dataOutExtraOffset), (ULONG)pk->dataOutExtraLengthMax, 0, 0);
+	do {
+		nt = fnk->ZwReadFile(hFile, NULL, NULL, NULL, &_io, (PVOID)(pk->DMAAddrVirtual + pk->dataOutExtraOffset), (ULONG)pk->dataOutExtraLengthMax, NULL, 0);
+		if(NT_ERROR(nt)) { break; }
+		pk->dataOutExtraLength = (QWORD)_io.Information;
+		if(pk->dataOutExtraLength != pk->dataOutExtraLengthMax) { break; }
+		isModeLargeTransfer = TRUE;
+	} while(WriteLargeOutput_WaitNext(fnk, pk));
 	fnk->ZwClose(hFile);
-	if(0 != nt) {
-		pk->dataOut[0] = nt;
-		goto cleanup;
+	if(isModeLargeTransfer) { 
+		WriteLargeOutput_Finish(fnk, pk); 
 	}
-	pk->dataOutExtraLength = (QWORD)_io.Information;
+	pk->dataOut[0] = nt;
 cleanup:
 	fnk->RtlFreeUnicodeString(&_su);
 }

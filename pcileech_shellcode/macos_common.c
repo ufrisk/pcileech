@@ -113,3 +113,36 @@ QWORD GetMemoryPhysicalMaxAddress(PBYTE pbMemoryRanges, QWORD cbMemoryRanges)
 	QWORD cMemMap = cbMemoryRanges / sizeof(PHYSICAL_MEMORY_RANGE);
 	return pMemMap[cMemMap - 1].BaseAddress + pMemMap[cMemMap - 1].NumberOfBytes;
 }
+
+
+BOOL _WriteLargeOutput_WaitForAck(PKMDDATA pk)
+{
+	PEXEC_IO pis = (PEXEC_IO)(pk->DMAAddrVirtual + EXEC_IO_DMAOFFSET_IS);
+	PEXEC_IO pos = (PEXEC_IO)(pk->DMAAddrVirtual + EXEC_IO_DMAOFFSET_OS);
+	while((pk->_op == KMD_CMD_EXEC_EXTENDED) && ((pis->magic != EXEC_IO_MAGIC) || (!pis->bin.fCompletedAck && (pis->bin.seqAck != pos->bin.seq)))) {
+		SysVCall(pk->fn.IOSleep, 25);
+	}
+	return (pk->_op == KMD_CMD_EXEC_EXTENDED) && !pis->bin.fCompletedAck;
+}
+
+BOOL WriteLargeOutput_WaitNext(PKMDDATA pk)
+{
+	PEXEC_IO pos = (PEXEC_IO)(pk->DMAAddrVirtual + EXEC_IO_DMAOFFSET_OS);
+	pos->magic = EXEC_IO_MAGIC;
+	CacheFlush();
+	pos->bin.seq++;
+	pk->_op = KMD_CMD_EXEC_EXTENDED;
+	return _WriteLargeOutput_WaitForAck(pk);
+}
+
+VOID WriteLargeOutput_Finish(PKMDDATA pk)
+{
+	PEXEC_IO pos = (PEXEC_IO)(pk->DMAAddrVirtual + EXEC_IO_DMAOFFSET_OS);
+	WriteLargeOutput_WaitNext(pk);
+	pk->dataOutExtraLength = 0;
+	CacheFlush();
+	pos->bin.fCompleted = TRUE;
+	pos->bin.seq++;
+	_WriteLargeOutput_WaitForAck(pk);
+	pk->_op = KMD_CMD_EXEC;
+}

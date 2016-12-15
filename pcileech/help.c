@@ -50,6 +50,8 @@ VOID Help_ShowGeneral()
 		"   pagedisplay            DMA,KMD   [ min ]                                    \n" \
 		"   testmemread            DMA       [ min ]                                    \n" \
 		"   testmemreadwrite       DMA       [ min ]                                    \n" \
+		" System specific commands and valid MODEs [ and options ]:                     \n" \
+		"   mac_fvrecover          DMA                                                  \n" \
 		" Valid options:                                                                \n" \
 		"   -min : memory min address, valid range: 0x0..0xffffffffffffffff             \n" \
 		"          default: 0x0                                                         \n" \
@@ -65,6 +67,10 @@ VOID Help_ShowGeneral()
 		"          No output file will be created if parameter is set to none or null.  \n" \
 		"   -all : search all memory for signature - do not stop at first occurrence.   \n" \
 		"          Option has no value. Example: -all                                   \n" \
+		"   -v   : verbose option. Additional information is displayed in the output.   \n" \
+		"          The memory map is shown when searching/dumping memory as an example. \n" \
+		"          Affects all modes and commands.                                      \n" \
+		"          Option has no value. Example: -v                                     \n" \
 		"   -force: force reads and writes even though target memory is marked as not   \n" \
 		"          accessible. Dangerous! Affects all modes and commands.               \n" \
 		"          Option has no value. Example: -force                                 \n" \
@@ -116,7 +122,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016 Ulf Frisk                                                   \n" \
-		" Version: 1.2-2                                                                  \n" \
+		" Version: 1.3                                                                  \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or later.                           \n" \
@@ -329,6 +335,24 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 			" EXAMPLES:      (example kernel module is loaded at address 0x7fffe000)        \n" \
 			" 1) unload the already loaded kernel module.                                   \n" \
 			"    pcileech kmdexit -kmd 0x7fffe000                                           \n");
+		break;
+	case MAC_FVRECOVER:
+		printf(
+			" RECOVER FILEVAULT 2 PASSWORD FROM A LOCKED macOS SYSTEM. (CVE-2016-XXXXX)     \n" \
+			" MODES   : DMA                                                                 \n" \
+			" OPTIONS :                                                                     \n" \
+			" Plug in the PCILeech device to any macOS system with a Thunderbolt 2 port. You\n" \
+			" will be asked to reboot if PCILeech is ready. After the reboot PCILeech will  \n" \
+			" try to figure out the filevault 2 full disk encryption password used to unlock\n" \
+			" the disk crypto. This issue has been patched in macOS Sierra 10.12.2.         \n" \
+			" A small memory dump will also be written to disk. In case PCILeech is uable to\n" \
+			" automatically figure out the password this memory dump may be used. In order  \n" \
+			" for PCILeech to figure out the password only ascii characters may be used; if \n" \
+			" other unicode characters exist in the password PCILeech will not be able to   \n" \
+			" automatically recover the password.                                           \n" \
+			" EXAMPLES:                                                                     \n" \
+			" 1) recover the filevault 2 disk encryption password.                          \n" \
+			"    pcileech.exe mac_fvrecover                                                 \n");
 		break;
 	case EXEC:
 		_HelpShowExecCommand(pCfg);

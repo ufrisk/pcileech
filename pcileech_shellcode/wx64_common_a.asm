@@ -32,4 +32,12 @@ GetCR3 PROC
 	RET
 GetCR3 ENDP
 
+; ----------------------------------------------------
+; Flush the CPU cache.
+; ----------------------------------------------------
+CacheFlush PROC
+	WBINVD
+	RET
+CacheFlush ENDP
+
 END

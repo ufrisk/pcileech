@@ -116,3 +116,35 @@ VOID CommonSleep(_In_ PKERNEL_FUNCTIONS fnk, _In_ DWORD ms)
 	LONGLONG llTimeToWait = -10000LL * ms;
 	fnk->KeDelayExecutionThread(KernelMode, FALSE, &llTimeToWait);
 }
+
+BOOL _WriteLargeOutput_WaitForAck(_In_ PKERNEL_FUNCTIONS fnk, _In_ PKMDDATA pk)
+{
+	PEXEC_IO pis = (PEXEC_IO)(pk->DMAAddrVirtual + EXEC_IO_DMAOFFSET_IS);
+	PEXEC_IO pos = (PEXEC_IO)(pk->DMAAddrVirtual + EXEC_IO_DMAOFFSET_OS);
+	while((pk->_op == KMD_CMD_EXEC_EXTENDED) && ((pis->magic != EXEC_IO_MAGIC) || (!pis->bin.fCompletedAck && (pis->bin.seqAck != pos->bin.seq)))) {
+		CommonSleep(fnk, 25);
+	}
+	return (pk->_op == KMD_CMD_EXEC_EXTENDED) && !pis->bin.fCompletedAck;
+}
+
+BOOL WriteLargeOutput_WaitNext(_In_ PKERNEL_FUNCTIONS fnk, _In_ PKMDDATA pk)
+{
+	PEXEC_IO pos = (PEXEC_IO)(pk->DMAAddrVirtual + EXEC_IO_DMAOFFSET_OS);
+	pos->magic = EXEC_IO_MAGIC;
+	CacheFlush();
+	pos->bin.seq++;
+	pk->_op = KMD_CMD_EXEC_EXTENDED;
+	return _WriteLargeOutput_WaitForAck(fnk, pk);
+}
+
+VOID WriteLargeOutput_Finish(_In_ PKERNEL_FUNCTIONS fnk, _In_ PKMDDATA pk)
+{
+	PEXEC_IO pos = (PEXEC_IO)(pk->DMAAddrVirtual + EXEC_IO_DMAOFFSET_OS);
+	WriteLargeOutput_WaitNext(fnk, pk);
+	pk->dataOutExtraLength = 0;
+	CacheFlush();
+	pos->bin.fCompleted = TRUE;
+	pos->bin.seq++;
+	_WriteLargeOutput_WaitForAck(fnk, pk);
+	pk->_op = KMD_CMD_EXEC;
+}

@@ -6,6 +6,7 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 #include "pcileech.h"
+#include "statistics.h"
 
 /*
 * Retrieve a page table entry (PTE). (4kB pages only).
@@ -158,5 +159,15 @@ VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATUR
 * -- return = TRUE if at least one 4k page could be read; FALSE if all pages failed.
 */
 BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_ PPAGE_STATISTICS pPageStat);
+
+/*
+* Wait for the connected PCILeech device to be power cycled. This function will
+* sleep until a power cycle event is detected on the connected PCILeech device.
+* The connected device needs to first be powered down and then powered up before
+* this function will exit.
+* -- pCfg
+* -- pDeviceData
+*/
+VOID Util_WaitForPowerCycle(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
 
 #endif /* __UTIL_H__ */

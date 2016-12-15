@@ -6,48 +6,13 @@
 #include "pcileech.h"
 #include "cpuflash.h"
 #include "device.h"
+#include "executor.h"
+#include "extra.h"
 #include "help.h"
 #include "memdump.h"
 #include "mempatch.h"
 #include "util.h"
 #include "kmd.h"
-
-VOID ShowUpdatePageRead(_In_ PCONFIG pCfg, _In_ QWORD qwCurrentAddress, _Inout_ PPAGE_STATISTICS pPageStat)
-{
-	QWORD qwPercentTotal = ((pPageStat->cPageSuccess + pPageStat->cPageFail) * 100) / pPageStat->cPageTotal;
-	QWORD qwPercentSuccess = (pPageStat->cPageSuccess * 100) / pPageStat->cPageTotal;
-	QWORD qwPercentFail = (pPageStat->cPageFail * 100) / pPageStat->cPageTotal;
-	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-	QWORD qwTickCountElapsed = GetTickCount64() - pPageStat->qwTickCountStart;
-	QWORD qwSpeedMBs = ((pPageStat->cPageSuccess + pPageStat->cPageFail) * 4 / 1024) / (1 + (qwTickCountElapsed / 1000));
-	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
-	if(pCfg->fPageStat) {
-		GetConsoleScreenBufferInfo(hConsole, &consoleInfo);
-		consoleInfo.dwCursorPosition.Y -= 7;
-		SetConsoleCursorPosition(hConsole, consoleInfo.dwCursorPosition);
-	}
-	pCfg->fPageStat = TRUE;
-	printf(
-		" Current Action: %s                                \n" \
-		" Access Mode:    %s                                \n" \
-		" Progress:       %i / %i (%i%%)                    \n" \
-		" Speed:          %i MB/s                           \n" \
-		" Address:        0x%016llX                         \n" \
-		" Pages read:     %i / %i (%i%%)                    \n" \
-		" Pages failed:   %i (%i%%)                         \n",
-		pPageStat->szCurrentAction,
-		pPageStat->isAccessModeKMD ? "KMD (kernel module assisted DMA)" : "DMA (hardware only)             ",
-		(pPageStat->cPageSuccess + pPageStat->cPageFail) / 256,
-		pPageStat->cPageTotal / 256,
-		qwPercentTotal,
-		qwSpeedMBs,
-		qwCurrentAddress,
-		pPageStat->cPageSuccess,
-		pPageStat->cPageTotal,
-		qwPercentSuccess,
-		pPageStat->cPageFail,
-		qwPercentFail);
-}
 
 HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 {
@@ -69,6 +34,7 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 		{.tp = PAGEDISPLAY,.sz = "pagedisplay" },
 		{.tp = TESTMEMREAD,.sz = "testmemread" },
 		{.tp = TESTMEMREADWRITE,.sz = "testmemreadwrite" },
+		{.tp = MAC_FVRECOVER,.sz = "mac_fvrecover" },
 	};
 	QWORD qw;
 	DWORD j, i = 1;
@@ -115,6 +81,10 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 			continue;
 		} else if(0 == _stricmp(argv[i], "-usb2")) {
 			pCfg->fForceUsb2 = TRUE;
+			i++;
+			continue;
+		} else if(0 == _stricmp(argv[i], "-v")) {
+			pCfg->fVerbose = TRUE;
 			i++;
 			continue;
 		} else if(i + 1 >= argc) {
@@ -230,6 +200,8 @@ int main(_In_ int argc, _In_ char* argv[])
 		ActionExecShellcode(pCfg, &device);
 	} else if(pCfg->tpAction == TESTMEMREAD || pCfg->tpAction == TESTMEMREADWRITE) {
 		ActionMemoryTestReadWrite(pCfg, &device);
+	} else if(pCfg->tpAction == MAC_FVRECOVER) {
+		Action_MacFilevaultRecover(pCfg, &device);
 	} else if(pCfg->tpAction == KMDLOAD) {
 		if(pCfg->qwKMD) {
 			printf("KMD: Successfully loaded at address: 0x%08x\n", (DWORD)pCfg->qwKMD);

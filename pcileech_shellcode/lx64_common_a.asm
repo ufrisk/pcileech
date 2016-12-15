@@ -133,4 +133,12 @@ m_page_to_phys PROC
 	RET
 m_page_to_phys ENDP
 
+; ----------------------------------------------------
+; Flush the CPU cache.
+; ----------------------------------------------------
+CacheFlush PROC
+	WBINVD
+	RET
+CacheFlush ENDP
+
 END

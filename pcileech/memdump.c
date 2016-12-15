@@ -5,6 +5,7 @@
 //
 #include "memdump.h"
 #include "device.h"
+#include "statistics.h"
 #include "util.h"
 
 typedef struct tdFILE_WRITE_ASYNC_BUFFER {
@@ -76,28 +77,23 @@ VOID ActionMemoryDump(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	{
 		pFileBuffer = NULL;
 	}
-
-	memset(&pageStat, 0, sizeof(PAGE_STATISTICS));
-	pageStat.cPageTotal = (DWORD)((pCfg->qwAddrMax - pCfg->qwAddrMin + 1) / 4096);
-	pageStat.isAccessModeKMD = pDeviceData->KMDHandle ? TRUE : FALSE;
-	pageStat.szCurrentAction = "Dumping Memory";
-	pageStat.qwTickCountStart = GetTickCount64();
 	pCfg->qwAddrMin &= ~0xfff;
 	pCfg->qwAddrMax = (pCfg->qwAddrMax + 1) & ~0xfff;
 	// 2: start dump in 16MB blocks
 	qwCurrentAddress = pCfg->qwAddrMin;
+	PageStatInitialize(&pageStat, pCfg->qwAddrMin, pCfg->qwAddrMax, "Dumping Memory", pDeviceData->KMDHandle ? TRUE : FALSE, pCfg->fVerbose);
 	while(qwCurrentAddress < pCfg->qwAddrMax) {
 		result = Util_Read16M(pCfg, pDeviceData, pbMemoryDump, qwCurrentAddress, &pageStat);
-		ShowUpdatePageRead(pCfg, qwCurrentAddress, &pageStat);
-		if(!pCfg->fForceRW && !result) {
+		if(!result && !pCfg->fForceRW && !pDeviceData->KMDHandle) {
+			PageStatClose(&pageStat);
 			printf("Memory Dump: Failed. Cannot dump any sequential data in 16MB - terminating.\n");
 			goto cleanup;
 		}
-
 		if (pFileBuffer != NULL)
 		{
 			// write file async
 			if(!pFileBuffer->isSuccess) {
+				PageStatClose(&pageStat);
 				printf("Memory Dump: Failed. Failed to write to dump file - terminating.\n");
 				goto cleanup;
 			}
@@ -112,13 +108,14 @@ VOID ActionMemoryDump(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		// add to address
 		qwCurrentAddress += 0x01000000;
 	}
+	PageStatClose(&pageStat);
 	printf("Memory Dump: Successful.\n");
 cleanup:
-	if(pbMemoryDump) { 
+	if(pbMemoryDump) {
 		LocalFree(pbMemoryDump);
 	}
 	if(pFileBuffer) {
-		if(pFileBuffer->hFile) { 
+		if(pFileBuffer->hFile) {
 			while(pFileBuffer->isExecuting) {
 				SwitchToThread();
 			}

@@ -252,6 +252,7 @@ VOID stage3_c_EntryPoint(PKMDDATA pk)
 #define KMD_CMD_EXEC		    5
 #define KMD_CMD_READ_VA			6
 #define KMD_CMD_WRITE_VA		7
+#define KMD_CMD_EXEC_EXTENDED	8
 
 // status:
 //     1: ready for command

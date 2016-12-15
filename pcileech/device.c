@@ -36,7 +36,6 @@
 #define REG_DMACOUNT_3						0x1f0
 #define REG_DMAADDR_3						0x1f4
 #define REGPCI_STATCMD						0x04
-#define DEVICE_READ_DMA_FLAG_CONTINUE		1
 
 typedef struct tdEP_INFO {
 	UCHAR pipe;
@@ -118,12 +117,17 @@ BOOL _DeviceReadDMA_Retry(PTHREAD_DATA_READ_EP ptd)
 
 VOID _DeviceReadDMA(PTHREAD_DATA_READ_EP ptd)
 {
-	DWORD cbTransferred;
+	DWORD dwTimeout, cbTransferred;
 	if(ptd->cb > ptd->pDeviceData->MaxSizeDmaIo) {
 		ptd->result = FALSE;
 		ptd->isFinished = TRUE;
 		return;
 	}
+	// set EP timeout value on conservative usb2 assumptions (3 parallel reads, 35MB/s total speed)
+	// (XMB * 1000 * 3) / (35 * 1024 * 1024) -> 0x2fc9 ~> 0x3000 :: 4k->64ms, 5.3M->520ms
+	dwTimeout = 64 + ptd->cb / 0x3000;
+	WinUsb_SetPipePolicy(ptd->pDeviceData->WinusbHandle, ptd->pep->pipe, PIPE_TRANSFER_TIMEOUT, (ULONG)sizeof(BOOL), &dwTimeout);
+	// perform memory read
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rADDR, (DWORD)ptd->qwAddr, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_ADDRESS
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rCOUNT, 0x40000000 | ptd->cb, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_COUNT
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rSTAT, 0x080000c1, CSR_CONFIGSPACE_MEMM | CSR_BYTE0 | CSR_BYTE3); // DMA_START & DMA_CLEAR_ABORT
@@ -146,7 +150,7 @@ BOOL DeviceReadDMA(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE
 	if(qwAddr + cb > 0x100000000) { return FALSE; }
 	if(_DeviceIsInReservedMemoryRange(qwAddr, cb) && !pDeviceData->IsAllowedAccessReservedAddress) { return FALSE; }
 	ZeroMemory(td, sizeof(THREAD_DATA_READ_EP) * 3);
-	if(cb < 0x00300000 || !pDeviceData->IsAllowedMultiThreadDMA) {
+	if(cb < 0x3000 || !pDeviceData->IsAllowedMultiThreadDMA) {
 		if(cb > 0x00800000) { // read max 8MB at a time.
 			return
 				DeviceReadDMA(pDeviceData, qwAddr, pb, 0x00800000, 0) &&
@@ -392,6 +396,8 @@ BOOL DeviceOpen(_In_ PCONFIG pCfg, _Out_ PDEVICE_DATA pDeviceData)
 	}
 	if(dwReg & 0xc0 /* Full-Speed(USB1)|High-Speed(USB2) */) {
 		printf("Device Info: Device running at USB2 speed.\n");
+	} else if(pCfg->fVerbose) {
+		printf("Device Info: Device running at USB3 speed.\n");
 	}
 	return TRUE;
 }
@@ -412,4 +418,30 @@ BOOL DeviceReadMEM(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE
 	} else {
 		return DeviceReadDMA(pDeviceData, qwAddr, pb, cb, flags);
 	}
+}
+
+BOOL DevicePciOutWriteDma(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb)
+{
+	DWORD cbTransferred;
+	BYTE data[4 + 4 + 64 * 4];
+	if(((cb % 4) != 0) || (cb > 256)) { return FALSE; }
+	if((qwAddr & 0x03) || ((qwAddr + cb) > 0x100000000)) { return FALSE; }
+	*(PDWORD)(data + 0) = 0x0000004f | (cb >> 2) << 24;
+	*(PDWORD)(data + 4) = (DWORD)qwAddr;
+	memcpy(data + 8, pb, cb);
+	return WinUsb_WritePipe(pDeviceData->WinusbHandle, pDeviceData->PipePciOut, data, 8 + cb, &cbTransferred, NULL);
+}
+
+BOOL DevicePciInReadDma(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
+{
+	DWORD cbTransferred;
+	BYTE data[4 + 4];
+	if(((cb % 4) != 0) || (cb > 256)) { return FALSE; }
+	if((qwAddr & 0x03) || ((qwAddr + cb) > 0x100000000)) { return FALSE; }
+	*(PDWORD)(data + 0) = 0x000000cf | (cb >> 2) << 24;
+	*(PDWORD)(data + 4) = (DWORD)qwAddr;
+	return
+		WinUsb_WritePipe(pDeviceData->WinusbHandle, pDeviceData->PipePciOut, data, 8, &cbTransferred, NULL) &&
+		WinUsb_ReadPipe(pDeviceData->WinusbHandle, pDeviceData->PipePciIn, pb, cb, &cbTransferred, NULL) &&
+		cb == cbTransferred;
 }

@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="consoleredir.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="cpuflash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -45,11 +42,17 @@
     <ClInclude Include="help.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="executor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="extra.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="statistics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="consoleredir.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="cpuflash.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -72,6 +75,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="help.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="executor.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="extra.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="statistics.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

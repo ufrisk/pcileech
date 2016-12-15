@@ -17,6 +17,14 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "pcileech_flash", "pcileech_flash", "{C8566802-6336-4B4B-A3F8-B08452CEBDAE}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "pcileech_kmd", "pcileech_kmd", "{2A4F90E3-A543-4D9C-9F89-CBCE396AE08A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "linux", "linux", "{2E5DAA3B-99A5-4493-B68B-B24153FCB6E4}"
+	ProjectSection(SolutionItems) = preProject
+		pcileech_kmd\linux\Makefile = pcileech_kmd\linux\Makefile
+		pcileech_kmd\linux\pcileech_kmd.c = pcileech_kmd\linux\pcileech_kmd.c
+	EndProjectSection
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "linux", "linux", "{4F8780C7-8ECD-4A8F-9412-426EE8C9E9C9}"
 	ProjectSection(SolutionItems) = preProject
 		pcileech_flash\linux\Makefile = pcileech_flash\linux\Makefile
@@ -54,6 +62,7 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{2E5DAA3B-99A5-4493-B68B-B24153FCB6E4} = {2A4F90E3-A543-4D9C-9F89-CBCE396AE08A}
 		{4F8780C7-8ECD-4A8F-9412-426EE8C9E9C9} = {C8566802-6336-4B4B-A3F8-B08452CEBDAE}
 	EndGlobalSection
 EndGlobal

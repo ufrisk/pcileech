@@ -67,7 +67,7 @@ Limitations/Known Issues:
 * Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10 Enterprise with Virtualization based security features enabled does not work fully - this is however not the default setting in Windows 10.
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * Linux might also not work if some virtualization based features are enabled.
-* Linux based on the 4.8 kernel does not work (Ubuntu 16.10).
+* Linux based on the 4.8 kernel usually does not work (Ubuntu 16.10). As an alternative, if target root access exists, compile and insert .ko (pcileech_kmd/linux).
 * Windows Vista: some shellcode modules such as wx64_pscmd does not work.
 * Windows 7: signatures are not published.
 
@@ -106,6 +106,9 @@ Dump all memory from the target system given that a kernel module is loaded at a
 Force dump memory below 4GB including accessible memory mapped devices using more stable USB2 approach.
 * ` pcileech.exe dump -force -usb2 `
 
+Exploit a vulnerable mac to retrieve the FileVault2 password.
+* ` pcileech.exe mac_fvrecover `
+
 Building:
 =========
 The binaries are found in the pcileech_files folder. If one wish to build an own version it is possible to do so. Compile the pcileech and pcileech_gensig projects from within Visual Studio. Tested with Visual Studio 2015. To compile kernel- and shellcode, located in the pcileech_shellcode project, please look into the individual files for instructions. These files are usually compiled command line.
@@ -133,9 +136,12 @@ v1.2
 * signature: macOS Sierra added.
 * other: various bug fixes and stability improvements.
 
-latest
-* core: stability improvements for USB2 and new options [-out none, -usb2, -iosize]
-* new implant: spawn cmd in user context [wx64_pscmd_user]
-* implant: stability improvements for Win8+ [wx64_pscreate, wx64_pscmd, wx64_pscmd_user]
-* other: firmware flash improvements.
+v1.3
+* core: basic linux 4.8 support.
+* core: mac_fvrecover - retrieve filevault2 password from locked mac.
+* core: stability improvements for USB2 and new options [-out none, -usb2, -iosize, -v]
+* implant: pull large files from target [wx64_filepull, mac_filepull, lx64_filepull].
+* implant: spawn cmd in user context [wx64_pscmd_user].
+* implant: stability improvements for Win8+ [wx64_pscreate, wx64_pscmd, wx64_pscmd_user].
+* other: load kmd by compiling and inserting .ko on linux [ pcileech_kmd/linux ].
 * other: firmware flash support in Windows.

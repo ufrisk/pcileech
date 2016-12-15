@@ -6,9 +6,10 @@
 #include "util.h"
 #include "device.h"
 #include "shellcode.h"
+#include "statistics.h"
 #include <bcrypt.h>
 
-#define PT_VALID_MASK		0x80000000000000BF	// valid, active, supervior paging structure
+#define PT_VALID_MASK		0x00000000000000BF	// valid, active, supervior paging structure
 #define PT_VALID_VALUE		0x0000000000000023	// 
 
 BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_opt_ PQWORD pqPTEAddrPhysOpt)
@@ -90,7 +91,7 @@ BOOL Util_PageTable_FindSignatureBase_Search(_In_ PDEVICE_DATA pDeviceData, _Ino
 {
 	// win8  kernel modules start at even  1-page boundaries (0x1000)
 	// win10 kernel modules start at even 16-page boundaries (0x10000)
-	// winx64 kernel memory is located above 0xffff800000000000
+	// winx64 kernel memory is located above 0xfffff80000000000
 	BOOL result;
 	QWORD PML4[512], PDPT[512], PD[512], PT[512];
 	QWORD PML4_idx = 0xfff, PDPT_idx = 0xfff, PD_idx = 0xfff;
@@ -199,8 +200,8 @@ BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevi
 		return Util_PageTable_FindSignatureBase_Search(pDeviceData, NULL, *pqwCR3, pPTEs, cPTEs, pqwSignatureBase);
 	}
 	// try CR3/PML4 hint at PA 0x1000 on windows 8.1/10.
-	result =
-		Util_PageTable_WindowsHintPML4(pDeviceData, pqwCR3) &&
+	result = 
+		Util_PageTable_WindowsHintPML4(pDeviceData, pqwCR3) && 
 		Util_PageTable_FindSignatureBase_Search(pDeviceData, NULL, *pqwCR3, pPTEs, cPTEs, pqwSignatureBase);
 	if(result) { return TRUE; }
 	// page table scan guessing common CR3 base addresses.
@@ -224,7 +225,7 @@ BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out
 	// 1: try load default
 	if(0 == memcmp("DEFAULT", sz, 7)) {
 		for(i = 0; i < (sizeof(SHELLCODE_DEFAULT) / sizeof(SHELLCODE_DEFAULT_STRUCT)); i++) {
-			if((0 == strcmp(SHELLCODE_DEFAULT[i].sz, sz)) && (SHELLCODE_DEFAULT[i].cb <= cb)) {
+			if((0 == strcmp(SHELLCODE_DEFAULT[i].sz, sz)) && (SHELLCODE_DEFAULT[i].cb <= cb)) {					
 				memcpy(pb, SHELLCODE_DEFAULT[i].pb, SHELLCODE_DEFAULT[i].cb);
 				*pcb = SHELLCODE_DEFAULT[i].cb;
 				return TRUE;
@@ -243,6 +244,12 @@ BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out
 		hFile = CreateFileA(sz, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		if(!hFile || hFile == INVALID_HANDLE_VALUE) { return E_FAIL; }
 		result = ReadFile(hFile, pb, cb, pcb, NULL);
+		if(*pcb == cb) {
+			cb = GetFileSize(hFile, NULL);
+			if(cb > *pcb || cb == INVALID_FILE_SIZE) {
+				return FALSE;
+			}
+		}
 		CloseHandle(hFile);
 		return result;
 	}
@@ -348,6 +355,8 @@ VOID Util_GenRandom(_Out_ PBYTE pb, _In_ DWORD cb)
 	CryptReleaseContext(hCryptProv, 0);
 }
 
+#define KMD_EXEC_MAX_SHELLCODE_SIZE		0x80000
+
 BOOL Util_LoadKmdExecShellcode(_In_ LPSTR szKmdExecName, _Out_ PKMDEXEC* ppKmdExec)
 {
 	CHAR szKmdExecFile[MAX_PATH];
@@ -357,16 +366,16 @@ BOOL Util_LoadKmdExecShellcode(_In_ LPSTR szKmdExecName, _Out_ PKMDEXEC* ppKmdEx
 	HANDLE hFile;
 	BOOL result;
 	BYTE pbKmdExecHASH[32];
-	pbKmdExec = (PBYTE)LocalAlloc(LMEM_ZEROINIT, 0x400000);
+	pbKmdExec = (PBYTE)LocalAlloc(LMEM_ZEROINIT, KMD_EXEC_MAX_SHELLCODE_SIZE);
 	if(!pbKmdExec) { return FALSE; }
 	// open and read file
 	Util_GetFileInDirectory(szKmdExecFile, szKmdExecName);
 	strcpy_s(szKmdExecFile + strlen(szKmdExecFile), MAX_PATH - strlen(szKmdExecFile), ".ksh");
 	hFile = CreateFileA(szKmdExecFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if(!hFile || hFile == INVALID_HANDLE_VALUE) { return FALSE; }
-	result = ReadFile(hFile, pbKmdExec, 0x10000, &cbKmdExec, NULL);
+	result = ReadFile(hFile, pbKmdExec, KMD_EXEC_MAX_SHELLCODE_SIZE, &cbKmdExec, NULL);
 	CloseHandle(hFile);
-	if(!result) { return FALSE; }
+	if(!result || cbKmdExec < sizeof(KMDEXEC)) { goto error; }
 	// ensure file validity
 	pKmdExec = (PKMDEXEC)pbKmdExec;
 	if(pKmdExec->dwMagic != KMDEXEC_MAGIC) { goto error; }
@@ -463,7 +472,7 @@ VOID Util_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE p
 	// try read 1M in 128k chunks
 	for(o = 0; o < 0x00100000; o += 0x00020000) {
 		if((qwBaseAddress + o + 0x00020000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer1M + o, 0x00020000, 0)) {
-			pPageStat->cPageSuccess += 32;
+			PageStatUpdate(pPageStat, qwBaseAddress + o + 0x00020000, 32, 0);
 		} else {
 			// try read 128k in 4k (page) chunks
 			for(p = 0; p < 0x00020000; p += 0x1000) {
@@ -471,9 +480,9 @@ VOID Util_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE p
 					return;
 				}
 				if(DeviceReadMEM(pDeviceData, qwBaseAddress + o + p, pbBuffer1M + o + p, 0x1000, 0)) {
-					pPageStat->cPageSuccess++;
+					PageStatUpdate(pPageStat, qwBaseAddress + o + p + 0x1000, 1, 0);
 				} else {
-					pPageStat->cPageFail++;
+					PageStatUpdate(pPageStat, qwBaseAddress + o + p + 0x1000, 0, 1);
 				}
 			}
 		}
@@ -486,7 +495,7 @@ BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE 
 	QWORD i, o, qwOffset;
 	// try read 16M
 	if((qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress, pbBuffer16M, 0x01000000, 0)) {
-		pPageStat->cPageSuccess += 4096;
+		PageStatUpdate(pPageStat, qwBaseAddress + 0x010000000, 4096, 0);
 		return TRUE;
 	}
 	// try read 16M in 4M chunks
@@ -497,23 +506,38 @@ BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE 
 	}
 	// DMA mode + all memory inside scope + and all 4M reads fail + no force flag => fail
 	if(!pCfg->fForceRW && !pDeviceData->KMDHandle && qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax && !isSuccess[0] && !isSuccess[1] && !isSuccess[2] && !isSuccess[3]) {
-		pPageStat->cPageFail += 4096;
+		PageStatUpdate(pPageStat, qwBaseAddress + 0x010000000, 0, 4096);
 		return FALSE;
 	}
 	// try read failed 4M chunks in 1M chunks
 	for(i = 0; i < 4; i++) {
 		if(isSuccess[i]) {
-			pPageStat->cPageSuccess += 1024;
+			PageStatUpdate(pPageStat, qwBaseAddress + (i + 1) * 0x00400000, 1024, 0);
 		} else {
 			qwOffset = 0x00400000 * i;
 			for(o = 0; o < 0x00400000; o += 0x00100000) {
 				Util_Read1M(pCfg, pDeviceData, pbBuffer16M + qwOffset + o, qwBaseAddress + qwOffset + o, pPageStat);
-				// update stats - failed reads take a long time in DMA mode - leaving the user in the dark if not updated.
-				if(pDeviceData->KMDHandle == NULL) {
-					ShowUpdatePageRead(pCfg, qwBaseAddress + qwOffset + o, pPageStat);
-				}
 			}
 		}
 	}
 	return TRUE;
+}
+
+VOID Util_WaitForPowerCycle(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
+{
+	BYTE pbDummy[4096];
+	DeviceClose(pDeviceData);
+	while(DeviceOpen(pCfg, pDeviceData)) {
+		DeviceClose(pDeviceData);
+		Sleep(100);
+	}
+	while(TRUE) {
+		if(DeviceOpen(pCfg, pDeviceData)) {
+			if(DeviceReadDMA(pDeviceData, 0x01000000, pbDummy, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
+				break;
+			}
+			DeviceClose(pDeviceData);
+		}
+		Sleep(100);
+	}
 }

@@ -81,26 +81,30 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="consoleredir.h" />
     <ClInclude Include="cpuflash.h" />
     <ClInclude Include="device.h" />
+    <ClInclude Include="executor.h" />
+    <ClInclude Include="extra.h" />
     <ClInclude Include="help.h" />
     <ClInclude Include="kmd.h" />
     <ClInclude Include="memdump.h" />
     <ClInclude Include="mempatch.h" />
     <ClInclude Include="pcileech.h" />
     <ClInclude Include="shellcode.h" />
+    <ClInclude Include="statistics.h" />
     <ClInclude Include="util.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="consoleredir.c" />
     <ClCompile Include="cpuflash.c" />
     <ClCompile Include="device.c" />
+    <ClCompile Include="executor.c" />
+    <ClCompile Include="extra.c" />
     <ClCompile Include="help.c" />
     <ClCompile Include="kmd.c" />
     <ClCompile Include="memdump.c" />
     <ClCompile Include="mempatch.c" />
     <ClCompile Include="pcileech.c" />
+    <ClCompile Include="statistics.c" />
     <ClCompile Include="util.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
