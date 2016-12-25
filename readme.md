@@ -15,6 +15,7 @@ The hardware confirmed working is:
 * PP3380-AB PCIe card.
 
 Please note that the ExpressCard EC3380-AB is not working!
+
 Please note that the USB3380-AB EVK-RC kit is not working!
 
 Recommended adapters:
