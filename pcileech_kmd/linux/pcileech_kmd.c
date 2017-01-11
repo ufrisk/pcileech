@@ -38,7 +38,7 @@ const char LINUX_X64_STAGE3_PRE_BIN[] = {
 static int __init pcileech_init(void)
 {
 	uint64_t pg_pa, pg_va, h_thread;
-	struct page *pg = alloc_pages_current(0x14, 1);
+	struct page *pg = alloc_pages_current(0x14, 2);
 	if(!pg) {
 		printk("pcileech: error allocating memory\n");
 		return 1;

@@ -1,6 +1,6 @@
 // pcileech.c : implementation of core pcileech functionality.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "pcileech.h"
@@ -35,6 +35,7 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 		{.tp = TESTMEMREAD,.sz = "testmemread" },
 		{.tp = TESTMEMREADWRITE,.sz = "testmemreadwrite" },
 		{.tp = MAC_FVRECOVER,.sz = "mac_fvrecover" },
+		{.tp = PT_PHYS2VIRT,.sz = "pt_phys2virt" },
 	};
 	QWORD qw;
 	DWORD j, i = 1;
@@ -133,8 +134,8 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 		pCfg->qwAddrMin = pCfg->qwAddrMax;
 		pCfg->qwAddrMax = qw;
 	}
-	pCfg->qwCR3 &= 0xfffff000;
-	pCfg->qwKMD &= 0xfffff000;
+	pCfg->qwCR3 &= ~0xfff;
+	pCfg->qwKMD &= ~0xfff;
 	return S_OK;
 }
 
@@ -202,6 +203,8 @@ int main(_In_ int argc, _In_ char* argv[])
 		ActionMemoryTestReadWrite(pCfg, &device);
 	} else if(pCfg->tpAction == MAC_FVRECOVER) {
 		Action_MacFilevaultRecover(pCfg, &device);
+	} else if(pCfg->tpAction == PT_PHYS2VIRT) {
+		Action_PT_Phys2Virt(pCfg, &device);
 	} else if(pCfg->tpAction == KMDLOAD) {
 		if(pCfg->qwKMD) {
 			printf("KMD: Successfully loaded at address: 0x%08x\n", (DWORD)pCfg->qwKMD);

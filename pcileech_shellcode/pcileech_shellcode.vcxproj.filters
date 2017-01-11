@@ -170,6 +170,9 @@
     <None Include="fbsdx64_common_a.asm">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="lx64_stage2_efi.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lx64_common.h">

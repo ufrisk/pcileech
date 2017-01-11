@@ -1,6 +1,6 @@
 // extra.c : implementation related various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "extra.h"
@@ -127,4 +127,16 @@ VOID Action_MacFilevaultRecover(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData
 	// clean up.
 	LocalFree(pbBuffer512M);
 	if(hFile) { CloseHandle(hFile); }
+}
+
+VOID Action_PT_Phys2Virt(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
+{
+	BOOL result;
+	QWORD qwVA, qwPTE;
+	result = Util_PageTable_FindMappedAddress(pCfg, pDeviceData, pCfg->qwCR3, pCfg->qwDataIn[0], &qwVA, &qwPTE);
+	if(result) {
+		printf("PT_PHYS2VIRT: PA: 0x%016llx :: VA: 0x%016llx :: PTE: 0x%016llx.\n", pCfg->qwDataIn[0], qwVA, qwPTE);
+	} else {
+		printf("PT_PHYS2VIRT: Failed.\n");
+	}
 }

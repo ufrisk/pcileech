@@ -15,4 +15,11 @@
 */
 VOID Action_MacFilevaultRecover(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
 
+/*
+* Search for the virtual address that maps to a physical address given a page table base.
+* -- pCfg
+* -- pDeviceData
+*/
+VOID Action_PT_Phys2Virt(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
+
 #endif /* __EXTRA_H__ */

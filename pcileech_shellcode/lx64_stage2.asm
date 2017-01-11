@@ -101,7 +101,7 @@ setup PROC
 	TEST rax, rax
 	JZ error
 	MOV rdi, 14h
-	MOV rsi, 1h
+	MOV rsi, 2h
 	CALL rax
 	TEST rax, rax
 	JZ error

@@ -1,6 +1,6 @@
 // help.c : implementation related to displaying help texts.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "help.h"
@@ -48,6 +48,7 @@ VOID Help_ShowGeneral()
 		"   8051stop               DMA,KMD                                              \n" \
 		"   flash                  DMA,KMD   [ in ]                                     \n" \
 		"   pagedisplay            DMA,KMD   [ min ]                                    \n" \
+		"   pt_phys2virt           DMA,KMD   [ cr3, 0 ]                                 \n" \
 		"   testmemread            DMA       [ min ]                                    \n" \
 		"   testmemreadwrite       DMA       [ min ]                                    \n" \
 		" System specific commands and valid MODEs [ and options ]:                     \n" \
@@ -102,8 +103,9 @@ VOID Help_ShowGeneral()
 		"   -kmd : address of already loaded kernel module helper (KMD).                \n" \
 		"          ALTERNATIVELY                                                        \n" \
 		"          kernel module to use, see list below for choices:                    \n" \
-		"             WIN10_X64   (WARNING! Unstable/Experimental)                      \n" \
-		"             LINUX_X64                                                         \n" \
+		"             WIN10_X64              (WARNING! Unstable/Experimental)           \n" \
+		"             LINUX_X64              (NB! Kernels below 4.8 only)               \n" \
+		"             LINUX_X64_EFI          (NB! EFI/UEFI booted systems only)         \n" \
 		"             FREEBSD_X64                                                       \n" \
 		"             MACOS                                                             \n" \
 	);
@@ -122,7 +124,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016 Ulf Frisk                                                   \n" \
-		" Version: 1.3                                                                  \n" \
+		" Version: 1.4                                                                  \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or later.                           \n" \
@@ -338,7 +340,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 		break;
 	case MAC_FVRECOVER:
 		printf(
-			" RECOVER FILEVAULT 2 PASSWORD FROM A LOCKED macOS SYSTEM. (CVE-2016-XXXXX)     \n" \
+			" RECOVER FILEVAULT 2 PASSWORD FROM A LOCKED macOS SYSTEM.                      \n" \
 			" MODES   : DMA                                                                 \n" \
 			" OPTIONS :                                                                     \n" \
 			" Plug in the PCILeech device to any macOS system with a Thunderbolt 2 port. You\n" \
@@ -353,6 +355,20 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 			" EXAMPLES:                                                                     \n" \
 			" 1) recover the filevault 2 disk encryption password.                          \n" \
 			"    pcileech.exe mac_fvrecover                                                 \n");
+		break;
+	case PT_PHYS2VIRT:
+		printf(
+			" SEARCH FOR VIRTUAL ADDRESS MAPPED TO GIVEN PHYSICAL ADDRESS.                  \n" \
+			" MODES   : DMA, KMD                                                            \n" \
+			" OPTIONS : -cr3, -0                                                            \n" \
+			" Walk the page table of which base is specified on the 'cr3' option to find the\n" \
+			" first occurrence of a virtual address mapped to the physical address specified\n" \
+			" in the '0' option. If an entry is found the virtual address and the PTE will  \n" \
+			" be displayed. Only the first occurrence will be displayed.                    \n" \
+			" EXAMPLEs:                                                                     \n" \
+			" 1) search for virtual address mapped to physical 0xfed90000 given a page table\n" \
+			"    (PML4) base at: 0x1aa000.                                                  \n" \
+			"    pcileech.exe pt_phys2virt -cr3 0x1aa000 -0 0xfed90000                      \n");
 		break;
 	case EXEC:
 		_HelpShowExecCommand(pCfg);

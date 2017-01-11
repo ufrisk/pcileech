@@ -1,6 +1,6 @@
 // util.h : definitions of various utility functions.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __UTIL_H__
@@ -33,6 +33,19 @@ BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _I
 * -- return
 */
 BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase);
+
+/*
+* Search the page tables for a given physical address. The first occurrence for
+* this address will be returned.
+* -- pCfg
+* -- pDeviceData
+* -- qwCR3 = the physical address of PML4.
+* -- qwAddrPhys = the physical address to search for.
+* -- pqwAddrVirt = ptr to receive virtual address.
+* -- pqwPTE = ptr to receive value of PTE
+* -- return
+*/
+BOOL Util_PageTable_FindMappedAddress(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_ PQWORD pqwPTE);
 
 /*
 * Load KMD and Unlock signatures.
@@ -103,6 +116,7 @@ QWORD Util_GetNumeric(_In_ LPSTR sz);
 /*
 * "Create" a static signature for Linux given the supplied parameters. The
 * function formats the paramerters and put them into the supplied pSignature.
+* This will only work for kernels prior to 4.8.
 * -- paBase = memory physical offset to paSzKallsyms
 * -- paSzKallsyms = physical offset to 'kallsyms_looup_name' text string.
 * -- vaSzKallsyms = virtual address of 'kallsyms_looup_name' text string.
@@ -110,7 +124,7 @@ QWORD Util_GetNumeric(_In_ LPSTR sz);
 * -- vaFnHijack = virtual address of the function to hijack.
 * -- pSignature = ptr to signature struct to place the result in.
 */
-VOID Util_CreateSignatureLinuxGeneric(_In_ DWORD paBase, _In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature);
+VOID Util_CreateSignatureLinuxGenericPre48(_In_ DWORD paBase, _In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature);
 
 /*
 * "Create" a static signature for FreeBSD given the supplied parameters. The
@@ -138,6 +152,13 @@ VOID Util_CreateSignatureMacOSGeneric(_In_ DWORD paKernelBase, _In_ DWORD paFunc
 * -- pSignature = ptr to signature struct to place the result in.
 */
 VOID Util_CreateSignatureWindowsHalGeneric(_Out_ PSIGNATURE pSignature);
+
+/*
+* Load the stage2 and stage3 code for the EFI Runtime Sertives hijack technique
+* into the supplied signature.
+* -- pSignature = ptr to signature struct to place the result in.
+*/
+VOID Util_CreateSignatureLinuxEfiRuntimeServices(_Out_ PSIGNATURE pSignature);
 
 /*
 * Create a search signature that searches all memory for the signature given in

@@ -81,6 +81,7 @@
     <None Include="fbsdx64_stage3.asm" />
     <None Include="lx64_common_a.asm" />
     <None Include="lx64_stage2.asm" />
+    <None Include="lx64_stage2_efi.asm" />
     <None Include="lx64_stage3.asm" />
     <None Include="lx64_stage3_pre.asm" />
     <None Include="macos_common_a.asm" />

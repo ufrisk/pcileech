@@ -100,6 +100,58 @@ typedef struct tdKMDDATA {
 #define KMD_CMD_READ_VA			6
 #define KMD_CMD_WRITE_VA		7
 
+/*
+* Tries to allocate 4MB contigious memory. If not possible 2MB will be tried.
+* If not possible -> fail.
+* -- pk
+* -- fRetry = should be set to TRUE on entry to enable retry on fail.
+* -- return = ptr to struct page if successful.
+*/
+QWORD AllocateMemoryDma(PKMDDATA pk, BOOL fRetry)
+{
+	QWORD i, pStructPages[3], pa[2];
+	for(i = 0; i < 2; i++) {
+		pStructPages[i] = SysVCall(pk->fn.alloc_pages_current, 0x14, 10);
+		pa[i] = pStructPages[i] ? m_page_to_phys(pStructPages[i]) : 0;
+	}
+	// success
+	if(pa[0] == pa[1] + 0x200000) {
+		pk->DMASizeBuffer = 0x400000;
+		pk->DMAAddrPhysical = pa[1];
+		return pStructPages[1];
+	}
+	// complete fail
+	if(!pa[0] && !pa[1]) {
+		return 0;
+	}
+	// if 2nd attempt - fail if not complete success
+	if(!fRetry) {
+		for(i = 0; i < 2; i++) {
+			if(pStructPages[i]) {
+				SysVCall(pk->fn.__free_pages, pStructPages[i], 10);
+			}
+		}
+		return 0;
+	}
+	// retry for possible complete success
+	pStructPages[2] = AllocateMemoryDma(pk, FALSE);
+	if(pStructPages[2]) {
+		for(i = 0; i < 2; i++) {
+			if(pStructPages[i]) {
+				SysVCall(pk->fn.__free_pages, pStructPages[i], 10);
+			}
+		}
+		return pStructPages[2];
+	}
+	// partial success
+	if(pStructPages[1]) {
+		SysVCall(pk->fn.__free_pages, pStructPages[1], 10);
+	}
+	pk->DMASizeBuffer = 0x200000;
+	pk->DMAAddrPhysical = pa[0];
+	return pStructPages[0];
+}
+
 // status:
 //     1: ready for command
 //     2: processing
@@ -124,16 +176,13 @@ VOID stage3_c_EntryPoint(PKMDDATA pk)
 		pk->_status = 0xf0000001;
 		return;
 	}
-	// 1: set up mem out dma area 4MB in lower 4GB (linux does not support std 16MB)
-	pStructPages = SysVCall(pk->fn.alloc_pages_current, 0x14, 10);
-	if(!pStructPages) {
+	// 1: allocate memory
+	if(0 == (pStructPages = AllocateMemoryDma(pk, TRUE))) {
 		pk->_status = 0xf0000002;
 		return;
 	}
-	pk->DMAAddrPhysical = m_page_to_phys(pStructPages);
 	pk->DMAAddrVirtual = m_phys_to_virt(pk->AddrKallsymsLookupName, pk->DMAAddrPhysical);
-	pk->DMASizeBuffer = 0x400000;
-	SysVCall(pk->fn.set_memory_x, pk->DMAAddrVirtual, 1024);
+	SysVCall(pk->fn.set_memory_x, pk->DMAAddrVirtual, pk->DMASizeBuffer / 4096);
 	// 2: main dump loop
 	SysVCall(pk->fn.do_gettimeofday, &timeLast);
 	while(TRUE) {

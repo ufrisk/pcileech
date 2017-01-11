@@ -1,6 +1,6 @@
 // util.c : implementation of various utility functions.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "util.h"
@@ -217,6 +217,88 @@ BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevi
 	return FALSE;
 }
 
+BOOL Util_PageTable_FindMappedAddress(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_ PQWORD pqwPTE)
+{
+	BOOL result, fFirstRun;
+	QWORD PML4[512], PDPT[512], PD[512], PT[512];
+	QWORD PML4_idx = 0xfff, PDPT_idx = 0xfff, PD_idx = 0xfff, PT_idx = 0xfff;
+	QWORD qwA;
+	QWORD qwPageTableData;
+	UNREFERENCED_PARAMETER(pCfg);
+	result = DeviceReadMEM(pDeviceData, qwCR3, (PBYTE)PML4, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	if(!result) { return FALSE; }
+	qwA = 0;
+	fFirstRun = TRUE;
+	while(qwA || fFirstRun) {
+		fFirstRun = FALSE;
+		if(qwA & 0xffff800000000000) {
+			qwA |= 0xffff800000000000;
+		}
+		if(PML4_idx != (0x1ff & (qwA >> 39))) { // PML4
+			PML4_idx = 0x1ff & (qwA >> 39);
+			qwPageTableData = PML4[PML4_idx];
+			if((qwPageTableData & 0x81) != 0x01) {
+				qwA = (qwA + 0x0000008000000000) & 0xffffff8000000000;
+				continue;
+			}
+			result = DeviceReadMEM(pDeviceData, qwPageTableData & ~0xfff, (PBYTE)PDPT, 0x1000, 0);
+			if(!result) {
+				qwA = (qwA + 0x0000008000000000) & 0xffffff8000000000;
+				continue;
+			}
+			PDPT_idx = 0xfff;
+			PD_idx = 0xfff;
+			PT_idx = 0xfff;
+		}
+		if(PDPT_idx != (0x1ff & (qwA >> 30))) { // PDPT(Page-Directory Pointer Table)
+			PDPT_idx = 0x1ff & (qwA >> 30);
+			qwPageTableData = PDPT[PDPT_idx];
+			if((qwPageTableData & 0x81) != 0x01) {
+				qwA = (qwA + 0x0000000040000000) & 0xffffffffC0000000;
+				continue;
+			}
+			result = DeviceReadMEM(pDeviceData, qwPageTableData & ~0xfff, (PBYTE)PD, 0x1000, 0);
+			if(!result) {
+				qwA = (qwA + 0x0000000040000000) & 0xffffffffC0000000;
+				continue;
+			}
+			PD_idx = 0xfff;
+			PT_idx = 0xfff;
+		}
+		if(PD_idx != (0x1ff & (qwA >> 21))) { // PD (Page Directory)
+			PD_idx = 0x1ff & (qwA >> 21);
+			qwPageTableData = PD[PD_idx];
+			if(((qwPageTableData & 0x81) == 0x81) && ((qwPageTableData & 0x0000ffffffe00000) == (qwAddrPhys & 0x0000ffffffe00000))) { // map 2MB page
+				*pqwAddrVirt = qwA + (qwAddrPhys & 0x1fffff);
+				*pqwPTE = qwPageTableData;
+				return TRUE;
+			}
+			if((qwPageTableData & 0x81) != 0x01) {
+				qwA = (qwA + 0x0000000000200000) & 0xffffffffffE00000;
+				continue;
+			}
+			result = DeviceReadMEM(pDeviceData, qwPageTableData & ~0xfff, (PBYTE)PT, 0x1000, 0);
+			if(!result) {
+				qwA = (qwA + 0x0000000000200000) & 0xffffffffffE00000;
+				continue;
+			}
+			PT_idx = 0xfff;
+		}
+		if(PT_idx != (0x1ff & (qwA >> 12))) { // PT (Page Table)
+			PT_idx = 0x1ff & (qwA >> 12);
+			qwPageTableData = PT[PT_idx];
+			if(((qwPageTableData & 0x01) == 0x01) && ((qwPageTableData & 0x0000fffffffff000) == (qwAddrPhys & 0x0000fffffffff000))) {
+				*pqwAddrVirt = qwA + (qwAddrPhys & 0xfff);
+				*pqwPTE = qwPageTableData;
+				return TRUE;
+			}
+			qwA = (qwA + 0x0000000000001000) & 0xfffffffffffff000;
+			continue;
+		}
+	}
+	return FALSE;
+}
+
 BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcb)
 {
 	SIZE_T i;
@@ -402,7 +484,7 @@ QWORD Util_GetNumeric(_In_ LPSTR sz)
 	}
 }
 
-VOID Util_CreateSignatureLinuxGeneric(_In_ DWORD paBase, _In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature)
+VOID Util_CreateSignatureLinuxGenericPre48(_In_ DWORD paBase, _In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature)
 {
 	DWORD dwBase2M = (paSzKallsyms & ~0x1fffff) - ((vaSzKallsyms & ~0x1fffff) - (vaFnKallsyms & ~0x1fffff)); // symbol name base is not same as fn base
 	memset(pSignature, 0, sizeof(SIGNATURE));
@@ -451,10 +533,15 @@ VOID Util_CreateSignatureMacOSGeneric(_In_ DWORD paKernelBase, _In_ DWORD paFunc
 VOID Util_CreateSignatureWindowsHalGeneric(_Out_ PSIGNATURE pSignature)
 {
 	memset(pSignature, 0, sizeof(SIGNATURE));
-	memcpy(pSignature->chunk[3].pb, WINX64_STAGE2_HAL_BIN, sizeof(WINX64_STAGE2_HAL_BIN));
-	memcpy(pSignature->chunk[4].pb, WINX64_STAGE3_BIN, sizeof(WINX64_STAGE3_BIN));
-	pSignature->chunk[3].cb = sizeof(WINX64_STAGE2_HAL_BIN);
-	pSignature->chunk[4].cb = sizeof(WINX64_STAGE3_BIN);
+	Util_ParseHexFileBuiltin("DEFAULT_WINX64_STAGE2_HAL", pSignature->chunk[3].pb, 4096, &pSignature->chunk[3].cb);
+	Util_ParseHexFileBuiltin("DEFAULT_WINX64_STAGE3", pSignature->chunk[4].pb, 4096, &pSignature->chunk[4].cb);
+}
+
+VOID Util_CreateSignatureLinuxEfiRuntimeServices(_Out_ PSIGNATURE pSignature)
+{
+	memset(pSignature, 0, sizeof(SIGNATURE));
+	Util_ParseHexFileBuiltin("DEFAULT_LINUX_X64_STAGE2_EFI", pSignature->chunk[3].pb, 4096, &pSignature->chunk[3].cb);
+	Util_ParseHexFileBuiltin("DEFAULT_LINUX_X64_STAGE3", pSignature->chunk[4].pb, 4096, &pSignature->chunk[4].cb);
 }
 
 VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATURE pSignature)

@@ -1,6 +1,6 @@
 // pcileech.h : definitions for pcileech - dump memory and unlock computers with a USB3380 device using DMA.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __PCILEECH_H__
@@ -76,7 +76,8 @@ typedef enum tdActionType {
 	KMDLOAD,
 	KMDEXIT,
 	EXEC,
-	MAC_FVRECOVER
+	MAC_FVRECOVER,
+	PT_PHYS2VIRT
 } ACTION_TYPE, PACTION_TYPE;
 
 #define CONFIG_MAX_INSIZE 0x400000 // 4MB

@@ -147,3 +147,7 @@ v1.3
 * implant: stability improvements for Win8+ [wx64_pscreate, wx64_pscmd, wx64_pscmd_user].
 * other: load kmd by compiling and inserting .ko on linux [ pcileech_kmd/linux ].
 * other: firmware flash support in Windows.
+
+v1.4
+* core: linux 4.8 efi support [-kmd linux_x64_efi] [http://blog.frizk.net/2017/01/attacking-uefi-and-linux.html].
+* other: linux stability fixes.
