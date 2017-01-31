@@ -151,3 +151,7 @@ v1.3
 v1.4
 * core: linux 4.8 efi support [-kmd linux_x64_efi] [http://blog.frizk.net/2017/01/attacking-uefi-and-linux.html].
 * other: linux stability fixes.
+
+Latest
+* signature: macOS Sierra updated.
+* other: bug fix - memory write in macOS.

