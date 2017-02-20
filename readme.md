@@ -155,3 +155,4 @@ v1.4
 Latest
 * signature: macOS Sierra updated.
 * other: bug fix - memory write in macOS.
+* other: firmware flash fixes for PP3380 device.

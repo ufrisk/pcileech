@@ -1,6 +1,6 @@
 // pcileech_flash.c : Linux kernel module to flash the USB3380 into a PCILeech device.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016. 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 // Compiling:
@@ -92,19 +92,23 @@ static int _action_flash_writeverify(unsigned char *pbar0)
 {
 	// 1: check if this is a valid device / memory range.
 	if(*(unsigned int*)(pbar0 + OFFSET_PCIREG_SUBSYS) != 0x338010B5) {
-		return -1;
+		return -2;
 	}
 	if(*(unsigned int*)(pbar0 + OFFSET_PCIREG_VEN_DEV) != 0x338010B5 && *(unsigned int*)(pbar0 + OFFSET_PCIREG_VEN_DEV) != 0x16BC14E4) {
-		return -1;
+		return -2;
 	}
-	// 2: is firmware already flashed?
+	// 2: check if EEPROM exists
+	if((*(unsigned int*)(pbar0 + OFFSET_PCIREG_EEPROM_CTL) & 0x00030000) == 0) {
+		return -3;
+	}
+	// 4: is firmware already flashed?
 	if(0 == _action_flash_verify(pbar0)) {
 		SET_LED(0xf); // success -> blue+red led
 		return 0;
 	}
-	// 3: flash firmware.
+	// 4: flash firmware.
 	_action_flash_write(pbar0);
-	// 4: verify flashed firmware.
+	// 5: verify flashed firmware.
 	if(0 == _action_flash_verify(pbar0)) {
 		SET_LED(0x8); // success -> blue led
 		return 0;
@@ -134,41 +138,54 @@ static int _action_flash_2(struct pci_dev *pdev)
 	// checking if PCI-device reachable by checking that BAR0 is defined and memory mapped
 	if(!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM)) {
 		printk(KERN_ERR "PCILEECH FLASH: ERROR: BAR0 configuration not found.\n");
-		ret = -ENODEV;
 		goto error;
 	}
 	// remap BAR0 avoiding the use of CPU cache
 	pbar0 = ioremap_nocache(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
 	ret = _action_flash_writeverify(pbar0);
 	if(ret) {
-		ret = _action_flash_writeverify(pbar0); // make two write attempts
+		// try force 1-byte addressing and make another flash attempt.
+		*(unsigned char*)(pbar0 + OFFSET_PCIREG_EEPROM_CTL + 2) =
+		0x60 | (0x1f & *(unsigned char*)(pbar0 + OFFSET_PCIREG_EEPROM_CTL + 2));
+		ret = _action_flash_writeverify(pbar0);
+	}
+	if(ret) {
+		// try force 2-byte addressing and make another flash attempt.
+		*(unsigned char*)(pbar0 + OFFSET_PCIREG_EEPROM_CTL + 2) =
+		  0xa0 | (0x1f & *(unsigned char*)(pbar0 + OFFSET_PCIREG_EEPROM_CTL + 2));
+		ret = _action_flash_writeverify(pbar0); 
 	}
 	iounmap(pbar0);
 	if(ret) {
-		printk(KERN_ERR "PCILEECH FLASH: ERROR: Firmware write/verify not successful.\n");
+		printk(KERN_ERR "PCILEECH FLASH: ERROR: Firmware write/verify not successful. Error: %08x\n", ret);
 	} else {
 		printk(KERN_ERR "PCILEECH FLASH: SUCCESSFUL: Please re-insert the device to use as a PCILeech device!\n");
 	}
 error:
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
-	return ret;
+	return ret ? -ENODEV : 0;
 }
 
 static int _action_flash_1(void) {
 	int ret;
-	struct pci_dev *pdev;
-	// retrieve compatible device (max 1 device per system)
-	if((pdev = pci_get_device(0x14e4, 0x16bc, NULL))) {
+	bool is_dev_found = false;
+	struct pci_dev *pdev = NULL;
+	// retrieve compatible devices
+	while((pdev = pci_get_device(0x14e4, 0x16bc, pdev))) {
 		printk(KERN_INFO "PCILEECH FLASH: Found USB3380 already flashed as PCILeech.\n");
-	} else if((pdev = pci_get_device(0x10b5, 0x3380, NULL))) {
+		ret = _action_flash_2(pdev);
+		is_dev_found = true;
+	}
+	while((pdev = pci_get_device(0x10b5, 0x3380, pdev))) {
 		printk(KERN_INFO "PCILEECH FLASH: Found USB3380 not flashed as PCILeech.\n");
-	} else {
+		ret = _action_flash_2(pdev);
+		is_dev_found = true;
+	}
+	if(!is_dev_found) {
 		printk(KERN_ERR "PCILEECH FLASH: ERROR: Device not found.\n");
 		return -ENODEV;
 	}
-	ret = _action_flash_2(pdev);
-	pci_dev_put(pdev);
 	return ret;
 }
 

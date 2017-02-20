@@ -1,6 +1,6 @@
 // installer.c : implementation of the PCILeech UMDF2 flash driver.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "PCILeechFlash.h"
@@ -66,19 +66,23 @@ static int _action_flash_writeverify(unsigned char *pbar0)
 {
 	// 1: check if this is a valid device / memory range.
 	if(*(unsigned int*)(pbar0 + OFFSET_PCIREG_SUBSYS) != 0x338010B5) {
-		return -1;
+		return -2;
 	}
 	if(*(unsigned int*)(pbar0 + OFFSET_PCIREG_VEN_DEV) != 0x338010B5 && *(unsigned int*)(pbar0 + OFFSET_PCIREG_VEN_DEV) != 0x16BC14E4) {
-		return -1;
+		return -2;
 	}
-	// 2: is firmware already flashed?
+	// 2: check if EEPROM exists
+	if((*(unsigned int*)(pbar0 + OFFSET_PCIREG_EEPROM_CTL) & 0x00030000) == 0) {
+		return -3;
+	}
+	// 4: is firmware already flashed?
 	if(0 == _action_flash_verify(pbar0)) {
 		SET_LED(0xf); // success -> blue+red led
 		return 0;
 	}
-	// 3: flash firmware.
+	// 4: flash firmware.
 	_action_flash_write(pbar0);
-	// 4: verify flashed firmware.
+	// 5: verify flashed firmware.
 	if(0 == _action_flash_verify(pbar0)) {
 		SET_LED(0x8); // success -> blue led
 		return 0;
@@ -110,6 +114,18 @@ NTSTATUS _EvtDevicePrepareHardware(_In_ WDFDEVICE Device, _In_ WDFCMRESLIST Reso
 		}
 		BaseAddress = (PBYTE)WdfDeviceGetHardwareRegisterMappedAddress(Device, PseudoBaseAddress);
 		status = _action_flash_writeverify(BaseAddress);
+		if(status) {
+			// try force 1-byte addressing and make another flash attempt.
+			*(unsigned char*)(BaseAddress + OFFSET_PCIREG_EEPROM_CTL + 2) =
+				0x60 | (0x1f & *(unsigned char*)(BaseAddress + OFFSET_PCIREG_EEPROM_CTL + 2));
+			status = _action_flash_writeverify(BaseAddress);
+		}
+		if(status) {
+			// try force 2-byte addressing and make another flash attempt.
+			*(unsigned char*)(BaseAddress + OFFSET_PCIREG_EEPROM_CTL + 2) =
+				0xa0 | (0x1f & *(unsigned char*)(BaseAddress + OFFSET_PCIREG_EEPROM_CTL + 2));
+			status = _action_flash_writeverify(BaseAddress);
+		}
 		WdfDeviceUnmapIoSpace(Device, PseudoBaseAddress, desc->u.Generic.Length);
 		return (status == 0) ? STATUS_SUCCESS : STATUS_DEVICE_CONFIGURATION_ERROR;
 	}
