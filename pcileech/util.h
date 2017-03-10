@@ -15,10 +15,21 @@
 * -- qwCR3 = the contents of the CPU register CR3 (= physical address of PML4)
 * -- qwAddressLinear = the virtual address for which the PTE should be retrieved
 * -- pqwPTE = ptr to receive the PTE
-* -- pqwPTEAddrPhysOpt = ptr to receive the physical address of the PTE (optional)
+* -- pqwPTEAddrPhysOpt = ptr to receive the physical address of the PTE
 * -- return
 */
-BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPTEAddrPhysOpt);
+BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_ PQWORD pqwPTEAddrPhys);
+
+/*
+* Change the mode of the mapped address to executable.
+* -- pCfg
+* -- pDeviceData
+* -- qwCR3
+* -- qwAddressLinear
+* -- fSetX = TRUE if virtual address should be executable.
+* -- return
+*/
+BOOL Util_PageTable_SetMode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX);
 
 /*
 * Find a module base given a page signature. Please note that this is a best
@@ -179,7 +190,7 @@ VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATUR
 * -- pPageStat = statistics struct to update on progress (pages success/fail).
 * -- return = TRUE if at least one 4k page could be read; FALSE if all pages failed.
 */
-BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_ PPAGE_STATISTICS pPageStat);
+BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat);
 
 /*
 * Wait for the connected PCILeech device to be power cycled. This function will

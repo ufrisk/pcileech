@@ -1,6 +1,6 @@
 // cpuflash.c : implementation related to 8051 CPU and EEPROM flashing.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "cpuflash.h"
@@ -14,7 +14,7 @@ VOID ActionFlash(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		printf("Flash failed: failed to open file or invalid size\n");
 		return;
 	}
-	if(pCfg->pbIn[0] != 0x5a || *(WORD*)(pCfg->pbIn + 2) > (DWORD)pCfg->cbIn - 1) {
+	if(!pCfg->fForceRW && (pCfg->pbIn[0] != 0x5a || *(WORD*)(pCfg->pbIn + 2) > (DWORD)pCfg->cbIn - 1)) {
 		printf("Flash failed: invalid firmware signature or size\n");
 		return;
 	}

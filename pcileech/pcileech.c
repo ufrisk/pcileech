@@ -13,6 +13,7 @@
 #include "mempatch.h"
 #include "util.h"
 #include "kmd.h"
+#include "vfs.h"
 
 HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 {
@@ -29,6 +30,7 @@ HRESULT ParseCmdLine(_In_ DWORD argc, _In_ char* argv[], _Out_ PCONFIG pCfg)
 		{.tp = KMDLOAD,.sz = "kmdload" },
 		{.tp = KMDEXIT,.sz = "kmdexit" },
 		{.tp = FLASH,.sz = "flash" },
+		{.tp = MOUNT,.sz = "mount" },
 		{.tp = START8051,.sz = "8051start" },
 		{.tp = STOP8051,.sz = "8051stop" },
 		{.tp = PAGEDISPLAY,.sz = "pagedisplay" },
@@ -205,6 +207,8 @@ int main(_In_ int argc, _In_ char* argv[])
 		Action_MacFilevaultRecover(pCfg, &device);
 	} else if(pCfg->tpAction == PT_PHYS2VIRT) {
 		Action_PT_Phys2Virt(pCfg, &device);
+	} else if(pCfg->tpAction == MOUNT) {
+		//ActionMount(pCfg, &device);
 	} else if(pCfg->tpAction == KMDLOAD) {
 		if(pCfg->qwKMD) {
 			printf("KMD: Successfully loaded at address: 0x%08x\n", (DWORD)pCfg->qwKMD);

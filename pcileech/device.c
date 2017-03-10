@@ -1,6 +1,6 @@
 // device.c : implementation related to the USB3380 hardware device.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "device.h"
@@ -250,9 +250,6 @@ BOOL DeviceFlashEEPROM(_In_ PDEVICE_DATA pDeviceData, _In_ PBYTE pbEEPROM, _In_ 
 	DWORD dwWriteValue;
 	if(cbEEPROM < 3 || cbEEPROM > 0x7FFF) {
 		return FALSE; // too small or too large for 2 byte addressing mode
-	}
-	if(pbEEPROM[0] != 0x5a || (pbEEPROM[1] & 0xf8) != 0x00) {
-		return FALSE; // rudimentary signature sanity check
 	}
 	while(wAddr < cbEEPROM) {
 		// initialize EEPROM for writing

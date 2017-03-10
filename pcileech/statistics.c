@@ -1,3 +1,8 @@
+// statistics.c : implementation of statistics related functionality.
+//
+// (c) Ulf Frisk, 2016, 2017
+// Author: Ulf Frisk, pcileech@frizk.net
+//
 #include "statistics.h"
 
 VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
@@ -103,8 +108,9 @@ VOID PageStatInitialize(_Inout_ PPAGE_STATISTICS ps, _In_ QWORD qwAddrBase, _In_
 	ps->i.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)_PageStatThreadLoop, ps, 0, NULL);
 }
 
-VOID PageStatUpdate(_Inout_ PPAGE_STATISTICS ps, _In_ QWORD qwAddr, _In_ QWORD cPageSuccessAdd, _In_ QWORD cPageFailAdd)
+VOID PageStatUpdate(_Inout_opt_ PPAGE_STATISTICS ps, _In_ QWORD qwAddr, _In_ QWORD cPageSuccessAdd, _In_ QWORD cPageFailAdd)
 {
+	if(!ps) { return; }
 	ps->qwAddr = qwAddr;
 	ps->cPageSuccess += cPageSuccessAdd;
 	ps->cPageFail += cPageFailAdd;

@@ -9,46 +9,49 @@
 #include "statistics.h"
 #include <bcrypt.h>
 
-#define PT_VALID_MASK		0x00000000000000BF	// valid, active, supervior paging structure
-#define PT_VALID_VALUE		0x0000000000000023	// 
+#define PT_VALID_MASK		0x00000000000000BD	// valid, active, supervior paging structure
+#define PT_VALID_VALUE		0x0000000000000021	// 
+#define PT_MASK_ENABLE		0x0000000000000001
+#define PT_MASK_PS			0x0000000000000080
+#define PT_MASK_NX			0x8000000000000000
+#define PT_FLAG_HELPER_X	0x0000000000000001
 
-BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_opt_ PQWORD pqPTEAddrPhysOpt)
+BOOL Util_PageTable_Helper(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwVA, _In_ QWORD qwPgLvl, _In_ QWORD qwPgTblPA, _In_ QWORD qwTestMask, _In_ QWORD qwTestValue, _In_ QWORD fMode, _Out_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPTEPA, _Out_ PQWORD pqwPgLvl)
 {
-	BYTE pb[4096];
 	BOOL result;
-	QWORD qwEntry, qwAddr;
-	// retrieve PML4
-	qwAddr = (qwCR3 & 0x0000fffffffff000);
-	if(!qwAddr) { return FALSE; }
-	result = DeviceReadMEM(pDeviceData, qwAddr, pb, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	BYTE pb[4096];
+	QWORD idx, pte;
+	result = DeviceReadMEM(pDeviceData, qwPgTblPA, pb, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL);
 	if(!result) { return FALSE; }
-	// retrieve PDPT (Page-Directory Pointer Table)
-	qwEntry = *(PQWORD)&pb[0xff8 & ((qwAddressLinear >> 39) << 3)];
-	qwAddr = 0x0000fffffffff000 & qwEntry;
-	if(!qwAddr) { return FALSE; }
-	if((qwEntry & PT_VALID_MASK) != PT_VALID_VALUE) { return FALSE; }
-	result = DeviceReadMEM(pDeviceData, qwAddr, pb, 4096, 0);
-	if(!result) { return FALSE; }
-	// retrieve PD (Page-Directory)
-	qwEntry = *(PQWORD)&pb[0xff8 & ((qwAddressLinear >> 30) << 3)];
-	qwAddr = 0x0000fffffffff000 & qwEntry;
-	if(!qwAddr) { return FALSE; }
-	if((qwEntry & PT_VALID_MASK) != PT_VALID_VALUE) { return FALSE; }
-	result = DeviceReadMEM(pDeviceData, qwAddr, pb, 4096, 0);
-	if(!result) { return FALSE; }
-	// retrieve PT (Page-Table)
-	qwEntry = *(PQWORD)&pb[0xff8 & ((qwAddressLinear >> 21) << 3)];
-	qwAddr = 0x0000fffffffff000 & qwEntry;
-	if(!qwAddr) { return FALSE; }
-	if((qwEntry & PT_VALID_MASK) != PT_VALID_VALUE) { return FALSE; }
-	result = DeviceReadMEM(pDeviceData, qwAddr, pb, 4096, 0);
-	if(!result) { return FALSE; }
-	// retrieve PTE
-	if(pqPTEAddrPhysOpt) {
-		*pqPTEAddrPhysOpt = qwAddr + (0xff8 & ((qwAddressLinear >> 12) << 3));
+	idx = 0xff8 & ((qwVA >> (qwPgLvl * 9 + 3)) << 3);
+	pte = *(PQWORD)(pb + idx);
+	if(!(pte & PT_MASK_ENABLE)) { return FALSE; }
+	if((pte & qwTestMask) != qwTestValue) { return FALSE; }
+	if((fMode & PT_FLAG_HELPER_X) && (pte & PT_MASK_NX)) {
+		*(PQWORD)(pb + idx) &= 0x7fffffffffffffff;
+		DeviceWriteMEM(pDeviceData, qwPgTblPA + idx, pb + idx, 8, 0);
 	}
-	*pqwPTE = *(PQWORD)&pb[0xff8 & ((qwAddressLinear >> 12) << 3)];
-	return TRUE;
+	if((qwPgLvl == 1) || (pte & PT_MASK_PS)) {
+		*pqwPgLvl = qwPgLvl;
+		*pqwPTE = pte;
+		*pqwPTEPA = qwPgTblPA + idx;
+		return TRUE;
+	}
+	qwPgTblPA = pte & 0x0000fffffffff000;
+	if(!qwPgTblPA) { return FALSE; }
+	return Util_PageTable_Helper(pCfg, pDeviceData, qwVA, qwPgLvl - 1, qwPgTblPA, qwTestMask, qwTestValue, fMode, pqwPTE, pqwPTEPA, pqwPgLvl);
+}
+
+BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_ PQWORD pqPTEAddrPhys)
+{
+	QWORD ptePgLvl;
+	return Util_PageTable_Helper(pCfg, pDeviceData, qwAddressLinear, 4, qwCR3, PT_VALID_MASK, PT_VALID_VALUE, 0, pqwPTE, pqPTEAddrPhys, &ptePgLvl);
+}
+
+BOOL Util_PageTable_SetMode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX)
+{
+	QWORD pte, pteVA, ptePgLvl;
+	return Util_PageTable_Helper(pCfg, pDeviceData, qwAddressLinear, 4, qwCR3, 0, 0, PT_FLAG_HELPER_X, &pte, &pteVA, &ptePgLvl);
 }
 
 BOOL Util_PageTable_FindSignatureBase_IsPageTableDataValid(_In_ QWORD qwPageTableData)
@@ -553,7 +556,7 @@ VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATUR
 	memcpy(pSignature->chunk[0].pb, pb, pSignature->chunk[0].cb);
 }
 
-VOID Util_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer1M, _In_ QWORD qwBaseAddress, _Inout_ PPAGE_STATISTICS pPageStat)
+VOID Util_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer1M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat)
 {
 	QWORD o, p;
 	// try read 1M in 128k chunks
@@ -576,7 +579,7 @@ VOID Util_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE p
 	}
 }
 
-BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_ PPAGE_STATISTICS pPageStat)
+BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat)
 {
 	BOOL isSuccess[4] = { FALSE, FALSE, FALSE, FALSE };
 	QWORD i, o, qwOffset;

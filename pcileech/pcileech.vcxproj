@@ -93,6 +93,7 @@
     <ClInclude Include="shellcode.h" />
     <ClInclude Include="statistics.h" />
     <ClInclude Include="util.h" />
+    <ClInclude Include="vfs.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cpuflash.c" />
@@ -106,6 +107,7 @@
     <ClCompile Include="pcileech.c" />
     <ClCompile Include="statistics.c" />
     <ClCompile Include="util.c" />
+    <ClCompile Include="vfs.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

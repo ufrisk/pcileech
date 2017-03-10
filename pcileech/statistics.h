@@ -1,6 +1,6 @@
 // statistics.h : definitions of statistics related functionality.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __STATISTICS_H__
@@ -54,11 +54,11 @@ VOID PageStatClose(_Inout_ PPAGE_STATISTICS ps);
 * pages. Should not be called before PageStatInitialize and not after PageStatClose.
 * This function must be used if the memory map should be shown; otherwise it's possible
 * to alter the PPAGE_STATISTICS struct members directly.
-* -- ps
+* -- ps = pointer to page statistics struct (optional).
 * -- qwAddr = new address (after completed operation).
 * -- cPageSuccessAdd = number of successfully read pages.
 * -- cPageFailAdd = number of pages that failed.
 */
-VOID PageStatUpdate(_Inout_ PPAGE_STATISTICS ps, _In_ QWORD qwAddr, _In_ QWORD cPageSuccessAdd, _In_ QWORD cPageFailAdd);
+VOID PageStatUpdate(_Inout_opt_ PPAGE_STATISTICS ps, _In_ QWORD qwAddr, _In_ QWORD cPageSuccessAdd, _In_ QWORD cPageFailAdd);
 
 #endif /* __STATISTICS_H__ */

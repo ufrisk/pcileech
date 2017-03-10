@@ -1,6 +1,6 @@
 // executor.h : definitions related to 'code execution' and 'console redirect' functionality.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __EXECUTOR_H__
@@ -24,6 +24,23 @@ VOID Exec_Callback(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ PKMDDA
 * -- hCallback = handle to close.
 */
 VOID Exec_CallbackClose(_In_ HANDLE hCallback);
+
+/*
+* Execute specified shellcode silently (do not display anything on-screen).
+* This function is to be called internally by PCILeech functionality that
+* require more advanced kernel functionality than the core implant is able
+* to provide.
+* -- pCfg
+* -- pDeviceData
+* -- szShellcodeName
+* -- pbIn = binary data to send to shellcode executing on the target.
+* -- cbIn
+* -- ppbOut = ptr to receive allocated buffer containing the result.
+*      Callers responsibility to call LocalFree(*ppbOut).
+* -- pcbOut
+* -- result
+*/
+BOOL Exec_ExecSilent(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbIn, _Out_ PBYTE *ppbOut, _Out_ PQWORD pcbOut);
 
 /*
 * Try to execute a shellcode module in the target system kernel. This function

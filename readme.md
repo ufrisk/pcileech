@@ -22,7 +22,9 @@ Recommended adapters:
 * PE3B - ExpressCard to mini-PCIe.
 * PE3A - ExpressCard to PCIe.
 * ADP - PCIe to mini-PCIe.
+* P15S-P15F - M.2 Key A+E to mini-PCIe.
 * Sonnet Echo ExpressCard Pro - Thunderbolt to ExpressCard.
+* Apple Thunderbolt3 (USB-C) - Thunderbolt2 dongle.
 
 Please note that other adapters may also work.
 
@@ -46,7 +48,7 @@ The Google Android USB driver also needs to be installed. Download the Google An
 
 Generating Signatures:
 ======================
-PCILeech comes with built in signatures for Linux, FreeBSD and macOS. For Windows 8.1 and higher two full pages of driver code is needed to hijack the kernel. In order to avoid copyright issues the end user has to generate these signatures by themselves using the pcileech_gensig.exe program. The user needs to point to a valid ntfs.sys file in order to generate a signature. Alternatively it is possible to use the unstable/experimental win10_x64 generic built-in signature.
+PCILeech comes with built in signatures for Linux, FreeBSD and macOS. For Windows 8.1 and higher two full pages of driver code is needed to hijack the kernel. In order to avoid copyright issues the end user has to generate these signatures by themselves using the pcileech_gensig.exe program. The user needs to point to a valid ntfs.sys file in order to generate a signature. Alternatively it is possible to use the win10_x64 generic built-in signature.
 
 Capabilities:
 =============
@@ -93,7 +95,7 @@ Load a kernel module into Windows Vista by using the default memory scan techniq
 Load a kernel module into Windows 10 by targeting the page table of the ntfs.sys driver signed on 2016-03-29.
 * ` pcileech.exe kmdload -kmd win10x64_ntfs_20160329 -pt `
 
-Load a kernel module into Windows 10 (unstable/experimental). Compatible with VBS/VTL0 only if "Protection of Code Integrity" is not enabled.
+Load a kernel module into Windows 10. Compatible with VBS/VTL0 only if "Protection of Code Integrity" is not enabled.
 * ` pcileech.exe kmdload -kmd WIN10_X64 `
 
 Spawn a system shell on the target system (system needs to be locked and kernel module must be loaded). In this example the kernel module is loaded at address: 0x7fffe000.
@@ -152,7 +154,8 @@ v1.4
 * core: linux 4.8 efi support [-kmd linux_x64_efi] [http://blog.frizk.net/2017/01/attacking-uefi-and-linux.html].
 * other: linux stability fixes.
 
-Latest
+v1.5
+* core: Win10 generic HAL attack stabilized (-sig win10_x64)
 * signature: macOS Sierra updated.
 * signature: Windows 10 updated.
 * other: bug fix - memory write in macOS.

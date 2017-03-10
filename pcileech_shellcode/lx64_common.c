@@ -1,7 +1,7 @@
 // lx64_common.c : support functions used by Linux x64 KMDs started by stage3 EXEC.
 // Compatible with Linux x64.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "lx64_common.h"
@@ -37,6 +37,3 @@ VOID WriteLargeOutput_Finish(PKMDDATA pk)
 	_WriteLargeOutput_WaitForAck(pk);
 	pk->_op = KMD_CMD_EXEC;
 }
-
-
-#include "lx64_common.h"

@@ -13,6 +13,7 @@ typedef void					VOID, *PVOID;
 typedef int						BOOL, *PBOOL;
 typedef unsigned char			BYTE, *PBYTE;
 typedef char					CHAR, *PCHAR;
+typedef unsigned short			WCHAR, *PWCHAR;
 typedef unsigned short			WORD, *PWORD;
 typedef unsigned long			DWORD, *PDWORD;
 typedef unsigned __int64		QWORD, *PQWORD;
@@ -22,8 +23,11 @@ typedef unsigned long			STATUS;
 #define MAX_PATH				260
 #define TRUE					1
 #define FALSE					0
+#define UNREFERENCED_PARAMETER(P) (P)
 
 extern QWORD SysVCall(QWORD fn, ...);
+extern QWORD WinCall(QWORD p1, ...);
+extern VOID WinCallSetFunction(QWORD pfn);
 extern BOOL  LookupFunctions(QWORD qwAddr_KallsymsLookupName, QWORD pqwNameTable, QWORD pqwFnTable, QWORD cFunctions);
 extern QWORD m_phys_to_virt(QWORD p1);
 extern QWORD m_page_to_phys(QWORD p1);
