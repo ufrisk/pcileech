@@ -160,3 +160,6 @@ v1.5
 * signature: Windows 10 updated.
 * other: bug fix - memory write in macOS.
 * other: firmware flash fixes for PP3380 device.
+
+Latest:
+* signature: Windows 10 updated.
