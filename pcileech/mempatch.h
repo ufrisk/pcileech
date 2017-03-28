@@ -8,11 +8,11 @@
 #include "pcileech.h"
 
 /*
-* Patch the memory of the target system. This includes the unlock
-* operating system functionality (remove password requirement).
+* Patch the memory of the target system. Alternatively search the memory of the
+* target system. This includes the unlock operating system functionality.
 * -- pCfg
 * -- pDeviceData
 */
-VOID ActionPatch(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
+VOID ActionPatchAndSearch(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
 
 #endif /* __MEMPATCH_H__ */

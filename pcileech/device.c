@@ -1,12 +1,41 @@
 // device.c : implementation related to the USB3380 hardware device.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "device.h"
 #include "kmd.h"
 #include "util.h"
 #include <versionhelpers.h>
+
+#define CSR_BYTE0							0x01
+#define CSR_BYTE1							0x02
+#define CSR_BYTE2							0x04
+#define CSR_BYTE3							0x08
+#define CSR_BYTEALL							0x0f
+#define CSR_CONFIGSPACE_PCIE				0x00
+#define CSR_CONFIGSPACE_MEMM				0x10
+#define CSR_CONFIGSPACE_8051				0x20
+#define REG_USBSTAT							0x90
+#define REG_USBCTL2							0xc8
+#define REG_DMACTL_0						0x180
+#define REG_DMASTAT_0						0x184
+#define REG_DMACOUNT_0						0x190
+#define REG_DMAADDR_0						0x194
+#define REG_FIFOSTAT_0						0x32c
+#define REG_DMACTL_1						0x1a0
+#define REG_DMASTAT_1						0x1a4
+#define REG_DMACOUNT_1						0x1b0
+#define REG_DMAADDR_1						0x1b4
+#define REG_DMACTL_2						0x1c0
+#define REG_DMASTAT_2						0x1c4
+#define REG_DMACOUNT_2						0x1d0
+#define REG_DMAADDR_2						0x1d4
+#define REG_DMACTL_3						0x1e0
+#define REG_DMASTAT_3						0x1e4
+#define REG_DMACOUNT_3						0x1f0
+#define REG_DMAADDR_3						0x1f4
+#define REGPCI_STATCMD						0x04
 
 typedef struct tdEP_INFO {
 	UCHAR pipe;
@@ -24,7 +53,7 @@ EP_INFO CEP_INFO[3] = {
 
 typedef struct tdThreadDataReadEP {
 	PDEVICE_DATA pDeviceData;
-	DWORD dwAddrPci32;
+	QWORD qwAddr;
 	PBYTE pb;
 	DWORD cb;
 	BOOL isFinished;
@@ -43,12 +72,12 @@ DEVICE_MEMORY_RANGE CDEVICE_RESERVED_MEMORY_RANGES[NUMBER_OF_DEVICE_RESERVED_MEM
 	{ .BaseAddress = 0xF0000000,.TopAddress = 0xFFFFFFFF }, // PCI SPACE
 };
 
-BOOL _DeviceIsInReservedMemoryRange(_In_ DWORD dwAddrPci32, _In_ DWORD cb)
+BOOL _DeviceIsInReservedMemoryRange(_In_ QWORD qwAddr, _In_ DWORD cb)
 {
 	PDEVICE_MEMORY_RANGE pmr;
 	for(DWORD i = 0; i < NUMBER_OF_DEVICE_RESERVED_MEMORY_RANGES; i++) {
 		pmr = &CDEVICE_RESERVED_MEMORY_RANGES[i];
-		if(!((dwAddrPci32 > pmr->TopAddress) || (dwAddrPci32 + cb <= pmr->BaseAddress))) {
+		if(!((qwAddr > pmr->TopAddress) || (qwAddr + cb <= pmr->BaseAddress))) {
 			return TRUE;
 		}
 	}
@@ -78,7 +107,7 @@ BOOL _DeviceReadDMA_Retry(PTHREAD_DATA_READ_EP ptd)
 	BOOL result;
 	DWORD cbTransferred;
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rCTL, 0xc2, CSR_CONFIGSPACE_MEMM | CSR_BYTE0); // DMA_ENABLE
-	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rADDR, ptd->dwAddrPci32, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_ADDRESS
+	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rADDR, (DWORD)ptd->qwAddr, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_ADDRESS
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rCOUNT, 0x40000000 | ptd->cb, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_COUNT
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rSTAT, 0x080000c1, CSR_CONFIGSPACE_MEMM | CSR_BYTE0 | CSR_BYTE3); // DMA_START & DMA_CLEAR_ABORT
 	DeviceWriteCsr(ptd->pDeviceData, REGPCI_STATCMD, 0x07, CSR_CONFIGSPACE_PCIE | CSR_BYTE0); // BUS_MASTER ??? needed ???
@@ -88,8 +117,18 @@ BOOL _DeviceReadDMA_Retry(PTHREAD_DATA_READ_EP ptd)
 
 VOID _DeviceReadDMA(PTHREAD_DATA_READ_EP ptd)
 {
-	DWORD cbTransferred;
-	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rADDR, ptd->dwAddrPci32, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_ADDRESS
+	DWORD dwTimeout, cbTransferred;
+	if(ptd->cb > ptd->pDeviceData->MaxSizeDmaIo) {
+		ptd->result = FALSE;
+		ptd->isFinished = TRUE;
+		return;
+	}
+	// set EP timeout value on conservative usb2 assumptions (3 parallel reads, 35MB/s total speed)
+	// (XMB * 1000 * 3) / (35 * 1024 * 1024) -> 0x2fc9 ~> 0x3000 :: 4k->64ms, 5.3M->520ms
+	dwTimeout = 64 + ptd->cb / 0x3000;
+	WinUsb_SetPipePolicy(ptd->pDeviceData->WinusbHandle, ptd->pep->pipe, PIPE_TRANSFER_TIMEOUT, (ULONG)sizeof(BOOL), &dwTimeout);
+	// perform memory read
+	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rADDR, (DWORD)ptd->qwAddr, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_ADDRESS
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rCOUNT, 0x40000000 | ptd->cb, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_COUNT
 	DeviceWriteCsr(ptd->pDeviceData, ptd->pep->rSTAT, 0x080000c1, CSR_CONFIGSPACE_MEMM | CSR_BYTE0 | CSR_BYTE3); // DMA_START & DMA_CLEAR_ABORT
 	ptd->result = WinUsb_ReadPipe(ptd->pDeviceData->WinusbHandle, ptd->pep->pipe, ptd->pb, ptd->cb, &cbTransferred, NULL);
@@ -99,23 +138,27 @@ VOID _DeviceReadDMA(PTHREAD_DATA_READ_EP ptd)
 	ptd->isFinished = TRUE;
 }
 
-BOOL DeviceReadDMA(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32, _Out_ PBYTE pb, _In_ DWORD cb)
+BOOL DeviceReadDMA(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)
 {
 	THREAD_DATA_READ_EP td[3];
 	DWORD i, dwChunk;
+	if(flags & PCILEECH_MEM_FLAG_RETRYONFAIL) {
+		return DeviceReadDMA(pDeviceData, qwAddr, pb, cb, 0) || DeviceReadDMA(pDeviceData, qwAddr, pb, cb, 0);
+	}
 	if(cb % 0x1000) { return FALSE; }
 	if(cb > 0x01000000) { return FALSE; }
-	if(_DeviceIsInReservedMemoryRange(dwAddrPci32, cb)) { return FALSE; }
+	if(qwAddr + cb > 0x100000000) { return FALSE; }
+	if(_DeviceIsInReservedMemoryRange(qwAddr, cb) && !pDeviceData->IsAllowedAccessReservedAddress) { return FALSE; }
 	ZeroMemory(td, sizeof(THREAD_DATA_READ_EP) * 3);
-	if(cb < 0x00300000 || !pDeviceData->IsAllowedMultiThreadDMA) {
+	if(cb < 0x3000 || !pDeviceData->IsAllowedMultiThreadDMA) {
 		if(cb > 0x00800000) { // read max 8MB at a time.
 			return
-				DeviceReadDMA(pDeviceData, dwAddrPci32, pb, 0x00800000) &&
-				DeviceReadDMA(pDeviceData, dwAddrPci32 + 0x00800000, pb + 0x00800000, cb - 0x00800000);
+				DeviceReadDMA(pDeviceData, qwAddr, pb, 0x00800000, 0) &&
+				DeviceReadDMA(pDeviceData, qwAddr + 0x00800000, pb + 0x00800000, cb - 0x00800000, 0);
 		}
 		td[0].pDeviceData = pDeviceData;
 		td[0].pep = &CEP_INFO[0];
-		td[0].dwAddrPci32 = dwAddrPci32;
+		td[0].qwAddr = qwAddr;
 		td[0].pb = pb;
 		td[0].cb = cb;
 		_DeviceReadDMA(&td[0]);
@@ -125,7 +168,7 @@ BOOL DeviceReadDMA(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32, _Out_ 
 		for(i = 0; i < 3; i++) {
 			td[i].pDeviceData = pDeviceData;
 			td[i].pep = &CEP_INFO[i];
-			td[i].dwAddrPci32 = dwAddrPci32; dwAddrPci32 += dwChunk;
+			td[i].qwAddr = qwAddr; qwAddr += dwChunk;
 			td[i].pb = pb; pb += dwChunk;
 			if(i == 2) {
 				td[i].cb = cb - 2 * dwChunk;
@@ -137,25 +180,23 @@ BOOL DeviceReadDMA(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32, _Out_ 
 			}
 		}
 		while(!td[0].isFinished || !td[1].isFinished || !td[2].isFinished) {
-			Sleep(0);
+			SwitchToThread();
 		}
 		return td[0].result && td[1].result && td[2].result;
 	}
 }
 
-BOOL DeviceReadDMARetryOnFail(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32, _Out_ PBYTE pb, _In_ DWORD cb)
-{
-	BOOL result = DeviceReadDMA(pDeviceData, dwAddrPci32, pb, cb);
-	return result ? TRUE : DeviceReadDMA(pDeviceData, dwAddrPci32, pb, cb);
-}
-
-BOOL DeviceWriteDMA_Retry(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32, _In_ PBYTE pb, _In_ DWORD cb)
+BOOL DeviceWriteDMA(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)
 {
 	BOOL result;
 	DWORD cbTransferred;
+	if(flags & PCILEECH_MEM_FLAG_RETRYONFAIL) {
+		return DeviceWriteDMA(pDeviceData, qwAddr, pb, cb, 0) || DeviceReadDMA(pDeviceData, qwAddr, pb, cb, 0);
+	}
+	if(qwAddr + cb > 0x100000000) { return FALSE; }
 	DeviceWriteCsr(pDeviceData, REG_FIFOSTAT_0, 0xffffffff, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // USB_FIFO0 FLUSH
 	DeviceWriteCsr(pDeviceData, REG_DMACTL_0, 0xc2, CSR_CONFIGSPACE_MEMM | CSR_BYTE0); // DMA_ENABLE
-	DeviceWriteCsr(pDeviceData, REG_DMAADDR_0, dwAddrPci32, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_ADDRESS
+	DeviceWriteCsr(pDeviceData, REG_DMAADDR_0, (DWORD)qwAddr, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_ADDRESS
 	DeviceWriteCsr(pDeviceData, REG_DMACOUNT_0, 0x00000000 | cb, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL); // DMA_COUNT
 	DeviceWriteCsr(pDeviceData, REG_DMASTAT_0, 0x080000d1, CSR_CONFIGSPACE_MEMM | CSR_BYTE0 | CSR_BYTE3); // DMA_START & DMA_CLEAR_ABORT
 	DeviceWriteCsr(pDeviceData, REGPCI_STATCMD, 0x07, CSR_CONFIGSPACE_PCIE | CSR_BYTE0); // BUS_MASTER ??? needed ???
@@ -164,21 +205,16 @@ BOOL DeviceWriteDMA_Retry(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32,
 	return result;
 }
 
-BOOL DeviceWriteDMA(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32, _In_ PBYTE pb, _In_ DWORD cb)
-{
-	if(cb > 0x00ffffff) { return FALSE; }
-	return DeviceWriteDMA_Retry(pDeviceData, dwAddrPci32, pb, cb) || DeviceWriteDMA_Retry(pDeviceData, dwAddrPci32, pb, cb);
-}
-
-BOOL DeviceWriteDMAVerify(_In_ PDEVICE_DATA pDeviceData, _In_ DWORD dwAddrPci32, _In_ PBYTE pb, _In_ DWORD cb)
+BOOL DeviceWriteDMAVerify(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)
 {
 	PBYTE pbV;
-	BOOL result = DeviceWriteDMA(pDeviceData, dwAddrPci32, pb, cb);
+	BOOL result = DeviceWriteDMA(pDeviceData, qwAddr, pb, cb, flags);
 	if(!result) { return FALSE; }
-	pbV = LocalAlloc(0, cb);
+	pbV = LocalAlloc(0, cb + 0x2000);
 	if(!pbV) { return FALSE; }
-	result = DeviceReadDMA(pDeviceData, dwAddrPci32, pbV, cb);
-	result = result & (0 == memcmp(pb, pbV, cb));
+	result = 
+		DeviceReadDMA(pDeviceData, qwAddr & ~0xfff, pbV, (cb + 0xfff + (qwAddr & 0xfff)) & ~0xfff, flags) &&
+		(0 == memcmp(pb, pbV + (qwAddr & 0xfff), cb));
 	LocalFree(pbV);
 	return result;
 }
@@ -214,9 +250,6 @@ BOOL DeviceFlashEEPROM(_In_ PDEVICE_DATA pDeviceData, _In_ PBYTE pbEEPROM, _In_ 
 	DWORD dwWriteValue;
 	if(cbEEPROM < 3 || cbEEPROM > 0x7FFF) {
 		return FALSE; // too small or too large for 2 byte addressing mode
-	}
-	if(pbEEPROM[0] != 0x5a || (pbEEPROM[1] & 0xf8) != 0x00) {
-		return FALSE; // rudimentary signature sanity check
 	}
 	while(wAddr < cbEEPROM) {
 		// initialize EEPROM for writing
@@ -280,7 +313,7 @@ BOOL DeviceRetrievePath(_Out_bytecap_(BufLen) LPWSTR wszDevicePath, _In_ ULONG B
 VOID DeviceOpen_SetPipePolicy(_In_ PDEVICE_DATA pDeviceData)
 {
 	BOOL boolTRUE = TRUE;
-	ULONG ulTIMEOUT = 100; // ms
+	ULONG ulTIMEOUT = 500; // ms
 	WinUsb_SetPipePolicy(pDeviceData->WinusbHandle, pDeviceData->PipeDmaOut, AUTO_CLEAR_STALL, (ULONG)sizeof(BOOL), &boolTRUE);
 	WinUsb_SetPipePolicy(pDeviceData->WinusbHandle, pDeviceData->PipeDmaOut, PIPE_TRANSFER_TIMEOUT, (ULONG)sizeof(BOOL), &ulTIMEOUT);
 	WinUsb_SetPipePolicy(pDeviceData->WinusbHandle, pDeviceData->PipeDmaIn1, AUTO_CLEAR_STALL, (ULONG)sizeof(BOOL), &boolTRUE);
@@ -291,7 +324,7 @@ VOID DeviceOpen_SetPipePolicy(_In_ PDEVICE_DATA pDeviceData)
 	WinUsb_SetPipePolicy(pDeviceData->WinusbHandle, pDeviceData->PipeDmaIn3, PIPE_TRANSFER_TIMEOUT, (ULONG)sizeof(BOOL), &ulTIMEOUT);
 }
 
-BOOL DeviceOpen(_Out_ PDEVICE_DATA pDeviceData)
+BOOL DeviceOpen_Open(_In_ PCONFIG pCfg, _Out_ PDEVICE_DATA pDeviceData)
 {
 	BOOL result;
 	pDeviceData->HandlesOpen = FALSE;
@@ -326,6 +359,8 @@ BOOL DeviceOpen(_Out_ PDEVICE_DATA pDeviceData)
 	DeviceOpen_SetPipePolicy(pDeviceData);
 	pDeviceData->HandlesOpen = TRUE;
 	pDeviceData->IsAllowedMultiThreadDMA = IsWindows8OrGreater(); // multi threaded DMA read fails on WIN7.
+	pDeviceData->IsAllowedAccessReservedAddress = pCfg->fForceRW;
+	pDeviceData->MaxSizeDmaIo = pCfg->qwMaxSizeDmaIo;
 	return TRUE;
 }
 
@@ -339,24 +374,71 @@ VOID DeviceClose(_Inout_ PDEVICE_DATA pDeviceData)
 	pDeviceData->HandlesOpen = FALSE;
 }
 
-BOOL DeviceWriteMEM(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb)
+BOOL DeviceOpen(_In_ PCONFIG pCfg, _Out_ PDEVICE_DATA pDeviceData)
+{
+	BOOL result;
+	DWORD dwReg;
+	result = DeviceOpen_Open(pCfg, pDeviceData);
+	if(!result) { return FALSE; }
+	DeviceReadCsr(pDeviceData, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
+	if(pCfg->fForceUsb2 && (dwReg & 0x0100 /* Super-Speed(USB3) */)) {
+		printf("Device Info: Device running at USB3 speed; downgrading to USB2 ...\n");
+		dwReg = 0x04; // USB2=ENABLE, USB3=DISABLE
+		DeviceWriteCsr(pDeviceData, REG_USBCTL2, dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTE0);
+		DeviceClose(pDeviceData);
+		Sleep(1000);
+		result = DeviceOpen_Open(pCfg, pDeviceData);
+		if(!result) { return FALSE; }
+		DeviceReadCsr(pDeviceData, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
+	}
+	if(dwReg & 0xc0 /* Full-Speed(USB1)|High-Speed(USB2) */) {
+		printf("Device Info: Device running at USB2 speed.\n");
+	} else if(pCfg->fVerbose) {
+		printf("Device Info: Device running at USB3 speed.\n");
+	}
+	return TRUE;
+}
+
+BOOL DeviceWriteMEM(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)
 {
 	if(pDeviceData->KMDHandle) {
 		return KMDWriteMemory(pDeviceData, qwAddr, pb, cb);
-	} else if(qwAddr + cb > 0xffffffff) {
-		return FALSE;
 	} else {
-		return DeviceWriteDMA(pDeviceData, (DWORD)qwAddr, pb, cb);
+		return DeviceWriteDMA(pDeviceData, qwAddr, pb, cb, flags);
 	}
 }
 
-BOOL DeviceReadMEM(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
+BOOL DeviceReadMEM(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)
 {
 	if(pDeviceData->KMDHandle) {
 		return KMDReadMemory(pDeviceData, qwAddr, pb, cb);
-	} else if(qwAddr + cb > 0xffffffff) {
-		return FALSE;
 	} else {
-		return DeviceReadDMA(pDeviceData, (DWORD)qwAddr, pb, cb);
+		return DeviceReadDMA(pDeviceData, qwAddr, pb, cb, flags);
 	}
+}
+
+BOOL DevicePciOutWriteDma(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb)
+{
+	DWORD cbTransferred;
+	BYTE data[4 + 4 + 64 * 4];
+	if(((cb % 4) != 0) || (cb > 256)) { return FALSE; }
+	if((qwAddr & 0x03) || ((qwAddr + cb) > 0x100000000)) { return FALSE; }
+	*(PDWORD)(data + 0) = 0x0000004f | (cb >> 2) << 24;
+	*(PDWORD)(data + 4) = (DWORD)qwAddr;
+	memcpy(data + 8, pb, cb);
+	return WinUsb_WritePipe(pDeviceData->WinusbHandle, pDeviceData->PipePciOut, data, 8 + cb, &cbTransferred, NULL);
+}
+
+BOOL DevicePciInReadDma(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
+{
+	DWORD cbTransferred;
+	BYTE data[4 + 4];
+	if(((cb % 4) != 0) || (cb > 256)) { return FALSE; }
+	if((qwAddr & 0x03) || ((qwAddr + cb) > 0x100000000)) { return FALSE; }
+	*(PDWORD)(data + 0) = 0x000000cf | (cb >> 2) << 24;
+	*(PDWORD)(data + 4) = (DWORD)qwAddr;
+	return
+		WinUsb_WritePipe(pDeviceData->WinusbHandle, pDeviceData->PipePciOut, data, 8, &cbTransferred, NULL) &&
+		WinUsb_ReadPipe(pDeviceData->WinusbHandle, pDeviceData->PipePciIn, pb, cb, &cbTransferred, NULL) &&
+		cb == cbTransferred;
 }

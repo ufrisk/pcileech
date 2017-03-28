@@ -39,6 +39,7 @@ VOID c_EntryPoint(PKMDDATA pk)
 {
 	FN2 fn2;
 	QWORD hFile, qwOffset = 0;
+	BOOL isModeLargeTransfer = FALSE;
 	if(!LookupFunctions2(pk, &fn2)) {
 		pk->dataOut[0] = STATUS_FAIL_FUNCTION_LOOKUP;
 		return;
@@ -49,10 +50,21 @@ VOID c_EntryPoint(PKMDDATA pk)
 		pk->dataOut[0] = STATUS_FAIL_FILE_CANNOT_OPEN;
 		return;
 	}
-	pk->dataOutExtraLength = SysVCall(fn2.vfs_read, hFile, pk->DMAAddrVirtual + pk->dataOutExtraOffset, pk->dataOutExtraLengthMax, &qwOffset);
-	if(pk->dataOutExtraLength >= pk->dataOutExtraLengthMax) {
-		pk->dataOut[0] = STATUS_FAIL_FILE_SIZE;
-		pk->dataOutExtraLength = 0;
+	while(TRUE) {
+		pk->dataOutExtraLength = SysVCall(fn2.vfs_read, hFile, pk->DMAAddrVirtual + pk->dataOutExtraOffset, pk->dataOutExtraLengthMax, &qwOffset);
+		if(pk->dataOutExtraLength < pk->dataOutExtraLengthMax) {
+			break;
+		}
+		isModeLargeTransfer = TRUE;
+		if(!WriteLargeOutput_WaitNext(pk)) {
+			pk->dataOutExtraLength = 0;
+			pk->dataOut[0] = STATUS_FAIL_PCILEECH_CORE;
+			SysVCall(fn2.filp_close, hFile, NULL);
+			return;
+		}
+	}
+	if(isModeLargeTransfer) {
+		WriteLargeOutput_Finish(pk);
 	}
 	SysVCall(fn2.filp_close, hFile, NULL);
 }

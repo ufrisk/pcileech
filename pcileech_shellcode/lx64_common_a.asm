@@ -11,6 +11,7 @@
 main PROTO
 LookupFunctions PROTO
 SysVCall PROTO 
+WinCallSetFunction PROTO
 m_phys_to_virt PROTO
 m_page_to_phys PROTO
 EXTRN c_EntryPoint:NEAR
@@ -111,6 +112,56 @@ SysVCall PROC
 SysVCall ENDP
 
 ; ------------------------------------------------------------------
+; WinCall callback function pointer.
+; ------------------------------------------------------------------
+data_wincall_fnptr dq 0
+
+; ------------------------------------------------------------------
+; Set the (windows x64 calling convention compatible) callback function
+; to forward callbacks sent to WinCall to.
+; NB! This requires the memory to be RWX.
+; rcx -> address of kallsyms_lookup_name
+; ------------------------------------------------------------------
+WinCallSetFunction PROC
+	MOV [data_wincall_fnptr], rcx
+	RET
+WinCallSetFunction ENDP
+
+; ------------------------------------------------------------------
+; Convert from the SystemV X64 calling convention (used by Linux)
+; to the Windows Windows X64 calling convention.
+; Function typically called by the Linux kernel as a callback function.
+; The address of the Windows X64 function to forward the call to is
+; set by 'WinCallSetFunction'.
+; A maximum of six (6) parameters are supported.
+; rdi -> rcx
+; rsi -> rdx
+; rdx -> r8
+; rcx -> r9
+; r8  -> stack
+; r9  -> stack
+; ------------------------------------------------------------------
+WinCall PROC
+	PUSH r15
+	MOV r15, rsp
+	AND rsp, 0FFFFFFFFFFFFFFF0h
+
+	PUSH r9
+	PUSH r8
+	SUB rsp, 020h
+	MOV r9, rcx
+	MOV r8, rdx
+	MOV rdx, rsi
+	MOV rcx, rdi
+
+	MOV rax, [data_wincall_fnptr]
+	CALL rax
+	MOV rsp, r15
+	POP r15
+	RET
+WinCall ENDP
+
+; ------------------------------------------------------------------
 ; Convert a physical address to a virtual address (Linux)
 ; Function uses Windows calling convention (rcx = 1st param)
 ; ------------------------------------------------------------------
@@ -132,5 +183,13 @@ m_page_to_phys PROC
 	MOV rax, rcx
 	RET
 m_page_to_phys ENDP
+
+; ----------------------------------------------------
+; Flush the CPU cache.
+; ----------------------------------------------------
+CacheFlush PROC
+	WBINVD
+	RET
+CacheFlush ENDP
 
 END

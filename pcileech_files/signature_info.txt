@@ -1,5 +1,5 @@
-Signature Guide for OS unlock signatures and Kernel Module Inserts
-==================================================================
+Signature Guide for Search/Patch signatures and Kernel Module signatures
+========================================================================
 
 
 
@@ -25,17 +25,31 @@ chunk[2] = offset 1aab00 and data loaded from file.
 
 
 
-UNLOCK OS SIGNATURE FORMAT
-==========================
-An operating system unlock signature file have the extension '.sig'. A file may
-contain multiple unlock signatures.  An unlock signature consists exactly three
-(3) chunks. Each offset is a page offset ranging between 0-fff. Pleae note that
-unlock signatures may be used to patch any code - just not OS login code.
+MEMORY PATCH SIGNATURE FORMAT
+=============================
+A memory patch signature file have the extension '.sig'.     A file may contain
+multiple memory patch signatures.     A memory patch signature consists exactly
+three (3) chunks. Memory patch signatures support wildcard and relative offsets
+in addition to the standard in-page offset.
 chunk[0] = search pattern 'data' at 'offset' distance from page base.
 chunk[1] = search pattern 'data' at 'offset' distance from page base.
            only searched in same page as chunk[0] if match is made in chunk[0].
            optional. if not used specify data: '-'
 chunk[2] = replace contents with 'data' at distance 'offset' from page base.
+
+MEMORY PATCH SIGNATURES - WILDCARD AND RELATIVE OFFSETS
+=======================================================
+- Memory patch signatures support in-page fixed offsets in all signature chunks
+  Examples: 0 ; e0 ; ee0.
+- Wildcard offsets are supported in signature chunk 0 and 1, but not in chunk 2
+  which is chunk containing patch data. A wildcard offset is denoted by '*'.
+  Example: *
+- Relative offsets are supported only in signature chunk 1 and 2.  The relative
+  offset is not supported in signature chunk 0. Relative offsets are calculated
+  from the offset in chunk 0.  Relative offsets can be combined with a wildcard
+  offset in chunk 0.   A relative offset is given by r and then the offset as a
+  32-bit DWORD in hex.
+  Examples: r0 ; r1F0 ; rFFFFFFF0 (negative offset of 0x10)
 
 
 
@@ -43,6 +57,7 @@ KERNEL MODULE SIGNATURE FORMAT #1 - memory search
 =================================================
 The default format for kernel signatures is the memory search format.   This is
 used by PCILeech to search the memory for a signature, which is then patched.
+Note that only fixed in-page offsets are supported in kernel module signatures.
 chunk[0] = search pattern 'data' at 'offset' distance from page base. 
            This page contains the function to be overwritten by stage #1 code.
 chunk[1] = search pattern 'data' at 'offset' distance from page base.
@@ -56,7 +71,8 @@ chunk[4] = <offset not in use>, and stage #3 code.
 KERNEL MODULE SIGNATURE FORMAT #2 - page table hijack
 =====================================================
 The page table hijack format is used when a page table needs to be hijacked in
-order to gain execution (if the targeted executable memory is above 4GB)
+order to gain execution (if the targeted executable memory is above 4GB). Note
+that only fixed in-page offsets are supported in kernel module signatures.
 chunk[0] = <offset not in use>, 4096-bytes of original page bytes for page in
            which stage #1 code should be placed.           
 chunk[1] = <offset not in use>, 4096-bytes of original page bytes for page in

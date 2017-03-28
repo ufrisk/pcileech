@@ -1,6 +1,6 @@
 // pcileech.h : definitions for pcileech - dump memory and unlock computers with a USB3380 device using DMA.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __PCILEECH_H__
@@ -17,6 +17,7 @@
 
 #pragma warning( disable : 4477)
 
+#define SIZE_PAGE_ALIGN_4K(x)				((x + 0xfff) & ~0xfff)
 #define CONFIG_MAX_SIGNATURES		        16
 typedef unsigned __int64					QWORD;
 typedef QWORD near							*PQWORD;
@@ -28,6 +29,8 @@ DEFINE_GUID(GUID_DEVINTERFACE_android, 0xF72FE0D4, 0xCBCB, 0x407d, 0x88, 0x14, 0
 typedef struct _DEVICE_DATA {
 	BOOL HandlesOpen;
 	BOOL IsAllowedMultiThreadDMA;
+	BOOL IsAllowedAccessReservedAddress;
+	QWORD MaxSizeDmaIo;
 	WINUSB_INTERFACE_HANDLE WinusbHandle;
 	HANDLE DeviceHandle;
 	WCHAR DevicePath[MAX_PATH];
@@ -63,6 +66,7 @@ typedef enum tdActionType {
 	DUMP,
 	WRITE,
 	PATCH,
+	SEARCH,
 	FLASH,
 	START8051,
 	STOP8051,
@@ -71,7 +75,10 @@ typedef enum tdActionType {
 	TESTMEMREADWRITE,
 	KMDLOAD,
 	KMDEXIT,
-	EXEC
+	EXEC,
+	MOUNT,
+	MAC_FVRECOVER,
+	PT_PHYS2VIRT
 } ACTION_TYPE, PACTION_TYPE;
 
 #define CONFIG_MAX_INSIZE 0x400000 // 4MB
@@ -89,23 +96,24 @@ typedef struct tdConfig {
 	CHAR szSignatureName[MAX_PATH];
 	CHAR szKMDName[MAX_PATH];
 	CHAR szShellcodeName[MAX_PATH];
-	BOOL fPageStat;
+	QWORD qwMaxSizeDmaIo;
 	BOOL fPageTableScan;
+	BOOL fPatchAll;
+	BOOL fForceRW;
+	BOOL fShowHelp;
+	BOOL fOutFile;
+	BOOL fForceUsb2;
+	BOOL fVerbose;
 } CONFIG, *PCONFIG;
 
-typedef struct tdPageStatistics {
-	QWORD cPageTotal;
-	QWORD cPageSuccess;
-	QWORD cPageFail;
-	QWORD qwTickCountStart;
-	BOOL isAccessModeKMD;
-	LPSTR szCurrentAction;
-} PAGE_STATISTICS, *PPAGE_STATISTICS;
-
+#define SIGNATURE_CHUNK_TP_OFFSET_FIXED		0
+#define SIGNATURE_CHUNK_TP_OFFSET_RELATIVE	1
+#define SIGNATURE_CHUNK_TP_OFFSET_ANY		2
 typedef struct tdSignatureChunk {
 	QWORD qwAddress;
 	DWORD cbOffset;
 	DWORD cb;
+	BYTE tpOffset;
 	BYTE pb[4096];
 } SIGNATURE_CHUNK, *PSIGNATURE_CHUNK;
 
@@ -138,6 +146,75 @@ typedef struct tdKmdExec {
 } KMDEXEC, *PKMDEXEC;
 #pragma pack(pop) /* RE-ENABLE STRUCT PADDINGS */
 
-VOID ShowUpdatePageRead(_In_ PCONFIG pCfg, _In_ QWORD qwCurrentAddress, _Inout_ PPAGE_STATISTICS pPageStat);
+#define KMDDATA_OPERATING_SYSTEM_WINDOWS		0x01
+#define KMDDATA_OPERATING_SYSTEM_LINUX			0x02
+#define KMDDATA_OPERATING_SYSTEM_MACOS			0x04
+#define KMDDATA_OPERATING_SYSTEM_FREEBSD		0x08
+
+#define KMDDATA_MAGIC							0xff11337711333377
+#define KMDDATA_MAGIC_PARTIAL					0xff11337711333388
+
+#define KMD_CMD_VOID							0xffff
+#define KMD_CMD_COMPLETED						0
+#define KMD_CMD_READ							1
+#define KMD_CMD_WRITE							2
+#define KMD_CMD_TERMINATE						3
+#define KMD_CMD_MEM_INFO						4
+#define KMD_CMD_EXEC							5
+#define KMD_CMD_READ_VA							6
+#define KMD_CMD_WRITE_VA						7
+#define KMD_CMD_EXEC_EXTENDED					8
+
+/*
+* KMD DATA struct. This struct must be contained in a 4096 byte section (page).
+* This page/struct is used to communicate between the inserted kernel code and
+* the pcileech program.
+* VNR: 002
+*/
+typedef struct tdKMDDATA {
+	QWORD MAGIC;					// [0x000] magic number 0x0ff11337711333377.
+	QWORD AddrKernelBase;			// [0x008] pre-filled by stage2, virtual address of kernel header (WINDOWS/MACOS).
+	QWORD AddrKallsymsLookupName;	// [0x010] pre-filled by stage2, virtual address of kallsyms_lookup_name (LINUX).
+	QWORD DMASizeBuffer;			// [0x018] size of DMA buffer.
+	QWORD DMAAddrPhysical;			// [0x020] physical address of DMA buffer.
+	QWORD DMAAddrVirtual;			// [0x028] virtual address of DMA buffer.
+	QWORD _status;					// [0x030] status of operation
+	QWORD _result;					// [0x038] result of operation TRUE|FALSE
+	QWORD _address;					// [0x040] virtual address to operate on.
+	QWORD _size;					// [0x048] size of operation / data in DMA buffer.
+	QWORD OperatingSystem;			// [0x050] operating system type
+	QWORD ReservedKMD;				// [0x058] reserved for specific kmd data (dependant on KMD version).
+	QWORD ReservedFutureUse1[20];	// [0x060] reserved for future use.
+	QWORD dataInExtraLength;		// [0x100] length of extra in-data.
+	QWORD dataInExtraOffset;		// [0x108] offset from DMAAddrPhysical/DMAAddrVirtual.
+	QWORD dataInExtraLengthMax;		// [0x110] maximum length of extra in-data. 
+	QWORD dataInConsoleBuffer;		// [0x118] physical address of 1-page console buffer.
+	QWORD dataIn[28];				// [0x120]
+	QWORD dataOutExtraLength;		// [0x200] length of extra out-data.
+	QWORD dataOutExtraOffset;		// [0x208] offset from DMAAddrPhysical/DMAAddrVirtual.
+	QWORD dataOutExtraLengthMax;	// [0x210] maximum length of extra out-data. 
+	QWORD dataOutConsoleBuffer;		// [0x218] physical address of 1-page console buffer.
+	QWORD dataOut[28];				// [0x220]
+	PVOID fn[32];					// [0x300] used by shellcode to store function pointers.
+	CHAR dataInStr[MAX_PATH];		// [0x400] string in-data
+	CHAR ReservedFutureUse2[252];
+	CHAR dataOutStr[MAX_PATH];		// [0x600] string out-data
+	CHAR ReservedFutureUse3[252];
+	QWORD ReservedFutureUse4[255];	// [0x800]
+	QWORD _op;						// [0xFF8] (op is last 8 bytes in 4k-page)
+} KMDDATA, *PKMDDATA;
+
+typedef struct _PHYSICAL_MEMORY_RANGE {
+	QWORD BaseAddress;
+	QWORD NumberOfBytes;
+} PHYSICAL_MEMORY_RANGE, *PPHYSICAL_MEMORY_RANGE;
+
+typedef struct tdKMDHANDLE {
+	DWORD dwPageAddr32;
+	QWORD cPhysicalMap;
+	PPHYSICAL_MEMORY_RANGE pPhysicalMap;
+	PKMDDATA status;
+	BYTE pbPageData[4096];
+} KMDHANDLE, *PKMDHANDLE;
 
 #endif /* __PCILEECH_H__ */

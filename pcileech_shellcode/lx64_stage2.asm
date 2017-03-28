@@ -101,7 +101,7 @@ setup PROC
 	TEST rax, rax
 	JZ error
 	MOV rdi, 14h
-	MOV rsi, 1h
+	MOV rsi, 2h
 	CALL rax
 	TEST rax, rax
 	JZ error
@@ -186,8 +186,27 @@ setup PROC
 	RET
 setup ENDP
 
-m_phys_to_virt PROC
+; ------------------------------------------------------------------
+; Retrieve the PAGE_OFFSET_BASE
+; r14 -> kallsyms_lookup_name
+; rax <- value of PAGE_OFFSET_BASE
+; ------------------------------------------------------------------
+m_page_offset_base PROC
+	LEA rdi, str_page_offset_base
+	CALL r14
+	TEST rax, rax
+	JZ kaslr_pg_disable
+	MOV rax, [rax]
+	RET
+	kaslr_pg_disable:
 	MOV rax, 0ffff880000000000h
+	RET
+m_page_offset_base ENDP
+
+m_phys_to_virt PROC
+	PUSH rdi
+	CALL m_page_offset_base
+	POP rdi
 	ADD rax, rdi
 	RET
 m_phys_to_virt ENDP
@@ -208,10 +227,9 @@ m_page_to_phys ENDP
 ; ----------------------------------------------------
 clear_8k PROC
 	XOR rax, rax
-	MOV rcx, 1024
-	loop_8k:
-	MOV [rdi+8*rcx-8], rax
-	LOOP loop_8k
+	MOV ecx, 1024
+	CLD
+	REP STOSQ [rdi]
 	RET
 clear_8k ENDP
 
@@ -242,6 +260,7 @@ str_kthread_create_on_node	db 'kthread_create_on_node', 0
 str_alloc_pages_current		db 'alloc_pages_current', 0
 str_set_memory_x			db 'set_memory_x', 0
 str_wake_up_process			db 'wake_up_process', 0
+str_page_offset_base		db 'page_offset_base', 0
 str_pcileech				db 'pcileech', 0
 
 END

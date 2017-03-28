@@ -60,12 +60,10 @@ LookupFunctions PROC
 	PUSH r13
 	MOV r15, rcx				; address of kallsyms_lookup_name
 	MOV r14, rdx				; ptr to FNLX struct 
-	MOV r13, 9*8				; num functions * 8
+	MOV r13, 10*8				; num functions * 8
 	; ----------------------------------------------------
 	; 1: PUSH FUNCTION NAME POINTERS ON STACK
 	; ----------------------------------------------------
-	LEA rax, str_kallsyms_lookup_name
-	PUSH rax
 	LEA rax, str_msleep
 	PUSH rax
 	LEA rax, str_alloc_pages_current
@@ -80,7 +78,11 @@ LookupFunctions PROC
 	PUSH rax
 	LEA rax, str_do_gettimeofday
 	PUSH rax
-	LEA rax, str_iomem_open
+	LEA rax, str_walk_system_ram_range
+	PUSH rax
+	LEA rax, str_iounmap
+	PUSH rax
+	LEA rax, str_ioremap_nocache
 	PUSH rax
 	; ----------------------------------------------------
 	; 2: LOOKUP FUNCTION POINTERS BY NAME
@@ -108,14 +110,16 @@ LookupFunctions PROC
 	RET
 LookupFunctions ENDP
 
-str_kallsyms_lookup_name		db		'kallsyms_lookup_name', 0
 str_alloc_pages_current			db		'alloc_pages_current', 0
 str_set_memory_x				db		'set_memory_x', 0
 str__free_pages					db		'__free_pages', 0
 str_memcpy						db		'memcpy', 0
 str_schedule					db		'schedule', 0
 str_do_gettimeofday				db		'do_gettimeofday', 0
-str_iomem_open					db		'iomem_open', 0
+str_page_offset_base			db		'page_offset_base', 0
+str_walk_system_ram_range		db		'walk_system_ram_range', 0
+str_iounmap						db		'iounmap', 0
+str_ioremap_nocache				db		'ioremap_nocache', 0
 
 ; ------------------------------------------------------------------
 ; Convert from the Windows X64 calling convention to the SystemV
@@ -150,12 +154,42 @@ SysVCall PROC
 SysVCall ENDP
 
 ; ------------------------------------------------------------------
+; Retrieve the PAGE_OFFSET_BASE
+; Function uses Linux calling convention.
+; rdi -> addr of kallsysms_lookup_name
+; rax <- value of PAGE_OFFSET_BASE
+; ------------------------------------------------------------------
+m_page_offset_base PROC
+	MOV rax, rdi
+	LEA rdi, str_page_offset_base
+	CALL rax
+	TEST rax, rax
+	JZ kaslr_pg_disable
+	MOV rax, [rax]
+	RET
+	kaslr_pg_disable:
+	MOV rax, 0ffff880000000000h
+	RET
+m_page_offset_base ENDP
+
+; ------------------------------------------------------------------
 ; Convert a physical address to a virtual address (Linux)
 ; Function uses Windows calling convention (rcx = 1st param)
+; rcx -> addr of kallsysms_lookup_name
+; rdx -> physical_address
+; rax <- virtual_address
 ; ------------------------------------------------------------------
 m_phys_to_virt PROC
-	MOV rax, 0ffff880000000000h
-	ADD rax, rcx
+	PUSH rdi
+	PUSH rsi
+	PUSH r15
+	MOV rdi, rcx
+	MOV r15, rdx
+	CALL m_page_offset_base
+	ADD rax, r15
+	POP r15
+	POP rsi
+	POP rdi
 	RET
 m_phys_to_virt ENDP
 
@@ -171,5 +205,61 @@ m_page_to_phys PROC
 	MOV rax, rcx
 	RET
 m_page_to_phys ENDP
+
+; ------------------------------------------------------------------
+; Receives callback from walk_system_ram_range for each range.
+; rdi -> pfn_start
+; rsi -> pfn_size
+; rdx -> PKMDDATA
+; rax <- 0
+; ------------------------------------------------------------------
+callback_walk_system_ram_range PROC
+	SHL rdi, 12				; convert to bytes
+	SHL rsi, 12				; convert to bytes
+	MOV rax, [rdx + 028h]	; PKMDDATA->DMAAddrVirtual
+	MOV rcx, [rdx + 048h]	; PKMDDATA->_size
+	ADD rax, rcx
+	MOV [rax], rdi
+	MOV [rax+8], rsi
+	ADD rcx, 10h
+	MOV [rdx + 048h], rcx	; PKMDDATA->_size
+	XOR rax, rax
+	RET
+callback_walk_system_ram_range ENDP
+
+; ------------------------------------------------------------------
+; Receives callback from walk_system_ram_range before a memcpy is
+; attempted. Validate if whole range is within range
+; rdi -> pfn_start (mem_range)
+; rsi -> pfn_size  (mem_range)
+; rdx -> PKMDDATA
+; rax <- 0 (if all in range), 1 (out of range)
+; ------------------------------------------------------------------
+callback_ismemread_inrange PROC
+	SHL rdi, 12				; convert to bytes (mem_range_base)
+	SHL rsi, 12				; convert to bytes (mem_range_size)
+	MOV r8, [rdx + 040h]	; PKMDDATA->_address (req_base)
+	MOV r9, [rdx + 048h]	; PKMDDATA->_size (req_size)
+	ADD rsi, rdi			; range (mem_range_top)
+	ADD r9, r8				; read  (req_top)
+	CMP r8, rdi				; req_base < mem_range_base -> out of range
+	JL out_of_range
+	CMP r9, rsi
+	JG out_of_range			; req_top > mem_range_top -> out of range
+	XOR rax, rax
+	RET
+	out_of_range:
+	XOR rax, rax
+	INC rax
+	RET
+callback_ismemread_inrange ENDP
+
+; ----------------------------------------------------
+; Flush the CPU cache.
+; ----------------------------------------------------
+CacheFlush PROC
+	WBINVD
+	RET
+CacheFlush ENDP
 
 END

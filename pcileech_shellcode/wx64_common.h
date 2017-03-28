@@ -7,6 +7,7 @@
 #ifndef __WX64_COMMON_H__
 #define __WX64_COMMON_H__
 #include <windows.h>
+#include "statuscodes.h"
 
 #pragma warning( disable : 4047 4055 4127 4200 4201 4204)
 
@@ -63,20 +64,26 @@ typedef struct tdKMDDATA {
 	QWORD _op;						// [0xFF8] (op is last 8 bytes in 4k-page)
 } KMDDATA, *PKMDDATA;
 
-// KMDDATA_OUTSTATUS_VOID - Normal status - take no special action.
-#define KMDDATA_OUTSTATUS_VOID		0
-// KMDDATA_OUTSTATUS_KBD_IO - Keyboard interactive IO.
-// dataOut[8] = input buffer physical address
-// dataOut[9] = output buffer physical address
-#define KMDDATA_OUTSTATUS_KBD_IO	1
-
-// used together with KMDDATA_OUTSTATUS_KBD_IO out status
-typedef struct tdKMDBUFFERIO {
-	DWORD qwSeqNo;
-	DWORD qwSeqNoAck;
-	DWORD cb;
-	BYTE  pb[];
-} KMD_BUFFER_IO, *PKMD_BUFFER_IO;
+#define EXEC_IO_MAGIC					0x12651232dfef9521
+#define EXEC_IO_CONSOLE_BUFFER_SIZE		0x800
+#define EXEC_IO_DMAOFFSET_IS			0x80000
+#define EXEC_IO_DMAOFFSET_OS			0x81000
+typedef struct tdEXEC_IO {
+	QWORD magic;
+	struct {
+		QWORD cbRead;
+		QWORD cbReadAck;
+		QWORD Reserved[10];
+		BYTE  pb[800];
+	} con;
+	struct {
+		QWORD seq;
+		QWORD seqAck;
+		QWORD fCompleted;
+		QWORD fCompletedAck;
+	} bin;
+	QWORD Reserved[395];
+} EXEC_IO, *PEXEC_IO;
 
 // system information class 11
 typedef struct _SYSTEM_MODULE_INFORMATION_ENTRY {
@@ -269,7 +276,7 @@ typedef struct tdKERNEL_FUNCTIONS {
 		_Out_    PIO_STATUS_BLOCK IoStatusBlock,
 		_Out_    PVOID            Buffer,
 		_In_     ULONG            Length,
-		_In_opt_ PLARGE_INTEGER   ByteOffset,
+		_In_opt_ PQWORD           ByteOffset,
 		_In_opt_ PULONG           Key
 		);
 	NTSTATUS(*ZwSetSystemInformation)(
@@ -325,6 +332,7 @@ typedef struct tdKERNEL_FUNCTIONS {
 #define H_RtlAnsiStringToUnicodeString			0xeb6c8389
 #define H_RtlCompareMemory						0x770dcef6
 #define H_RtlCopyMemory							0xcf64979b
+#define H_RtlCreateUserThread					0x442f2041
 #define H_RtlFreeUnicodeString					0xa8b2c02a
 #define H_RtlInitAnsiString						0x7cc3283d
 #define H_RtlInitUnicodeString					0x3035d02a
@@ -350,6 +358,27 @@ QWORD PEGetProcAddressH(_In_ QWORD hModule, _In_ DWORD dwProcNameH);
 QWORD KernelGetModuleBase(_In_ PKERNEL_FUNCTIONS fnk, _In_ LPSTR szModuleName);
 VOID InitializeKernelFunctions(_In_ QWORD qwNtosBase, _Out_ PKERNEL_FUNCTIONS fnk);
 DWORD PEGetImageSize(_In_ QWORD hModule);
+VOID CommonSleep(_In_ PKERNEL_FUNCTIONS fnk, _In_ DWORD ms);
 extern QWORD GetCR3();
+extern VOID CacheFlush();
+
+/*
+* If a large output is to be written to PCILeech which won't fit in the DMA
+* buffer - write as much as possible in the DMA buffer and then call this fn.
+* When returned successfully write another chunk to this buffer and call again.
+* WriteLargeOutput_Finish must be called after all data is written to clean up.
+* -- fnk
+* -- pk
+* -- return
+*/
+BOOL WriteLargeOutput_WaitNext(_In_ PKERNEL_FUNCTIONS fnk, PKMDDATA pk);
+
+/*
+* Clean up function that must be called if WriteLargeOutput_WaitNext has
+* previously been called.
+* -- fnk
+* -- pk
+*/
+VOID WriteLargeOutput_Finish(_In_ PKERNEL_FUNCTIONS fnk, PKMDDATA pk);
 
 #endif /* __WX64_COMMON_H__ */

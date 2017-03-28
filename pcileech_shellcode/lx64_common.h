@@ -7,10 +7,13 @@
 #ifndef __LX64_COMMON_H__
 #define __LX64_COMMON_H__
 
+#include "statuscodes.h"
+
 typedef void					VOID, *PVOID;
 typedef int						BOOL, *PBOOL;
 typedef unsigned char			BYTE, *PBYTE;
 typedef char					CHAR, *PCHAR;
+typedef unsigned short			WCHAR, *PWCHAR;
 typedef unsigned short			WORD, *PWORD;
 typedef unsigned long			DWORD, *PDWORD;
 typedef unsigned __int64		QWORD, *PQWORD;
@@ -20,11 +23,15 @@ typedef unsigned long			STATUS;
 #define MAX_PATH				260
 #define TRUE					1
 #define FALSE					0
+#define UNREFERENCED_PARAMETER(P) (P)
 
 extern QWORD SysVCall(QWORD fn, ...);
+extern QWORD WinCall(QWORD p1, ...);
+extern VOID WinCallSetFunction(QWORD pfn);
 extern BOOL  LookupFunctions(QWORD qwAddr_KallsymsLookupName, QWORD pqwNameTable, QWORD pqwFnTable, QWORD cFunctions);
 extern QWORD m_phys_to_virt(QWORD p1);
 extern QWORD m_page_to_phys(QWORD p1);
+extern VOID CacheFlush();
 
 /*
 * KMD DATA struct. This struct must be contained in a 4096 byte section (page)
@@ -65,10 +72,42 @@ typedef struct tdKMDDATA {
 	QWORD _op;						// [0xFF8] (op is last 8 bytes in 4k-page)
 } KMDDATA, *PKMDDATA;
 
-#define STATUS_FAIL_FUNCTION_LOOKUP			0xf0000001
-#define STATUS_FAIL_FILE_CANNOT_OPEN		0xf0000002
-#define STATUS_FAIL_FILE_SIZE				0xf0000003
-#define STATUS_FAIL_INPPARAMS_BAD			0xf0000004
-#define STATUS_FAIL_ACTION					0xf0000005
+#define EXEC_IO_MAGIC					0x12651232dfef9521
+#define EXEC_IO_CONSOLE_BUFFER_SIZE		0x800
+#define EXEC_IO_DMAOFFSET_IS			0x80000
+#define EXEC_IO_DMAOFFSET_OS			0x81000
+typedef struct tdEXEC_IO {
+	QWORD magic;
+	struct {
+		QWORD cbRead;
+		QWORD cbReadAck;
+		QWORD Reserved[10];
+		BYTE  pb[800];
+	} con;
+	struct {
+		QWORD seq;
+		QWORD seqAck;
+		QWORD fCompleted;
+		QWORD fCompletedAck;
+	} bin;
+	QWORD Reserved[395];
+} EXEC_IO, *PEXEC_IO;
+
+/*
+* If a large output is to be written to PCILeech which won't fit in the DMA
+* buffer - write as much as possible in the DMA buffer and then call this fn.
+* When returned successfully write another chunk to this buffer and call again.
+* WriteLargeOutput_Finish must be called after all data is written to clean up.
+* -- pk
+* -- return
+*/
+BOOL WriteLargeOutput_WaitNext(PKMDDATA pk);
+
+/*
+* Clean up function that must be called if WriteLargeOutput_WaitNext has
+* previously been called.
+* -- pk
+*/
+VOID WriteLargeOutput_Finish(PKMDDATA pk);
 
 #endif /* __LX64_COMMON_H__ */

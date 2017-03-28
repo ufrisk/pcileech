@@ -8,15 +8,6 @@
 #include "pcileech.h"
 
 /*
-* Try to execute a shellcode module in the target system kernel. This function
-* requires a KMD to be loaded. The KMD is then used to load and execute the
-* code supplied in the target system!
-* -- pCfg
-* -- pDeviceData
-*/
-VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
-
-/*
 * Open a kernel module (KMD). This can be done in multiple ways as specified in
 * the configuration data.
 * -- pCfg
@@ -51,5 +42,15 @@ BOOL KMDReadMemory(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddress, _Out_ PB
 * -- return TRUE on success, otherwise FALSE.
 */
 BOOL KMDWriteMemory(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddress, _In_ PBYTE pb, _In_ DWORD cb);
+
+/*
+* Submit a command to an already loaded kernel module.
+* -- pCfg
+* -- pDeviceData
+* -- phKMD = ptr to the kmd handle.
+* -- op = the command (opcode) to submit for processing.
+* -- return TRUE on success, otherwise FALSE.
+*/
+BOOL KMD_SubmitCommand(_In_opt_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Inout_ PKMDHANDLE phKMD, _In_ QWORD op);
 
 #endif /* __KMD_H__ */

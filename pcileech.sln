@@ -16,11 +16,26 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "pcileech_flash", "pcileech_flash", "{C8566802-6336-4B4B-A3F8-B08452CEBDAE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "pcileech_kmd", "pcileech_kmd", "{2A4F90E3-A543-4D9C-9F89-CBCE396AE08A}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "linux", "linux", "{2E5DAA3B-99A5-4493-B68B-B24153FCB6E4}"
 	ProjectSection(SolutionItems) = preProject
-		pcileech_flash\Makefile = pcileech_flash\Makefile
-		pcileech_flash\pcileech_flash.c = pcileech_flash\pcileech_flash.c
-		pcileech_flash\readme_flash.txt = pcileech_flash\readme_flash.txt
+		pcileech_kmd\linux\Makefile = pcileech_kmd\linux\Makefile
+		pcileech_kmd\linux\pcileech_kmd.c = pcileech_kmd\linux\pcileech_kmd.c
 	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "linux", "linux", "{4F8780C7-8ECD-4A8F-9412-426EE8C9E9C9}"
+	ProjectSection(SolutionItems) = preProject
+		pcileech_flash\linux\Makefile = pcileech_flash\linux\Makefile
+		pcileech_flash\linux\pcileech_flash.c = pcileech_flash\linux\pcileech_flash.c
+		pcileech_flash\linux\readme.md = pcileech_flash\linux\readme.md
+		pcileech_flash\linux\readme_flash.txt = pcileech_flash\linux\readme_flash.txt
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PCILeechFlash", "pcileech_flash\windows\PCILeechFlash\PCILeechFlash.vcxproj", "{E11BECC1-685F-41B9-A352-A6127FAB3758}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PCILeechFlash_installer", "pcileech_flash\windows\PCILeechFlash_Installer\PCILeechFlash_Installer.vcxproj", "{F2F4AA4A-BEFE-4738-9412-820007919334}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -28,18 +43,26 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.Debug|x64.ActiveCfg = Debug|x64
-		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.Debug|x64.Build.0 = Debug|x64
+		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.Debug|x64.ActiveCfg = Release|x64
+		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.Debug|x64.Build.0 = Release|x64
 		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.Release|x64.ActiveCfg = Release|x64
 		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.Release|x64.Build.0 = Release|x64
-		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Debug|x64.ActiveCfg = Debug|x64
-		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Debug|x64.Build.0 = Debug|x64
+		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Debug|x64.ActiveCfg = Release|x64
+		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Debug|x64.Build.0 = Release|x64
 		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Release|x64.ActiveCfg = Release|x64
 		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Release|x64.Build.0 = Release|x64
 		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.Debug|x64.ActiveCfg = Release|x64
 		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.Release|x64.ActiveCfg = Release|x64
+		{E11BECC1-685F-41B9-A352-A6127FAB3758}.Debug|x64.ActiveCfg = Release|x64
+		{E11BECC1-685F-41B9-A352-A6127FAB3758}.Release|x64.ActiveCfg = Release|x64
+		{F2F4AA4A-BEFE-4738-9412-820007919334}.Debug|x64.ActiveCfg = Release|x64
+		{F2F4AA4A-BEFE-4738-9412-820007919334}.Release|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{2E5DAA3B-99A5-4493-B68B-B24153FCB6E4} = {2A4F90E3-A543-4D9C-9F89-CBCE396AE08A}
+		{4F8780C7-8ECD-4A8F-9412-426EE8C9E9C9} = {C8566802-6336-4B4B-A3F8-B08452CEBDAE}
 	EndGlobalSection
 EndGlobal

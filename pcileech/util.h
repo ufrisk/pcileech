@@ -1,11 +1,12 @@
 // util.h : definitions of various utility functions.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __UTIL_H__
 #define __UTIL_H__
 #include "pcileech.h"
+#include "statistics.h"
 
 /*
 * Retrieve a page table entry (PTE). (4kB pages only).
@@ -14,10 +15,21 @@
 * -- qwCR3 = the contents of the CPU register CR3 (= physical address of PML4)
 * -- qwAddressLinear = the virtual address for which the PTE should be retrieved
 * -- pqwPTE = ptr to receive the PTE
-* -- pqwPTEAddrPhysOpt = ptr to receive the physical address of the PTE (optional)
+* -- pqwPTEAddrPhysOpt = ptr to receive the physical address of the PTE
 * -- return
 */
-BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPTEAddrPhysOpt);
+BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_ PQWORD pqwPTEAddrPhys);
+
+/*
+* Change the mode of the mapped address to executable.
+* -- pCfg
+* -- pDeviceData
+* -- qwCR3
+* -- qwAddressLinear
+* -- fSetX = TRUE if virtual address should be executable.
+* -- return
+*/
+BOOL Util_PageTable_SetMode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX);
 
 /*
 * Find a module base given a page signature. Please note that this is a best
@@ -34,6 +46,19 @@ BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _I
 BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase);
 
 /*
+* Search the page tables for a given physical address. The first occurrence for
+* this address will be returned.
+* -- pCfg
+* -- pDeviceData
+* -- qwCR3 = the physical address of PML4.
+* -- qwAddrPhys = the physical address to search for.
+* -- pqwAddrVirt = ptr to receive virtual address.
+* -- pqwPTE = ptr to receive value of PTE
+* -- return
+*/
+BOOL Util_PageTable_FindMappedAddress(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_ PQWORD pqwPTE);
+
+/*
 * Load KMD and Unlock signatures.
 * -- szSignatureName
 * -- szFileExtension
@@ -47,8 +72,8 @@ BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension,
 /*
 * Retrieve the full file path to the file name specified. Path is relative to
 * directory of running executable.
-* szPath = buffer to receive the full path result.
-* szFileName = a file name in the current directory.
+* -- szPath = buffer to receive the full path result.
+* -- szFileName = a file name in the current directory.
 */
 VOID Util_GetFileInDirectory(_Out_ CHAR szPath[MAX_PATH], _In_ LPSTR szFileName);
 
@@ -68,8 +93,8 @@ DWORD Util_memcmpEx(_In_ PBYTE pb1, _In_ PBYTE pb2, _In_ DWORD cb);
 
 /*
 * Simple random number function.
-* --pb = buffer to receive random data.
-* --cb = length of random data to create.
+* -- pb = buffer to receive random data.
+* -- cb = length of random data to create.
 */
 VOID Util_GenRandom(_Out_ PBYTE pb, _In_ DWORD cb);
 
@@ -102,6 +127,7 @@ QWORD Util_GetNumeric(_In_ LPSTR sz);
 /*
 * "Create" a static signature for Linux given the supplied parameters. The
 * function formats the paramerters and put them into the supplied pSignature.
+* This will only work for kernels prior to 4.8.
 * -- paBase = memory physical offset to paSzKallsyms
 * -- paSzKallsyms = physical offset to 'kallsyms_looup_name' text string.
 * -- vaSzKallsyms = virtual address of 'kallsyms_looup_name' text string.
@@ -109,16 +135,71 @@ QWORD Util_GetNumeric(_In_ LPSTR sz);
 * -- vaFnHijack = virtual address of the function to hijack.
 * -- pSignature = ptr to signature struct to place the result in.
 */
-VOID Util_CreateSignatureLinuxGeneric(_In_ DWORD paBase, _In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature);
+VOID Util_CreateSignatureLinuxGenericPre48(_In_ DWORD paBase, _In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature);
 
 /*
-* "Create" a static signature for Apple OSX given the supplied parameters. The
+* "Create" a static signature for FreeBSD given the supplied parameters. The
+* function formats the paramerters and put them into the supplied pSignature.
+* -- paStrTab = physical address of the strtab found.
+* -- paFnHijack = physical address of the function to hijack.
+* -- pSignature = ptr to signature struct to place the result in.
+*/
+VOID Util_CreateSignatureFreeBSDGeneric(_In_ DWORD paStrTab, _In_ DWORD paFnHijack, _Out_ PSIGNATURE pSignature);
+
+/*
+* "Create" a static signature for MacOS given the supplied parameters. The
 * function formats the paramerters and put them into the supplied pSignature.
 * -- paKernelBase = memory physical address of kernel macho-o header.
 * -- paFunctionHook = memory physical address of the hook function.
 * -- paStage2 = memory physical address where to place the stage2 shellcode.
 * -- pSignature = ptr to signature struct to place the result in.
 */
-VOID Util_CreateSignatureAppleGeneric(_In_ DWORD paKernelBase, _In_ DWORD paFunctionHook, _In_ DWORD paStage2, _Out_ PSIGNATURE pSignature);
+VOID Util_CreateSignatureMacOSGeneric(_In_ DWORD paKernelBase, _In_ DWORD paFunctionHook, _In_ DWORD paStage2, _Out_ PSIGNATURE pSignature);
+
+
+/*
+* Load the stage2 and stage3 code for the Hal.dll injection technique into
+* the supplied signature.
+* -- pSignature = ptr to signature struct to place the result in.
+*/
+VOID Util_CreateSignatureWindowsHalGeneric(_Out_ PSIGNATURE pSignature);
+
+/*
+* Load the stage2 and stage3 code for the EFI Runtime Sertives hijack technique
+* into the supplied signature.
+* -- pSignature = ptr to signature struct to place the result in.
+*/
+VOID Util_CreateSignatureLinuxEfiRuntimeServices(_Out_ PSIGNATURE pSignature);
+
+/*
+* Create a search signature that searches all memory for the signature given in
+* the supplied pb and cb parameters.
+* -- pb = signature.
+* -- cb
+* -- pSignature = ptr to signature struct to place the result in.
+*/
+VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATURE pSignature);
+
+/*
+* Read a 16MB data chunk from the target and place it in the pbBuffer16M buffer.
+* Any data that failed to read within the 16MB buffer is set to zero.
+* -- pCfg
+* -- pDeviceData
+* -- pbBuffer16M = the already allocated 16MB buffer to place the content in.
+* -- qwBaseAddress = the base address to start reading from.
+* -- pPageStat = statistics struct to update on progress (pages success/fail).
+* -- return = TRUE if at least one 4k page could be read; FALSE if all pages failed.
+*/
+BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat);
+
+/*
+* Wait for the connected PCILeech device to be power cycled. This function will
+* sleep until a power cycle event is detected on the connected PCILeech device.
+* The connected device needs to first be powered down and then powered up before
+* this function will exit.
+* -- pCfg
+* -- pDeviceData
+*/
+VOID Util_WaitForPowerCycle(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
 
 #endif /* __UTIL_H__ */
