@@ -28,3 +28,6 @@ e19,c60f85,e20,b8,e1a,909090909090
 #
 # signature for Windows 7 x64 [msv1_0.dll 6.1.7601.23452 & 6.1.7601.23455]
 df1,c60f85,df8,b8,df2,909090909090
+#
+# signature for Windows 7 x64 [msv1_0.dll 6.1.7601.23571]
+e11,c60f85,e18,b8,e02,909090909090
