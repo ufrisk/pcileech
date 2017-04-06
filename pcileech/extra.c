@@ -132,10 +132,18 @@ VOID Action_MacFilevaultRecover(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData
 VOID Action_PT_Phys2Virt(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 {
 	BOOL result;
-	QWORD qwVA, qwPTE;
-	result = Util_PageTable_FindMappedAddress(pCfg, pDeviceData, pCfg->qwCR3, pCfg->qwDataIn[0], &qwVA, &qwPTE);
+	QWORD qwVA, qwPTE, qwPDE, qwPDPTE, qwPML4E;
+	printf("PT_PHYS2VIRT: searching ... (this may take some time).\n");
+	result = Util_PageTable_FindMappedAddress(pCfg, pDeviceData, pCfg->qwCR3, pCfg->qwDataIn[0], &qwVA, &qwPTE, &qwPDE, &qwPDPTE, &qwPML4E);
 	if(result) {
-		printf("PT_PHYS2VIRT: PA: 0x%016llx :: VA: 0x%016llx :: PTE: 0x%016llx.\n", pCfg->qwDataIn[0], qwVA, qwPTE);
+		printf("PT_PHYS2VIRT: finished.\n");
+		printf("          0x00000000FFFFFFFF\n");
+		printf("   PA:    0x%016llx\n", pCfg->qwDataIn[0]);
+		printf("   VA:    0x%016llx\n", qwVA);
+		printf("   PTE:   0x%016llx\n", qwPTE);
+		printf("   PDE:   0x%016llx\n", qwPDE);
+		printf("   PDPTE: 0x%016llx\n", qwPDPTE);
+		printf("   PML4E: 0x%016llx\n", qwPML4E);
 	} else {
 		printf("PT_PHYS2VIRT: Failed.\n");
 	}

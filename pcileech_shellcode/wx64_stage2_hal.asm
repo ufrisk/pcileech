@@ -16,7 +16,7 @@ main PROC
 	data_phys_addr_alloc	dd 00000000h						; 04h byte offset (4 bytes long)
 	data_orig_fnptr			dq 0000000000000000h				; 08h byte offset (8 bytes long)
 	data_orig_fnptraddr		dq 0000000000000000h				; 10h byte offset (8 bytes long)
-	data_thread_handle		dq 0								; 18h byte offset (8 bytes long)
+	data_thread_handle		dq 0000000000000000h				; 18h byte offset (8 bytes long)
 	; ----------------------------------------------------
 	; SAVE ORIGINAL PARAMETERS
 	; ----------------------------------------------------
@@ -118,8 +118,12 @@ main ENDP
 ; r13 :: virtual address buffer
 ; ----------------------------------------------------
 setup2 PROC
-	MOV al, 2					; DEBUG
-	MOV [data_filler], al		; DEBUG
+	; ----------------------------------------------------
+	; SET UP STACK SHADOW SPACE (REQUIRED FOR SOME FUNCTION CALLS)
+	; ----------------------------------------------------
+	PUSH rbp
+	MOV rbp, rsp
+	SUB rsp, 020h
 	; ----------------------------------------------------
 	; ALLOCATE 0x2000 CONTIGUOUS MEMORY BELOW 0x7fffffff
 	; ----------------------------------------------------
@@ -127,7 +131,7 @@ setup2 PROC
 	MOV edx, 9f361ebch			; H_MmAllocateContiguousMemory
 	CALL PEGetProcAddressH
 	MOV rcx, 2000h
-	MOV rdx, 7fffffffh	
+	MOV rdx, 7fffffffh
 	CALL rax
 	MOV r13, rax
 	; ----------------------------------------------------
@@ -160,6 +164,8 @@ setup2 PROC
 	; ----------------------------------------------------
 	; JMP INTO ALLOCATED AREA
 	; ----------------------------------------------------
+	MOV rsp, rbp
+	POP rbp
 	ADD r13, 1000h
 	JMP r13
 setup2 ENDP

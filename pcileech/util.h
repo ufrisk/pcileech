@@ -53,10 +53,13 @@ BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevi
 * -- qwCR3 = the physical address of PML4.
 * -- qwAddrPhys = the physical address to search for.
 * -- pqwAddrVirt = ptr to receive virtual address.
-* -- pqwPTE = ptr to receive value of PTE
+* -- pqwPTE = ptr to optionally receive value of PTE
+* -- pqwPDE = ptr to optionally receive value of PDE
+* -- pqwPDPTE = ptr to optionally receive value of PDPTE
+* -- pqwPML4E = ptr to optionally receive value of PML4E
 * -- return
 */
-BOOL Util_PageTable_FindMappedAddress(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_ PQWORD pqwPTE);
+BOOL Util_PageTable_FindMappedAddress(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_opt_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPDE, _Out_opt_ PQWORD pqwPDPTE, _Out_opt_ PQWORD pqwPML4E);
 
 /*
 * Load KMD and Unlock signatures.
@@ -200,6 +203,15 @@ BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE 
 * -- pCfg
 * -- pDeviceData
 */
-VOID Util_WaitForPowerCycle(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
+VOID Util_WaitForPowerCycle(_In_ PCONFIG pCfg, _Inout_ PDEVICE_DATA pDeviceData);
+
+/*
+* Wait for a PCILeech device to be powered on and for it to complete a dummy
+* memory read. The pDeviceData will be initialized upon success - in which
+* the function will exit.
+* -- pCfg
+* -- pDeviceData
+*/
+VOID Util_WaitForPowerOn(_In_ PCONFIG pCfg, _Inout_ PDEVICE_DATA pDeviceData);
 
 #endif /* __UTIL_H__ */

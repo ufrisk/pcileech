@@ -162,4 +162,5 @@ v1.5
 * other: firmware flash fixes for PP3380 device.
 
 Latest:
-* signature: Windows 10 updated.
+* signature: Windows 10 Creators Update.
+* signature: macOS Sierra updated.

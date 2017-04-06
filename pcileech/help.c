@@ -124,7 +124,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016, 2017 Ulf Frisk                                             \n" \
-		" Version: 1.5                                                                  \n" \
+		" Version: 1.5.1                                                                \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or later.                           \n" \
@@ -351,7 +351,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 			" automatically figure out the password this memory dump may be used. In order  \n" \
 			" for PCILeech to figure out the password only ascii characters may be used; if \n" \
 			" other unicode characters exist in the password PCILeech will not be able to   \n" \
-			" automatically recover the password.                                           \n" \
+			" automatically recover the password. (CVE-2016-7585).                          \n" \
 			" EXAMPLES:                                                                     \n" \
 			" 1) recover the filevault 2 disk encryption password.                          \n" \
 			"    pcileech.exe mac_fvrecover                                                 \n");

