@@ -1,7 +1,7 @@
 // lx64_stage3_c.c : stage3 main shellcode.
 // Compatible with Linux x64.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 
@@ -20,7 +20,7 @@ typedef void					*HANDLE;
 extern QWORD SysVCall(QWORD fn, ...);
 extern QWORD LookupFunctions(QWORD qwAddr_KallsymsLookupName, QWORD qwAddr_FNLX);
 extern QWORD m_phys_to_virt(QWORD qwAddr_KallsymsLookupName, QWORD pa);
-extern QWORD m_page_to_phys(QWORD p1);
+extern QWORD m_page_to_phys(QWORD qwAddr_KallsymsLookupName, QWORD p1);
 extern VOID callback_walk_system_ram_range();
 extern VOID callback_ismemread_inrange();
 extern VOID CacheFlush();
@@ -112,7 +112,7 @@ QWORD AllocateMemoryDma(PKMDDATA pk, BOOL fRetry)
 	QWORD i, pStructPages[3], pa[2];
 	for(i = 0; i < 2; i++) {
 		pStructPages[i] = SysVCall(pk->fn.alloc_pages_current, 0x14, 10);
-		pa[i] = pStructPages[i] ? m_page_to_phys(pStructPages[i]) : 0;
+		pa[i] = pStructPages[i] ? m_page_to_phys(pk->AddrKallsymsLookupName, pStructPages[i]) : 0;
 	}
 	// success
 	if(pa[0] == pa[1] + 0x200000) {

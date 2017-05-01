@@ -23,7 +23,7 @@ data_debug0					dq 0								; [0a0h offset, 08h size]
 data_debug1					dq 0								; [0a8h offset, 08h size]
 data_debug2					dq 0								; [0b0h offset, 08h size]
 data_debug3					dq 0								; [0b8h offset, 08h size]
-data_debug4					dq 0								; [0c0h offset, 08h size]
+addr_vmemmap_base			dq 0								; [0c0h offset, 08h size]
 addr_kthread_create_on_node	dq 0								; [0c8h offset, 08h size]
 addr_wake_up_process		dq 0								; [0d0h offset, 08h size]
 addr_page_offset_base		dq 0								; [0d8h offset, 08h size]
@@ -194,6 +194,10 @@ find_symbols PROC
 	LEA rdi, str_page_offset_base
 	CALL r15
 	MOV [addr_page_offset_base], rax
+	; addr_vmemmap_base
+	LEA rdi, str_vmemmap_base
+	CALL r15
+	MOV [addr_vmemmap_base], rax
 	; addr_kthread_create_on_node
 	LEA rdi, str_kthread_create_on_node
 	CALL r15
@@ -323,8 +327,21 @@ m_phys_to_virt PROC
 	RET
 m_phys_to_virt ENDP
 
-m_page_to_phys PROC
+m_vmemmap_base PROC
+	MOV rax, [addr_vmemmap_base]
+	TEST rax, rax
+	JZ kaslr_memmap_disable
+	MOV rax, [rax]
+	RET
+	kaslr_memmap_disable:
 	MOV rax, 0ffffea0000000000h
+	RET
+m_vmemmap_base ENDP
+
+m_page_to_phys PROC
+	PUSH rdi
+	CALL m_vmemmap_base
+	POP rdi
 	SUB rdi, rax
 	SHR rdi, 7		; PFN
 	SHL rdi, 12
@@ -336,6 +353,7 @@ str_kallsyms				db 0, 'kallsyms_lookup_name', 0
 str_kthread_create_on_node	db 'kthread_create_on_node', 0
 str_alloc_pages_current		db 'alloc_pages_current', 0
 str_page_offset_base		db 'page_offset_base', 0
+str_vmemmap_base			db 'vmemmap_base', 0
 str_vfs_read				db 'vfs_read', 0
 str_set_memory_x			db 'set_memory_x', 0
 str_wake_up_process			db 'wake_up_process', 0

