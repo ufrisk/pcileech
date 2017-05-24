@@ -16,12 +16,12 @@
 #define PT_MASK_NX			0x8000000000000000
 #define PT_FLAG_HELPER_X	0x0000000000000001
 
-BOOL Util_PageTable_Helper(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwVA, _In_ QWORD qwPgLvl, _In_ QWORD qwPgTblPA, _In_ QWORD qwTestMask, _In_ QWORD qwTestValue, _In_ QWORD fMode, _Out_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPTEPA, _Out_ PQWORD pqwPgLvl)
+BOOL Util_PageTable_Helper(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwVA, _In_ QWORD qwPgLvl, _In_ QWORD qwPgTblPA, _In_ QWORD qwTestMask, _In_ QWORD qwTestValue, _In_ QWORD fMode, _Out_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPTEPA, _Out_ PQWORD pqwPgLvl)
 {
 	BOOL result;
 	BYTE pb[4096];
 	QWORD idx, pte;
-	result = DeviceReadMEM(pDeviceData, qwPgTblPA, pb, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	result = DeviceReadMEM(ctx, qwPgTblPA, pb, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL);
 	if(!result) { return FALSE; }
 	idx = 0xff8 & ((qwVA >> (qwPgLvl * 9 + 3)) << 3);
 	pte = *(PQWORD)(pb + idx);
@@ -29,7 +29,7 @@ BOOL Util_PageTable_Helper(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In
 	if((pte & qwTestMask) != qwTestValue) { return FALSE; }
 	if((fMode & PT_FLAG_HELPER_X) && (pte & PT_MASK_NX)) {
 		*(PQWORD)(pb + idx) &= 0x7fffffffffffffff;
-		DeviceWriteMEM(pDeviceData, qwPgTblPA + idx, pb + idx, 8, 0);
+		DeviceWriteMEM(ctx, qwPgTblPA + idx, pb + idx, 8, 0);
 	}
 	if((qwPgLvl == 1) || (pte & PT_MASK_PS)) {
 		*pqwPgLvl = qwPgLvl;
@@ -39,19 +39,19 @@ BOOL Util_PageTable_Helper(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In
 	}
 	qwPgTblPA = pte & 0x0000fffffffff000;
 	if(!qwPgTblPA) { return FALSE; }
-	return Util_PageTable_Helper(pCfg, pDeviceData, qwVA, qwPgLvl - 1, qwPgTblPA, qwTestMask, qwTestValue, fMode, pqwPTE, pqwPTEPA, pqwPgLvl);
+	return Util_PageTable_Helper(ctx, qwVA, qwPgLvl - 1, qwPgTblPA, qwTestMask, qwTestValue, fMode, pqwPTE, pqwPTEPA, pqwPgLvl);
 }
 
-BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_ PQWORD pqPTEAddrPhys)
+BOOL Util_PageTable_ReadPTE(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_ PQWORD pqPTEAddrPhys)
 {
 	QWORD ptePgLvl;
-	return Util_PageTable_Helper(pCfg, pDeviceData, qwAddressLinear, 4, qwCR3, PT_VALID_MASK, PT_VALID_VALUE, 0, pqwPTE, pqPTEAddrPhys, &ptePgLvl);
+	return Util_PageTable_Helper(ctx, qwAddressLinear, 4, qwCR3, PT_VALID_MASK, PT_VALID_VALUE, 0, pqwPTE, pqPTEAddrPhys, &ptePgLvl);
 }
 
-BOOL Util_PageTable_SetMode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX)
+BOOL Util_PageTable_SetMode(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX)
 {
 	QWORD pte, pteVA, ptePgLvl;
-	return Util_PageTable_Helper(pCfg, pDeviceData, qwAddressLinear, 4, qwCR3, 0, 0, PT_FLAG_HELPER_X, &pte, &pteVA, &ptePgLvl);
+	return Util_PageTable_Helper(ctx, qwAddressLinear, 4, qwCR3, 0, 0, PT_FLAG_HELPER_X, &pte, &pteVA, &ptePgLvl);
 }
 
 BOOL Util_PageTable_FindSignatureBase_IsPageTableDataValid(_In_ QWORD qwPageTableData)
@@ -72,13 +72,13 @@ BOOL Util_PageTable_FindSignatureBase_IsPageTableDataValid(_In_ QWORD qwPageTabl
 	return TRUE;
 }
 
-BOOL Util_PageTable_FindSignatureBase_CachedReadMEM(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE pbPage, _Inout_updates_bytes_(0x01000000) PBYTE pbCache)
+BOOL Util_PageTable_FindSignatureBase_CachedReadMEM(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pbPage, _Inout_updates_bytes_(0x01000000) PBYTE pbCache)
 {
 	BOOL result;
 	if(pbCache) {
 		if(*(PQWORD)pbCache == 0) {
 			*(PQWORD)pbCache = 2;
-			result = DeviceReadMEM(pDeviceData, 0x00100000, pbCache + 0x00100000, 0x00F00000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+			result = DeviceReadMEM(ctx, 0x00100000, pbCache + 0x00100000, 0x00F00000, PCILEECH_MEM_FLAG_RETRYONFAIL);
 			if(!result) { return FALSE; }
 			*(PQWORD)pbCache = 1;
 		}
@@ -87,10 +87,10 @@ BOOL Util_PageTable_FindSignatureBase_CachedReadMEM(_In_ PDEVICE_DATA pDeviceDat
 			return TRUE;
 		}
 	}
-	return DeviceReadMEM(pDeviceData, qwAddr, pbPage, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	return DeviceReadMEM(ctx, qwAddr, pbPage, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL);
 }
 
-BOOL Util_PageTable_FindSignatureBase_Search(_In_ PDEVICE_DATA pDeviceData, _Inout_ PBYTE pbCache, _In_ QWORD qwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase)
+BOOL Util_PageTable_FindSignatureBase_Search(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PBYTE pbCache, _In_ QWORD qwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase)
 {
 	// win8  kernel modules start at even  1-page boundaries (0x1000)
 	// win10 kernel modules start at even 16-page boundaries (0x10000)
@@ -102,7 +102,7 @@ BOOL Util_PageTable_FindSignatureBase_Search(_In_ PDEVICE_DATA pDeviceData, _Ino
 	QWORD cPTE = 0, cPTEPages = 0, PTE, qwA;
 	QWORD qwPageTableData;
 	WORD wSignature;
-	result = Util_PageTable_FindSignatureBase_CachedReadMEM(pDeviceData, qwCR3 & 0x0000fffffffff000, (PBYTE)PML4, pbCache);
+	result = Util_PageTable_FindSignatureBase_CachedReadMEM(ctx, qwCR3 & 0x0000fffffffff000, (PBYTE)PML4, pbCache);
 	if(!result) { return FALSE; }
 	qwA = 0x0fffff80000000000;
 	while(qwA > 0x07fffffffffffffff) {
@@ -114,7 +114,7 @@ BOOL Util_PageTable_FindSignatureBase_Search(_In_ PDEVICE_DATA pDeviceData, _Ino
 				qwA &= 0xffffff8000000000;
 				continue;
 			}
-			result = Util_PageTable_FindSignatureBase_CachedReadMEM(pDeviceData, qwPageTableData & 0x0000fffffffff000, (PBYTE)PDPT, pbCache);
+			result = Util_PageTable_FindSignatureBase_CachedReadMEM(ctx, qwPageTableData & 0x0000fffffffff000, (PBYTE)PDPT, pbCache);
 			if(!result) {
 				qwA += 0x0000008000000000;
 				qwA &= 0xffffff8000000000;
@@ -131,7 +131,7 @@ BOOL Util_PageTable_FindSignatureBase_Search(_In_ PDEVICE_DATA pDeviceData, _Ino
 				qwA &= 0xffffffffC0000000;
 				continue;
 			}
-			result = Util_PageTable_FindSignatureBase_CachedReadMEM(pDeviceData, qwPageTableData & 0x0000fffffffff000, (PBYTE)PD, pbCache);
+			result = Util_PageTable_FindSignatureBase_CachedReadMEM(ctx, qwPageTableData & 0x0000fffffffff000, (PBYTE)PD, pbCache);
 			if(!result) {
 				qwA += 0x0000000040000000;
 				qwA &= 0xffffffffC0000000;
@@ -147,7 +147,7 @@ BOOL Util_PageTable_FindSignatureBase_Search(_In_ PDEVICE_DATA pDeviceData, _Ino
 				qwA &= 0xffffffffffE00000;
 				continue;
 			}
-			result = Util_PageTable_FindSignatureBase_CachedReadMEM(pDeviceData, qwPageTableData & 0x0000fffffffff000, (PBYTE)PT, pbCache);
+			result = Util_PageTable_FindSignatureBase_CachedReadMEM(ctx, qwPageTableData & 0x0000fffffffff000, (PBYTE)PT, pbCache);
 			if(!result) {
 				qwA += 0x0000000000200000;
 				qwA &= 0xffffffffffE00000;
@@ -182,35 +182,35 @@ BOOL Util_PageTable_FindSignatureBase_Search(_In_ PDEVICE_DATA pDeviceData, _Ino
 	return FALSE;
 }
 
-BOOL Util_PageTable_WindowsHintPML4(_In_ PDEVICE_DATA pDeviceData, _Out_ PQWORD pqwCR3)
+BOOL Util_PageTable_WindowsHintPML4(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PQWORD pqwCR3)
 {
 	BYTE pb[0x1000];
 	return
-		DeviceReadMEM(pDeviceData, 0x1000, pb, 0x1000, 0) &&
+		DeviceReadMEM(ctx, 0x1000, pb, 0x1000, 0) &&
 		((*(PQWORD)(pb + 0x78) & 0xfffffffffff00fff) == 0xffffffffffd00000) &&
 		((*(PQWORD)(pb + 0xa0) & 0xffffffff00000fff) == 0) &&
 		(*pqwCR3 = *(PQWORD)(pb + 0xa0));
 	return FALSE;
 }
 
-BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase)
+BOOL Util_PageTable_FindSignatureBase(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase)
 {
 	BOOL result;
 	QWORD qwRegCR3;
 	PBYTE pbCache;
 	// if page base (CR3) is specified -> use it.
-	if(!pCfg->fPageTableScan) {
-		return Util_PageTable_FindSignatureBase_Search(pDeviceData, NULL, *pqwCR3, pPTEs, cPTEs, pqwSignatureBase);
+	if(!ctx->cfg->fPageTableScan) {
+		return Util_PageTable_FindSignatureBase_Search(ctx, NULL, *pqwCR3, pPTEs, cPTEs, pqwSignatureBase);
 	}
 	// try CR3/PML4 hint at PA 0x1000 on windows 8.1/10.
 	result = 
-		Util_PageTable_WindowsHintPML4(pDeviceData, pqwCR3) && 
-		Util_PageTable_FindSignatureBase_Search(pDeviceData, NULL, *pqwCR3, pPTEs, cPTEs, pqwSignatureBase);
+		Util_PageTable_WindowsHintPML4(ctx, pqwCR3) && 
+		Util_PageTable_FindSignatureBase_Search(ctx, NULL, *pqwCR3, pPTEs, cPTEs, pqwSignatureBase);
 	if(result) { return TRUE; }
 	// page table scan guessing common CR3 base addresses.
 	pbCache = LocalAlloc(LMEM_ZEROINIT, 0x01000000);
 	for(qwRegCR3 = 0x100000; qwRegCR3 < 0x1000000; qwRegCR3 += 0x1000) {
-		if(Util_PageTable_FindSignatureBase_Search(pDeviceData, pbCache, qwRegCR3, pPTEs, cPTEs, pqwSignatureBase)) {
+		if(Util_PageTable_FindSignatureBase_Search(ctx, pbCache, qwRegCR3, pPTEs, cPTEs, pqwSignatureBase)) {
 			*pqwCR3 = qwRegCR3;
 			LocalFree(pbCache);
 			return TRUE;
@@ -220,15 +220,14 @@ BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevi
 	return FALSE;
 }
 
-BOOL Util_PageTable_FindMappedAddress(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_opt_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPDE, _Out_opt_ PQWORD pqwPDPTE, _Out_opt_ PQWORD pqwPML4E)
+BOOL Util_PageTable_FindMappedAddress(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_opt_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPDE, _Out_opt_ PQWORD pqwPDPTE, _Out_opt_ PQWORD pqwPML4E)
 {
 	BOOL result, fFirstRun;
 	QWORD PML4[512], PDPT[512], PD[512], PT[512];
 	QWORD PML4_idx = 0xfff, PDPT_idx = 0xfff, PD_idx = 0xfff, PT_idx = 0xfff;
 	QWORD qwA;
 	QWORD qwPageTableData;
-	UNREFERENCED_PARAMETER(pCfg);
-	result = DeviceReadMEM(pDeviceData, qwCR3 & 0x0000fffffffff000, (PBYTE)PML4, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	result = DeviceReadMEM(ctx, qwCR3 & 0x0000fffffffff000, (PBYTE)PML4, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL);
 	if(!result) { return FALSE; }
 	qwA = 0;
 	fFirstRun = TRUE;
@@ -244,7 +243,7 @@ BOOL Util_PageTable_FindMappedAddress(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevi
 				qwA = (qwA + 0x0000008000000000) & 0xffffff8000000000;
 				continue;
 			}
-			result = DeviceReadMEM(pDeviceData, qwPageTableData & 0x0000fffffffff000, (PBYTE)PDPT, 0x1000, 0);
+			result = DeviceReadMEM(ctx, qwPageTableData & 0x0000fffffffff000, (PBYTE)PDPT, 0x1000, 0);
 			if(!result) {
 				qwA = (qwA + 0x0000008000000000) & 0xffffff8000000000;
 				continue;
@@ -260,7 +259,7 @@ BOOL Util_PageTable_FindMappedAddress(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevi
 				qwA = (qwA + 0x0000000040000000) & 0xffffffffC0000000;
 				continue;
 			}
-			result = DeviceReadMEM(pDeviceData, qwPageTableData & 0x0000fffffffff000, (PBYTE)PD, 0x1000, 0);
+			result = DeviceReadMEM(ctx, qwPageTableData & 0x0000fffffffff000, (PBYTE)PD, 0x1000, 0);
 			if(!result) {
 				qwA = (qwA + 0x0000000040000000) & 0xffffffffC0000000;
 				continue;
@@ -283,7 +282,7 @@ BOOL Util_PageTable_FindMappedAddress(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevi
 				qwA = (qwA + 0x0000000000200000) & 0xffffffffffE00000;
 				continue;
 			}
-			result = DeviceReadMEM(pDeviceData, qwPageTableData & 0x0000fffffffff000, (PBYTE)PT, 0x1000, 0);
+			result = DeviceReadMEM(ctx, qwPageTableData & 0x0000fffffffff000, (PBYTE)PT, 0x1000, 0);
 			if(!result) {
 				qwA = (qwA + 0x0000000000200000) & 0xffffffffffE00000;
 				continue;
@@ -505,20 +504,21 @@ QWORD Util_GetNumeric(_In_ LPSTR sz)
 	}
 }
 
-VOID Util_CreateSignatureLinuxGenericPre48(_In_ DWORD paBase, _In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature)
+VOID Util_CreateSignatureLinuxGeneric(_In_ QWORD paBase, 
+	_In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms, 
+	_In_ DWORD paSzFnHijack, _In_ QWORD vaSzFnHijack, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature)
 {
-	DWORD dwBase2M = (paSzKallsyms & ~0x1fffff) - ((vaSzKallsyms & ~0x1fffff) - (vaFnKallsyms & ~0x1fffff)); // symbol name base is not same as fn base
+	DWORD dwBaseKallsyms2M = (paSzKallsyms & ~0x1fffff) - ((vaSzKallsyms & ~0x1fffff) - (vaFnKallsyms & ~0x1fffff));	// symbol name base is not same as fn base
+	DWORD dwBaseFnHijack2M = (paSzFnHijack & ~0x1fffff) - ((vaSzFnHijack & ~0x1fffff) - (vaFnHijack & ~0x1fffff));		// symbol name base is not same as fn base
 	memset(pSignature, 0, sizeof(SIGNATURE));
 	Util_ParseHexFileBuiltin("DEFAULT_LINUX_X64_STAGE1", pSignature->chunk[2].pb, 4096, &pSignature->chunk[2].cb);
 	Util_ParseHexFileBuiltin("DEFAULT_LINUX_X64_STAGE2", pSignature->chunk[3].pb, 4096, &pSignature->chunk[3].cb);
 	Util_ParseHexFileBuiltin("DEFAULT_LINUX_X64_STAGE3", pSignature->chunk[4].pb, 4096, &pSignature->chunk[4].cb);
-	pSignature->chunk[0].cbOffset = paBase + dwBase2M + (vaFnHijack & 0xffffff);
-	pSignature->chunk[1].cbOffset = paBase + dwBase2M + 0xd00;
-	pSignature->chunk[2].cbOffset = dwBase2M + (vaFnHijack & 0xffffff);
-	pSignature->chunk[3].cbOffset = dwBase2M + 0xd00;
-	pSignature->chunk[4].cbOffset = dwBase2M + (vaFnKallsyms & 0xffffff);
-	pSignature->chunk[0].qwAddress = pSignature->chunk[0].cbOffset & ~0xfff;
-	pSignature->chunk[1].qwAddress = pSignature->chunk[1].cbOffset & ~0xfff;
+	pSignature->chunk[2].cbOffset = (DWORD)(dwBaseFnHijack2M + (vaFnHijack & 0x1fffff));
+	pSignature->chunk[3].cbOffset = 0xd00;
+	pSignature->chunk[4].cbOffset = (DWORD)(dwBaseKallsyms2M + (vaFnKallsyms & 0x1fffff));
+	pSignature->chunk[0].qwAddress = paBase + dwBaseFnHijack2M + (vaFnHijack & 0x1ff000);
+	pSignature->chunk[1].qwAddress = paBase;
 }
 
 VOID Util_CreateSignatureFreeBSDGeneric(_In_ DWORD paStrTab, _In_ DWORD paFnHijack, _Out_ PSIGNATURE pSignature)
@@ -574,20 +574,20 @@ VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATUR
 	memcpy(pSignature->chunk[0].pb, pb, pSignature->chunk[0].cb);
 }
 
-VOID Util_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer1M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat)
+VOID Util_Read1M(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PBYTE pbBuffer1M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat)
 {
 	QWORD o, p;
 	// try read 1M in 128k chunks
 	for(o = 0; o < 0x00100000; o += 0x00020000) {
-		if((qwBaseAddress + o + 0x00020000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer1M + o, 0x00020000, 0)) {
+		if((qwBaseAddress + o + 0x00020000 <= ctx->cfg->qwAddrMax) && DeviceReadMEM(ctx, qwBaseAddress + o, pbBuffer1M + o, 0x00020000, 0)) {
 			PageStatUpdate(pPageStat, qwBaseAddress + o + 0x00020000, 32, 0);
 		} else {
 			// try read 128k in 4k (page) chunks
 			for(p = 0; p < 0x00020000; p += 0x1000) {
-				if(!(qwBaseAddress + o + p + 0x1000 <= pCfg->qwAddrMax)) {
+				if(!(qwBaseAddress + o + p + 0x1000 <= ctx->cfg->qwAddrMax)) {
 					return;
 				}
-				if(DeviceReadMEM(pDeviceData, qwBaseAddress + o + p, pbBuffer1M + o + p, 0x1000, 0)) {
+				if(DeviceReadMEM(ctx, qwBaseAddress + o + p, pbBuffer1M + o + p, 0x1000, 0)) {
 					PageStatUpdate(pPageStat, qwBaseAddress + o + p + 0x1000, 1, 0);
 				} else {
 					PageStatUpdate(pPageStat, qwBaseAddress + o + p + 0x1000, 0, 1);
@@ -597,12 +597,12 @@ VOID Util_Read1M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE p
 	}
 }
 
-BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat)
+BOOL Util_Read16M(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat)
 {
 	BOOL isSuccess[4] = { FALSE, FALSE, FALSE, FALSE };
 	QWORD i, o, qwOffset;
 	// try read 16M
-	if((qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress, pbBuffer16M, 0x01000000, 0)) {
+	if((qwBaseAddress + 0x01000000 <= ctx->cfg->qwAddrMax) && DeviceReadMEM(ctx, qwBaseAddress, pbBuffer16M, 0x01000000, 0)) {
 		PageStatUpdate(pPageStat, qwBaseAddress + 0x010000000, 4096, 0);
 		return TRUE;
 	}
@@ -610,10 +610,10 @@ BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE 
 	memset(pbBuffer16M, 0, 0x01000000);
 	for(i = 0; i < 4; i++) {
 		o = 0x00400000 * i;
-		isSuccess[i] = (qwBaseAddress + o + 0x00400000 <= pCfg->qwAddrMax) && DeviceReadMEM(pDeviceData, qwBaseAddress + o, pbBuffer16M + o, 0x00400000, 0);
+		isSuccess[i] = (qwBaseAddress + o + 0x00400000 <= ctx->cfg->qwAddrMax) && DeviceReadMEM(ctx, qwBaseAddress + o, pbBuffer16M + o, 0x00400000, 0);
 	}
-	// DMA mode + all memory inside scope + and all 4M reads fail + no force flag => fail
-	if(!pCfg->fForceRW && !pDeviceData->KMDHandle && qwBaseAddress + 0x01000000 <= pCfg->qwAddrMax && !isSuccess[0] && !isSuccess[1] && !isSuccess[2] && !isSuccess[3]) {
+	// DMA mode + all memory inside scope + and all 4M reads fail + no force flag + iosize >= 1MB => fail
+	if(!ctx->cfg->fForceRW && !ctx->phKMD && (ctx->cfg->qwMaxSizeDmaIo >= 0x01000000) && qwBaseAddress + 0x01000000 <= ctx->cfg->qwAddrMax && !isSuccess[0] && !isSuccess[1] && !isSuccess[2] && !isSuccess[3]) {
 		PageStatUpdate(pPageStat, qwBaseAddress + 0x010000000, 0, 4096);
 		return FALSE;
 	}
@@ -624,33 +624,50 @@ BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE 
 		} else {
 			qwOffset = 0x00400000 * i;
 			for(o = 0; o < 0x00400000; o += 0x00100000) {
-				Util_Read1M(pCfg, pDeviceData, pbBuffer16M + qwOffset + o, qwBaseAddress + qwOffset + o, pPageStat);
+				Util_Read1M(ctx, pbBuffer16M + qwOffset + o, qwBaseAddress + qwOffset + o, pPageStat);
 			}
 		}
 	}
 	return TRUE;
 }
 
-VOID Util_WaitForPowerOn(_In_ PCONFIG pCfg, _Inout_ PDEVICE_DATA pDeviceData)
+VOID Util_WaitForPowerOn(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	BYTE pbDummy[4096];
 	while(TRUE) {
-		if(DeviceOpen(pCfg, pDeviceData)) {
-			if(DeviceReadDMA(pDeviceData, 0x01000000, pbDummy, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
+		if(DeviceOpen(ctx)) {
+			if(DeviceReadDMA(ctx, 0x01000000, pbDummy, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
 				break;
 			}
-			DeviceClose(pDeviceData);
+			DeviceClose(ctx);
 		}
 		Sleep(100);
 	}
 }
 
-VOID Util_WaitForPowerCycle(_In_ PCONFIG pCfg, _Inout_ PDEVICE_DATA pDeviceData)
+VOID Util_WaitForPowerCycle(_Inout_ PPCILEECH_CONTEXT ctx)
 {
-	DeviceClose(pDeviceData);
-	while(DeviceOpen(pCfg, pDeviceData)) {
-		DeviceClose(pDeviceData);
+	DeviceClose(ctx);
+	while(DeviceOpen(ctx)) {
+		DeviceClose(ctx);
 		Sleep(100);
 	}
-	Util_WaitForPowerOn(pCfg, pDeviceData);
+	Util_WaitForPowerOn(ctx);
+}
+
+VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb)
+{
+	PBYTE pbTextBuffer = NULL;
+	DWORD cbTextBuffer;
+	if(!cb) { return; }
+	if(cb > 8192) {
+		printf("Large output. Only displaying first 8192 bytes.\n");
+		cb = 8192;
+	}
+	if(CryptBinaryToStringA(pb, cb, CRYPT_STRING_HEXASCIIADDR, NULL, &cbTextBuffer) &&
+		(pbTextBuffer = (LPSTR)LocalAlloc(LMEM_ZEROINIT, cbTextBuffer)) &&
+		CryptBinaryToStringA(pb, cb, CRYPT_STRING_HEXASCIIADDR, (LPSTR)pbTextBuffer, &cbTextBuffer)) {
+		printf("%s\n", (LPSTR)pbTextBuffer);
+	}
+	if(pbTextBuffer) { LocalFree(pbTextBuffer); }
 }

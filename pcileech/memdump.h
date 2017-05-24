@@ -1,6 +1,6 @@
 // memdump.h : definitions related to memory dumping functionality.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __MEMDUMP_H__
@@ -11,36 +11,32 @@
 * Dump physical memory to file. The USB3380 card may only dump the lower 4GB
 * in default DMA mode due to hardware limitations. If a kernel module (KMD) is
 * inserted in the target computer OS kernel all memory may be dumped.
-* -- pCfg = configuration containing dump regions, file name and more info.
-* -- pDeviceData
+* -- ctx
 */
-VOID ActionMemoryDump(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
+VOID ActionMemoryDump(_Inout_ PPCILEECH_CONTEXT ctx);
 
 /*
 * Write data to the physical memory. The USB3380 may only write to the lower
 * 4GB in default DMA mode due to hardware limitations. If a kernel module (KMD)
 * is inserted in the target computer OS any kernel accessable memory can be
 * written/updated.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 */
-VOID ActionMemoryWrite(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
+VOID ActionMemoryWrite(_Inout_ PPCILEECH_CONTEXT ctx);
 
 /*
 * Tries to read a page 1000 times from the address specified in the min parameter
 * in pCfg. If memory is changed the result will be flagged.
 * After a read an optional 100 write/read cycles will be completed to test write.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 */
-VOID ActionMemoryTestReadWrite(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
+VOID ActionMemoryTestReadWrite(_Inout_ PPCILEECH_CONTEXT ctx);
 
 /*
 * Print out the contents of the 1st readable page. The address specified in the
 * min parameter in pCfg.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 */
-VOID ActionMemoryPageDisplay(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
+VOID ActionMemoryPageDisplay(_Inout_ PPCILEECH_CONTEXT ctx);
 
 #endif /* __MEMDUMP_H__ */

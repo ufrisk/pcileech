@@ -1,6 +1,6 @@
 // extra.h : definitions related to various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __EXTRA_H__
@@ -9,17 +9,28 @@
 #include "kmd.h"
 
 /*
-* Recover the Filevault 2 password on locked macOS systems prior or equal to 10.12.2
-* -- pCfg
-* -- pDeviceData
+* Recover the Filevault 2 password on locked macOS systems prior to 10.12.2.
+* (IsRebootRequired = TRUE).
+* Also recover the Filevault 2 password just after user filevault unlock on
+* some macs prior to 10.XX.YY (IsRebootRequired = FALSE).
+* -- ctx
+* -- IsRebootRequired
 */
-VOID Action_MacFilevaultRecover(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
+VOID Action_MacFilevaultRecover(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BOOL IsRebootRequired);
+
+/*
+* Try to disable VT-d on a mac in the short time window that exists after EFI
+* drops VT-d DMA protections and before macOS enables them again. If successful
+* the DMAR ACPI table will be zeroed out - resulting in macOS not enabling VT-d
+* DMA protections. This works on macs prior to 10.XX.YY
+* -- ctx
+*/
+VOID Action_MacDisableVtd(_Inout_ PPCILEECH_CONTEXT ctx);
 
 /*
 * Search for the virtual address that maps to a physical address given a page table base.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 */
-VOID Action_PT_Phys2Virt(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
+VOID Action_PT_Phys2Virt(_Inout_ PPCILEECH_CONTEXT ctx);
 
 #endif /* __EXTRA_H__ */

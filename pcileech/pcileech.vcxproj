@@ -81,8 +81,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="cpuflash.h" />
     <ClInclude Include="device.h" />
+    <ClInclude Include="device3380.h" />
+    <ClInclude Include="device605.h" />
+    <ClInclude Include="dokan.h" />
     <ClInclude Include="executor.h" />
     <ClInclude Include="extra.h" />
     <ClInclude Include="help.h" />
@@ -92,12 +94,14 @@
     <ClInclude Include="pcileech.h" />
     <ClInclude Include="shellcode.h" />
     <ClInclude Include="statistics.h" />
+    <ClInclude Include="tlp.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="vfs.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cpuflash.c" />
     <ClCompile Include="device.c" />
+    <ClCompile Include="device3380.c" />
+    <ClCompile Include="device605.c" />
     <ClCompile Include="executor.c" />
     <ClCompile Include="extra.c" />
     <ClCompile Include="help.c" />
@@ -106,6 +110,7 @@
     <ClCompile Include="mempatch.c" />
     <ClCompile Include="pcileech.c" />
     <ClCompile Include="statistics.c" />
+    <ClCompile Include="tlp.c" />
     <ClCompile Include="util.c" />
     <ClCompile Include="vfs.c" />
   </ItemGroup>

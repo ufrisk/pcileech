@@ -1,6 +1,6 @@
 // mempatch.c : implementation related to operating systems unlock/patch functionality.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "mempatch.h"
@@ -65,29 +65,29 @@ BOOL Patch_FindAndPatch(_Inout_ PBYTE pbPage, _In_ PSIGNATURE pSignatures, _In_ 
 
 #define MAX_NUM_PATCH_LOCATIONS		0x100
 
-VOID ActionPatchAndSearch(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
+VOID ActionPatchAndSearch(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	SIGNATURE oSignatures[CONFIG_MAX_SIGNATURES];
 	DWORD dwoPatch, cbPatch, cSignatures = CONFIG_MAX_SIGNATURES;
 	QWORD qwAddrBase;
 	PBYTE pbBuffer16M = LocalAlloc(0, 0x01000000);
 	PAGE_STATISTICS pageStat;
-	BOOL result, isModePatch = pCfg->tpAction == PATCH;
+	BOOL result, isModePatch = ctx->cfg->tpAction == PATCH;
 	LPSTR szAction = isModePatch ? "Patch" : "Search";
 	QWORD i, qwoPages, qwPatchList[MAX_NUM_PATCH_LOCATIONS], cPatchList = 0;
 	// initialize / allocate memory
-	qwAddrBase = pCfg->qwAddrMin;
+	qwAddrBase = ctx->cfg->qwAddrMin;
 	if(!pbBuffer16M) { return; }
-	if(pCfg->qwAddrMax < qwAddrBase + 0xfff) {
+	if(ctx->cfg->qwAddrMax < qwAddrBase + 0xfff) {
 		printf("%s: Failed. Zero or negative memory range specified.\n", szAction);
 		goto cleanup;
 	}
 	// load and verify signatures
-	if(pCfg->cbIn) {
-		Util_CreateSignatureSearchAll(pCfg->pbIn, (DWORD)pCfg->cbIn, oSignatures);
+	if(ctx->cfg->cbIn) {
+		Util_CreateSignatureSearchAll(ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn, oSignatures);
 		cSignatures = 1;
 	} else {
-		result = Util_LoadSignatures(pCfg->szSignatureName, ".sig", oSignatures, &cSignatures, 3);
+		result = Util_LoadSignatures(ctx->cfg->szSignatureName, ".sig", oSignatures, &cSignatures, 3);
 		if(!result || !cSignatures) {
 			printf("%s: Failed. Failed to load signature.\n", szAction);
 			goto cleanup;
@@ -101,21 +101,21 @@ VOID ActionPatchAndSearch(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 		}
 	}
 	// loop patch / unlock
-	PageStatInitialize(&pageStat, qwAddrBase, pCfg->qwAddrMax, isModePatch ? "Patching" : "Searching", pDeviceData->KMDHandle ? TRUE : FALSE, pCfg->fVerbose);
-	for(; qwAddrBase < pCfg->qwAddrMax; qwAddrBase += 0x01000000) {
-		result = Util_Read16M(pCfg, pDeviceData, pbBuffer16M, qwAddrBase, &pageStat);
-		if(!result && !pCfg->fForceRW && !pDeviceData->KMDHandle) {
+	PageStatInitialize(&pageStat, qwAddrBase, ctx->cfg->qwAddrMax, isModePatch ? "Patching" : "Searching", ctx->phKMD ? TRUE : FALSE, ctx->cfg->fVerbose);
+	for(; qwAddrBase < ctx->cfg->qwAddrMax; qwAddrBase += 0x01000000) {
+		result = Util_Read16M(ctx, pbBuffer16M, qwAddrBase, &pageStat);
+		if(!result && !ctx->cfg->fForceRW && !ctx->phKMD) {
 			PageStatClose(&pageStat);
 			printf("%s: Failed. Cannot dump any sequential data in 16MB - terminating.\n", szAction);
 			goto cleanup;
 		}
-		for(qwoPages = 0; (qwoPages < 0x01000000) && (qwAddrBase + qwoPages < pCfg->qwAddrMax); qwoPages += 0x1000) {
+		for(qwoPages = 0; (qwoPages < 0x01000000) && (qwAddrBase + qwoPages < ctx->cfg->qwAddrMax); qwoPages += 0x1000) {
 			result = Patch_FindAndPatch(pbBuffer16M + qwoPages, oSignatures, cSignatures, &dwoPatch, &cbPatch);
 			if(!result) {
 				continue;
 			}
 			if(isModePatch) {
-				result = DeviceWriteMEM(pDeviceData, qwAddrBase + qwoPages + dwoPatch, pbBuffer16M + qwoPages + dwoPatch, cbPatch, 0);
+				result = DeviceWriteMEM(ctx, qwAddrBase + qwoPages + dwoPatch, pbBuffer16M + qwoPages + dwoPatch, cbPatch, 0);
 			}
 			if(result) {
 				if(cPatchList == MAX_NUM_PATCH_LOCATIONS) {
@@ -130,7 +130,7 @@ VOID ActionPatchAndSearch(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 				printf("%s: Failed. Write memory failed. Location: 0x%llx\n", szAction, qwAddrBase + qwoPages + dwoPatch);
 				goto cleanup;
 			}
-			if(!pCfg->fPatchAll) {
+			if(!ctx->cfg->fPatchAll) {
 				PageStatClose(&pageStat);
 				goto cleanup;
 			}

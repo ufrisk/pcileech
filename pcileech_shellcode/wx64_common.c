@@ -93,6 +93,7 @@ VOID InitializeKernelFunctions(_In_ QWORD qwNtosBase, _Out_ PKERNEL_FUNCTIONS fn
 		{ &fnk->ZwCreateFile,				H_ZwCreateFile },
 		{ &fnk->ZwOpenFile,					H_ZwOpenFile },
 		{ &fnk->ZwReadFile,					H_ZwReadFile },
+		{ &fnk->ZwQueryDirectoryFile,		H_ZwQueryDirectoryFile },
 		{ &fnk->ZwQuerySystemInformation,	H_ZwQuerySystemInformation },
 		{ &fnk->ZwSetSystemInformation,		H_ZwSetSystemInformation },
 		{ &fnk->ZwWriteFile,				H_ZwWriteFile }

@@ -32,7 +32,8 @@ VOID Help_ShowGeneral()
 		" erted KMD. The already inserted KMD will be left intact upon exit.  If the KMD\n" \
 		" contains a kernel mode signature the kernel module will be loaded and then un-\n" \
 		" loaded on program exit ( except for the kmdload command ).                    \n" \
-		" KMD mode may access all memory. DMA mode may only access memory below 4GB.    \n" \
+		" KMD mode may access all memory.   DMA mode may only access memory below 4GB if\n" \
+		" the USB3380 hardware is used.                                                 \n" \
 		" For more detailed help about a specific command type: pcileech <command> -help\n" \
 		" General syntax: pcileech.exe <command> [-<optionname1> <optionvalue1>] ...    \n" \
 		" Valid commands and valid MODEs [ and options ]:                               \n" \
@@ -44,30 +45,32 @@ VOID Help_ShowGeneral()
 		"   [implant]                  KMD   [ in, out, s, 0..9 ]                       \n" \
 		"   kmdload                DMA       [ pt, cr3 ]                                \n" \
 		"   kmdexit                    KMD                                              \n" \
-		"   8051start              DMA,KMD   [ in ]                                     \n" \
-		"   8051stop               DMA,KMD                                              \n" \
-		"   flash                  DMA,KMD   [ in ]                                     \n" \
+		"   mount                      KMD   [ s ]                                      \n" \
 		"   pagedisplay            DMA,KMD   [ min ]                                    \n" \
 		"   pt_phys2virt           DMA,KMD   [ cr3, 0 ]                                 \n" \
 		"   testmemread            DMA       [ min ]                                    \n" \
 		"   testmemreadwrite       DMA       [ min ]                                    \n" \
+		" Device specific commands and valid MODEs [ and options ] (and device):        \n" \
+		"   usb3380_flash          DMA,KMD   [ in ] (USB3380)                           \n" \
+		"   usb3380_8051start      DMA,KMD   [ in ] (USB3380)                           \n" \
+		"   usb3380_8051stop       DMA,KMD          (USB3380)                           \n" \
+		"   tlp                    DMA       [ in ] (SP605)                             \n" \
 		" System specific commands and valid MODEs [ and options ]:                     \n" \
 		"   mac_fvrecover          DMA                                                  \n" \
+		"   mac_fvrecover2         DMA                                                  \n" \
+		"   mac_disablevtd         DMA                                                  \n" \
 		" Valid options:                                                                \n" \
 		"   -min : memory min address, valid range: 0x0..0xffffffffffffffff             \n" \
 		"          default: 0x0                                                         \n" \
-		"          For memory accesses over 0xffffffff KMD must be loaded.              \n" \
-		"          note that the address must be given in hexadecimal format.           \n" \
 		"   -max : memory max address, valid range: 0x0..0xffffffffffffffff             \n" \
-		"          default: 0xffffffff (4GB) in standard mode                           \n" \
-		"          default: actual memory size in KMD mode                              \n" \
-		"          For memory accesses over 0xffffffff KMD must be loaded.              \n" \
-		"          note that the address must be given in hexadecimal format.           \n" \
+		"          default: <max supported by device> (0xffffffff/4GB for USB3380)      \n" \
+		"          default: actual memory size in KMD mode.                             \n" \
 		"   -out : name of output file.                                                 \n" \
 		"          default: pcileech-<minaddr>-<maxaddr>-<date>-<time>.raw              \n" \
 		"          No output file will be created if parameter is set to none or null.  \n" \
 		"   -all : search all memory for signature - do not stop at first occurrence.   \n" \
 		"          Option has no value. Example: -all                                   \n" \
+		"   -vv  : extra verbose option. Same as -v but even more detailed output.      \n" \
 		"   -v   : verbose option. Additional information is displayed in the output.   \n" \
 		"          The memory map is shown when searching/dumping memory as an example. \n" \
 		"          Affects all modes and commands.                                      \n" \
@@ -75,13 +78,17 @@ VOID Help_ShowGeneral()
 		"   -force: force reads and writes even though target memory is marked as not   \n" \
 		"          accessible. Dangerous! Affects all modes and commands.               \n" \
 		"          Option has no value. Example: -force                                 \n" \
-		"   -usb2: force USB2 mode. USB2 will reduce transfer speed but may increase    \n" \
-		"          stability. PCILeech device must be power cycled to return to USB3.   \n" \
+		"   -usb2: force USB2 mode (only for USB3380 device). USB2 will reduce transfer \n" \
+		"          speed but may increase stability.                                    \n" \
 		"          Affects all modes and commands.                                      \n" \
 		"          Option has no value. Example: -usb2                                  \n" \
 		"   -iosize: max DMA i/o size. Hardware DMA requests larger than iosize will    \n" \
 		"          be discarded. Affects all modes and commands.                        \n" \
-		"          default: 0x00800000 (8MB)                                            \n" \
+		"   -wait: wait in seconds before exit. Useful when viewing received PCIe TLPs. \n" \
+		"          Affects all modes and commands.                                      \n" \
+		"   -device: specify a hardware device other than the USB3380 to use.           \n" \
+		"          Affects all modes and commands.                                      \n" \
+		"          Valid options: USB3380, SP605                                        \n" \
 		"   -help: show help about the selected command or implant and then exit        \n" \
 		"          without running the command. Affects all modes and commands.         \n" \
 		"          Option has no value. Example: -help                                  \n" \
@@ -98,14 +105,14 @@ VOID Help_ShowGeneral()
 		"          with 4GB+ RAM when kernel is located in high-memory (Windows 10).    \n" \
 		"          Insertion may trigger system crash unless signature exactly matches. \n" \
 		"   -cr3 : base address of system page table / CR3 CPU register.                \n" \
-		"          Valid range: 0x00..0xfffff000                                        \n" \
 		"          Insertion may trigger system crash unless signature exactly matches. \n" \
 		"   -kmd : address of already loaded kernel module helper (KMD).                \n" \
 		"          ALTERNATIVELY                                                        \n" \
 		"          kernel module to use, see list below for choices:                    \n" \
 		"             WIN10_X64                                                         \n" \
-		"             LINUX_X64              (NB! Kernels below 4.8 only)               \n" \
-		"             LINUX_X64_EFI          (NB! EFI/UEFI booted systems only)         \n" \
+		"             LINUX_X64_46           (NB! Kernels 4.6 and below)                \n" \
+		"             LINUX_X64_48           (NB! Kernels 4.8+, 64-bit DMA recommended) \n" \
+		"             LINUX_X64_EFI          (NB! UEFI booted systems only)             \n" \
 		"             FREEBSD_X64                                                       \n" \
 		"             MACOS                                                             \n" \
 	);
@@ -124,7 +131,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016, 2017 Ulf Frisk                                             \n" \
-		" Version: 1.5.2                                                                \n" \
+		" Version: 2.0                                                                  \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or later.                           \n" \
@@ -132,16 +139,24 @@ VOID Help_ShowInfo()
 		"   PCILeech          - https://github.com/ufrisk/pcileech                      \n" \
 		"   Slotscreamer      - https://github.com/NSAPlayset/SLOTSCREAMER              \n" \
 		"   Inception         - https://github.com/carmaa/inception                     \n" \
-		"   Google USB driver - http://developer.android.com/sdk/win-usb.html#download  \n" \
+		"   Google USB driver - https://developer.android.com/sdk/win-usb.html#download \n" \
+		"   Dokany            - https://github.com/dokan-dev/dokany/releases/latest     \n" \
 		" ----------------                                                              \n" \
-		" Use with USB3380 hardware programmed as a pcileech device only.               \n" \
-		" Use with USB2 or USB3. USB3 is strongly recommended performance wise.         \n\n" \
+		" Use with USB3380 hardware programmed as a PCILeech device.                    \n" \
+		" Use with SP605 hardware / 'PCI Express DIY hacking toolkit' by cr4sh/@d_olex. \n\n" \
 		" ----------------                                                              \n" \
-		" Driver information:                                                           \n" \
-		" The pcileech requires a dummy driver to function properly. The pcileech       \n" \
-		" device masks as a Google Glass. Please download and install the Google USB    \n" \
-		" driver before proceeding.                                                     \n" \
+		" Driver information (USB3380):                                                 \n" \
+		"   The USB3380 HW requires a dummy driver to function properly. The PCILeech   \n" \
+		"   device masks as a Google Glass. Please download and install the Google USB  \n" \
+		"   driver before proceeding by using the USB3380 device. USB3 is recommended   \n" \
+		"   to performance reasons (USB2 will work but impact performance).             \n" \
+		" Driver information (Dokany):                                                  \n" \
+		"   To be able to use the 'mount' functionality for filesystem browsing and live\n" \
+		"   memory file access PCILeech requires Dokany to be installed for virtual file\n" \
+		"   system support. Please download and install Dokany on your computer before  \n" \
+		"   using the mount functionality.                                              \n" \
 		" ----------------                                                              \n" \
+		" Notes about the PCILeech USB3380 device:                                      \n" \
 		" Usage: connect USB3380 device to target computer and USB cable to the computer\n" \
 		" executing pcileech.exe.  If all memory reads fail try to re-insert the device.\n" \
 		" - It is only possible to access the lower 4GB of RAM (32-bit) with DMA.       \n" \
@@ -270,6 +285,33 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 			" 4) search for the first location containing the pattern in the file pat.bin.  \n" \
 			"    pcileech search -in pat.bin -all -kmd 0x7fffe000                           \n");
 		break;
+	case MOUNT:
+		printf(
+			" MOUNT TARGET LIVE RAM AND FILE SYSTEM AS 'NETWORK DRIVE'.                     \n" \
+			" MODES   : KMD                                                                 \n" \
+			" OPTIONS : -s                                                                  \n" \
+			" Mount the target system live ram and file system as the drive letter specified\n" \
+			" in the -s option. If the -s option is not specified PCILeech will try to mount\n" \
+			" the target file system as the K: drive letter.                                \n" \
+			" File system mount is currently supported for: macOS, Windows and Linux.  There\n" \
+			" are limitations that are important to know, please see below. Use at own risk!\n" \
+			"  - Create file: not implemented.                                              \n" \
+			"  - Write to files may be buggy and may in rare cases corrupt the target file. \n" \
+			"  - Delete file will most often work, but with errors.                         \n" \
+			"  - Delete directory, rename/move file and other features may not be supported.\n" \
+			"  - Only the C:\\ driver is mounted on Windows target systems.                 \n" \
+			" The target system files are found in the files directory.   The live memory of\n" \
+			" the target system is mapped into the file: liveram.raw.    Writing to the live\n" \
+			" memory may crash the target system. Use with care.   Copying files and dumping\n" \
+			" memory via the PCILeech virtual file system will work but the performance will\n" \
+			" be better when using the built in commandline commands when performing actions\n" \
+			" like the ones mentioned above.                                                \n" \
+			" EXAMPLES:      (example kernel module is loaded at address 0x7fffe000)        \n" \
+			" 1) mount file system and live RAM of target as the default K: drive letter.   \n" \
+			"    pcileech mount -kmd 0x7fffe000                                             \n" \
+			" 2) mount file system and live RAM of target as X: drive letter.               \n" \
+			"    pcileech mount -kmd 0x7fffe000 -s X                                        \n");
+		break;
 	case PAGEDISPLAY:
 		printf(
 			" DISPLAY A MEMORY PAGE ON SCREEN.                                              \n" \
@@ -356,6 +398,35 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 			" 1) recover the filevault 2 disk encryption password.                          \n" \
 			"    pcileech.exe mac_fvrecover                                                 \n");
 		break;
+	case MAC_FVRECOVER2:
+		printf(
+			" RECOVER FILEVAULT 2 PASSWORD FROM A macOS SYSTEM IMMEDIATELY AFTER UNLOCK.    \n" \
+			" MODES   : DMA                                                                 \n" \
+			" OPTIONS :                                                                     \n" \
+			" Plug in the PCILeech device to any macOS system with a Thunderbolt 2 port.    \n" \
+			" Wait for the user to enter the filefault 2 password to unlock the computer.   \n" \
+			" Immediately after unlock VT-d DMA protections are dropped for a short while   \n" \
+			" and the password can be recovered in a similar way to the MAV_FVRECOVER       \n" \
+			" command. (CVE-2016-7585).                                                     \n" \
+			" EXAMPLES:                                                                     \n" \
+			" 1) recover the filevault 2 disk encryption password immediately after unlock. \n" \
+			"    pcileech.exe mac_fvrecover2                                                \n");
+		break;
+	case MAC_DISABLE_VTD:
+		printf(
+			" DISABLE Vt-d DMA PROTECTIONS IMMEDIATELY AFTER macOS BOOT.                    \n" \
+			" MODES   : DMA                                                                 \n" \
+			" OPTIONS :                                                                     \n" \
+			" Plug in the PCILeech device to any macOS system with a Thunderbolt 2 port.    \n" \
+			" Wait for the user to enter the filefault 2 password to unlock the computer.   \n" \
+			" Immediately after unlock VT-d DMA protections are dropped for a short while   \n" \
+			" and it is possible to disable the in-memory DMAR ACPI table - which results   \n" \
+			" in completely disabled VT-d protections until the computer is rebooted.       \n" \
+			" (CVE-2016-7585).                                                              \n" \
+			" EXAMPLES:                                                                     \n" \
+			" 1) disable Vt-d DMA protections immediately after macOS boot.                 \n" \
+			"    pcileech.exe mac_disablevtd                                                \n");
+		break;
 	case PT_PHYS2VIRT:
 		printf(
 			" SEARCH FOR VIRTUAL ADDRESS MAPPED TO GIVEN PHYSICAL ADDRESS.                  \n" \
@@ -369,6 +440,20 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 			" 1) search for virtual address mapped to physical 0xfed90000 given a page table\n" \
 			"    (PML4) base at: 0x1aa000.                                                  \n" \
 			"    pcileech.exe pt_phys2virt -cr3 0x1aa000 -0 0xfed90000                      \n");
+		break;
+	case TLP:
+		printf(
+			" TRANSMIT AND RECEIVE RAW PCIe TLPs                                            \n" \
+			" MODES   : DMA                                                                 \n" \
+			" OPTIONS : -in, -vv, -wait                                                     \n" \
+			" Transmit and receive PCIe TLPs. Requires supported devices such as the SP605. \n" \
+			" The USB3380 is not a supported device. Multiple TLPs may be stacked. If not   \n" \
+			" specifying an -in parameter no TLP will be sent. Specify the -vv setting to   \n" \
+			" display received and sent TLPs. The default listen time is 0.5s, if a longer  \n" \
+			" listen time is required specify it with the -wait parameter.                  \n" \
+			" EXAMPLEs:                                                                     \n" \
+			" 1) Listen for incoming TLPs for 10s:                                          \n" \
+			"    pcileech.exe -vv -wait 10                                                  \n");
 		break;
 	case EXEC:
 		_HelpShowExecCommand(pCfg);

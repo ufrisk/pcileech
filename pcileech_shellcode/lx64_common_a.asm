@@ -1,7 +1,7 @@
 ; lx64_common_a.asm : assembly to receive execution from stage3 exec command.
 ; Compatible with Linux x64.
 ;
-; (c) Ulf Frisk, 2016
+; (c) Ulf Frisk, 2016, 2017
 ; Author: Ulf Frisk, pcileech@frizk.net
 ;
 

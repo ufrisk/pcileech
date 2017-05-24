@@ -12,12 +12,10 @@
 * Callback for when kernel executable code is in "extended execution mode".
 * This will allow the kernel executable code running on the target machine to
 * communicate interactively with this executable to deliver large files.
-* -- pCfg
-* -- pDeviceData
-* -- pk
+* -- ctx
 * -- phCallback = ptr to handle; handle must be null on first entry.
 */
-VOID Exec_Callback(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ PKMDDATA pk, _Inout_ PHANDLE phCallback);
+VOID Exec_Callback(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PHANDLE phCallback);
 
 /*
 * Close handle opened/used in Exec_Callback.
@@ -30,8 +28,7 @@ VOID Exec_CallbackClose(_In_ HANDLE hCallback);
 * This function is to be called internally by PCILeech functionality that
 * require more advanced kernel functionality than the core implant is able
 * to provide.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 * -- szShellcodeName
 * -- pbIn = binary data to send to shellcode executing on the target.
 * -- cbIn
@@ -40,15 +37,14 @@ VOID Exec_CallbackClose(_In_ HANDLE hCallback);
 * -- pcbOut
 * -- result
 */
-BOOL Exec_ExecSilent(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbIn, _Out_ PBYTE *ppbOut, _Out_ PQWORD pcbOut);
+BOOL Exec_ExecSilent(_Inout_ PPCILEECH_CONTEXT ctx, _In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbIn, _Out_ PBYTE *ppbOut, _Out_ PQWORD pcbOut);
 
 /*
 * Try to execute a shellcode module in the target system kernel. This function
 * requires a KMD to be loaded. The KMD is then used to load and execute the
 * code supplied in the target system!
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 */
-VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData);
+VOID ActionExecShellcode(_Inout_ PPCILEECH_CONTEXT ctx);
 
 #endif /* __EXECUTOR_H__ */

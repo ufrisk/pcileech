@@ -243,26 +243,39 @@ typedef struct tdKERNEL_FUNCTIONS {
 		_In_ HANDLE hObject
 		);
 	NTSTATUS(*ZwCreateFile)(
-		_Out_ PHANDLE FileHandle, 
-		_In_ ACCESS_MASK DesiredAccess, 
-		_In_ PVOID ObjectAttributes, 
-		_Out_ PIO_STATUS_BLOCK IoStatusBlock, 
-		_In_opt_ PLARGE_INTEGER AllocationSize, 
-		_In_ ULONG FileAttributes, 
-		_In_ ULONG ShareAccess, 
-		_In_ ULONG CreateDisposition,
-		_In_ ULONG CreateOptions, 
+		_Out_	 PHANDLE			FileHandle, 
+		_In_	 ACCESS_MASK		DesiredAccess, 
+		_In_	 PVOID				ObjectAttributes, 
+		_Out_	 PIO_STATUS_BLOCK	IoStatusBlock, 
+		_In_opt_ PLARGE_INTEGER		AllocationSize, 
+		_In_	 ULONG				FileAttributes, 
+		_In_	 ULONG				ShareAccess, 
+		_In_	 ULONG				CreateDisposition,
+		_In_	 ULONG				CreateOptions, 
 		_In_reads_bytes_opt_(EaLength) PVOID EaBuffer, 
-		_In_ ULONG EaLength
+		_In_	 ULONG				EaLength
 		);
 	NTSTATUS(*ZwOpenFile)(
-		_Out_ PHANDLE            FileHandle,
-		_In_  ACCESS_MASK        DesiredAccess,
-		_In_  POBJECT_ATTRIBUTES ObjectAttributes,
-		_Out_ PIO_STATUS_BLOCK   IoStatusBlock,
-		_In_  ULONG              ShareAccess,
-		_In_  ULONG              OpenOptions
+		_Out_	 PHANDLE            FileHandle,
+		_In_	 ACCESS_MASK        DesiredAccess,
+		_In_	 POBJECT_ATTRIBUTES ObjectAttributes,
+		_Out_	 PIO_STATUS_BLOCK   IoStatusBlock,
+		_In_	 ULONG              ShareAccess,
+		_In_	 ULONG              OpenOptions
 		);
+	NTSTATUS(*ZwQueryDirectoryFile)(
+		_In_	 HANDLE				FileHandle,
+		_In_opt_ HANDLE				Event,
+		_In_opt_ PVOID				ApcRoutine,
+		_In_opt_ PVOID				ApcContext,
+		_Out_	 PIO_STATUS_BLOCK	IoStatusBlock,
+		_Out_	 PVOID				FileInformation,
+		_In_	 ULONG				Length,
+		_In_	 QWORD				FileInformationClass,
+		_In_	 BOOLEAN			ReturnSingleEntry,
+		_In_opt_ PUNICODE_STRING	FileName,
+		_In_	 BOOLEAN			RestartScan
+	);
 	NTSTATUS(*ZwQuerySystemInformation)(
 		_In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
 		_Inout_ PVOID SystemInformation,
@@ -341,10 +354,13 @@ typedef struct tdKERNEL_FUNCTIONS {
 #define H_ZwClose								0x5d044c61
 #define H_ZwCreateFile							0xc3a08f9d
 #define H_ZwCreateKey							0x11c719c1
+#define H_ZwDeleteFile							0xb6b0987d
 #define H_ZwLoadDriver							0x0675aa53
 #define H_ZwOpenFile							0x8829d4b8
 #define H_ZwOpenProcess							0xf0d09d60
 #define H_ZwReadFile							0x87fd3516
+#define H_ZwQueryDirectoryFile					0x6fb06450
+#define H_ZwQueryInformationFile				0xd7cd4118
 #define H_ZwQuerySystemInformation				0xe661cae2
 #define H_ZwSetSystemInformation				0xf7e624de
 #define H_ZwSetValueKey							0x03a49be5

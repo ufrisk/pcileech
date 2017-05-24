@@ -56,11 +56,13 @@
     <ClCompile Include="lx64_filepull.c" />
     <ClCompile Include="lx64_filepush.c" />
     <ClCompile Include="lx64_stage3_c.c" />
+    <ClCompile Include="lx64_vfs.c" />
     <ClCompile Include="macos_common.c" />
     <ClCompile Include="macos_filepull.c" />
     <ClCompile Include="macos_filepush.c" />
     <ClCompile Include="macos_stage3_c.c" />
     <ClCompile Include="macos_unlock.c" />
+    <ClCompile Include="macos_vfs.c" />
     <ClCompile Include="wx64_common.c" />
     <ClCompile Include="wx64_driverinfo.c" />
     <ClCompile Include="wx64_driverload_svc.c" />
@@ -74,6 +76,7 @@
     <ClCompile Include="wx64_pslist.c" />
     <ClCompile Include="wx64_stage3_c.c" />
     <ClCompile Include="wx64_unlock.c" />
+    <ClCompile Include="wx64_vfs.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="fbsdx64_common_a.asm" />

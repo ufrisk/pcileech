@@ -13,11 +13,11 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\dokan">
+      <UniqueIdentifier>{e58d3af7-d6c0-4d7c-8869-49e91f315004}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="cpuflash.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="device.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -54,11 +54,20 @@
     <ClInclude Include="vfs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="dokan.h">
+      <Filter>Header Files\dokan</Filter>
+    </ClInclude>
+    <ClInclude Include="device605.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="device3380.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tlp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cpuflash.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="device.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -90,6 +99,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="vfs.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="device605.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="device3380.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tlp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

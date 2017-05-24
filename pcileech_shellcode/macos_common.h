@@ -13,6 +13,7 @@ typedef void					VOID, *PVOID;
 typedef int						BOOL, *PBOOL;
 typedef unsigned char			BYTE, *PBYTE;
 typedef char					CHAR, *PCHAR;
+typedef unsigned short			WCHAR, *PWCHAR;
 typedef unsigned short			WORD, *PWORD;
 typedef unsigned long			DWORD, *PDWORD;
 typedef unsigned __int64		QWORD, *PQWORD;
@@ -21,10 +22,9 @@ typedef void					*HANDLE;
 #define MAX_PATH				260
 #define TRUE					1
 #define FALSE					0
+#define UNREFERENCED_PARAMETER(P) (P)
 
 typedef unsigned long			STATUS;
-#define STATUS_SUCCESS			0
-#define STATUS_FAIL_BASE		0xf0000000UL
 
 extern QWORD SysVCall(QWORD fn, ...);
 extern QWORD LookupFunctionMacOS(QWORD qwAddrKernelBase, CHAR szFunctionName[]);

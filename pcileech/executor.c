@@ -29,8 +29,7 @@ typedef struct tdEXEC_IO {
 } EXEC_IO, *PEXEC_IO;
 
 typedef struct tdCONSOLEREDIR_THREADDATA {
-	PCONFIG pCfg;
-	PDEVICE_DATA pDeviceData;
+	PPCILEECH_CONTEXT ctx;
 	HANDLE hThreadIS;
 	HANDLE hThreadOS;
 	PEXEC_IO pInfoIS;
@@ -40,9 +39,7 @@ typedef struct tdCONSOLEREDIR_THREADDATA {
 } CONSOLEREDIR_THREADDATA, *PCONSOLEREDIR_THREADDATA;
 
 typedef struct tdEXEC_HANDLE {
-	PCONFIG pCfg;
-	PDEVICE_DATA pDeviceData;
-	PKMDDATA pk;
+	PPCILEECH_CONTEXT ctx;
 	PBYTE pbDMA;
 	HANDLE hFileOutput;
 	QWORD qwFileWritten;
@@ -87,15 +84,14 @@ DWORD ConsoleRedirect_ThreadConsoleOutput(PCONSOLEREDIR_THREADDATA pd)
 	}
 }
 
-BOOL Exec_ConsoleRedirect_Initialize(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD ConsoleBufferAddr_InputStream, _In_ QWORD ConsoleBufferAddr_OutputStream, _Inout_ PCONSOLEREDIR_THREADDATA pd)
+BOOL Exec_ConsoleRedirect_Initialize(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD ConsoleBufferAddr_InputStream, _In_ QWORD ConsoleBufferAddr_OutputStream, _Inout_ PCONSOLEREDIR_THREADDATA pd)
 {
 	BOOL result;
-	pd->pCfg = pCfg;
-	pd->pDeviceData = pDeviceData;
+	pd->ctx = ctx;
 	pd->pInfoIS = (PEXEC_IO)pd->pbDataISConsoleBuffer;
 	pd->pInfoOS = (PEXEC_IO)pd->pbDataOSConsoleBuffer;
 	// read initial buffer and check validity
-	result = DeviceReadMEM(pDeviceData, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, 0);
+	result = DeviceReadMEM(ctx, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, 0);
 	if(!result || (pd->pInfoOS->magic != EXEC_IO_MAGIC)) {
 		return FALSE;
 	}
@@ -105,30 +101,30 @@ BOOL Exec_ConsoleRedirect_Initialize(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevic
 	return TRUE;
 }
 
-VOID Exec_ConsoleRedirect(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD ConsoleBufferAddr_InputStream, _In_ QWORD ConsoleBufferAddr_OutputStream)
+VOID Exec_ConsoleRedirect(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD ConsoleBufferAddr_InputStream, _In_ QWORD ConsoleBufferAddr_OutputStream)
 {
 	BOOL result;
 	PCONSOLEREDIR_THREADDATA pd = LocalAlloc(LMEM_ZEROINIT, sizeof(CONSOLEREDIR_THREADDATA));
 	if(!pd) { return; }
-	result = Exec_ConsoleRedirect_Initialize(pCfg, pDeviceData, ConsoleBufferAddr_InputStream, ConsoleBufferAddr_OutputStream, pd);
+	result = Exec_ConsoleRedirect_Initialize(ctx, ConsoleBufferAddr_InputStream, ConsoleBufferAddr_OutputStream, pd);
 	if(!result) {
 		printf("\nCONSOLE_REDIRECT: Error: Address 0x%016llX does not\ncontain a valid console buffer.\n", ConsoleBufferAddr_OutputStream);
 		return;
 	}
 	// buffer syncer
 	while(TRUE) {
-		result = DeviceReadMEM(pDeviceData, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, 0);
+		result = DeviceReadMEM(ctx, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, 0);
 		if(!result || pd->pInfoOS->magic != EXEC_IO_MAGIC) {
 			printf("\nCONSOLE_REDIRECT: Error: Address 0x%016llX does not\ncontain a valid console buffer.\n", ConsoleBufferAddr_OutputStream);
 			return;
 		}
-		DeviceWriteMEM(pDeviceData, ConsoleBufferAddr_InputStream, pd->pbDataISConsoleBuffer, 0x1000, 0);
+		DeviceWriteMEM(ctx, ConsoleBufferAddr_InputStream, pd->pbDataISConsoleBuffer, 0x1000, 0);
 	}
 	TerminateThread(pd->hThreadIS, 0);
 	TerminateThread(pd->hThreadOS, 0);
 }
 
-VOID Exec_Callback(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ PKMDDATA pk, _Inout_ PHANDLE phCallback)
+VOID Exec_Callback(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PHANDLE phCallback)
 {
 	BOOL result;
 	PEXEC_HANDLE ph = *phCallback;
@@ -138,39 +134,37 @@ VOID Exec_Callback(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ PKMDDA
 		// core initialize
 		ph = *phCallback = LocalAlloc(LMEM_ZEROINIT, sizeof(EXEC_HANDLE));
 		if(!ph) { return; }
-		ph->pbDMA = LocalAlloc(LMEM_ZEROINIT, pk->dataOutExtraLengthMax);
+		ph->pbDMA = LocalAlloc(LMEM_ZEROINIT, ctx->pk->dataOutExtraLengthMax);
 		if(!ph->pbDMA) { LocalFree(ph); *phCallback = NULL; return; }
-		ph->pCfg = pCfg;
-		ph->pDeviceData = pDeviceData;
-		ph->pk = pk;
+		ph->ctx = ctx;
 		ph->is.magic = EXEC_IO_MAGIC;
 		// open output file
-		ph->hFileOutput = CreateFileA(pCfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+		ph->hFileOutput = CreateFileA(ctx->cfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 		if(!ph->hFileOutput || (ph->hFileOutput == INVALID_HANDLE_VALUE)) {
 			ph->hFileOutput = NULL;
 			ph->is.bin.fCompletedAck = TRUE;
-			DeviceWriteDMA(pDeviceData, pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, (PBYTE)&ph->is, 0x1000, 0);
+			DeviceWriteDMA(ctx, ctx->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, (PBYTE)&ph->is, 0x1000, 0);
 			ph->fError = TRUE;
-			printf("EXEC: Failed writing large outut to file: %s\n", ph->pCfg->szFileOut);
+			printf("EXEC: Failed writing large outut to file: %s\n", ctx->cfg->szFileOut);
 			return;
 		}
-		printf("EXEC: Start writing large output to file: %s\n", ph->pCfg->szFileOut);
+		printf("EXEC: Start writing large output to file: %s\n", ctx->cfg->szFileOut);
 	}
 	// write to output file and ack to buffer
 	if(ph->is.bin.fCompletedAck) { return; }
-	DeviceReadDMA(pDeviceData, ph->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_OS, (PBYTE)&ph->os, 0x1000, 0);
+	DeviceReadDMA(ctx, ctx->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_OS, (PBYTE)&ph->os, 0x1000, 0);
 	if(ph->os.magic != EXEC_IO_MAGIC) { return; }
 	if(ph->is.bin.seqAck >= ph->os.bin.seq) { return; }
 	cbLength = 0;
 	result =
-		DeviceReadDMA(pDeviceData, ph->pk->DMAAddrPhysical + ph->pk->dataOutExtraOffset, ph->pbDMA, (DWORD)SIZE_PAGE_ALIGN_4K(ph->pk->dataOutExtraLength), 0) &&
-		WriteFile(ph->hFileOutput, ph->pbDMA, (DWORD)ph->pk->dataOutExtraLength, &cbLength, NULL) &&
-		(ph->pk->dataOutExtraLength == cbLength);
+		DeviceReadDMA(ctx, ctx->pk->DMAAddrPhysical + ctx->pk->dataOutExtraOffset, ph->pbDMA, (DWORD)SIZE_PAGE_ALIGN_4K(ctx->pk->dataOutExtraLength), 0) &&
+		WriteFile(ph->hFileOutput, ph->pbDMA, (DWORD)ctx->pk->dataOutExtraLength, &cbLength, NULL) &&
+		(ctx->pk->dataOutExtraLength == cbLength);
 	ph->qwFileWritten += cbLength;
 	ph->fError = !result;
 	ph->is.bin.fCompletedAck = ph->is.bin.fCompletedAck || ph->os.bin.fCompleted || !result;
 	ph->is.bin.seqAck = ph->os.bin.seq;
-	DeviceWriteDMA(pDeviceData, pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, (PBYTE)&ph->is, 0x1000, 0);
+	DeviceWriteDMA(ctx, ctx->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, (PBYTE)&ph->is, 0x1000, 0);
 }
 
 VOID Exec_CallbackClose(_In_ HANDLE hCallback)
@@ -179,7 +173,7 @@ VOID Exec_CallbackClose(_In_ HANDLE hCallback)
 	if(hCallback == NULL) { return; }
 	if(ph->hFileOutput) {
 		if(ph->fError) {
-			printf("EXEC: Failed writing large outut to file: %s\n", ph->pCfg->szFileOut);
+			printf("EXEC: Failed writing large outut to file: %s\n", ph->ctx->cfg->szFileOut);
 		} else {
 			printf("EXEC: Successfully wrote %i bytes.\n", ph->qwFileWritten);
 		}
@@ -189,9 +183,9 @@ VOID Exec_CallbackClose(_In_ HANDLE hCallback)
 	LocalFree(ph);
 }
 
-BOOL Exec_ExecSilent(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbIn, _Out_ PBYTE *ppbOut, _Out_ PQWORD pcbOut)
+BOOL Exec_ExecSilent(_Inout_ PPCILEECH_CONTEXT ctx, _In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbIn, _Out_ PBYTE *ppbOut, _Out_ PQWORD pcbOut)
 {
-	PKMDDATA pk;
+	PKMDDATA pk = ctx->pk;
 	BOOL result = FALSE;
 	DWORD cbBuffer;
 	PBYTE pbBuffer = NULL;
@@ -199,12 +193,11 @@ BOOL Exec_ExecSilent(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ LPST
 	//------------------------------------------------
 	// 1: Setup and initial validity checks.
 	//------------------------------------------------
-	if(!pDeviceData->KMDHandle) { goto fail; }
-	pk = ((PKMDHANDLE)pDeviceData->KMDHandle)->status;
+	if(!ctx->phKMD) { goto fail; }
 	result = Util_LoadKmdExecShellcode(szShellcodeName, &pKmdExec);
 	if(!result) { goto fail; }
 	cbBuffer = SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode) + SIZE_PAGE_ALIGN_4K(cbIn);
-	if(!result || (pk->DMASizeBuffer < cbBuffer)) { result = FALSE;  goto fail; }
+	if(!result || (ctx->pk->DMASizeBuffer < cbBuffer)) { result = FALSE;  goto fail; }
 	pbBuffer = LocalAlloc(LMEM_ZEROINIT, cbBuffer);
 	if(!pbBuffer) { result = FALSE;  goto fail; }
 	//------------------------------------------------
@@ -216,7 +209,7 @@ BOOL Exec_ExecSilent(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ LPST
 	//------------------------------------------------
 	memcpy(pbBuffer, pKmdExec->pbShellcode, pKmdExec->cbShellcode);
 	memcpy(pbBuffer + SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode), pbIn, cbIn);
-	result = DeviceWriteDMA(pDeviceData, pk->DMAAddrPhysical, pbBuffer, cbBuffer, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	result = DeviceWriteDMA(ctx, pk->DMAAddrPhysical, pbBuffer, cbBuffer, PCILEECH_MEM_FLAG_RETRYONFAIL);
 	if(!result) { goto fail; }
 	pk->dataInExtraOffset = SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode);
 	pk->dataInExtraLength = cbIn;
@@ -227,8 +220,8 @@ BOOL Exec_ExecSilent(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ LPST
 	//------------------------------------------------ 
 	// 3: Execute!
 	//------------------------------------------------
-	KMD_SubmitCommand(pCfg, pDeviceData, pDeviceData->KMDHandle, KMD_CMD_VOID);
-	result = KMD_SubmitCommand(pCfg, pDeviceData, pDeviceData->KMDHandle, KMD_CMD_EXEC);
+	KMD_SubmitCommand(ctx, KMD_CMD_VOID);
+	result = KMD_SubmitCommand(ctx, KMD_CMD_EXEC);
 	if(!result || pk->dataOut[0] || (pk->dataOutExtraLength > pk->dataOutExtraLengthMax)) {
 		result = FALSE;
 		goto fail;
@@ -240,7 +233,7 @@ BOOL Exec_ExecSilent(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ LPST
 		*pcbOut = pk->dataOutExtraLength;
 		*ppbOut = (PBYTE)LocalAlloc(0, SIZE_PAGE_ALIGN_4K(*pcbOut));
 		if(!*ppbOut) { result = FALSE; goto fail; }
-		result = DeviceReadDMA(pDeviceData, pk->DMAAddrPhysical + pk->dataOutExtraOffset, *ppbOut, SIZE_PAGE_ALIGN_4K(*pcbOut), 0);
+		result = DeviceReadDMA(ctx, pk->DMAAddrPhysical + pk->dataOutExtraOffset, *ppbOut, SIZE_PAGE_ALIGN_4K(*pcbOut), 0);
 	}
 fail:
 	LocalFree(pKmdExec);
@@ -248,7 +241,7 @@ fail:
 	return result;
 }
 
-VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
+VOID ActionExecShellcode(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	const DWORD CONFIG_SHELLCODE_MAX_BYTES_OUT_PRINT = 8192;
 	BOOL result;
@@ -256,30 +249,29 @@ VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	PBYTE pbBuffer = NULL;
 	BYTE pbZeroPage2[0x2000] = { 0 };
 	PSTR szBufferText = NULL;
-	DWORD cbBufferText, cbLength;
+	DWORD cbLength;
 	HANDLE hFile = NULL;
-	PKMDDATA pk;
+	PKMDDATA pk = ctx->pk;
 	//------------------------------------------------ 
 	// 1: Setup and initial validity checks.
 	//------------------------------------------------
-	if(!pDeviceData->KMDHandle) {
-		printf("EXEC: Failed. Retrieving page info requires an active kernel module (KMD). Please use in conjunction with the -kmd option only.\n");
+	if(!ctx->phKMD) {
+		printf("EXEC: Failed. Executing code requires an active kernel module (KMD).\n      Please use in conjunction with the -kmd option only.\n");
 		goto fail;
 	}
-	pk = ((PKMDHANDLE)pDeviceData->KMDHandle)->status;
-	if(pk->DMASizeBuffer < 0x084000 + 0x100000 + min(0x100000, SIZE_PAGE_ALIGN_4K(pCfg->cbIn))) {
+	if(pk->DMASizeBuffer < 0x084000 + 0x100000 + min(0x100000, SIZE_PAGE_ALIGN_4K(ctx->cfg->cbIn))) {
 		printf("EXEC: Failed. DMA buffer is too small / input size exceeded.\n");
 		goto fail;
 	}
 	//------------------------------------------------ 
 	// 2: Load KMD shellcode and commit to target memory.
 	//------------------------------------------------
-	result = Util_LoadKmdExecShellcode(pCfg->szShellcodeName, &pKmdExec);
+	result = Util_LoadKmdExecShellcode(ctx->cfg->szShellcodeName, &pKmdExec);
 	if(!result) {
-		printf("EXEC: Failed loading shellcode from file: '%s.ksh' ...\n", pCfg->szShellcodeName);
+		printf("EXEC: Failed loading shellcode from file: '%s.ksh' ...\n", ctx->cfg->szShellcodeName);
 		goto fail;
 	}
-	result = DeviceWriteDMAVerify(pDeviceData, pk->DMAAddrPhysical, pKmdExec->pbShellcode, (DWORD)pKmdExec->cbShellcode, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	result = DeviceWriteDMA(ctx, pk->DMAAddrPhysical, pKmdExec->pbShellcode, (DWORD)pKmdExec->cbShellcode, PCILEECH_MEM_FLAG_RETRYONFAIL | PCILEECH_MEM_FLAG_VERIFYWRITE);
 	if(!result) {
 		printf("EXEC: Failed writing shellcode to target memory.\n");
 		goto fail;
@@ -293,19 +285,19 @@ VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	//    [0x082000, X       [ = data in (to target computer); X = max(0x100000, cb_in)
 	//    [X       , buf_max [ = data out (from target computer)
 	//------------------------------------------------
-	DeviceWriteDMA(pDeviceData, pk->DMAAddrPhysical + 0x080000, pbZeroPage2, 0x2000, 0);
+	DeviceWriteDMA(ctx, pk->DMAAddrPhysical + 0x080000, pbZeroPage2, 0x2000, 0);
 	pk->dataInExtraOffset = 0x082000;
-	pk->dataInExtraLength = pCfg->cbIn;
-	pk->dataInExtraLengthMax = max(0x100000, SIZE_PAGE_ALIGN_4K(pCfg->cbIn));
+	pk->dataInExtraLength = ctx->cfg->cbIn;
+	pk->dataInExtraLengthMax = max(0x100000, SIZE_PAGE_ALIGN_4K(ctx->cfg->cbIn));
 	pk->dataOutExtraOffset = pk->dataInExtraOffset + pk->dataInExtraLengthMax;
 	pk->dataOutExtraLength = 0;
 	pk->dataOutExtraLengthMax = pk->DMASizeBuffer - pk->dataOutExtraOffset;
-	memcpy(pk->dataIn, pCfg->qwDataIn, sizeof(QWORD) * 10);
-	memcpy(pk->dataInStr, pCfg->szInS, MAX_PATH);
+	memcpy(pk->dataIn, ctx->cfg->qwDataIn, sizeof(QWORD) * 10);
+	memcpy(pk->dataInStr, ctx->cfg->szInS, MAX_PATH);
 	memset(pk->dataOut, 0, sizeof(QWORD) * 10);
 	memset(pk->dataOutStr, 0, MAX_PATH);
-	if(pCfg->cbIn) {
-		result = DeviceWriteDMA(pDeviceData, pk->DMAAddrPhysical + pk->dataInExtraOffset, pCfg->pbIn, (DWORD)SIZE_PAGE_ALIGN_4K(pCfg->cbIn), 0);
+	if(ctx->cfg->cbIn) {
+		result = DeviceWriteDMA(ctx, pk->DMAAddrPhysical + pk->dataInExtraOffset, ctx->cfg->pbIn, (DWORD)SIZE_PAGE_ALIGN_4K(ctx->cfg->cbIn), 0);
 		if(!result) {
 			printf("EXEC: Failed writing data to target memory.\n");
 			goto fail;
@@ -316,8 +308,8 @@ VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	//------------------------------------------------ 
 	// 4: Execute! and display result.
 	//------------------------------------------------
-	KMD_SubmitCommand(pCfg, pDeviceData, pDeviceData->KMDHandle, KMD_CMD_VOID);
-	result = KMD_SubmitCommand(pCfg, pDeviceData, pDeviceData->KMDHandle, KMD_CMD_EXEC);
+	KMD_SubmitCommand(ctx, KMD_CMD_VOID);
+	result = KMD_SubmitCommand(ctx, KMD_CMD_EXEC);
 	if(!result) {
 		printf("EXEC: Failed sending execute command to KMD.\n");
 		goto fail;
@@ -342,22 +334,15 @@ VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 	if(cbLength > 0) {
 		// read extra output buffer
 		if(!(pbBuffer = LocalAlloc(LMEM_ZEROINIT, SIZE_PAGE_ALIGN_4K(cbLength))) ||
-			!DeviceReadDMA(pDeviceData, pk->DMAAddrPhysical + pk->dataOutExtraOffset, pbBuffer, SIZE_PAGE_ALIGN_4K(cbLength), 0)) {
+			!DeviceReadDMA(ctx, pk->DMAAddrPhysical + pk->dataOutExtraOffset, pbBuffer, SIZE_PAGE_ALIGN_4K(cbLength), 0)) {
 			printf("EXEC: Error reading output.\n");
 			goto fail;
 		}
 		// print to screen
-		if(cbLength > CONFIG_SHELLCODE_MAX_BYTES_OUT_PRINT) {
-			printf("EXEC: Large output. Only displaying first %i bytes.\n", CONFIG_SHELLCODE_MAX_BYTES_OUT_PRINT);
-		}
-		if(CryptBinaryToStringA(pbBuffer, min(CONFIG_SHELLCODE_MAX_BYTES_OUT_PRINT, cbLength), CRYPT_STRING_HEXASCIIADDR, NULL, &cbBufferText) &&
-			(szBufferText = (LPSTR)LocalAlloc(LMEM_ZEROINIT, cbBufferText)) &&
-			CryptBinaryToStringA(pbBuffer, min(CONFIG_SHELLCODE_MAX_BYTES_OUT_PRINT, cbLength), CRYPT_STRING_HEXASCIIADDR, szBufferText, &cbBufferText)) {
-			printf("%s\n", szBufferText);
-		}
+		Util_PrintHexAscii(pbBuffer, cbLength);
 		// write to out file
-		if(pCfg->szFileOut[0]) {
-			hFile = CreateFileA(pCfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+		if(ctx->cfg->szFileOut[0]) {
+			hFile = CreateFileA(ctx->cfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 			if(!hFile || (hFile == INVALID_HANDLE_VALUE)) {
 				printf("EXEC: Error writing output to file.\n");
 				goto fail;
@@ -366,14 +351,14 @@ VOID ActionExecShellcode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData)
 				printf("EXEC: Error writing output to file.\n");
 				goto fail;
 			}
-			printf("EXEC: Wrote %i bytes to file %s.\n", cbLength, pCfg->szFileOut);
+			printf("EXEC: Wrote %i bytes to file %s.\n", cbLength, ctx->cfg->szFileOut);
 		}
 	}
 	//----------------------------------------------------------
 	// 6: Call the post execution console redirection if needed.
 	//----------------------------------------------------------
 	if(pk->dataInConsoleBuffer || pk->dataOutConsoleBuffer) {
-		Exec_ConsoleRedirect(pCfg, pDeviceData, pk->dataInConsoleBuffer, pk->dataOutConsoleBuffer);
+		Exec_ConsoleRedirect(ctx, pk->dataInConsoleBuffer, pk->dataOutConsoleBuffer);
 	}
 	printf("\n");
 fail:

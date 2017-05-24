@@ -10,46 +10,42 @@
 
 /*
 * Retrieve a page table entry (PTE). (4kB pages only).
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 * -- qwCR3 = the contents of the CPU register CR3 (= physical address of PML4)
 * -- qwAddressLinear = the virtual address for which the PTE should be retrieved
 * -- pqwPTE = ptr to receive the PTE
 * -- pqwPTEAddrPhysOpt = ptr to receive the physical address of the PTE
 * -- return
 */
-BOOL Util_PageTable_ReadPTE(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_ PQWORD pqwPTEAddrPhys);
+BOOL Util_PageTable_ReadPTE(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_ PQWORD pqwPTEAddrPhys);
 
 /*
 * Change the mode of the mapped address to executable.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 * -- qwCR3
 * -- qwAddressLinear
 * -- fSetX = TRUE if virtual address should be executable.
 * -- return
 */
-BOOL Util_PageTable_SetMode(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX);
+BOOL Util_PageTable_SetMode(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX);
 
 /*
 * Find a module base given a page signature. Please note that this is a best
 * effort search. Multiple modules may have the same signature or parts of the
 * paging structures may be outside the 32-bit addressing scope >4GiB.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 * -- pqwCR3 = the contents of the CPU register CR3 (= physical address of PML4) (may be zero on entry if page table base should be searched as well)
 * -- pPTEs = paging signature of the module to find
 * -- cPTEs = number of entries in pPTEs
 * -- pqwSignatureBase = ptr to receive the module base
 * -- return
 */
-BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase);
+BOOL Util_PageTable_FindSignatureBase(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase);
 
 /*
 * Search the page tables for a given physical address. The first occurrence for
 * this address will be returned.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 * -- qwCR3 = the physical address of PML4.
 * -- qwAddrPhys = the physical address to search for.
 * -- pqwAddrVirt = ptr to receive virtual address.
@@ -59,7 +55,7 @@ BOOL Util_PageTable_FindSignatureBase(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDevi
 * -- pqwPML4E = ptr to optionally receive value of PML4E
 * -- return
 */
-BOOL Util_PageTable_FindMappedAddress(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_opt_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPDE, _Out_opt_ PQWORD pqwPDPTE, _Out_opt_ PQWORD pqwPML4E);
+BOOL Util_PageTable_FindMappedAddress(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_opt_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPDE, _Out_opt_ PQWORD pqwPDPTE, _Out_opt_ PQWORD pqwPML4E);
 
 /*
 * Load KMD and Unlock signatures.
@@ -132,14 +128,17 @@ QWORD Util_GetNumeric(_In_ LPSTR sz);
 * function formats the paramerters and put them into the supplied pSignature.
 * This will only work for kernels prior to 4.8.
 * -- paBase = memory physical offset to paSzKallsyms
-* -- paSzKallsyms = physical offset to 'kallsyms_looup_name' text string.
-* -- vaSzKallsyms = virtual address of 'kallsyms_looup_name' text string.
-* -- vaFnKallsyms = virtual address of the kallsyms_lookup_name function.
-* -- vaFnHijack = virtual address of the function to hijack.
+* -- paSzKallsyms = physical offset (from base) to 'kallsyms_lookup_name' text string.
+* -- vaSzKallsyms = virtual address of 'kallsyms_lookup_name' text string.
+* -- vaFnKallsyms = virtual address of 'kallsyms_lookup_name' function.
+* -- paSzFnHijack = physical offset (from base) to 'function to hijack' text string.
+* -- vaSzFnHijack = virtual address text string 'of function to hijack' test string.
+* -- vaFnHijack = virtual address of function to hijack.
 * -- pSignature = ptr to signature struct to place the result in.
 */
-VOID Util_CreateSignatureLinuxGenericPre48(_In_ DWORD paBase, _In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature);
-
+VOID Util_CreateSignatureLinuxGeneric(_In_ QWORD paBase,
+	_In_ DWORD paSzKallsyms, _In_ QWORD vaSzKallsyms, _In_ QWORD vaFnKallsyms,
+	_In_ DWORD paSzFnHijack, _In_ QWORD vaSzFnHijack, _In_ QWORD vaFnHijack, _Out_ PSIGNATURE pSignature);
 /*
 * "Create" a static signature for FreeBSD given the supplied parameters. The
 * function formats the paramerters and put them into the supplied pSignature.
@@ -186,32 +185,36 @@ VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATUR
 /*
 * Read a 16MB data chunk from the target and place it in the pbBuffer16M buffer.
 * Any data that failed to read within the 16MB buffer is set to zero.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 * -- pbBuffer16M = the already allocated 16MB buffer to place the content in.
 * -- qwBaseAddress = the base address to start reading from.
 * -- pPageStat = statistics struct to update on progress (pages success/fail).
 * -- return = TRUE if at least one 4k page could be read; FALSE if all pages failed.
 */
-BOOL Util_Read16M(_In_ PCONFIG pCfg, _In_ PDEVICE_DATA pDeviceData, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat);
+BOOL Util_Read16M(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat);
 
 /*
 * Wait for the connected PCILeech device to be power cycled. This function will
 * sleep until a power cycle event is detected on the connected PCILeech device.
 * The connected device needs to first be powered down and then powered up before
 * this function will exit.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 */
-VOID Util_WaitForPowerCycle(_In_ PCONFIG pCfg, _Inout_ PDEVICE_DATA pDeviceData);
+VOID Util_WaitForPowerCycle(_Inout_ PPCILEECH_CONTEXT ctx);
 
 /*
 * Wait for a PCILeech device to be powered on and for it to complete a dummy
 * memory read. The pDeviceData will be initialized upon success - in which
 * the function will exit.
-* -- pCfg
-* -- pDeviceData
+* -- ctx
 */
-VOID Util_WaitForPowerOn(_In_ PCONFIG pCfg, _Inout_ PDEVICE_DATA pDeviceData);
+VOID Util_WaitForPowerOn(_Inout_ PPCILEECH_CONTEXT ctx);
+
+/*
+* Print a maximum of 8192 bytes of binary data as hexascii on the screen.
+* -- pb
+* -- cb
+*/
+VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb);
 
 #endif /* __UTIL_H__ */

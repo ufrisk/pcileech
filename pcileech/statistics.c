@@ -7,13 +7,15 @@
 
 VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
 {
+	if(0 == ps->cPageTotal) { return; }
 	QWORD qwPercentTotal = ((ps->cPageSuccess + ps->cPageFail) * 100) / ps->cPageTotal;
 	QWORD qwPercentSuccess = (ps->cPageSuccess * 200 + 1) / (ps->cPageTotal * 2);
 	QWORD qwPercentFail = (ps->cPageFail * 200 + 1) / (ps->cPageTotal * 2);
 	QWORD qwTickCountElapsed = GetTickCount64() - ps->i.qwTickCountStart;
-	QWORD qwSpeedMBs = ((ps->cPageSuccess + ps->cPageFail) * 4 / 1024) / (1 + (qwTickCountElapsed / 1000));
+	QWORD qwSpeed = ((ps->cPageSuccess + ps->cPageFail) * 4) / (1 + (qwTickCountElapsed / 1000));
 	QWORD qwLastUpdateCtrl = ps->qwAddr + ps->cPageSuccess + ps->cPageFail + (QWORD)ps->szAction;
 	CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+	BOOL isMBs = qwSpeed >= 1024;
 	if(qwLastUpdateCtrl == ps->i.qwLastUpdateCtrl) {
 		return; // only refresh on updates
 	}
@@ -22,31 +24,33 @@ VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
 		GetConsoleScreenBufferInfo(ps->i.hConsole, &consoleInfo);
 		consoleInfo.dwCursorPosition.Y = ps->i.wConsoleCursorPosition;
 		SetConsoleCursorPosition(ps->i.hConsole, consoleInfo.dwCursorPosition);
-	} else {
-		ps->i.hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-		GetConsoleScreenBufferInfo(ps->i.hConsole, &consoleInfo);
-		ps->i.wConsoleCursorPosition = consoleInfo.dwCursorPosition.Y;
 	}
 	printf(
 		" Current Action: %s                             \n" \
 		" Access Mode:    %s                             \n" \
-		" Progress:       %i / %i (%i%%)                 \n" \
-		" Speed:          %i MB/s                        \n" \
+		" Progress:       %u / %u (%u%%)                 \n" \
+		" Speed:          %u %s                          \n" \
 		" Address:        0x%016llX                      \n" \
-		" Pages read:     %i / %i (%i%%)                 \n" \
-		" Pages failed:   %i (%i%%)                      \n",
+		" Pages read:     %u / %u (%u%%)                 \n" \
+		" Pages failed:   %u (%u%%)                      \n",
 		ps->szAction,
 		ps->fKMD ? "KMD (kernel module assisted DMA)" : "DMA (hardware only)             ",
 		(ps->cPageSuccess + ps->cPageFail) / 256,
 		ps->cPageTotal / 256,
 		qwPercentTotal,
-		qwSpeedMBs,
+		(isMBs ? qwSpeed >> 10 : qwSpeed),
+		(isMBs ? "MB/s" : "kB/s"),
 		ps->qwAddr,
 		ps->cPageSuccess,
 		ps->cPageTotal,
 		qwPercentSuccess,
 		ps->cPageFail,
 		qwPercentFail);
+	if(!ps->i.hConsole) {
+		ps->i.hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+		GetConsoleScreenBufferInfo(ps->i.hConsole, &consoleInfo);
+		ps->i.wConsoleCursorPosition = consoleInfo.dwCursorPosition.Y - 7;
+	}
 }
 
 VOID _PageStatPrintMemMap(_In_ PPAGE_STATISTICS ps)
