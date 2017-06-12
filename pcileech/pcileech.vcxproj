@@ -56,6 +56,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalOptions>/D WIN32 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <FullProgramDatabaseFile>
@@ -71,6 +72,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>/D WIN32 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -91,6 +93,7 @@
     <ClInclude Include="kmd.h" />
     <ClInclude Include="memdump.h" />
     <ClInclude Include="mempatch.h" />
+    <ClInclude Include="oscompatibility.h" />
     <ClInclude Include="pcileech.h" />
     <ClInclude Include="shellcode.h" />
     <ClInclude Include="statistics.h" />
@@ -108,11 +111,16 @@
     <ClCompile Include="kmd.c" />
     <ClCompile Include="memdump.c" />
     <ClCompile Include="mempatch.c" />
+    <ClCompile Include="oscompatibility.c" />
     <ClCompile Include="pcileech.c" />
     <ClCompile Include="statistics.c" />
     <ClCompile Include="tlp.c" />
     <ClCompile Include="util.c" />
     <ClCompile Include="vfs.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Android.mk" />
+    <None Include="Makefile" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

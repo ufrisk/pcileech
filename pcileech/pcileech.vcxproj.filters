@@ -66,6 +66,9 @@
     <ClInclude Include="tlp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="oscompatibility.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.c">
@@ -110,5 +113,16 @@
     <ClCompile Include="tlp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="oscompatibility.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Makefile">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Android.mk">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

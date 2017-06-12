@@ -3,6 +3,8 @@
 // (c) Ulf Frisk, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
+#ifdef WIN32
+
 #include "device605.h"
 #include "device.h"
 #include "tlp.h"
@@ -354,3 +356,36 @@ VOID Action_Device605_TlpTx(_Inout_ PPCILEECH_CONTEXT ctx)
 		printf("TLP: Failed. TX error.\n");
 	}
 }
+
+#endif /* WIN32 */
+#if defined(LINUX) || defined(ANDROID)
+
+#include "device605.h"
+
+BOOL Device605_Open(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	printf("SP605: Failed. Device only supported in PCILeech for Windows.");
+	return FALSE;
+}
+
+VOID Device605_Close(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	return;
+}
+
+VOID Action_Device605_TlpTx(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	printf("TLP: Failed. Operation only supported in PCILeech for Windows.");
+}
+
+BOOL Device605_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
+{
+	return FALSE;
+}
+
+BOOL Device605_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb)
+{
+	return FALSE;
+}
+
+#endif /* LINUX || ANDROID */

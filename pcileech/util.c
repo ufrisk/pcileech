@@ -3,11 +3,10 @@
 // (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
+#include "pcileech.h"
 #include "util.h"
 #include "device.h"
 #include "shellcode.h"
-#include "statistics.h"
-#include <bcrypt.h>
 
 #define PT_VALID_MASK		0x00000000000000BD	// valid, active, supervior paging structure
 #define PT_VALID_VALUE		0x0000000000000021	// 
@@ -303,15 +302,25 @@ BOOL Util_PageTable_FindMappedAddress(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD 
 			qwA = (qwA + 0x0000000000001000) & 0xfffffffffffff000;
 			continue;
 		}
-		BOOL debug = TRUE;
 	}
 	return FALSE;
+}
+
+BOOL Util_HexAsciiToBinary(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcb)
+{
+	SIZE_T i, csz = strlen(sz);
+	*pcb = (DWORD)(csz >> 1);
+	if((csz % 2) || (cb < *pcb)) { return FALSE; }
+	for(i = 0; i < *pcb; i++) {
+		if(!sscanf_s(sz + (i << 1), "%02x", (PDWORD)(pb + i))) { return FALSE; }
+	}
+	return TRUE;
 }
 
 BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcb)
 {
 	SIZE_T i;
-	HANDLE hFile;
+	FILE *pFile;
 	BOOL result;
 	// 1: try load default
 	if(0 == memcmp("DEFAULT", sz, 7)) {
@@ -325,23 +334,16 @@ BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out
 		return FALSE;
 	}
 	// 2: try load hex ascii
-	*pcb = cb;
-	if(CryptStringToBinaryA(sz, 0, CRYPT_STRING_HEX_ANY, pb, pcb, NULL, NULL)) {
+	if(Util_HexAsciiToBinary(sz, pb, cb, pcb)) {
 		return TRUE;
 	}
 	// 3: try load file
 	i = strnlen_s(sz, MAX_PATH);
 	if(i > 4 && i < MAX_PATH) { // try to load from file
-		hFile = CreateFileA(sz, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-		if(!hFile || hFile == INVALID_HANDLE_VALUE) { return FALSE; }
-		result = ReadFile(hFile, pb, cb, pcb, NULL);
-		if(*pcb == cb) {
-			cb = GetFileSize(hFile, NULL);
-			if(cb > *pcb || cb == INVALID_FILE_SIZE) {
-				return FALSE;
-			}
-		}
-		CloseHandle(hFile);
+		if(fopen_s(&pFile, sz, "rb") || !pFile) { return FALSE; }
+		*pcb = (DWORD)fread(pb, 1, cb, pFile);
+		result = (0 != feof(pFile));
+		fclose(pFile);
 		return result;
 	}
 	return FALSE;
@@ -381,8 +383,7 @@ BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension,
 	BYTE pbFile[0x10000];
 	DWORD cbFile = 0, cSignatureIdx = 0;
 	CHAR szSignatureFile[MAX_PATH];
-	HANDLE hFile;
-	BOOL bResult;
+	FILE *pFile;
 	LPSTR szContext = NULL, szLine;
 	memset(pSignatures, 0, *cSignatures * sizeof(SIGNATURE));
 	// open and read file
@@ -390,12 +391,11 @@ BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension,
 	if(_strnicmp(szSignatureFile + strlen(szSignatureFile) - strlen(szFileExtension), szFileExtension, MAX_PATH)) { // add extension if missing
 		strcpy_s(szSignatureFile + strlen(szSignatureFile), MAX_PATH - strlen(szSignatureFile), szFileExtension);
 	}
-	hFile = CreateFileA(szSignatureFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	if(!hFile || hFile == INVALID_HANDLE_VALUE) { return FALSE; }
+	if(fopen_s(&pFile, szSignatureFile, "rb") || !pFile) { return FALSE; }
 	memset(pbFile, 0, 0x10000);
-	bResult = ReadFile(hFile, pbFile, 0x10000, &cbFile, NULL);
-	CloseHandle(hFile);
-	if(!bResult || !cbFile || cbFile == 0x10000) { return FALSE; }
+	cbFile = (DWORD)fread(pbFile, 1, 0x10000, pFile);
+	fclose(pFile);
+	if(!cbFile || cbFile == 0x10000) { return FALSE; }
 	// parse file
 	szLine = strtok_s(pbFile, "\r\n", &szContext);
 	while(szLine && cSignatureIdx < *cSignatures) {
@@ -410,27 +410,20 @@ BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension,
 
 VOID Util_GetFileInDirectory(_Out_ CHAR szPath[MAX_PATH], _In_ LPSTR szFileName)
 {
-	SIZE_T cchFileName = strlen(szFileName);
-	SIZE_T cchPath = GetModuleFileNameA(NULL, (LPSTR)szPath, (DWORD)(MAX_PATH - cchFileName - 4));
-	strcpy_s(&szPath[cchPath], MAX_PATH - cchPath, "\\..\\");
-	strcpy_s(&szPath[cchPath + 4], MAX_PATH - cchPath - 4, szFileName);
-}
-
-VOID Util_SHA256(_In_ PBYTE pb, _In_ DWORD cb, _Out_ __bcount(32) PBYTE pbHash)
-{
-	BCRYPT_ALG_HANDLE hAlg = NULL;
-	BCRYPT_HASH_HANDLE hHash = NULL;
-	BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, NULL, 0);
-	BCryptCreateHash(hAlg, &hHash, NULL, 0, NULL, 0, 0);
-	BCryptHashData(hHash, pb, cb, 0);
-	BCryptFinishHash(hHash, pbHash, 32, 0);
-	BCryptDestroyHash(hHash);
-	BCryptCloseAlgorithmProvider(hAlg, 0);
+	SIZE_T i, cchFileName = strlen(szFileName);
+	GetModuleFileNameA(NULL, (LPSTR)szPath, (DWORD)(MAX_PATH - cchFileName - 4));
+	for(i = strlen(szPath) - 1; i > 0; i--) {
+		if(szPath[i] == '/' || szPath[i] == '\\') {
+			strcpy_s(&szPath[i + 1], MAX_PATH - i - 5, szFileName);
+			return;
+		}
+	}
 }
 
 DWORD Util_memcmpEx(_In_ PBYTE pb1, _In_ PBYTE pb2, _In_  DWORD cb)
 {
-	for(DWORD i = 0; i < cb; i++) {
+	DWORD i;
+	for(i = 0; i < cb; i++) {
 		if(pb1[i] != pb2[i]) {
 			return i + 1;
 		}
@@ -440,10 +433,15 @@ DWORD Util_memcmpEx(_In_ PBYTE pb1, _In_ PBYTE pb2, _In_  DWORD cb)
 
 VOID Util_GenRandom(_Out_ PBYTE pb, _In_ DWORD cb)
 {
-	HCRYPTPROV hCryptProv;
-	CryptAcquireContext(&hCryptProv, 0, 0, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT);
-	CryptGenRandom(hCryptProv, cb, pb);
-	CryptReleaseContext(hCryptProv, 0);
+	DWORD i = 0;
+	srand((unsigned int)GetTickCount64()); 
+	if(cb % 2) {
+		*(PBYTE)(pb) = (BYTE)rand();
+		i++;
+	}
+	for(;i <= cb - 2; i += 2) {
+		*(PWORD)(pb + i) = (WORD)rand();
+	}
 }
 
 #define KMD_EXEC_MAX_SHELLCODE_SIZE		0x80000
@@ -454,9 +452,7 @@ BOOL Util_LoadKmdExecShellcode(_In_ LPSTR szKmdExecName, _Out_ PKMDEXEC* ppKmdEx
 	PBYTE pbKmdExec;
 	DWORD cbKmdExec = 0, i;
 	PKMDEXEC pKmdExec;
-	HANDLE hFile;
-	BOOL result;
-	BYTE pbKmdExecHASH[32];
+	FILE *pFile;
 	pbKmdExec = (PBYTE)LocalAlloc(LMEM_ZEROINIT, KMD_EXEC_MAX_SHELLCODE_SIZE);
 	if(!pbKmdExec) { return FALSE; }
 	// open and read file
@@ -472,21 +468,19 @@ BOOL Util_LoadKmdExecShellcode(_In_ LPSTR szKmdExecName, _Out_ PKMDEXEC* ppKmdEx
 	if(0 == cbKmdExec) {
 		Util_GetFileInDirectory(szKmdExecFile, szKmdExecName);
 		strcpy_s(szKmdExecFile + strlen(szKmdExecFile), MAX_PATH - strlen(szKmdExecFile), ".ksh");
-		hFile = CreateFileA(szKmdExecFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-		if(!hFile || hFile == INVALID_HANDLE_VALUE) { return FALSE; }
-		result = ReadFile(hFile, pbKmdExec, KMD_EXEC_MAX_SHELLCODE_SIZE, &cbKmdExec, NULL);
-		CloseHandle(hFile);
-		if(!result || cbKmdExec < sizeof(KMDEXEC)) { goto error; }
+		if(fopen_s(&pFile, szKmdExecFile, "rb") || !pFile) { return FALSE; }
+		cbKmdExec = (DWORD)fread(pbKmdExec, 1, KMD_EXEC_MAX_SHELLCODE_SIZE, pFile);
+		fclose(pFile);
+		if(cbKmdExec < sizeof(KMDEXEC)) { goto error; }
 	}
 	// ensure file validity
 	pKmdExec = (PKMDEXEC)pbKmdExec;
 	if(pKmdExec->dwMagic != KMDEXEC_MAGIC) { goto error; }
-	Util_SHA256(pbKmdExec + 40, cbKmdExec - 40, pbKmdExecHASH);
-	if(memcmp(pbKmdExecHASH, pKmdExec->pbChecksumSHA256, 32)) { goto error; }
+	// INFO: TODO: SHA256 integrity validation temporarily removed due to linux port.
 	// parse file
 	pKmdExec->cbShellcode = (pKmdExec->cbShellcode + 0xfff) & 0xfffff000; // align to 4k (otherwise dma write may fail)
 	pKmdExec->szOutFormatPrintf = (LPSTR)((QWORD)pKmdExec + (QWORD)pKmdExec->szOutFormatPrintf);
-	pKmdExec->pbShellcode = (LPSTR)((QWORD)pKmdExec + (QWORD)pKmdExec->pbShellcode);
+	pKmdExec->pbShellcode = (PBYTE)((QWORD)pKmdExec + (QWORD)pKmdExec->pbShellcode);
 	*ppKmdExec = pKmdExec;
 	return TRUE;
 error:
@@ -657,17 +651,36 @@ VOID Util_WaitForPowerCycle(_Inout_ PPCILEECH_CONTEXT ctx)
 
 VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb)
 {
-	PBYTE pbTextBuffer = NULL;
-	DWORD cbTextBuffer;
-	if(!cb) { return; }
+	DWORD i, j;
 	if(cb > 8192) {
 		printf("Large output. Only displaying first 8192 bytes.\n");
 		cb = 8192;
 	}
-	if(CryptBinaryToStringA(pb, cb, CRYPT_STRING_HEXASCIIADDR, NULL, &cbTextBuffer) &&
-		(pbTextBuffer = (LPSTR)LocalAlloc(LMEM_ZEROINIT, cbTextBuffer)) &&
-		CryptBinaryToStringA(pb, cb, CRYPT_STRING_HEXASCIIADDR, (LPSTR)pbTextBuffer, &cbTextBuffer)) {
-		printf("%s\n", (LPSTR)pbTextBuffer);
+	for(i = 0; i < cb + ((cb % 16) ? (16 - cb % 16) : 0); i++)
+	{
+		// address
+		if(0 == i % 16) {
+			printf("%04x    ", i % 0x10000);
+		} else if(0 == i % 8) {
+			putchar(' ');
+		}
+		// hex
+		if(i < cb) {
+			printf("%02x ", pb[i]);
+		} else {
+			printf("   ");
+		}
+		// ascii
+		if(15 == i % 16) {
+			printf("  ");
+			for(j = i - 15; j <= i; j++) {
+				if(j >= cb) {
+					putchar(' ');
+				} else {
+					putchar(isprint(pb[j]) ? pb[j] : '.');
+				}
+			}
+			putchar('\n');
+		}
 	}
-	if(pbTextBuffer) { LocalFree(pbTextBuffer); }
 }

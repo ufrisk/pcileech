@@ -58,7 +58,7 @@ BOOL Extra_MacFVRecover_Analyze(_In_ PBYTE pb512M)
 				isFound = TRUE;
 				if(memcmp(pbLast, pb + dwCandidate, 32)) { // duplicate removal
 					memcpy(pbLast, pb + dwCandidate, 32);
-					printf("MAC_FVRECOVER: PASSWORD CANDIDATE: %S\n", pb + dwCandidate);
+					printf("MAC_FVRECOVER: PASSWORD CANDIDATE: %S\n", (LPWSTR)(pb + dwCandidate));
 				}
 				break;
 			}
@@ -88,8 +88,7 @@ VOID Extra_MacFVRecover_SetOutFileName(_Inout_ PCONFIG pCfg)
 
 VOID Action_MacFilevaultRecover(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BOOL IsRebootRequired)
 {
-	HANDLE hFile;
-	DWORD cbLength;
+	FILE *pFile = NULL;
 	PBYTE pbBuffer512M;
 	// Allocate 512 MB buffer
 	if(!(pbBuffer512M = LocalAlloc(LMEM_ZEROINIT, 0x20000000))) {
@@ -114,11 +113,15 @@ VOID Action_MacFilevaultRecover(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BOOL IsReboo
 	// Try write to disk image.
 	printf("MAC_FVRECOVER: Writing partial memory contents to file ...\n");
 	Extra_MacFVRecover_SetOutFileName(ctx->cfg);
-	hFile = CreateFileA(ctx->cfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
-	if(!hFile || (hFile == INVALID_HANDLE_VALUE)) {
+	if(!fopen_s(&pFile, ctx->cfg->szFileOut, "r") || pFile) {
+		printf("MAC_FVRECOVER: Error writing partial memory contents to file. File exists.\n");
+		fclose(pFile);
+		pFile = NULL;
+	} else if(fopen_s(&pFile, ctx->cfg->szFileOut, "wb") || !pFile) {
 		printf("MAC_FVRECOVER: Error writing partial memory contents to file.\n");
-		hFile = NULL;
-	} else if(!WriteFile(hFile, pbBuffer512M, 0x20000000, &cbLength, NULL)) {
+		pFile = NULL;
+	}
+	else if(0x20000000 != fwrite(pbBuffer512M, 1, 0x20000000, pFile)) {
 		printf("MAC_FVRECOVER: Error writing partial memory contents to file.\n");
 	} else {
 		printf("MAC_FVRECOVER: File: %s.\n", ctx->cfg->szFileOut);
@@ -132,7 +135,7 @@ VOID Action_MacFilevaultRecover(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BOOL IsReboo
 	}
 	// clean up.
 	LocalFree(pbBuffer512M);
-	if(hFile) { CloseHandle(hFile); }
+	if(pFile) { fclose(pFile); }
 }
 
 VOID Action_MacDisableVtd(_Inout_ PPCILEECH_CONTEXT ctx)

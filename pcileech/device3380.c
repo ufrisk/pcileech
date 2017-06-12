@@ -5,11 +5,6 @@
 //
 #include "device3380.h"
 #include "device.h"
-#include <versionhelpers.h>
-
-// Device Interface GUID. Must match "DeviceInterfaceGUIDs" registry value specified in the INF file.
-// F72FE0D4-CBCB-407d-8814-9ED673D0DD6B
-DEFINE_GUID(GUID_DEVINTERFACE_android, 0xF72FE0D4, 0xCBCB, 0x407d, 0x88, 0x14, 0x9E, 0xD6, 0x73, 0xD0, 0xDD, 0x6B);
 
 #define CSR_BYTE0							0x01
 #define CSR_BYTE1							0x02
@@ -104,8 +99,9 @@ DEVICE_MEMORY_RANGE CDEVICE_RESERVED_MEMORY_RANGES[NUMBER_OF_DEVICE_RESERVED_MEM
 
 BOOL Device3380_IsInReservedMemoryRange(_In_ QWORD qwAddr, _In_ DWORD cb)
 {
+	DWORD i;
 	PDEVICE_MEMORY_RANGE pmr;
-	for(DWORD i = 0; i < NUMBER_OF_DEVICE_RESERVED_MEMORY_RANGES; i++) {
+	for(i = 0; i < NUMBER_OF_DEVICE_RESERVED_MEMORY_RANGES; i++) {
 		pmr = &CDEVICE_RESERVED_MEMORY_RANGES[i];
 		if(!((qwAddr > pmr->TopAddress) || (qwAddr + cb <= pmr->BaseAddress))) {
 			return TRUE;
@@ -297,6 +293,135 @@ BOOL Device3380_FlashEEPROM(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PBYTE pbEEPROM, 
 	return TRUE;
 }
 
+VOID Action_Device3380_Flash(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	BOOL result;
+	if(ctx->cfg->tpDevice != PCILEECH_DEVICE_USB3380) {
+		printf("Flash failed: unsupported device.\n");
+		return;
+	}
+	printf("Flashing firmware ... \n");
+	if(!ctx->cfg->cbIn || ctx->cfg->cbIn > 32768) {
+		printf("Flash failed: failed to open file or invalid size\n");
+		return;
+	}
+	if(!ctx->cfg->fForceRW && (ctx->cfg->pbIn[0] != 0x5a || *(WORD*)(ctx->cfg->pbIn + 2) > (DWORD)ctx->cfg->cbIn - 1)) {
+		printf("Flash failed: invalid firmware signature or size\n");
+		return;
+	}
+	result = Device3380_FlashEEPROM(ctx, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn);
+	if(!result) {
+		printf("Flash failed: failed to write firmware to device\n");
+		return;
+	}
+	printf("SUCCESS!\n");
+}
+
+VOID Action_Device3380_8051Start(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	BOOL result;
+	if(ctx->cfg->tpDevice != PCILEECH_DEVICE_USB3380) {
+		printf("8051 startup failed: unsupported device.\n");
+		return;
+	}
+	printf("Loading 8051 executable and starting ... \n");
+	if(!ctx->cfg->cbIn || ctx->cfg->cbIn > 32768) {
+		printf("8051 startup failed: failed to open file or invalid size\n");
+		return;
+	}
+	result = Device3380_8051Start(ctx, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn);
+	if(!result) {
+		printf("8051 startup failed: failed to write executable to device or starting 8051\n");
+		return;
+	}
+	printf("SUCCESS!\n");
+}
+
+VOID Action_Device3380_8051Stop(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	if(ctx->cfg->tpDevice != PCILEECH_DEVICE_USB3380) {
+		printf("Stopping 8051 failed: unsupported device.\n");
+		return;
+	}
+	printf("Stopping 8051 ... \n");
+	Device3380_8051Stop(ctx);
+	printf("SUCCESS!\n");
+}
+
+BOOL DevicePciOutWriteDma(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb)
+{
+	DWORD cbTransferred;
+	BYTE data[4 + 4 + 64 * 4];
+	if(((cb % 4) != 0) || (cb > 256)) { return FALSE; }
+	if((qwAddr & 0x03) || ((qwAddr + cb) > 0x100000000)) { return FALSE; }
+	*(PDWORD)(data + 0) = 0x0000004f | (cb >> 2) << 24;
+	*(PDWORD)(data + 4) = (DWORD)qwAddr;
+	memcpy(data + 8, pb, cb);
+	return WinUsb_WritePipe(pDeviceData->WinusbHandle, USB_EP_PCIOUT, data, 8 + cb, &cbTransferred, NULL);
+}
+
+BOOL DevicePciInReadDma(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
+{
+	DWORD cbTransferred;
+	BYTE data[4 + 4];
+	if(((cb % 4) != 0) || (cb > 256)) { return FALSE; }
+	if((qwAddr & 0x03) || ((qwAddr + cb) > 0x100000000)) { return FALSE; }
+	*(PDWORD)(data + 0) = 0x000000cf | (cb >> 2) << 24;
+	*(PDWORD)(data + 4) = (DWORD)qwAddr;
+	return
+		WinUsb_WritePipe(pDeviceData->WinusbHandle, USB_EP_PCIOUT, data, 8, &cbTransferred, NULL) &&
+		WinUsb_ReadPipe(pDeviceData->WinusbHandle, USB_EP_PCIIN, pb, cb, &cbTransferred, NULL) &&
+		cb == cbTransferred;
+}
+
+BOOL Device3380_Open2(_Inout_ PPCILEECH_CONTEXT ctx);
+
+BOOL Device3380_Open(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	BOOL result;
+	DWORD dwReg;
+	result = Device3380_Open2(ctx);
+	if(!result) { return FALSE; }
+	Device3380_ReadCsr((PDEVICE_DATA)ctx->hDevice, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
+	if(ctx->cfg->fForceUsb2 && (dwReg & 0x0100 /* Super-Speed(USB3) */)) {
+		printf("Device Info: Device running at USB3 speed; downgrading to USB2 ...\n");
+		dwReg = 0x04; // USB2=ENABLE, USB3=DISABLE
+		Device3380_WriteCsr((PDEVICE_DATA)ctx->hDevice, REG_USBCTL2, dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTE0);
+		Device3380_Close(ctx);
+		Sleep(1000);
+		result = Device3380_Open2(ctx);
+		if(!result) { return FALSE; }
+		Device3380_ReadCsr((PDEVICE_DATA)ctx->hDevice, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
+	}
+	if(dwReg & 0xc0 /* Full-Speed(USB1)|High-Speed(USB2) */) {
+		printf("Device Info: Device running at USB2 speed.\n");
+	} else if(ctx->cfg->fVerbose) {
+		printf("Device Info: Device running at USB3 speed.\n");
+	}
+	if(ctx->cfg->fVerbose) { printf("Device Info: USB3380.\n"); }
+	return TRUE;
+}
+
+VOID Device3380_Close(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	PDEVICE_DATA pDeviceData = (PDEVICE_DATA)ctx->hDevice;
+	if(!pDeviceData) { return; }
+	if(!pDeviceData->HandlesOpen) { return; }
+	WinUsb_Free(pDeviceData->WinusbHandle);
+	if(pDeviceData->DeviceHandle) { CloseHandle(pDeviceData->DeviceHandle); }
+	pDeviceData->HandlesOpen = FALSE;
+	LocalFree(ctx->hDevice);
+	ctx->hDevice = 0;
+}
+
+#ifdef WIN32
+
+#include <versionhelpers.h>
+
+// Device Interface GUID. Must match "DeviceInterfaceGUIDs" registry value specified in the INF file.
+// F72FE0D4-CBCB-407d-8814-9ED673D0DD6B
+DEFINE_GUID(GUID_DEVINTERFACE_android, 0xF72FE0D4, 0xCBCB, 0x407d, 0x88, 0x14, 0x9E, 0xD6, 0x73, 0xD0, 0xDD, 0x6B);
+
 BOOL Device3380_RetrievePath(_Out_bytecap_(BufLen) LPWSTR wszDevicePath, _In_ ULONG BufLen)
 {
 	BOOL result;
@@ -385,121 +510,31 @@ BOOL Device3380_Open2(_Inout_ PPCILEECH_CONTEXT ctx)
 	return TRUE;
 }
 
-VOID Device3380_Close(_Inout_ PPCILEECH_CONTEXT ctx)
-{
-	PDEVICE_DATA pDeviceData = (PDEVICE_DATA)ctx->hDevice;
-	if(!pDeviceData) { return; }
-	if(!pDeviceData->HandlesOpen) { return; }
-	WinUsb_Free(pDeviceData->WinusbHandle);
-	CloseHandle(pDeviceData->DeviceHandle);
-	pDeviceData->HandlesOpen = FALSE;
-	LocalFree(ctx->hDevice);
-	ctx->hDevice = 0;
-}
+#endif /* WIN32 */
+#if defined(LINUX) || defined(ANDROID)
 
-BOOL Device3380_Open(_Inout_ PPCILEECH_CONTEXT ctx)
+BOOL Device3380_Open2(_Inout_ PPCILEECH_CONTEXT ctx)
 {
-	BOOL result;
-	DWORD dwReg;
-	result = Device3380_Open2(ctx);
-	if(!result) { return FALSE; }
-	Device3380_ReadCsr((PDEVICE_DATA)ctx->hDevice, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
-	if(ctx->cfg->fForceUsb2 && (dwReg & 0x0100 /* Super-Speed(USB3) */)) {
-		printf("Device Info: Device running at USB3 speed; downgrading to USB2 ...\n");
-		dwReg = 0x04; // USB2=ENABLE, USB3=DISABLE
-		Device3380_WriteCsr((PDEVICE_DATA)ctx->hDevice, REG_USBCTL2, dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTE0);
-		Device3380_Close(ctx);
-		Sleep(1000);
-		result = Device3380_Open2(ctx);
-		if(!result) { return FALSE; }
-		Device3380_ReadCsr((PDEVICE_DATA)ctx->hDevice, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
+	PDEVICE_DATA pDeviceData;
+	if(libusb_init(NULL)) { return FALSE; }
+	if(!ctx->hDevice) {
+		ctx->hDevice = (HANDLE)LocalAlloc(LMEM_ZEROINIT, sizeof(DEVICE_DATA));
+		if(!ctx->hDevice) { return FALSE; }
 	}
-	if(dwReg & 0xc0 /* Full-Speed(USB1)|High-Speed(USB2) */) {
-		printf("Device Info: Device running at USB2 speed.\n");
-	} else if(ctx->cfg->fVerbose) {
-		printf("Device Info: Device running at USB3 speed.\n");
+	pDeviceData = (PDEVICE_DATA)ctx->hDevice;
+	pDeviceData->WinusbHandle = libusb_open_device_with_vid_pid(NULL, 0x18d1, 0x9001);
+	if(!pDeviceData->WinusbHandle) { 
+		libusb_exit(NULL);
+		LocalFree(ctx->hDevice);
+		ctx->hDevice = NULL;
+		return FALSE;
 	}
-	if(ctx->cfg->fVerbose) { printf("Device Info: USB3380.\n"); }
+	libusb_claim_interface(pDeviceData->WinusbHandle, 0);
+	pDeviceData->HandlesOpen = TRUE;
+	// synchronous libusb bulk read/write doesn't seem to support multi threaded accesses.
+	pDeviceData->IsAllowedMultiThreadDMA = FALSE;
+	pDeviceData->MaxSizeDmaIo = ctx->cfg->qwMaxSizeDmaIo;
 	return TRUE;
 }
 
-VOID Action_Device3380_Flash(_Inout_ PPCILEECH_CONTEXT ctx)
-{
-	BOOL result;
-	if(ctx->cfg->tpDevice != PCILEECH_DEVICE_USB3380) {
-		printf("Flash failed: unsupported device.\n");
-		return;
-	}
-	printf("Flashing firmware ... \n");
-	if(!ctx->cfg->cbIn || ctx->cfg->cbIn > 32768) {
-		printf("Flash failed: failed to open file or invalid size\n");
-		return;
-	}
-	if(!ctx->cfg->fForceRW && (ctx->cfg->pbIn[0] != 0x5a || *(WORD*)(ctx->cfg->pbIn + 2) > (DWORD)ctx->cfg->cbIn - 1)) {
-		printf("Flash failed: invalid firmware signature or size\n");
-		return;
-	}
-	result = Device3380_FlashEEPROM(ctx, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn);
-	if(!result) {
-		printf("Flash failed: failed to write firmware to device\n");
-		return;
-	}
-	printf("SUCCESS!\n");
-}
-
-VOID Action_Device3380_8051Start(_Inout_ PPCILEECH_CONTEXT ctx)
-{
-	BOOL result;
-	if(ctx->cfg->tpDevice != PCILEECH_DEVICE_USB3380) {
-		printf("8051 startup failed: unsupported device.\n");
-		return;
-	}
-	printf("Loading 8051 executable and starting ... \n");
-	if(!ctx->cfg->cbIn || ctx->cfg->cbIn > 32768) {
-		printf("8051 startup failed: failed to open file or invalid size\n");
-		return;
-	}
-	result = Device3380_8051Start(ctx, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn);
-	if(!result) {
-		printf("8051 startup failed: failed to write executable to device or starting 8051\n");
-		return;
-	}
-	printf("SUCCESS!\n");
-}
-
-VOID Action_Device3380_8051Stop(_Inout_ PPCILEECH_CONTEXT ctx)
-{
-	if(ctx->cfg->tpDevice != PCILEECH_DEVICE_USB3380) {
-		printf("Stopping 8051 failed: unsupported device.\n");
-		return;
-	}
-	printf("Stopping 8051 ... \n");
-	Device3380_8051Stop(ctx);
-	printf("SUCCESS!\n");
-}
-
-BOOL DevicePciOutWriteDma(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb)
-{
-	DWORD cbTransferred;
-	BYTE data[4 + 4 + 64 * 4];
-	if(((cb % 4) != 0) || (cb > 256)) { return FALSE; }
-	if((qwAddr & 0x03) || ((qwAddr + cb) > 0x100000000)) { return FALSE; }
-	*(PDWORD)(data + 0) = 0x0000004f | (cb >> 2) << 24;
-	*(PDWORD)(data + 4) = (DWORD)qwAddr;
-	memcpy(data + 8, pb, cb);
-	return WinUsb_WritePipe(pDeviceData->WinusbHandle, USB_EP_PCIOUT, data, 8 + cb, &cbTransferred, NULL);
-}
-
-BOOL DevicePciInReadDma(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
-{
-	DWORD cbTransferred;
-	BYTE data[4 + 4];
-	if(((cb % 4) != 0) || (cb > 256)) { return FALSE; }
-	if((qwAddr & 0x03) || ((qwAddr + cb) > 0x100000000)) { return FALSE; }
-	*(PDWORD)(data + 0) = 0x000000cf | (cb >> 2) << 24;
-	*(PDWORD)(data + 4) = (DWORD)qwAddr;
-	return
-		WinUsb_WritePipe(pDeviceData->WinusbHandle, USB_EP_PCIOUT, data, 8, &cbTransferred, NULL) &&
-		WinUsb_ReadPipe(pDeviceData->WinusbHandle, USB_EP_PCIIN, pb, cb, &cbTransferred, NULL) &&
-		cb == cbTransferred;
-}
+#endif /* LINUX || ANDROID */

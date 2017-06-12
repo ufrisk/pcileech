@@ -5,7 +5,6 @@
 //
 #ifndef __SHELLCODE_H__
 #define __SHELLCODE_H__
-#include "windows.h"
 
 typedef struct tdSHELLCODE_DEFAULT_STRUCT {
 	const LPSTR sz;

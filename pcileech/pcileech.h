@@ -5,22 +5,10 @@
 //
 #ifndef __PCILEECH_H__
 #define __PCILEECH_H__
-#include <windows.h>
-#include <stdio.h>
-#include <winusb.h>
-#include <setupapi.h>
-
-#pragma comment (lib, "winusb.lib")
-#pragma comment (lib, "setupapi.lib")
-#pragma comment (lib, "crypt32.lib")
-#pragma comment (lib, "bcrypt.lib")
-
-#pragma warning( disable : 4477)
+#include "oscompatibility.h"
 
 #define SIZE_PAGE_ALIGN_4K(x)				((x + 0xfff) & ~0xfff)
 #define CONFIG_MAX_SIGNATURES		        16
-typedef unsigned __int64					QWORD;
-typedef QWORD near							*PQWORD;
 
 #pragma pack(push, 1) /* DISABLE STRUCT PADDINGS (REENABLE AFTER STRUCT DEFINITIONS) */
 typedef struct tdSignaturePTE {
@@ -164,7 +152,7 @@ typedef struct tdKMDDATA {
 	QWORD DMAAddrVirtual;			// [0x028] virtual address of DMA buffer.
 	QWORD _status;					// [0x030] status of operation
 	QWORD _result;					// [0x038] result of operation TRUE|FALSE
-	QWORD _address;					// [0x040] virtual address to operate on.
+	QWORD _address;					// [0x040] address to operate on.
 	QWORD _size;					// [0x048] size of operation / data in DMA buffer.
 	QWORD OperatingSystem;			// [0x050] operating system type
 	QWORD ReservedKMD;				// [0x058] reserved for specific kmd data (dependant on KMD version).

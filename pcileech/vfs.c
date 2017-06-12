@@ -3,6 +3,8 @@
 // (c) Ulf Frisk, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
+#ifdef WIN32
+
 #include "vfs.h"
 #include "device.h"
 #include "executor.h"
@@ -935,3 +937,15 @@ fail:
 	if(pDokanOptions) { LocalFree(pDokanOptions); }
 	if(pDokanOperations) { LocalFree(pDokanOperations); }
 }
+
+#endif /* WIN32 */
+#if defined(LINUX) || defined(ANDROID)
+
+#include "vfs.h"
+
+VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	printf("MOUNT: Failed. Operation only supported in PCILeech for Windows.");
+}
+
+#endif /* LINUX || ANDROID */

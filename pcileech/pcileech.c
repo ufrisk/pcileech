@@ -287,5 +287,6 @@ int main(_In_ int argc, _In_ char* argv[])
 	}
 	Sleep(1000 * (DWORD)ctx->cfg->qwWaitBeforeExit);
 	PCILeechFreeContext(ctx);
+	ExitProcess(0);
 	return 0;
 }

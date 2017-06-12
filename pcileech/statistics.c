@@ -21,18 +21,23 @@ VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
 	}
 	ps->i.qwLastUpdateCtrl = qwLastUpdateCtrl;
 	if(ps->i.hConsole) {
+#ifdef WIN32
 		GetConsoleScreenBufferInfo(ps->i.hConsole, &consoleInfo);
 		consoleInfo.dwCursorPosition.Y = ps->i.wConsoleCursorPosition;
 		SetConsoleCursorPosition(ps->i.hConsole, consoleInfo.dwCursorPosition);
+#endif /* WIN32 */
+#if defined(LINUX) || defined(ANDROID)
+		printf("\033[7A"); // Move up X lines;
+#endif /* LINUX || ANDROID */
 	}
 	printf(
 		" Current Action: %s                             \n" \
 		" Access Mode:    %s                             \n" \
-		" Progress:       %u / %u (%u%%)                 \n" \
-		" Speed:          %u %s                          \n" \
+		" Progress:       %llu / %llu (%llu%%)           \n" \
+		" Speed:          %llu %s                        \n" \
 		" Address:        0x%016llX                      \n" \
-		" Pages read:     %u / %u (%u%%)                 \n" \
-		" Pages failed:   %u (%u%%)                      \n",
+		" Pages read:     %llu / %llu (%llu%%)           \n" \
+		" Pages failed:   %llu (%llu%%)                  \n",
 		ps->szAction,
 		ps->fKMD ? "KMD (kernel module assisted DMA)" : "DMA (hardware only)             ",
 		(ps->cPageSuccess + ps->cPageFail) / 256,
@@ -46,11 +51,16 @@ VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
 		qwPercentSuccess,
 		ps->cPageFail,
 		qwPercentFail);
+#ifdef WIN32
 	if(!ps->i.hConsole) {
 		ps->i.hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 		GetConsoleScreenBufferInfo(ps->i.hConsole, &consoleInfo);
 		ps->i.wConsoleCursorPosition = consoleInfo.dwCursorPosition.Y - 7;
 	}
+#endif /* WIN32 */
+#if defined(LINUX) || defined(ANDROID)
+	ps->i.hConsole = (HANDLE)1;
+#endif /* LINUX || ANDROID */
 }
 
 VOID _PageStatPrintMemMap(_In_ PPAGE_STATISTICS ps)
@@ -89,10 +99,14 @@ VOID _PageStatThreadLoop(_In_ PPAGE_STATISTICS ps)
 
 VOID PageStatClose(_Inout_ PPAGE_STATISTICS ps)
 {
+	BOOL status;
 	DWORD dwExitCode;
 	ps->i.fThreadExit = TRUE;
-	while(GetExitCodeThread(ps->i.hThread, &dwExitCode) && STILL_ACTIVE == dwExitCode) {
+	while((status = GetExitCodeThread(ps->i.hThread, &dwExitCode)) && STILL_ACTIVE == dwExitCode) {
 		SwitchToThread();
+	}
+	if(!status) {
+		Sleep(200);
 	}
 	if(ps->i.fMemMap) {
 		_PageStatPrintMemMap(ps);

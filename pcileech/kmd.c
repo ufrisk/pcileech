@@ -251,7 +251,6 @@ BOOL KMD_FreeBSDKernelSeekSignature(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PSIGNAT
 		i -= 4;
 		if(i < 0x1000) { goto error; }
 		if(0 == *(PDWORD)(pb64M + i - 4)) { 
-			DWORD dwbug = *(PDWORD)(pb64M + i - 4);
 			break; 
 		}
 	}
@@ -282,7 +281,8 @@ error:
 
 BOOL KMD_LinuxIsAllAddrFoundSeek(_In_ PKERNELSEEKER pS, _In_ DWORD cS)
 {
-	for(DWORD j = 0; j < cS; j++) {
+	DWORD j;
+	for(j = 0; j < cS; j++) {
 		if(!pS[j].aSeek) {
 			return FALSE;
 		}
@@ -292,7 +292,8 @@ BOOL KMD_LinuxIsAllAddrFoundSeek(_In_ PKERNELSEEKER pS, _In_ DWORD cS)
 
 BOOL KMD_LinuxIsAllAddrFoundTableEntry(_In_ PKERNELSEEKER pS, _In_ DWORD cS)
 {
-	for(DWORD j = 0; j < cS; j++) {
+	DWORD j;
+	for(j = 0; j < cS; j++) {
 		if(!pS[j].aTableEntry) {
 			return FALSE;
 		}
@@ -345,8 +346,8 @@ BOOL KMD_Linux46KernelSeekSignature(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PSIGNAT
 {
 	BOOL result;
 	KERNELSEEKER ks[2] = {
-		{ .pbSeek = "\0kallsyms_lookup_name",.cbSeek = 22 },
-		{ .pbSeek = "\0vfs_read",.cbSeek = 10 }
+		{ .pbSeek = (PBYTE)"\0kallsyms_lookup_name",.cbSeek = 22 },
+		{ .pbSeek = (PBYTE)"\0vfs_read",.cbSeek = 10 }
 	};
 	DWORD cKSlide, dwKernelBase;
 	PBYTE pb = LocalAlloc(0, CONFIG_LINUX_SEEK_BUFFER_SIZE);
@@ -431,8 +432,8 @@ BOOL KMD_Linux48KernelSeekSignature(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PSIGNAT
 	QWORD qwKernelBase;
 	PAGE_STATISTICS ps;
 	KERNELSEEKER ks[2] = {
-		{ .pbSeek = "\0kallsyms_lookup_name",.cbSeek = 22 },
-		{ .pbSeek = "\0vfs_read",.cbSeek = 10 }
+		{ .pbSeek = (PBYTE)"\0kallsyms_lookup_name",.cbSeek = 22 },
+		{ .pbSeek = (PBYTE)"\0vfs_read",.cbSeek = 10 }
 	};
 	PBYTE pb = LocalAlloc(0, 0x01000000);
 	if(!pb) { return FALSE; }
@@ -632,9 +633,9 @@ BOOL KMDOpen_HalHijack(_Inout_ PPCILEECH_CONTEXT ctx)
 	Sleep(250);
 	DeviceWriteDMA(ctx, (qwPTEOrig & 0xfffff000) + dwHookFnPgOffset, (PBYTE)&qwShellcodeVA, sizeof(QWORD), PCILEECH_MEM_FLAG_RETRYONFAIL);
 	if(ctx->cfg->fVerbose) {
-		printf("INFO: PA PT BASE:   0x%08x\n", qwPML4);
-		printf("INFO: PA PT:        0x%08x\n", qwPTPA);
-		printf("INFO: PA HAL HEAP:  0x%08x\n", (qwPTEOrig & 0xfffff000) + dwHookFnPgOffset);
+		printf("INFO: PA PT BASE:   0x%016llx\n", qwPML4);
+		printf("INFO: PA PT:        0x%016llx\n", qwPTPA);
+		printf("INFO: PA HAL HEAP:  0x%016llx\n", (qwPTEOrig & 0xfffff000) + dwHookFnPgOffset);
 		printf("INFO: VA SHELLCODE: 0x%016llx\n", qwShellcodeVA);
 	}
 	printf("KMD: Code inserted into the kernel - Waiting to receive execution.\n");
@@ -670,8 +671,9 @@ BOOL KMDOpen_HalHijack(_Inout_ PPCILEECH_CONTEXT ctx)
 
 BOOL KMD_IsRangeInPhysicalMap(_In_ PKMDHANDLE phKMD, _In_ QWORD qwBaseAddress, _In_ QWORD qwNumberOfBytes)
 {
+	QWORD i;
 	PHYSICAL_MEMORY_RANGE pmr;
-	for(QWORD i = 0; i < phKMD->cPhysicalMap; i++) {
+	for(i = 0; i < phKMD->cPhysicalMap; i++) {
 		pmr = phKMD->pPhysicalMap[i];
 		if(((pmr.BaseAddress <= qwBaseAddress) && (pmr.BaseAddress + pmr.NumberOfBytes >= qwBaseAddress + qwNumberOfBytes))) {
 			return TRUE;
@@ -692,6 +694,11 @@ BOOL KMD_SubmitCommand(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD op)
 			Exec_CallbackClose(hCallback);
 			return FALSE;
 		}
+		if((op != KMD_CMD_MEM_INFO) && (ctx->pk->MAGIC != KMDDATA_MAGIC) && (ctx->pk->MAGIC != KMDDATA_MAGIC_PARTIAL)) {
+			printf("PCILEECH: FAIL: KMDDATA corruption! - bit errors? Address: %08x. Terminating.\n", ctx->phKMD->dwPageAddr32);
+			DeviceClose(ctx);
+			ExitProcess(0);
+		}
 		if(ctx->pk->_op == KMD_CMD_EXEC_EXTENDED) {
 			Exec_Callback(ctx, &hCallback);
 		}
@@ -708,7 +715,7 @@ VOID KMD_PhysicalMemoryMapDisplay(_In_ PKMDHANDLE phKMD)
 	for(i = 0; i < phKMD->cPhysicalMap; i++) {
 		pmr = phKMD->pPhysicalMap[i];
 		printf(
-			" %016llx - %016llx  %08x\n",
+			" %016llx - %016llx  %08llx\n",
 			pmr.BaseAddress,
 			pmr.BaseAddress + pmr.NumberOfBytes - 1,
 			pmr.NumberOfBytes / 0x1000);

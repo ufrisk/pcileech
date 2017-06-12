@@ -33,10 +33,10 @@ VOID Help_ShowGeneral()
 		" contains a kernel mode signature the kernel module will be loaded and then un-\n" \
 		" loaded on program exit ( except for the kmdload command ).                    \n" \
 		" KMD mode may access all memory.   DMA mode may only access memory below 4GB if\n" \
-		" the USB3380 hardware is used.                                                 \n" \
-		" For more detailed help about a specific command type: pcileech <command> -help\n" \
+		" USB3380 hardware is used.   Commands marked 'W' are only available on Windows.\n" \
+		" For detailed help about a specific command type:  pcileech.exe <command> -help\n" \
 		" General syntax: pcileech.exe <command> [-<optionname1> <optionvalue1>] ...    \n" \
-		" Valid commands and valid MODEs [ and options ]:                               \n" \
+		" Valid commands and valid MODEs     [ and options ]                            \n" \
 		"   info                   DMA,KMD                                              \n" \
 		"   dump                   DMA,KMD   [ min, max, out ]                          \n" \
 		"   patch                  DMA,KMD   [ min, max, sig, all ]                     \n" \
@@ -45,7 +45,7 @@ VOID Help_ShowGeneral()
 		"   [implant]                  KMD   [ in, out, s, 0..9 ]                       \n" \
 		"   kmdload                DMA       [ pt, cr3 ]                                \n" \
 		"   kmdexit                    KMD                                              \n" \
-		"   mount                      KMD   [ s ]                                      \n" \
+		"   mount                W     KMD   [ s ]                                      \n" \
 		"   pagedisplay            DMA,KMD   [ min ]                                    \n" \
 		"   pt_phys2virt           DMA,KMD   [ cr3, 0 ]                                 \n" \
 		"   testmemread            DMA       [ min ]                                    \n" \
@@ -54,7 +54,7 @@ VOID Help_ShowGeneral()
 		"   usb3380_flash          DMA,KMD   [ in ] (USB3380)                           \n" \
 		"   usb3380_8051start      DMA,KMD   [ in ] (USB3380)                           \n" \
 		"   usb3380_8051stop       DMA,KMD          (USB3380)                           \n" \
-		"   tlp                    DMA       [ in ] (SP605)                             \n" \
+		"   tlp                  W DMA       [ in ] (SP605)                             \n" \
 		" System specific commands and valid MODEs [ and options ]:                     \n" \
 		"   mac_fvrecover          DMA                                                  \n" \
 		"   mac_fvrecover2         DMA                                                  \n" \
@@ -131,10 +131,10 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016, 2017 Ulf Frisk                                             \n" \
-		" Version: 2.0                                                                  \n" \
+		" Version: 2.1                                                                  \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
-		" System requirements: 64-bit Windows 7, 10 or later.                           \n" \
+		" System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \
 		" Other project references:                                                     \n" \
 		"   PCILeech          - https://github.com/ufrisk/pcileech                      \n" \
 		"   Slotscreamer      - https://github.com/NSAPlayset/SLOTSCREAMER              \n" \
@@ -145,16 +145,19 @@ VOID Help_ShowInfo()
 		" Use with USB3380 hardware programmed as a PCILeech device.                    \n" \
 		" Use with SP605 hardware / 'PCI Express DIY hacking toolkit' by cr4sh/@d_olex. \n\n" \
 		" ----------------                                                              \n" \
-		" Driver information (USB3380):                                                 \n" \
+		" Driver information (USB3380/Windows):                                         \n" \
 		"   The USB3380 HW requires a dummy driver to function properly. The PCILeech   \n" \
 		"   device masks as a Google Glass. Please download and install the Google USB  \n" \
 		"   driver before proceeding by using the USB3380 device. USB3 is recommended   \n" \
 		"   to performance reasons (USB2 will work but impact performance).             \n" \
-		" Driver information (Dokany):                                                  \n" \
+		" Driver information (Dokany/Windows):                                          \n" \
 		"   To be able to use the 'mount' functionality for filesystem browsing and live\n" \
 		"   memory file access PCILeech requires Dokany to be installed for virtual file\n" \
 		"   system support. Please download and install Dokany on your computer before  \n" \
 		"   using the mount functionality.                                              \n" \
+		" Driver information (Libusb/Linux):                                            \n" \
+		"   PCILeech on Linux requires that libusb is installed. Libusb is most probably\n" \
+		"   installed by default, if not install by running:apt-get install libusb-1.0-0\n" \
 		" ----------------                                                              \n" \
 		" Notes about the PCILeech USB3380 device:                                      \n" \
 		" Usage: connect USB3380 device to target computer and USB cable to the computer\n" \
@@ -305,7 +308,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 			" memory may crash the target system. Use with care.   Copying files and dumping\n" \
 			" memory via the PCILeech virtual file system will work but the performance will\n" \
 			" be better when using the built in commandline commands when performing actions\n" \
-			" like the ones mentioned above.                                                \n" \
+			" like the ones mentioned above.Supported only when running PCILeech on Windows.\n" \
 			" EXAMPLES:      (example kernel module is loaded at address 0x7fffe000)        \n" \
 			" 1) mount file system and live RAM of target as the default K: drive letter.   \n" \
 			"    pcileech mount -kmd 0x7fffe000                                             \n" \
@@ -451,6 +454,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 			" specifying an -in parameter no TLP will be sent. Specify the -vv setting to   \n" \
 			" display received and sent TLPs. The default listen time is 0.5s, if a longer  \n" \
 			" listen time is required specify it with the -wait parameter.                  \n" \
+			" Supported only when running PCILeech on Windows.                              \n" \
 			" EXAMPLEs:                                                                     \n" \
 			" 1) Listen for incoming TLPs for 10s:                                          \n" \
 			"    pcileech.exe -vv -wait 10                                                  \n");

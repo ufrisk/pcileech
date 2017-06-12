@@ -9,7 +9,7 @@
 #include "util.h"
 
 typedef struct tdFILE_WRITE_ASYNC_BUFFER {
-	HANDLE hFile;
+	FILE *phFile;
 	BOOL isSuccess;
 	BOOL isExecuting;
 	DWORD cb;
@@ -18,8 +18,7 @@ typedef struct tdFILE_WRITE_ASYNC_BUFFER {
 
 VOID MemoryDump_FileWriteAsync_Thread(PFILE_WRITE_ASYNC_BUFFER pfb)
 {
-	DWORD cbWritten;
-	pfb->isSuccess = WriteFile(pfb->hFile, pfb->pb, pfb->cb, &cbWritten, NULL);
+	pfb->isSuccess = 0 != fwrite(pfb->pb, 1, pfb->cb, pfb->phFile);
 	pfb->isExecuting = FALSE;
 }
 
@@ -32,7 +31,7 @@ VOID MemoryDump_SetOutFileName(_Inout_ PCONFIG pCfg)
 			pCfg->szFileOut,
 			MAX_PATH,
 			_TRUNCATE,
-			"pcileech-%x-%llx-%i%02i%02i-%02i%02i%02i.raw",
+			"pcileech-%llx-%llx-%i%02i%02i-%02i%02i%02i.raw",
 			pCfg->qwAddrMin,
 			pCfg->qwAddrMax,
 			st.wYear,
@@ -57,7 +56,6 @@ VOID ActionMemoryDump(_Inout_ PPCILEECH_CONTEXT ctx)
 		printf("Memory Dump: Failed. Failed to allocate memory buffers.\n");
 		return;
 	}
-
 	if (ctx->cfg->fOutFile != FALSE)
 	{
 		MemoryDump_SetOutFileName(ctx->cfg);
@@ -66,8 +64,12 @@ VOID ActionMemoryDump(_Inout_ PPCILEECH_CONTEXT ctx)
 			printf("Memory Dump: Failed. Failed to allocate memory buffers.\n");
 			return;
 		}
-		pFileBuffer->hFile = CreateFileA(ctx->cfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
-		if(!pFileBuffer->hFile || pFileBuffer->hFile == INVALID_HANDLE_VALUE) {
+		if(!fopen_s(&pFileBuffer->phFile, ctx->cfg->szFileOut, "r") || pFileBuffer->phFile) {
+			fclose(pFileBuffer->phFile);
+			printf("Memory Dump: Failed. File already exists.\n");
+			return;
+		}
+		if(fopen_s(&pFileBuffer->phFile, ctx->cfg->szFileOut, "wb") || !pFileBuffer->phFile) {
 			printf("Memory Dump: Failed. Error writing to file.\n");
 			return;
 		}
@@ -115,11 +117,11 @@ cleanup:
 		LocalFree(pbMemoryDump);
 	}
 	if(pFileBuffer) {
-		if(pFileBuffer->hFile) {
+		if(pFileBuffer->phFile) {
 			while(pFileBuffer->isExecuting) {
 				SwitchToThread();
 			}
-			CloseHandle(pFileBuffer->hFile);
+			fclose(pFileBuffer->phFile);
 		}
 		LocalFree(pFileBuffer);
 	}

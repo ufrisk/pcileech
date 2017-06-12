@@ -4,9 +4,9 @@ PCILeech uses PCIe hardware devices to read and write from the target system mem
 
 PCILeech supports multiple hardware. Currently only the USB3380 hardware is publically available. The USB3380 is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel.
 
-PCILeech is also capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. The software is written in visual studio and runs on Windows 7/Windows 10. Supported target systems are currently the x64 versions of: Linux, FreeBSD, macOS and Windows.
+PCILeech is capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. PCIleech runs on Windows/Linux/Android. Supported target systems are currently the x64 versions of: Linux, FreeBSD, macOS and Windows.
 
-<img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_mbp.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_m2.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_shadow.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_dump.gif" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_mount.jpg" height="150"/>
+<img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_mbp.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_m2.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_shadow.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_dump.gif" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_mount.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/314e527e13e78edd44cc6db2b7c05cfa4a1ce322/_gh_android.jpg" height="150"/>
 
 Capabilities:
 =============
@@ -30,11 +30,18 @@ Installing PCILeech:
 ====================
 Please ensure you do have the most recent version of PCILeech by visiting the PCILeech github repository at: https://github.com/ufrisk/pcileech
 
-Clone the PCILeech Github repository. The binaries are found in pcileech_files and should work on Windows 7 and Windows 10 64-bit versions. Please copy all files from pcileech_files since some files contains additional modules and signatures.
+Clone the PCILeech Github repository. The binaries are found in pcileech_files and should work on 64-bit Windows and Linux. Please copy all files from pcileech_files since some files contains additional modules and signatures.
 
-The Google Android USB driver also have to be installed. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver. Open Device Manager. Right click on the computer, choose add legacy hardware. Select install the hardware manually. Click Have Disk. Navigate to the Android Driver, select android_winusb.inf and install. The PCILeech lies about being a Google Glass so that the Android USB driver may be used to access the PCILeech hardware from Windows.
+#### Windows:
+The Google Android USB driver also have to be installed. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver. Open Device Manager. Right click on the computer, choose add legacy hardware. Select install the hardware manually. Click Have Disk. Navigate to the Android Driver, select android_winusb.inf and install.
 
 To mount live ram and target file system as drive in Windows the Dokany file system library must be installed. Please download and install the latest version of Dokany at: https://github.com/dokan-dev/dokany/releases/latest
+
+#### Linux:
+PCILeech on Linux must be run as root. PCILeech also requires libusb. Libusb is probably installed by default - if not install it by running: `apt-get install libusb-1.0-0`.
+
+#### Android:
+Separate instructions for [Android](Android.md).
 
 Hardware:
 =================
@@ -129,10 +136,15 @@ Limitations/Known Issues:
 * Linux based on the 4.8 kernel and later might not work with the USB3380 hardware. As an alternative, if target root access exists, compile and insert .ko (pcileech_kmd/linux). If the system is EFI booted an alternative signature exists.
 * Windows Vista: some shellcode modules such as wx64_pscmd does not work.
 * Windows 7: signatures are not published.
+* The Linux/Android versions of PCILeech dumps memory slightly slower than the Windows version. Mount target file system and live RAM are also not availabe in the Linux/Android versions.
 
 Building:
 =========
-The binaries are found in the pcileech_files folder. If one wish to build an own version it is possible to do so. Compile the pcileech and pcileech_gensig projects from within Visual Studio. Tested with Visual Studio 2015. To compile kernel- and shellcode, located in the pcileech_shellcode project, please look into the individual files for instructions. These files are usually compiled command line.
+The binaries are found in the pcileech_files folder. If one wish to build an own version it is possible to do so. Compile the pcileech and pcileech_gensig projects from within Visual Studio. Tested with Visual Studio 2015. 
+
+To compile kernel- and shellcode, located in the pcileech_shellcode project, please look into the individual files for instructions. These files are usually compiled command line. To compile for Linux make sure the dependencies are met my running: `apt-get install libusb-1.0-0-dev pkg-config` then move into the pcileech/pcileech directory and build by running: `make`. Copy the pcileech binary to pcileech/pcileech_files afterwards.
+
+Separate instructions for [Android](Android.md).
 
 Links:
 ======
@@ -152,3 +164,7 @@ v2.0
 * mount target system live RAM and file system as drive.
 * substantial refactorings to support future multiple hardware devices.
 * signature: Linux 4.10 kernel support in LINUX_X64_EFI signature.
+
+v2.1
+* Linux support.
+* Android support.

@@ -36,12 +36,13 @@ typedef struct tdCONSOLEREDIR_THREADDATA {
 	PEXEC_IO pInfoOS;
 	BYTE pbDataISConsoleBuffer[4096];
 	BYTE pbDataOSConsoleBuffer[4096];
+	BOOL fTerminateThread;
 } CONSOLEREDIR_THREADDATA, *PCONSOLEREDIR_THREADDATA;
 
 typedef struct tdEXEC_HANDLE {
 	PPCILEECH_CONTEXT ctx;
 	PBYTE pbDMA;
-	HANDLE hFileOutput;
+	FILE *pFileOutput;
 	QWORD qwFileWritten;
 	QWORD fError;
 	EXEC_IO is;
@@ -52,9 +53,8 @@ typedef struct tdEXEC_HANDLE {
 // read from this console and send to targeted console
 DWORD ConsoleRedirect_ThreadConsoleInput(PCONSOLEREDIR_THREADDATA pd)
 {
-	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	DWORD cbWrite, cbModulo, cbModuloAck;
-	while(TRUE) {
+	while(!pd->fTerminateThread) {
 		while(pd->pInfoOS->con.cbRead == pd->pInfoIS->con.cbReadAck) {
 			Sleep(10);
 			continue;
@@ -62,26 +62,27 @@ DWORD ConsoleRedirect_ThreadConsoleInput(PCONSOLEREDIR_THREADDATA pd)
 		cbModulo = pd->pInfoOS->con.cbRead % EXEC_IO_CONSOLE_BUFFER_SIZE;
 		cbModuloAck = pd->pInfoIS->con.cbReadAck % EXEC_IO_CONSOLE_BUFFER_SIZE;
 		if(cbModuloAck < cbModulo) {
-			WriteConsoleA(hConsole, pd->pInfoOS->con.pb + cbModuloAck, cbModulo - cbModuloAck, &cbWrite, NULL);
-		}
-		else {
-			WriteConsoleA(hConsole, pd->pInfoOS->con.pb + cbModuloAck, EXEC_IO_CONSOLE_BUFFER_SIZE - cbModuloAck, &cbWrite, NULL);
+			cbWrite = cbModulo - cbModuloAck;
+			printf("%.*s", cbWrite, pd->pInfoOS->con.pb + cbModuloAck);
+		} else {
+			cbWrite = EXEC_IO_CONSOLE_BUFFER_SIZE - cbModuloAck;
+			printf("%.*s", cbWrite, pd->pInfoOS->con.pb + cbModuloAck);
 		}
 		pd->pInfoIS->con.cbReadAck += cbWrite;
 	}
+	return 0;
 }
 
 DWORD ConsoleRedirect_ThreadConsoleOutput(PCONSOLEREDIR_THREADDATA pd)
 {
-	HANDLE hConsoleIn = GetStdHandle(STD_INPUT_HANDLE);
-	DWORD cbRead;
-	while(TRUE) {
-		ReadConsoleA(hConsoleIn, pd->pInfoIS->con.pb + (pd->pInfoIS->con.cbRead % EXEC_IO_CONSOLE_BUFFER_SIZE), 1, &cbRead, NULL);
-		pd->pInfoIS->con.cbRead += cbRead;
+	while(!pd->fTerminateThread) {
+		*(pd->pInfoIS->con.pb + (pd->pInfoIS->con.cbRead % EXEC_IO_CONSOLE_BUFFER_SIZE)) = (BYTE)getchar();
+		pd->pInfoIS->con.cbRead++;
 		while(pd->pInfoIS->con.cbRead - pd->pInfoOS->con.cbReadAck >= EXEC_IO_CONSOLE_BUFFER_SIZE) {
 			Sleep(10);
 		}
 	}
+	return 0;
 }
 
 BOOL Exec_ConsoleRedirect_Initialize(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD ConsoleBufferAddr_InputStream, _In_ QWORD ConsoleBufferAddr_OutputStream, _Inout_ PCONSOLEREDIR_THREADDATA pd)
@@ -109,26 +110,26 @@ VOID Exec_ConsoleRedirect(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD ConsoleBuffe
 	result = Exec_ConsoleRedirect_Initialize(ctx, ConsoleBufferAddr_InputStream, ConsoleBufferAddr_OutputStream, pd);
 	if(!result) {
 		printf("\nCONSOLE_REDIRECT: Error: Address 0x%016llX does not\ncontain a valid console buffer.\n", ConsoleBufferAddr_OutputStream);
-		return;
+		goto fail;
 	}
 	// buffer syncer
 	while(TRUE) {
 		result = DeviceReadMEM(ctx, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, 0);
 		if(!result || pd->pInfoOS->magic != EXEC_IO_MAGIC) {
 			printf("\nCONSOLE_REDIRECT: Error: Address 0x%016llX does not\ncontain a valid console buffer.\n", ConsoleBufferAddr_OutputStream);
-			return;
+			goto fail;
 		}
 		DeviceWriteMEM(ctx, ConsoleBufferAddr_InputStream, pd->pbDataISConsoleBuffer, 0x1000, 0);
 	}
-	TerminateThread(pd->hThreadIS, 0);
-	TerminateThread(pd->hThreadOS, 0);
+	fail:
+	pd->fTerminateThread = TRUE;
 }
 
 VOID Exec_Callback(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PHANDLE phCallback)
 {
 	BOOL result;
 	PEXEC_HANDLE ph = *phCallback;
-	DWORD cbLength;
+	QWORD cbLength;
 	// initialize if not initialized previously.
 	if(!*phCallback) {
 		// core initialize
@@ -139,9 +140,12 @@ VOID Exec_Callback(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PHANDLE phCallback)
 		ph->ctx = ctx;
 		ph->is.magic = EXEC_IO_MAGIC;
 		// open output file
-		ph->hFileOutput = CreateFileA(ctx->cfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
-		if(!ph->hFileOutput || (ph->hFileOutput == INVALID_HANDLE_VALUE)) {
-			ph->hFileOutput = NULL;
+		if(!fopen_s(&ph->pFileOutput, ctx->cfg->szFileOut, "r") || ph->pFileOutput) {
+			fclose(ph->pFileOutput);
+			printf("EXEC: Failed. File already exists: %s\n", ctx->cfg->szFileOut);
+			return;
+		}
+		if(fopen_s(&ph->pFileOutput, ctx->cfg->szFileOut, "wb") || !ph->pFileOutput) {
 			ph->is.bin.fCompletedAck = TRUE;
 			DeviceWriteDMA(ctx, ctx->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, (PBYTE)&ph->is, 0x1000, 0);
 			ph->fError = TRUE;
@@ -158,7 +162,7 @@ VOID Exec_Callback(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PHANDLE phCallback)
 	cbLength = 0;
 	result =
 		DeviceReadDMA(ctx, ctx->pk->DMAAddrPhysical + ctx->pk->dataOutExtraOffset, ph->pbDMA, (DWORD)SIZE_PAGE_ALIGN_4K(ctx->pk->dataOutExtraLength), 0) &&
-		WriteFile(ph->hFileOutput, ph->pbDMA, (DWORD)ctx->pk->dataOutExtraLength, &cbLength, NULL) &&
+		(cbLength = fwrite(ph->pbDMA, 1, ctx->pk->dataOutExtraLength, ph->pFileOutput)) &&
 		(ctx->pk->dataOutExtraLength == cbLength);
 	ph->qwFileWritten += cbLength;
 	ph->fError = !result;
@@ -171,14 +175,14 @@ VOID Exec_CallbackClose(_In_ HANDLE hCallback)
 {
 	PEXEC_HANDLE ph = hCallback;
 	if(hCallback == NULL) { return; }
-	if(ph->hFileOutput) {
+	if(ph->pFileOutput) {
 		if(ph->fError) {
 			printf("EXEC: Failed writing large outut to file: %s\n", ph->ctx->cfg->szFileOut);
 		} else {
-			printf("EXEC: Successfully wrote %i bytes.\n", ph->qwFileWritten);
+			printf("EXEC: Successfully wrote %i bytes.\n", (DWORD)ph->qwFileWritten);
 		}
 	}
-	if(ph->hFileOutput) { CloseHandle(ph->hFileOutput); }
+	if(ph->pFileOutput) { fclose(ph->pFileOutput); }
 	LocalFree(ph->pbDMA);
 	LocalFree(ph);
 }
@@ -243,14 +247,13 @@ fail:
 
 VOID ActionExecShellcode(_Inout_ PPCILEECH_CONTEXT ctx)
 {
-	const DWORD CONFIG_SHELLCODE_MAX_BYTES_OUT_PRINT = 8192;
 	BOOL result;
 	PKMDEXEC pKmdExec = NULL;
 	PBYTE pbBuffer = NULL;
 	BYTE pbZeroPage2[0x2000] = { 0 };
 	PSTR szBufferText = NULL;
 	DWORD cbLength;
-	HANDLE hFile = NULL;
+	FILE *pFile = NULL;
 	PKMDDATA pk = ctx->pk;
 	//------------------------------------------------ 
 	// 1: Setup and initial validity checks.
@@ -342,12 +345,16 @@ VOID ActionExecShellcode(_Inout_ PPCILEECH_CONTEXT ctx)
 		Util_PrintHexAscii(pbBuffer, cbLength);
 		// write to out file
 		if(ctx->cfg->szFileOut[0]) {
-			hFile = CreateFileA(ctx->cfg->szFileOut, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
-			if(!hFile || (hFile == INVALID_HANDLE_VALUE)) {
+			// open output file
+			if(!fopen_s(&pFile, ctx->cfg->szFileOut, "r") || pFile) {
+				printf("EXEC: Error writing output to file. File already exists: %s\n", ctx->cfg->szFileOut);
+				goto fail;
+			}
+			if(fopen_s(&pFile, ctx->cfg->szFileOut, "wb") || !pFile) {
 				printf("EXEC: Error writing output to file.\n");
 				goto fail;
 			}
-			if(!WriteFile(hFile, pbBuffer, cbLength, &cbLength, NULL)) {
+			if(cbLength != fwrite(pbBuffer, 1, cbLength, pFile)) {
 				printf("EXEC: Error writing output to file.\n");
 				goto fail;
 			}
@@ -365,5 +372,5 @@ fail:
 	LocalFree(pKmdExec);
 	LocalFree(pbBuffer);
 	LocalFree(szBufferText);
-	if(hFile) { CloseHandle(hFile); }
+	if(pFile) { fclose(pFile); }
 }
