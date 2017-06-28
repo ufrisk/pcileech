@@ -110,7 +110,7 @@ VOID Help_ShowGeneral()
 		"          ALTERNATIVELY                                                        \n" \
 		"          kernel module to use, see list below for choices:                    \n" \
 		"             WIN10_X64                                                         \n" \
-		"             LINUX_X64_46           (NB! Kernels 4.6 and below)                \n" \
+		"             LINUX_X64_46           (NB! Kernels 2.6.33 - 4.6)                 \n" \
 		"             LINUX_X64_48           (NB! Kernels 4.8+, 64-bit DMA recommended) \n" \
 		"             LINUX_X64_EFI          (NB! UEFI booted systems only)             \n" \
 		"             FREEBSD_X64                                                       \n" \
@@ -131,7 +131,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016, 2017 Ulf Frisk                                             \n" \
-		" Version: 2.1                                                                  \n" \
+		" Version: 2.1.1                                                                \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \

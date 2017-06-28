@@ -112,8 +112,9 @@ typedef struct tdFN2 {
 	QWORD vfs_read;
 	QWORD vfs_write;
 	QWORD vfs_stat;
-	QWORD iterate_dir;
 	QWORD yield;
+	QWORD iterate_dir_opt;
+	QWORD vfs_readdir_opt;
 } FN2, *PFN2;
 
 typedef struct tdDIR_CONTEXT {
@@ -139,9 +140,11 @@ BOOL LookupFunctions2(PKMDDATA pk, PFN2 pfn2) {
 	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 'r', 'e', 'a', 'd', 0 };
 	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 'w', 'r', 'i', 't', 'e', 0 };
 	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 0 };
-	NAMES[i++] = (QWORD)(CHAR[]) { 'i', 't', 'e', 'r', 'a', 't', 'e', '_', 'd', 'i', 'r', 0 };
 	NAMES[i++] = (QWORD)(CHAR[]) { 'y', 'i', 'e', 'l', 'd', 0 };
-	return LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)NAMES, (QWORD)pfn2, i);
+	if(!LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)NAMES, (QWORD)pfn2, i)) { return FALSE; }
+	pfn2->iterate_dir_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'i', 't', 'e', 'r', 'a', 't', 'e', '_', 'd', 'i', 'r', 0 }));
+	pfn2->vfs_readdir_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 'r', 'e', 'a', 'd', 'd', 'i', 'r', 0 }));
+	return TRUE;
 }
 
 static int VfsList_CallbackIterateDir(PDIR_CONTEXT_EXTENDED ctx, const char *name, int len, unsigned __int64 pos, unsigned __int64 ino, unsigned int d_type)
@@ -229,7 +232,13 @@ STATUS VfsList(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 	dce.fn = pfn2;
 	dce.pk = pk;
 	dce.pop = pop;
-	pk->dataOut[1] = SysVCall(pfn2->iterate_dir, hFile, &dce);
+	if(pfn2->iterate_dir_opt) {
+		// use iterate_dir (kernel >= 3.11) 
+		pk->dataOut[1] = SysVCall(pfn2->iterate_dir_opt, hFile, &dce);
+	} else if(pfn2->vfs_readdir_opt) {
+		// use vfs_readdir (kernel <= 3.10)
+		pk->dataOut[1] = SysVCall(pfn2->vfs_readdir_opt, hFile, WinCall, &dce);
+	}
 	SysVCall(pfn2->filp_close, hFile, NULL);
 	SysVCall(pfn2->yield);
 	VfsList_SetSizeTime(pk, pfn2, pop);

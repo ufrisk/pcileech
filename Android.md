@@ -12,7 +12,7 @@ Installing
 ==========
 Please ensure you do have the most recent version of PCILeech by downloading it from: https://github.com/ufrisk/pcileech
 
-Either build your own binaries, or download the pre-built [PCILeech v2.1 Android binaries](https://gist.github.com/ufrisk/d783ef49813a269704f3bce1c022cefb/raw/1392da4748c357dc0436f94f91f2128cfa5a7374/pcileech_android_v21.zip). SHA-256: `f48c9269e3cdf6cbf884970b2665d111a0d04bdf3008fdea62eddf793c9211cf`
+Either build your own binaries, or download the pre-built [PCILeech v2.1.1 Android binaries](https://gist.github.com/ufrisk/d783ef49813a269704f3bce1c022cefb/raw/044100b923fd652411326bc8825b16700287905b/pcileech_android_v211.zip). SHA-256: `bd92d16d20acb0bd8a51ef3873d9ea9341064319e190ecf7ca5b91194522dc04`
 
 Run the commands below as root on Android device to install PCILeech:
 * Remount system file system as read/write: `mount -o remount,rw /system`

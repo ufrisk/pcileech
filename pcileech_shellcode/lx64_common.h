@@ -24,6 +24,7 @@ typedef unsigned long			STATUS;
 #define TRUE					1
 #define FALSE					0
 #define UNREFERENCED_PARAMETER(P) (P)
+#define LOOKUP_FUNCTION(pk, szFn) (SysVCall(pk->AddrKallsymsLookupName, szFn))
 
 extern QWORD SysVCall(QWORD fn, ...);
 extern QWORD WinCall(QWORD p1, ...);

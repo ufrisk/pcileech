@@ -650,9 +650,6 @@ BOOL KMDOpen_HalHijack(_Inout_ PPCILEECH_CONTEXT ctx)
 			return FALSE;
 		}
 	} while(!*pdwPhysicalAddress);
-	if(ctx->cfg->fVerbose) {
-		printf("INFO: PA KMD BASE:  0x%08x\n", *pdwPhysicalAddress);
-	}
 	printf("KMD: Execution received - continuing ...\n");
 	//------------------------------------------------
 	// 6: Restore hooks to original.
@@ -755,6 +752,9 @@ BOOL KMD_SetupStage3(_Inout_ PPCILEECH_CONTEXT ctx, _In_ DWORD dwPhysicalAddress
 	if(dwPhysicalAddress == 0xffffffff) {
 		printf("KMD: Failed. Stage2 shellcode error.\n");
 		return FALSE;
+	}
+	if(ctx->cfg->fVerbose) {
+		printf("INFO: PA KMD BASE:  0x%08x\n", dwPhysicalAddress);
 	}
 	DeviceWriteDMA(ctx, dwPhysicalAddress + 0x1000, pbStage3, cbStage3, 0);
 	ctx->phKMD = (PKMDHANDLE)LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE));

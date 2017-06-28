@@ -4,7 +4,7 @@
 // execution flow in Windows 10. To avoid copyright infringement the end user
 // must create the kmd signature files together with supported ntfs.sys files
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 // Github: github.com/ufrisk/pcileech
 //
@@ -26,160 +26,86 @@ typedef struct tdSIGNATURE{
 	LPSTR szSignatureData;
 } SIGNATURE, *PSIGNATURE;
 
-#define NUMBER_OF_SIGNATURES	15
+#define MAX_SIGNATURES 64
 
-const SIGNATURE SIGNATURES[NUMBER_OF_SIGNATURES] = {
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2014-10-15 (Windows 8.1 x64)",
-		.szFileName = "win8x64_ntfs_20141015.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2014-10-15 (MJ_CREATE)",
-		.dwOffset1 = 0xd3000,
-		.dwOffset2 = 0x4a000,
-		.szHash1 = "1ac5c0df47e153480fc49bb3687df84473168bd65b4bb58ab3885f47a6116d1b",
-		.szHash2 = "a65cf907fb5aecb5d2a256b8a49706469025c740a896e3a8d0b27537f6fbbc6f",
-		.szSignatureData = ",d3920,DEFAULT_WINX64_STAGE1,4ad80,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,010003804a000100210001800a0003800c00018054010100080000001b00018001000000"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2015-12-30 (Windows 8.1 x64)",
-		.szFileName = "win8x64_ntfs_20151230.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2016-12-30 (MJ_CREATE)",
-		.dwOffset1 = 0xd1000,
-		.dwOffset2 = 0x49000,
-		.szHash1 = "65b0b0cf8a508d20cb6906fe4fea9e10a1c4398c4f5c4bbbc366383e06572695",
-		.szHash2 = "6387547a0a12d5814681f0ed5fc47cd6aa31e8b4428bee8cf18081bb8ab57d67",
-		.szSignatureData = ",d1190,DEFAULT_WINX64_STAGE1,49d80,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,0100038049000100200001800a0003800c00018054010100080000001b00018001000000"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-02-23 (Windows 10 x64)",
-		.szFileName = "win10x64_ntfs_20160223.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2016-02-23 (MJ_CREATE)",
-		.dwOffset1 = 0xca000,
-		.dwOffset2 = 0x4f000,
-		.szHash1 = "0592b0387ec943697dd0f552564e087c8dd385b25db565ffb11fa6bd1cf10b14",
-		.szHash2 = "218325e192e8146883054359e984376be0d13486c05d31ab4a23ff834ebb623e",
-		.szSignatureData = ",ca770,DEFAULT_WINX64_STAGE1,4fe38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,010003804f00010023000180080003801400018066010100050000001d00018001000000"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2015-12-01 (Windows 10 x64)",
-		.szFileName = "win10x64_ntfs_20151201.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2015-12-01 (MJ_CREATE)",
-		.dwOffset1 = 0xc5000,
-		.dwOffset2 = 0x4d000,
-		.szHash1 = "3bac25cd0e0cfc45dcb7efa67200e4800ffe8278fd3249a382bd4403f3309756",
-		.szHash2 = "fcc23d38f37141010e2985cc2c7babc8796c36e85b820d77d5c6b4fe66c6caf0",
-		.szSignatureData = ",c51e0,DEFAULT_WINX64_STAGE1,4dd30,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,010003804d00010022000180080003801400018061010100050000001d00018001000000"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2015-07-30 (Windows 10 x64)",
-		.szFileName = "win10x64_ntfs_20150730.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2015-07-30 (MJ_CREATE)",
-		.dwOffset1 = 0xc4000,
-		.dwOffset2 = 0x4d000,
-		.szHash1 = "cd135fc58b88f96abff0ddb1207cb9e84e5b2f040607d0500de0018d32ad1572",
-		.szHash2 = "2cfd3b597b341c056a30a186b1347d82d211cf1319464ad1f13cfa525891e409",
-		.szSignatureData = ",c4dc0,DEFAULT_WINX64_STAGE1,4dd20,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,010003804d00010022000180080003801400018061010100050000001d00018001000000"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2015-07-17 (Windows 10 x64)",
-		.szFileName = "win10x64_ntfs_20150717.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2015-07-17 (MJ_CREATE)",
-		.dwOffset1 = 0x1f000,
-		.dwOffset2 = 0x4d000,
-		.szHash1 = "9ac57fa7e7d8d92e066c6ce9c76c82fc3afccc1e6211eb4d9b03ea79c8a70b3b",
-		.szHash2 = "2cfd3b597b341c056a30a186b1347d82d211cf1319464ad1f13cfa525891e409",
-		.szSignatureData = ",1fb90,DEFAULT_WINX64_STAGE1,4dd20,DEFAULT_WINX64_STAGE2.bin,0,DEFAULT_WINX64_STAGE3,0,010003804d00010022000180080003801400018061010100050000001d00018001000000"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2015-07-10 (Windows 10 x64)",
-		.szFileName = "win10x64_ntfs_20150710.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2015-07-10 (MJ_CREATE)",
-		.dwOffset1 = 0xc4000,
-		.dwOffset2 = 0x4d000,
-		.szHash1 = "a8a4e0d7963c2652226064c674b7ed38b1f84a8661e8f63663783dafb83271fc",
-		.szHash2 = "95964341fb3121baf303037a3796bd98c4167261ead9a4b4587a31e8a546dda1",
-		.szSignatureData = ",c4ec0,DEFAULT_WINX64_STAGE1,4dd20,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,010003804d00010022000180080003801400018062010100050000001d000180"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-03-29 (Windows 10 x64)",
-		.szFileName = "win10x64_ntfs_20160329.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2016-03-29 (MJ_CREATE)",
-		.dwOffset1 = 0xca000,
-		.dwOffset2 = 0x4f000,
-		.szHash1 = "d091d4d5452ef388c6ff22780922f3f944a8439e5109dae207151f7f4fd23991",
-		.szHash2 = "84b0ffd20272e8757023975ef52132c9e82df7e81da537cf436407733a1f4957",
-		.szSignatureData = ",ca770,DEFAULT_WINX64_STAGE1,4fe38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,010003804f00010023000180080003801400018066010100050000001d000180"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-07-16 (Windows 10 x64) [10.0.14393.0]",
-		.szFileName = "win10x64_ntfs_20160716_14393.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2016-07-16 (MJ_CREATE) [10.0.14393.0]",
-		.dwOffset1 = 0xf6000,
-		.dwOffset2 = 0x53000,
-		.szHash1 = "5cadebe69115cc66e07f7d1e3f97ad0522840c1c648d33b37d8fe9f9a36ae413",
-		.szHash2 = "04d501dae7a097b649edc0bb68dc02036e31ece8c30ee48ab24ac8fb3095fe46",
-		.szSignatureData = ",f6b70,DEFAULT_WINX64_STAGE1,53e38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,0100038053000100240001800800038014000180760101000500000022000180"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-08-03 (Windows 10 x64) [10.0.10240.17071]",
-		.szFileName = "win10x64_ntfs_20160803_10240.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2016-08-03 (MJ_CREATE) [10.0.10240.17071]",
-		.dwOffset1 = 0xc5000,
-		.dwOffset2 = 0x4d000,
-		.szHash1 = "c80d2ff8c58669a539ecc636103a73eb8c65a4568c81d6627a9b14f428d0207f",
-		.szHash2 = "bafe68ca0561d5137504c53360cdec01b8d522eade7e558b90231fdaf53a66a5",
-		.szSignatureData = ",c51e0,DEFAULT_WINX64_STAGE1,4de38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,010003804d00010022000180080003801400018061010100050000001d00018001000000"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-08-20 (Windows 10 x64) [10.0.14393.103]",
-		.szFileName = "win10x64_ntfs_20160820_14393.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2016-08-20 (MJ_CREATE) [10.0.14393.103]",
-		.dwOffset1 = 0xf6000,
-		.dwOffset2 = 0x53000,
-		.szHash1 = "c6b3a2c6a9d19798b9974704e551a4798d0f2098279a67924eebcb03cee07590",
-		.szHash2 = "04d501dae7a097b649edc0bb68dc02036e31ece8c30ee48ab24ac8fb3095fe46",
-		.szSignatureData = ",f6b70,DEFAULT_WINX64_STAGE1,53e38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,0100038053000100240001800800038014000180760101000500000022000180"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-09-07 (Windows 10 x64) [10.0.14393.187]",
-		.szFileName = "win10x64_ntfs_20160907_14393.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2016-09-07 (MJ_CREATE) [10.0.14393.187]",
-		.dwOffset1 = 0xf7000,
-		.dwOffset2 = 0x53000,
-		.szHash1 = "e6f94244f8ab0cb45a2509679a15ebbb933c936c23d0c600116124b4aebf67d5",
-		.szHash2 = "04d501dae7a097b649edc0bb68dc02036e31ece8c30ee48ab24ac8fb3095fe46",
-		.szSignatureData = ",f78e0,DEFAULT_WINX64_STAGE1,53e38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,0100038053000100240001800800038014000180760101000500000022000180"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2016-11-02 (Windows 10 x64) [10.0.14393.447]",
-		.szFileName = "win10x64_ntfs_20161102_14393.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2016-11-02 (MJ_CREATE) [10.0.14393.447]",
-		.dwOffset1 = 0xf7000,
-		.dwOffset2 = 0x53000,
-		.szHash1 = "e044cff9460a778a04e75081dbfa7441bd1b142a9798a2c978c28612f33682c3",
-		.szHash2 = "04d501dae7a097b649edc0bb68dc02036e31ece8c30ee48ab24ac8fb3095fe46",
-		.szSignatureData = ",f78e0,DEFAULT_WINX64_STAGE1,53e38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,0100038053000100240001800800038014000180760101000500000022000180"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2017-03-04 (Windows 10 x64) [10.0.14393.953]",
-		.szFileName = "win10x64_ntfs_20170304_14393.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2017-03-04 (MJ_CREATE) [10.0.14393.953]",
-		.dwOffset1 = 0xf7000,
-		.dwOffset2 = 0x53000,
-		.szHash1 = "228a30faacc59dd6b41fab0a5eab73e30ee774fde51e4ee30a8501f81cfe8e54",
-		.szHash2 = "6c4742133e9409255abb3c3d21eca24e7f303b4968e703acfe4f3e3f4e39ce36",
-		.szSignatureData = ",f78f0,DEFAULT_WINX64_STAGE1,53e38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,0100038053000100240001800800038014000180760101000500000022000180"
-	},
-	{
-		.szSignatureInfoDisplay = "ntfs.sys signed on 2017-03-18 (Windows 10 x64) [10.0.15063.0]",
-		.szFileName = "win10x64_ntfs_20170318_15063.kmd",
-		.szSignatureInfo = "# ntfs.sys signed on 2017-03-18 (MJ_CREATE) [10.0.15063.0]",
-		.dwOffset1 = 0xcb000,
-		.dwOffset2 = 0x55000,
-		.szHash1 = "f190019c227cbbbd19e9ed6fb840e9838afab598b9ac23a3008d60fb3b139845",
-		.szHash2 = "b48ce1f64615ae1e734d36f94c0c41cce4e5f6caab58df0121ca6f27e8569599",
-		.szSignatureData = ",cb2e0,DEFAULT_WINX64_STAGE1,55e38,DEFAULT_WINX64_STAGE2,0,DEFAULT_WINX64_STAGE3,0,01000380550001002800018008000380150001807f0101000500000023000180"
+VOID Util_GetFileInDirectory(_Out_ CHAR szPath[MAX_PATH], _In_ LPSTR szFileName)
+{
+	SIZE_T i, cchFileName = strlen(szFileName);
+	GetModuleFileNameA(NULL, (LPSTR)szPath, (DWORD)(MAX_PATH - cchFileName - 4));
+	for(i = strlen(szPath) - 1; i > 0; i--) {
+		if(szPath[i] == '/' || szPath[i] == '\\') {
+			strcpy_s(&szPath[i + 1], MAX_PATH - i - 5, szFileName);
+			return;
+		}
 	}
-};
+}
+
+_Success_(return) BOOL Util_ParseSignatureLine(_In_ PSTR szLine, _In_ PSIGNATURE pSignature) {
+	LPSTR szToken, szContext = NULL;
+	SIZE_T i;
+	if(!szLine || !strlen(szLine) || szLine[0] == '#') { return FALSE; }
+	szToken = strtok_s(szLine, ";", &szContext);
+	for(i = 0; i < 8; i++) {
+		if(!szToken) { return FALSE; }
+		switch(i) {
+			case 0:
+				pSignature->szSignatureInfoDisplay = szToken;
+				break;
+			case 1:
+				pSignature->szFileName = szToken;
+				break;
+			case 2:
+				pSignature->szSignatureInfo = szToken;
+				break;
+			case 3:
+				pSignature->dwOffset1 = strtoul(szToken, NULL, 16);
+				break;
+			case 4:
+				pSignature->dwOffset2 = strtoul(szToken, NULL, 16);
+				break;
+			case 5:
+				pSignature->szHash1 = szToken;
+				break;
+			case 6:
+				pSignature->szHash2 = szToken;
+				break;
+			case 7:
+				pSignature->szSignatureData = szToken;
+				break;
+		}
+		szToken = strtok_s(NULL, ";", &szContext);
+	}
+	return (i == 8);
+}
+
+VOID GetSignaturesFromConfigFile(_Out_ PSIGNATURE pSignatures, _Out_ PDWORD pcSignatures)
+{
+	PBYTE pbFile;
+	DWORD cbFile;
+	FILE *pFile;
+	CHAR szFile[MAX_PATH];
+	LPSTR szContext = NULL, szLine;
+	*pcSignatures = 0;
+	// 1: Open configuration file containing signatures
+	pbFile = LocalAlloc(LMEM_ZEROINIT, 0x00100000);
+	if(!pbFile) { return; }
+	Util_GetFileInDirectory(szFile, "pcileech_gensig.cfg");
+	if(fopen_s(&pFile, szFile, "rb") || !pFile) { goto error; }
+	cbFile = (DWORD)fread(pbFile, 1, 0x00100000, pFile);
+	fclose(pFile);
+	if(!cbFile || (cbFile == 0x00100000)) { goto error; }
+	// 2: Parse signature file on a per-line level
+	szLine = strtok_s(pbFile, "\r\n", &szContext);
+	while(szLine && (*pcSignatures < MAX_SIGNATURES)) {
+		if(Util_ParseSignatureLine(szLine, &pSignatures[*pcSignatures])) {
+			*pcSignatures = *pcSignatures + 1;
+		}
+		szLine = strtok_s(NULL, "\r\n", &szContext);
+	}
+error:
+	;
+	//LocalFree(pbFile); // buffer is leaked (is used by the tokenized fragments)
+}
 
 const LPSTR SIGNATURE_FILE_HEADER = \
 "# PCILeech kernel module signature                                            \r\n" \
@@ -254,7 +180,7 @@ _Success_(return) BOOL WriteSignatureFile(_In_ PSIGNATURE pSignature, _In_ __bco
 	return result;
 }
 
-VOID ShowInfo()
+VOID ShowInfo(_In_ PSIGNATURE pS, _In_ DWORD cS)
 {
 	printf(
 		"The PCILeech signature generator  -  generate Windows kernel module signatures \n" \
@@ -270,8 +196,8 @@ VOID ShowInfo()
 		"a .kmd signature file will be created on success.                              \n" \
 		"Supported ntfs.sys file versions:                                              \n" \
 		"=================================                                              \n");
-	for(DWORD i = 0; i < NUMBER_OF_SIGNATURES; i++) {
-		printf("%s\n", SIGNATURES[i].szSignatureInfoDisplay);
+	for(DWORD i = 0; i < cS; i++) {
+		printf("%s\n", pS[i].szSignatureInfoDisplay);
 	}
 	printf("\n");
 }
@@ -279,11 +205,16 @@ VOID ShowInfo()
 int main(_In_ int argc, _In_ char* argv[])
 {
 	BOOL result;
-	PSIGNATURE pS;
+	SIGNATURE pS[MAX_SIGNATURES];
 	HMODULE hModule;
-	DWORD i, dwSizeMax;
+	DWORD i, dwSizeMax, cS;
+	GetSignaturesFromConfigFile(pS, &cS);
+	if(!cS) {
+		printf("pcileech_gensig: failed! cannot load signatures from configuration file: pcileech_gensig.cfg\n\n");
+		return 1;
+	}
 	if(argc != 2) {
-		ShowInfo();
+		ShowInfo(pS, cS);
 		return 1;
 	}
 	hModule = LoadLibraryA(argv[1]);
@@ -296,23 +227,22 @@ int main(_In_ int argc, _In_ char* argv[])
 		printf("pcileech_gensig: failed! cannot interpret the file: %s\n\n", argv[1]);
 		return 1;
 	}
-	for(i = 0; i < sizeof(SIGNATURES) / sizeof(SIGNATURE); i++) {
-		pS = SIGNATURES + i;
-		if(pS->dwOffset1 > dwSizeMax || pS->dwOffset2 > dwSizeMax) {
+	for(i = 0; i < cS; i++) {
+		if(pS[i].dwOffset1 > dwSizeMax || pS[i].dwOffset2 > dwSizeMax) {
 			continue;
 		}
-		if(!Util_SHA256CMP((PBYTE)hModule + pS->dwOffset1, pS->szHash1)) {
+		if(!Util_SHA256CMP((PBYTE)hModule + pS[i].dwOffset1, pS[i].szHash1)) {
 			continue;
 		}
-		if(!Util_SHA256CMP((PBYTE)hModule + pS->dwOffset2, pS->szHash2)) {
+		if(!Util_SHA256CMP((PBYTE)hModule + pS[i].dwOffset2, pS[i].szHash2)) {
 			continue;
 		}
-		result = WriteSignatureFile(pS, (PBYTE)hModule + pS->dwOffset1, (PBYTE)hModule + pS->dwOffset2);
+		result = WriteSignatureFile(&pS[i], (PBYTE)hModule + pS[i].dwOffset1, (PBYTE)hModule + pS[i].dwOffset2);
 		if(result) {
-			printf("pcileech_gensig: successfully wrote signatute to file: %s\n\n", pS->szFileName);
+			printf("pcileech_gensig: successfully wrote signatute to file: %s\n\n", pS[i].szFileName);
 			return 0;
 		} else {
-			printf("pcileech_gensig: failed! failed writing to file: %s\n\n", pS->szFileName);
+			printf("pcileech_gensig: failed! failed writing to file: %s\n\n", pS[i].szFileName);
 			return 1;
 		}
 	}

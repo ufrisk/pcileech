@@ -337,6 +337,10 @@ BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out
 	if(Util_HexAsciiToBinary(sz, pb, cb, pcb)) {
 		return TRUE;
 	}
+	if(0 == memcmp("-", sz, 2)) {
+		*pcb = 0;
+		return TRUE;
+	}
 	// 3: try load file
 	i = strnlen_s(sz, MAX_PATH);
 	if(i > 4 && i < MAX_PATH) { // try to load from file
@@ -581,7 +585,7 @@ VOID Util_Read1M(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PBYTE pbBuffer1M, _In_ QWO
 				if(!(qwBaseAddress + o + p + 0x1000 <= ctx->cfg->qwAddrMax)) {
 					return;
 				}
-				if(DeviceReadMEM(ctx, qwBaseAddress + o + p, pbBuffer1M + o + p, 0x1000, 0)) {
+				if((qwBaseAddress + o + p + 0x1000 <= ctx->cfg->qwAddrMax) && DeviceReadMEM(ctx, qwBaseAddress + o + p, pbBuffer1M + o + p, 0x1000, 0)) {
 					PageStatUpdate(pPageStat, qwBaseAddress + o + p + 0x1000, 1, 0);
 				} else {
 					PageStatUpdate(pPageStat, qwBaseAddress + o + p + 0x1000, 0, 1);

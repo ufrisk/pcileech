@@ -69,14 +69,16 @@ LookupFunctions PROC
 	; ----------------------------------------------------
 	; 3: RESTORE NV REGISTERS AND RETURN
 	; ----------------------------------------------------
+	XOR rax, rax
+	INC rax
+	JMP lookup_exit
+	lookup_fail:
+	XOR rax, rax
+	lookup_exit:
 	POP r12
 	POP r13
 	POP r14
 	POP r15
-	MOV RAX, 1
-	RET
-	lookup_fail:
-	XOR rax, rax
 	RET
 LookupFunctions ENDP
 

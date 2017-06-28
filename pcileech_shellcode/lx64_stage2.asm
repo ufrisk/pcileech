@@ -143,11 +143,12 @@ setup PROC
 	JNZ copy_stage3_pre_loop
 	; ----------------------------------------------------
 	; 4: CREATE THREAD & SET UP DATA AREA
+	; (try kthread_create_on_node 1st, kthread_create 2nd)
 	; ----------------------------------------------------
 	LEA rdi, str_kthread_create_on_node
 	CALL r14
 	TEST rax, rax
-	JZ error
+	JZ thread_kthread_create
 	MOV rdi, r12
 	ADD rdi, 01000h
 	XOR rsi, rsi
@@ -156,12 +157,26 @@ setup PROC
 	LEA rcx, str_pcileech
 	CALL rax
 	TEST rax, rax
+	JZ thread_kthread_create
+	JMP thread_start
+	thread_kthread_create:
+	LEA rdi, str_kthread_create
+	CALL r14
+	TEST rax, rax
 	JZ error
-	MOV [r12+58h], rax   ; KMDDATA.ReservedKMD
-	MOV [r12+10h], r14   ; KMDDATA.AddrKallsymsLookupName
+	MOV rdi, r12
+	ADD rdi, 01000h
+	XOR rsi, rsi
+	LEA rdx, str_pcileech
+	CALL rax
+	TEST rax, rax
+	JZ error
 	; ----------------------------------------------------
 	; 5: START THREAD
 	; ----------------------------------------------------
+	thread_start:
+	MOV [r12+58h], rax   ; KMDDATA.ReservedKMD
+	MOV [r12+10h], r14   ; KMDDATA.AddrKallsymsLookupName
 	LEA rdi, str_wake_up_process
 	CALL r14
 	TEST rax, rax
@@ -271,6 +286,7 @@ lx64_stage3_pre PROC
 	JZ label_main_loop
 lx64_stage3_pre ENDP
 
+str_kthread_create			db 'kthread_create', 0
 str_kthread_create_on_node	db 'kthread_create_on_node', 0
 str_alloc_pages_current		db 'alloc_pages_current', 0
 str_set_memory_x			db 'set_memory_x', 0

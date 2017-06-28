@@ -168,3 +168,7 @@ v2.0
 v2.1
 * Linux support.
 * Android support.
+
+Latest
+* Linux 2.6.33-4.6 target support (binaries not built/only source code)
+* signature: Windows 10 updates to pcileech_gensig.exe
