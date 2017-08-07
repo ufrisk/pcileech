@@ -12,3 +12,7 @@ NB! If flashing the PP3380 PCIe card the J3 jumper must be bridged to connect th
 The insmod command must be run as root. If compilation fails you might have to install dependencies before you try again. On debian based systems - such as debian, ubuntu and kali, run ` apt-get update && apt-get install gcc make linux-headers-$(uname -r) ` and try again.
 
 If module insertion is successful flashing is also successful. In order to activate the flashed PCILeech device it must be power-cycled. Re-inserting it in the computer will achieve this. If one wish to flash more devices then unload the pcileech_flash kernel module by issuing the command: ` rmmod pcileech_flash `. If there is an error flashing is unsuccessful. Please try again and check any debug error messages by issing the command: ` dmsg `.
+
+Alternative Flash using uflash:
+======================================
+If the above method using a kernel module fails or isn't desirable you may also use the [uflash utility](https://github.com/ANSSI-FR/pciemem/uflash) by Yves-Alexis Perez / ANSSI-FR. It must be run as root but should build without any special dependencies.
