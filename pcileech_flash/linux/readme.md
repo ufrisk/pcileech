@@ -15,4 +15,4 @@ If module insertion is successful flashing is also successful. In order to activ
 
 Alternative Flash using uflash:
 ======================================
-If the above method using a kernel module fails or isn't desirable you may also use the [uflash utility](https://github.com/ANSSI-FR/pciemem/uflash) by Yves-Alexis Perez / ANSSI-FR. It must be run as root but should build without any special dependencies.
+If the above method using a kernel module fails or isn't desirable you may also use the [uflash utility](https://github.com/ANSSI-FR/pciemem/tree/master/uflash) by Yves-Alexis Perez / ANSSI-FR. It must be run as root but should build without any special dependencies.
