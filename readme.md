@@ -4,7 +4,7 @@ PCILeech uses PCIe hardware devices to read and write from the target system mem
 
 PCILeech supports multiple hardware. Currently only the USB3380 hardware is publically available. The USB3380 is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel.
 
-PCILeech is capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. PCIleech runs on Windows/Linux/Android. Supported target systems are currently the x64 versions of: Linux, FreeBSD, macOS and Windows.
+PCILeech is capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. PCIleech runs on Windows/Linux/Android. Supported target systems are currently the x64 versions of: UEFI, Linux, FreeBSD, macOS and Windows.
 
 <img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_mbp.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_m2.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_shadow.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_dump.gif" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_mount.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/314e527e13e78edd44cc6db2b7c05cfa4a1ce322/_gh_android.jpg" height="150"/>
 
@@ -124,6 +124,12 @@ Exploit a vulnerable mac to retrieve the FileVault2 password.
 Receive PCIe TLPs (Transaction Layer Packets) and print them on screen (correctly configured FPGA dev board required).
 * ` pcileech.exe tlp -vv -wait 1000 `
 
+Load a "kernel" module by searching for and hooking UEFI BootServices.SignalEvent(), execute sample print to screen shellcode and then unload "kernel" module.
+* ` pcileech.exe uefi_textout -kmd UEFI_SIGNAL_EVENT ` 
+
+Load a "kernel" module by hooking and BootServices.ExitBootServices(). Base memory location of UEFI specified manually (IBI SYST table).
+* ` pcileech.exe kmdload -kmd UEFI_EXIT_BOOT_SERVICES -efibase 0x7b399018 ` 
+
 Generating Signatures:
 ======================
 PCILeech comes with built in signatures for Windows, Linux, FreeBSD and macOS. For Windows 8.1 or later it is also possible to use the pcileech_gensig.exe program to generate alternative signatures.
@@ -169,6 +175,7 @@ v2.1
 * Linux support.
 * Android support.
 
-Latest
+v2.2
+* UEFI support.
 * Linux 2.6.33-4.6 target support.
 * signature: Windows 10 updates to pcileech_gensig.exe

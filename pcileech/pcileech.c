@@ -42,6 +42,7 @@ BOOL PCILeechInitializeConfig(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILE
 		{.tp = MAC_DISABLE_VTD,.sz = "mac_disablevtd" },
 		{.tp = PT_PHYS2VIRT,.sz = "pt_phys2virt" },
 		{.tp = TLP,.sz = "tlp" },
+		{.tp = PROBE,.sz = "probe" },
 	};
 	QWORD qw;
 	DWORD j, i = 1;
@@ -109,6 +110,8 @@ BOOL PCILeechInitializeConfig(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILE
 			ctx->cfg->qwAddrMax = Util_GetNumeric(argv[i + 1]);
 		} else if(0 == strcmp(argv[i], "-cr3")) {
 			ctx->cfg->qwCR3 = Util_GetNumeric(argv[i + 1]);
+		}else if(0 == strcmp(argv[i], "-efibase")) {
+			ctx->cfg->qwEFI_IBI_SYST = Util_GetNumeric(argv[i + 1]);
 		} else if(0 == strcmp(argv[i], "-iosize")) {
 			ctx->cfg->qwMaxSizeDmaIo = Util_GetNumeric(argv[i + 1]);
 		} else if(0 == strcmp(argv[i], "-wait")) {
@@ -136,6 +139,8 @@ BOOL PCILeechInitializeConfig(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILE
 			ctx->cfg->qwKMD = strtoull(argv[i + 1], NULL, 16);
 			if(ctx->cfg->qwKMD < 0x1000) {
 				strcpy_s(ctx->cfg->szKMDName, MAX_PATH, argv[i + 1]);
+			} else {
+				ctx->cfg->fAddrKMDSetByArgument = TRUE;
 			}
 		} else if(2 == strlen(argv[i]) && '0' <= argv[i][1] && '9' >= argv[i][1]) { // -0..9 param
 			ctx->cfg->qwDataIn[argv[i][1] - '0'] = Util_GetNumeric(argv[i + 1]);
@@ -193,11 +198,6 @@ int main(_In_ int argc, _In_ char* argv[])
 		printf("PCILEECH: Out of memory.\n");
 		return 1;
 	}
-	//LPSTR szTMP[] = { "", "pt_phys2virt", "-kmd", "0x7fffe000", "-cr3", "0x1b8000", "-0", "0xd6c08000"};
-	//LPSTR szTMP[] = { "", "mount", "-kmd", "win10_x64"};
-	//LPSTR szTMP[] = { "", "pagedisplay", "-min", "0x0", "-device", "sp605", "-vv"};
-	//LPSTR szTMP[] = { "", "write", "-min", "0x1ff0", "-in", "ffffffff", "-device", "sp605", "-vv"};
-	//result = PCILeechInitializeConfig(sizeof(szTMP) / sizeof(LPSTR), szTMP, ctx);
 	result = PCILeechInitializeConfig((DWORD)argc, argv, ctx);
 	if(!result) {
 		Help_ShowGeneral();
@@ -268,6 +268,8 @@ int main(_In_ int argc, _In_ char* argv[])
 		Action_PT_Phys2Virt(ctx);
 	} else if(ctx->cfg->tpAction == TLP) {
 		Action_Device605_TlpTx(ctx);
+	} else if(ctx->cfg->tpAction == PROBE) {
+		ActionMemoryProbe(ctx);
 	} else if(ctx->cfg->tpAction == MOUNT) {
 		ActionMount(ctx);
 	} else if(ctx->cfg->tpAction == KMDLOAD) {
@@ -282,8 +284,9 @@ int main(_In_ int argc, _In_ char* argv[])
 	} else {
 		printf("Failed. Not yet implemented.\n");
 	}
-	if(!ctx->cfg->qwKMD) {
+	if((ctx->cfg->tpAction != KMDLOAD) && !ctx->cfg->fAddrKMDSetByArgument) {
 		KMDUnload(ctx);
+		printf("KMD: Hopefully unloaded.\n");
 	}
 	Sleep(1000 * (DWORD)ctx->cfg->qwWaitBeforeExit);
 	PCILeechFreeContext(ctx);

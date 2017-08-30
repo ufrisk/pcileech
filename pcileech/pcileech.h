@@ -38,7 +38,8 @@ typedef enum tdActionType {
 	MAC_FVRECOVER2,
 	MAC_DISABLE_VTD,
 	PT_PHYS2VIRT,
-	TLP
+	TLP,
+	PROBE
 } ACTION_TYPE;
 
 typedef enum tdPCILEECH_DEVICE_TYPE {
@@ -53,6 +54,7 @@ typedef struct tdConfig {
 	QWORD qwAddrMax;
 	QWORD qwAddrMaxDeviceNative;
 	QWORD qwCR3;
+	QWORD qwEFI_IBI_SYST;
 	QWORD qwKMD;
 	CHAR szFileOut[MAX_PATH];
 	BYTE  pbIn[CONFIG_MAX_INSIZE]; 
@@ -76,6 +78,7 @@ typedef struct tdConfig {
 	BOOL fVerboseExtra;
 	BOOL fDebug;
 	BOOL fPartialPageReadSupported;
+	BOOL fAddrKMDSetByArgument;
 } CONFIG, *PCONFIG;
 
 #define SIGNATURE_CHUNK_TP_OFFSET_FIXED		0
@@ -122,6 +125,7 @@ typedef struct tdKmdExec {
 #define KMDDATA_OPERATING_SYSTEM_LINUX			0x02
 #define KMDDATA_OPERATING_SYSTEM_MACOS			0x04
 #define KMDDATA_OPERATING_SYSTEM_FREEBSD		0x08
+#define KMDDATA_OPERATING_SYSTEM_UEFI			0x10
 
 #define KMDDATA_MAGIC							0xff11337711333377
 #define KMDDATA_MAGIC_PARTIAL					0xff11337711333388

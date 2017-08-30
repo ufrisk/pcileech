@@ -34,6 +34,9 @@
     <Filter Include="Source Files\vfs">
       <UniqueIdentifier>{fbf1519d-9768-4c2e-9bf2-c4a5f13a5f62}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\test">
+      <UniqueIdentifier>{5098b4fc-a903-4dfa-b480-ea87dfca3baf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lx64_common.c">
@@ -123,6 +126,15 @@
     <ClCompile Include="wx64_vfs.c">
       <Filter>Source Files\vfs</Filter>
     </ClCompile>
+    <ClCompile Include="uefi_common.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="uefi_kmd_c.c">
+      <Filter>Source Files\kmd_core</Filter>
+    </ClCompile>
+    <ClCompile Include="uefi_textout.c">
+      <Filter>Source Files\test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="lx64_common_a.asm">
@@ -185,6 +197,12 @@
     <None Include="lx64_stage2_efi.asm">
       <Filter>Source Files\kmd_core</Filter>
     </None>
+    <None Include="uefi_common_a.asm">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="uefi_kmd.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lx64_common.h">
@@ -202,18 +220,12 @@
     <ClInclude Include="fbsdx64_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="uefi_common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="lx64_info.txt">
-      <Filter>Source Files\kmd_core</Filter>
-    </Text>
-    <Text Include="wx64_info.txt">
-      <Filter>Source Files\kmd_core</Filter>
-    </Text>
-    <Text Include="macos_info.txt">
-      <Filter>Source Files\kmd_core</Filter>
-    </Text>
-    <Text Include="fbsdx64_info.txt">
+    <Text Include="info_kmd_core.txt">
       <Filter>Source Files\kmd_core</Filter>
     </Text>
   </ItemGroup>

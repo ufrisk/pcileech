@@ -21,6 +21,8 @@
 #define SP605_STATUS_MASK_END		0x01000000
 #define SP605_COM_TIMEOUT			100			// milliseconds
 #define SP605_READ_TIMEOUT			500			// milliseconds
+#define SP605_PROBE_TIMEOUT			350			// milliseconds
+#define SP605_PROBE_MAXPAGES		1024
 
 #define ENDIAN_SWAP_DWORD(x)	(x = (x << 24) | ((x >> 8) & 0xff00) | ((x << 8) & 0xff0000) | (x >> 24))
 
@@ -42,6 +44,7 @@ typedef struct tdDEVICE_CONTEXT_SP605 {
 	OVERLAPPED oCfg;
 	HANDLE hRxBufferEvent;
 	PDEVICE_CONTEXT_SP605_RXBUF pRxBuffer;
+	VOID(*hRxTlpCallbackFn)(_Inout_ struct tdDEVICE_CONTEXT_SP605 *ctx605, _In_ PBYTE pb, _In_ DWORD cb);
 } DEVICE_CONTEXT_SP605, *PDEVICE_CONTEXT_SP605;
 
 VOID Device605_RxTlp_Thread(PDEVICE_CONTEXT_SP605 ctx605);
@@ -163,25 +166,20 @@ BOOL Device605_TxTlp(_In_ PDEVICE_CONTEXT_SP605 ctx605, _In_ PBYTE pbTlp, _In_ D
 		(GetLastError() == ERROR_IO_PENDING && GetOverlappedResult(ctx605->hCommPcie, &ctx605->oTx, &dwTxed, TRUE));
 }
 
-VOID Device605_RxTlp(_In_ PDEVICE_CONTEXT_SP605 ctx605, _In_ PBYTE pb, _In_ DWORD cb)
+VOID Device605_RxTlp_CallbackMRd(_Inout_ PDEVICE_CONTEXT_SP605 ctx605, _In_ PBYTE pb, _In_ DWORD cb)
 {
+	PDEVICE_CONTEXT_SP605_RXBUF prxbuf = ctx605->pRxBuffer;
 	PTLP_HDR_CplD hdrC = (PTLP_HDR_CplD)pb;
 	PTLP_HDR hdr = (PTLP_HDR)pb;
 	PDWORD buf = (PDWORD)pb;
-	PDEVICE_CONTEXT_SP605_RXBUF prxbuf;
 	DWORD o, c;
-	if(cb < 12) { return; }
-	if(ctx605->isPrintTlp) {
-		TLP_Print(pb, cb, FALSE);
-	}
 	buf[0] = _byteswap_ulong(buf[0]);
 	if(cb < ((DWORD)hdr->Length << 2) - 12) { return; }
-	if((hdr->TypeFmt == TLP_CplD) && ctx605->pRxBuffer) {
+	if((hdr->TypeFmt == TLP_CplD) && prxbuf) {
 		buf[1] = _byteswap_ulong(buf[1]);
 		buf[2] = _byteswap_ulong(buf[2]);
 		// NB! read algorithm below only support reading full 4kB pages _or_
 		//     partial page if starting at page boundry and read is less than 4kB.
-		prxbuf = ctx605->pRxBuffer;
 		o = (hdrC->Tag << 12) + min(0x1000, prxbuf->cbMax) - (hdrC->ByteCount ? hdrC->ByteCount : 0x1000);
 		c = (DWORD)hdr->Length << 2;
 		memcpy(prxbuf->pb + o, pb + 12, c);
@@ -211,7 +209,14 @@ VOID Device605_RxTlp_Thread(_In_ PDEVICE_CONTEXT_SP605 ctx605)
 		dwTlp[cdwTlp] = rx[1];
 		cdwTlp++;
 		if(rx[0] & SP605_STATUS_MASK_END) {
-			Device605_RxTlp(ctx605, (PBYTE)dwTlp, cdwTlp << 2);
+			if(cdwTlp >= 3) {
+				if(ctx605->isPrintTlp) {
+					TLP_Print((PBYTE)dwTlp, cdwTlp << 2, FALSE);
+				}
+				if(ctx605->hRxTlpCallbackFn) {
+					ctx605->hRxTlpCallbackFn(ctx605, (PBYTE)dwTlp, cdwTlp << 2);
+				}
+			}
 			cdwTlp = 0;
 		}
 		if(cdwTlp >= 1024) { goto fail; }
@@ -238,6 +243,7 @@ BOOL Device605_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ P
 	rxbuf.cbMax = cb;
 	ctx605->pRxBuffer = &rxbuf;
 	ResetEvent(ctx605->hRxBufferEvent);
+	ctx605->hRxTlpCallbackFn = Device605_RxTlp_CallbackMRd;
 	// transmit TLPs
 	for(o = 0; o < cb; o += 0x1000) {
 		memset(tx, 0, 16);
@@ -267,9 +273,88 @@ BOOL Device605_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ P
 	}
 	// wait for result
 	WaitForSingleObject(ctx605->hRxBufferEvent, SP605_READ_TIMEOUT);
+	ctx605->hRxTlpCallbackFn = NULL;
 	ctx605->pRxBuffer = NULL;
 	SetEvent(ctx605->hRxBufferEvent);
 	return rxbuf.cb >= rxbuf.cbMax;
+}
+
+VOID Device605_RxTlp_CallbackProbeDMA(_Inout_ PDEVICE_CONTEXT_SP605 ctx605, _In_ PBYTE pb, _In_ DWORD cb)
+{
+	PDEVICE_CONTEXT_SP605_RXBUF prxbuf = ctx605->pRxBuffer;
+	PTLP_HDR_CplD hdrC = (PTLP_HDR_CplD)pb;
+	PDWORD buf = (PDWORD)pb;
+	DWORD i;
+	if(cb < 16) { return; } // min size CplD = 16 bytes.
+	buf[0] = _byteswap_ulong(buf[0]);
+	buf[1] = _byteswap_ulong(buf[1]);
+	buf[2] = _byteswap_ulong(buf[2]);
+	if((hdrC->h.TypeFmt == TLP_CplD) && prxbuf) {
+		// 5 low address bits coded into the dword read, 5 high address bits coded into tag.
+		i = ((hdrC->Tag & 0x1f) << 5) + ((hdrC->LowerAddress >> 2) & 0x1f);
+		prxbuf->pb[i] = 1;
+		if(prxbuf->cbMax <= (DWORD)InterlockedAdd(&prxbuf->cb, 1)) {
+			SetEvent(ctx605->hRxBufferEvent);
+		}
+	}
+}
+
+VOID Device605_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap)
+{
+	DWORD i, j;
+	PDEVICE_CONTEXT_SP605 ctx605 = (PDEVICE_CONTEXT_SP605)ctx->hDevice;
+	DEVICE_CONTEXT_SP605_RXBUF rxbuf;
+	DWORD tx[4];
+	BOOL is32;
+	PTLP_HDR_MRdWr64 hdrRd64 = (PTLP_HDR_MRdWr64)tx;
+	PTLP_HDR_MRdWr32 hdrRd32 = (PTLP_HDR_MRdWr32)tx;
+	// split probe into processing chunks if too large...
+	while(cPages > SP605_PROBE_MAXPAGES) {
+		Device605_ProbeDMA(ctx, qwAddr, SP605_PROBE_MAXPAGES, pbResultMap);
+		cPages -= SP605_PROBE_MAXPAGES;
+		pbResultMap += SP605_PROBE_MAXPAGES;
+		qwAddr += SP605_PROBE_MAXPAGES << 12;
+	}
+	memset(pbResultMap, 0, cPages);
+	// prepare
+	rxbuf.cb = 0;
+	rxbuf.pb = pbResultMap;
+	rxbuf.cbMax = cPages;
+	ctx605->pRxBuffer = &rxbuf;
+	ResetEvent(ctx605->hRxBufferEvent);
+	ctx605->hRxTlpCallbackFn = Device605_RxTlp_CallbackProbeDMA;
+	// transmit TLPs
+	for(i = 0; i < cPages; i++) {
+		memset(tx, 0, 16);
+		is32 = qwAddr + (i << 12) < 0x100000000;
+		if(is32) {
+			hdrRd32->h.TypeFmt = TLP_MRd32;
+			hdrRd32->h.Length = 1;
+			hdrRd32->RequesterID = ctx605->wDeviceId;
+			hdrRd32->FirstBE = 0xf;
+			hdrRd32->LastBE = 0;
+			hdrRd32->Address = (DWORD)(qwAddr + (i << 12) + ((i & 0x1f) << 2)); // 5 low address bits coded into the dword read.
+			hdrRd32->Tag = (BYTE)((i >> 5) & 0x1f); // 5 high address bits coded into tag.
+		} else {
+			hdrRd64->h.TypeFmt = TLP_MRd64;
+			hdrRd32->h.Length = 1;
+			hdrRd32->RequesterID = ctx605->wDeviceId;
+			hdrRd32->FirstBE = 0xf;
+			hdrRd32->LastBE = 0;
+			hdrRd64->AddressHigh = (DWORD)((qwAddr + (i << 12)) >> 32);
+			hdrRd32->Address = (DWORD)(qwAddr + (i << 12) + ((i & 0x1f) << 2)); // 5 low address bits coded into the dword read.
+			hdrRd32->Tag = (BYTE)((i >> 5) & 0x1f); // 5 high address bits coded into tag.
+		}
+		for(j = 0; j < 4; j++) {
+			ENDIAN_SWAP_DWORD(tx[j]);
+		}
+		Device605_TxTlp(ctx605, (PBYTE)tx, is32 ? 12 : 16);
+	}
+	// wait for result
+	WaitForSingleObject(ctx605->hRxBufferEvent, SP605_PROBE_TIMEOUT);
+	ctx605->hRxTlpCallbackFn = NULL;
+	ctx605->pRxBuffer = NULL;
+	SetEvent(ctx605->hRxBufferEvent);
 }
 
 BOOL Device605_WriteDMA_TXP(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwA, _In_ BYTE bFirstBE, _In_ BYTE bLastBE, _In_ PBYTE pb, _In_ DWORD cb)
@@ -386,6 +471,11 @@ BOOL Device605_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ P
 BOOL Device605_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb)
 {
 	return FALSE;
+}
+
+VOID Device605_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap)
+{
+	;
 }
 
 #endif /* LINUX || ANDROID */

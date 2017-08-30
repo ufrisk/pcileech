@@ -41,6 +41,16 @@ BOOL Device605_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ P
 BOOL Device605_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb);
 
 /*
+* Probe the memory of the target system to check whether it's readable or not.
+* -- ctx
+* -- qwAddr = address to start probe from.
+* -- cPages = number of 4kB pages to probe.
+* -- pbResultMap = result map, 1 byte represents 1 page, 0 = fail, 1 = success.
+* -- return = FALSE if not supported by underlying hardware, TRUE if supported.
+*/
+VOID Device605_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap);
+
+/*
 * Transmit a raw PCIe TLP.
 * -- ctx
 */

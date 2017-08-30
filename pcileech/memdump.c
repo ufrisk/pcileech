@@ -127,6 +127,33 @@ cleanup:
 	}
 }
 
+#define MEMORY_PROBE_PAGES_PER_SWEEP	0x400
+
+VOID ActionMemoryProbe(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	PAGE_STATISTICS ps;
+	QWORD qwA, cPages, i;
+	BYTE pbResultMap[MEMORY_PROBE_PAGES_PER_SWEEP];
+	ctx->cfg->qwAddrMin &= ~0xfff;
+	ctx->cfg->qwAddrMax = (ctx->cfg->qwAddrMax + 1) & ~0xfff;
+	qwA = ctx->cfg->qwAddrMin;
+	PageStatInitialize(&ps, ctx->cfg->qwAddrMin, ctx->cfg->qwAddrMax, "Probing Memory", FALSE, TRUE);
+	while(qwA < ctx->cfg->qwAddrMax) {
+		cPages = min(MEMORY_PROBE_PAGES_PER_SWEEP, (ctx->cfg->qwAddrMax - qwA) / 0x1000);
+		if(!DeviceProbeDMA(ctx, qwA, (DWORD)cPages, pbResultMap)) {
+			PageStatClose(&ps);
+			printf("Memory Probe: Failed. Unsupported hardware (USB3380) or other failure.\n");
+			return;
+		}
+		for(i = 0; i < cPages; i++) {
+			PageStatUpdate(&ps, (qwA + i * 0x1000), (pbResultMap[i] ? 1 : 0), (pbResultMap[i] ? 0 : 1));
+		}
+		qwA += MEMORY_PROBE_PAGES_PER_SWEEP * 0x1000;
+	}
+	PageStatClose(&ps);
+	printf("Memory Probe: Completed.\n");
+}
+
 VOID ActionMemoryPageDisplay(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	BYTE pb[4096];

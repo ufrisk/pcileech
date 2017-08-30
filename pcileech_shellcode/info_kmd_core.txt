@@ -1,0 +1,136 @@
+# compile instructions for the various kernel module shellcode sources.
+#
+#======================================== UEFI ========================================
+#
+# COMPILE C CODE TO OBJ FILE
+cl.exe /O1 /Os /Oy /FD /MT /Zp1 /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel uefi_kmd_c.c
+#
+# COMPILE ASM AND LINK C OBJ FILE TO EXE
+ml64 uefi_kmd.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main "uefi_kmd_c.obj"
+#
+# EXTRACT SHELLCODE (shellcode saved as uefi_kmd.bin, c-ify by xxd -i uefi_kmd.bin)
+shellcode64.exe -o uefi_kmd.exe
+#
+#======================================== FreeBSD ========================================
+#
+# compile instructions for the FreeBSD x64 kernel module code
+#
+#=============== STAGE 1 ===============
+#
+# COMPILE ASM TO EXE (SAME CODE AS FOR WINDOWS)
+ml64 wx64_stage1.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main
+#
+# EXTRACT SHELLCODE (shellcode saved as wx64_stage1.bin, c-ify by xxd -i wx64_stage1.bin)
+shellcode64.exe -o wx64_stage1.exe
+#
+#=============== STAGE 2 ===============
+#
+# COMPILE ASM TO EXE
+ml64 fbsdx64_stage2.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main 
+#
+# EXTRACT SHELLCODE (shellcode saved as fbsdx64_stage2.bin, c-ify by xxd -i fbsdx64_stage2.bin)
+shellcode64.exe -o fbsdx64_stage2.exe
+#
+#=============== STAGE 3 ===============
+#
+# COMPILE C CODE TO OBJ FILE
+cl.exe /O1 /Os /Oy /FD /MT /Zp1 /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel fbsdx64_stage3_c.c
+#
+# COMPILE ASM AND LINK C OBJ FILE TO EXE
+ml64 fbsdx64_stage3.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main "fbsdx64_stage3_c.obj"
+#
+# EXTRACT SHELLCODE (shellcode saved as fbsdx64_stage3.bin, c-ify by xxd -i fbsdx64_stage3.bin)
+shellcode64.exe -o fbsdx64_stage3.exe
+#
+#======================================== LINUX ========================================
+#
+# compile instructions for the linux x64 kernel module code
+#
+#=============== STAGE 1 ===============
+#
+# COMPILE ASM TO EXE (SAME CODE AS FOR WINDOWS)
+ml64 wx64_stage1.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main
+#
+# EXTRACT SHELLCODE (shellcode saved as wx64_stage1.bin, c-ify by xxd -i wx64_stage1.bin)
+shellcode64.exe -o wx64_stage1.exe
+#
+#=============== STAGE 2 ===============
+#
+# COMPILE ASM TO EXE
+ml64 lx64_stage2.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main
+#
+# EXTRACT SHELLCODE (shellcode saved as lx64_stage2.bin, c-ify by xxd -i lx64_stage2.bin)
+shellcode64.exe -o lx64_stage2.exe
+#
+#=============== STAGE 3 ===============
+#
+# COMPILE C CODE TO OBJ FILE
+cl.exe /O1 /Os /Oy /FD /MT /Zp1 /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel lx64_stage3_c.c
+#
+# COMPILE ASM AND LINK C OBJ FILE TO EXE
+ml64 lx64_stage3.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main "lx64_stage3_c.obj"
+#
+# EXTRACT SHELLCODE (shellcode saved as lx64_stage3.bin, c-ify by xxd -i lx64_stage3.bin)
+shellcode64.exe -o lx64_stage3.exe
+#
+#======================================== macOS ========================================
+#
+# compile instructions for the macOS kernel module code
+#
+#=============== STAGE 1 ===============
+#
+# COMPILE ASM TO EXE (SAME CODE AS FOR WINDOWS)
+ml64 wx64_stage1.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main
+#
+# EXTRACT SHELLCODE (shellcode saved as wx64_stage1.bin, c-ify by xxd -i wx64_stage1.bin)
+shellcode64.exe -o wx64_stage1.exe
+#
+#=============== STAGE 2 ===============
+#
+# COMPILE ASM TO EXE
+ml64 macos_stage2.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main 
+#
+# EXTRACT SHELLCODE (shellcode saved as macos_stage2.bin, c-ify by xxd -i macos_stage2.bin)
+shellcode64.exe -o macos_stage2.exe
+#
+#=============== STAGE 3 ===============
+#
+# COMPILE C CODE TO OBJ FILE
+cl.exe /O1 /Os /Oy /FD /MT /Zp1 /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel macos_stage3_c.c
+#
+# COMPILE ASM AND LINK C OBJ FILE TO EXE
+ml64 macos_stage3.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main "macos_stage3_c.obj"
+#
+# EXTRACT SHELLCODE (shellcode saved as macos_stage3.bin, c-ify by xxd -i macos_stage3.bin)
+shellcode64.exe -o macos_stage3.exe
+#
+#======================================== Windows x64 ========================================
+#
+# compile instructions for the Windows x64 kernel module code
+#
+#=============== STAGE 1 ===============
+#
+# COMPILE ASM TO EXE
+ml64 wx64_stage1.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main
+#
+# EXTRACT SHELLCODE (shellcode saved as wx64_stage1.bin, c-ify by xxd -i wx64_stage1.bin)
+shellcode64.exe -o wx64_stage1.exe
+#
+#=============== STAGE 2 ===============
+#
+# COMPILE ASM AND LINK C OBJ FILE TO EXE
+ml64 wx64_stage2.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main
+#
+# EXTRACT SHELLCODE (shellcode saved as wx64_stage2.bin, c-ify by xxd -i wx64_stage2.bin)
+shellcode64.exe -o wx64_stage2.exe
+#
+#=============== STAGE 3 ===============
+#
+# COMPILE C CODE TO OBJ FILE
+cl.exe /O1 /Os /Oy /FD /MT /Zp1 /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_stage3_c.c
+#
+# COMPILE ASM AND LINK C OBJ FILE TO EXE
+ml64 wx64_stage3.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main "wx64_stage3_c.obj"
+#
+# EXTRACT SHELLCODE (shellcode saved as wx64_stage3.bin, c-ify by xxd -i wx64_stage3.bin)
+shellcode64.exe -o wx64_stage3.exe

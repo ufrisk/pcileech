@@ -46,11 +46,22 @@ BOOL DeviceReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE
 BOOL DeviceWriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags);
 
 /*
+* Probe the memory of the target system to check whether it's readable or not.
+* Please note that not all hardwares are supported (USB3380).
+* -- ctx
+* -- qwAddr = address to start probe from.
+* -- cPages = number of 4kB pages to probe.
+* -- pbResultMap = result map, 1 byte represents 1 page, 0 = fail, 1 = success.
+* -- return = FALSE if not supported by underlying hardware, TRUE if supported.
+*/
+BOOL DeviceProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap);
+
+/*
 * Write target physical memory. If an KMD is inserted in the target kernel the
 * KMD will be used to write the memory, otherwise the memory will be written
 * with standard DMA. Minimum granularity: byte.
 * -- ctx
-* -- qwAddress = the physical address to write to in the target system.
+* -- qwAddr = the physical address to write to in the target system.
 * -- pb = bytes to write
 * -- cb = number of bytes to write.
 * -- flags - supported flags: 0, PCILEECH_MEM_FLAG_RETRYONFAIL
@@ -63,7 +74,7 @@ BOOL DeviceWriteMEM(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE
 * KMD will be used to read the memory, otherwise the memory will be read with
 * standard DMA. Minimum granularity: page (4kB)
 * -- ctx
-* -- qwAddress = physical address in target system to read.
+* -- qwAddr = physical address in target system to read.
 * -- pb = pre-allocated buffer to place result in.
 * -- cb = length of data to read, must not be larger than pb.
 * -- flags - supported flags: 0, PCILEECH_MEM_FLAG_RETRYONFAIL

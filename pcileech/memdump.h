@@ -16,6 +16,14 @@
 VOID ActionMemoryDump(_Inout_ PPCILEECH_CONTEXT ctx);
 
 /*
+* Probe readable physical memory (for reading). The resulting memory map is
+* displayed on-screen. Probing is performed in DMA mode. The USB3380 hardware
+* does not support this operation.
+* -- ctx
+*/
+VOID ActionMemoryProbe(_Inout_ PPCILEECH_CONTEXT ctx);
+
+/*
 * Write data to the physical memory. The USB3380 may only write to the lower
 * 4GB in default DMA mode due to hardware limitations. If a kernel module (KMD)
 * is inserted in the target computer OS any kernel accessable memory can be

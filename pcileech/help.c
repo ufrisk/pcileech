@@ -55,6 +55,7 @@ VOID Help_ShowGeneral()
 		"   usb3380_8051start      DMA,KMD   [ in ] (USB3380)                           \n" \
 		"   usb3380_8051stop       DMA,KMD          (USB3380)                           \n" \
 		"   tlp                  W DMA       [ in ] (SP605)                             \n" \
+		"   probe                W DMA       [ in ] (SP605)                             \n" \
 		" System specific commands and valid MODEs [ and options ]:                     \n" \
 		"   mac_fvrecover          DMA                                                  \n" \
 		"   mac_fvrecover2         DMA                                                  \n" \
@@ -106,15 +107,19 @@ VOID Help_ShowGeneral()
 		"          Insertion may trigger system crash unless signature exactly matches. \n" \
 		"   -cr3 : base address of system page table / CR3 CPU register.                \n" \
 		"          Insertion may trigger system crash unless signature exactly matches. \n" \
+		"   -efibase : base address of EFI_SYSTEM_TABLE (IBI SYST) used when inserting  \n" \
+		"          UEFI 'kernel' modules.                                               \n" \
 		"   -kmd : address of already loaded kernel module helper (KMD).                \n" \
 		"          ALTERNATIVELY                                                        \n" \
 		"          kernel module to use, see list below for choices:                    \n" \
 		"             WIN10_X64                                                         \n" \
-		"             LINUX_X64_46           (NB! Kernels 2.6.33 - 4.6)                 \n" \
-		"             LINUX_X64_48           (NB! Kernels 4.8+, 64-bit DMA recommended) \n" \
-		"             LINUX_X64_EFI          (NB! UEFI booted systems only)             \n" \
+		"             LINUX_X64_46            (NB! Kernels 2.6.33 - 4.6)                \n" \
+		"             LINUX_X64_48            (NB! Kernels 4.8+, 64-bit DMA recommended)\n" \
+		"             LINUX_X64_EFI           (NB! UEFI booted systems only)            \n" \
 		"             FREEBSD_X64                                                       \n" \
 		"             MACOS                                                             \n" \
+		"             UEFI_EXIT_BOOT_SERVICES                                           \n" \
+		"             UEFI_SIGNAL_EVENT                                                 \n" \
 	);
 	ShowListFiles("*.kmd");
 	printf(
@@ -131,7 +136,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016, 2017 Ulf Frisk                                             \n" \
-		" Version: 2.1.1                                                                \n" \
+		" Version: 2.2                                                                  \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \
@@ -458,6 +463,17 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 			" EXAMPLEs:                                                                     \n" \
 			" 1) Listen for incoming TLPs for 10s:                                          \n" \
 			"    pcileech.exe -vv -wait 10                                                  \n");
+		break;
+	case PROBE:
+		printf(
+			" PROBE MEMORY FOR READABLE PAGES                                               \n" \
+			" MODES   : DMA                                                                 \n" \
+			" Probe a memory region specified by defaults or -min, -max for readable pages. \n" \
+			" This is done in a device-effifient manner. Probing is performed in DMA mode.  \n" \
+			" The USB3380 is not a supported device.                                        \n" \
+			" EXAMPLEs:                                                                     \n" \
+			" 1) Probe memory up to 10GB                                                    \n" \
+			"    pcileech.exe probe -max 0x280000000                                        \n");
 		break;
 	case EXEC:
 		_HelpShowExecCommand(pCfg);

@@ -63,6 +63,9 @@
     <ClCompile Include="macos_stage3_c.c" />
     <ClCompile Include="macos_unlock.c" />
     <ClCompile Include="macos_vfs.c" />
+    <ClCompile Include="uefi_common.c" />
+    <ClCompile Include="uefi_kmd_c.c" />
+    <ClCompile Include="uefi_textout.c" />
     <ClCompile Include="wx64_common.c" />
     <ClCompile Include="wx64_driverinfo.c" />
     <ClCompile Include="wx64_driverload_svc.c" />
@@ -90,6 +93,8 @@
     <None Include="macos_common_a.asm" />
     <None Include="macos_stage2.asm" />
     <None Include="macos_stage3.asm" />
+    <None Include="uefi_common_a.asm" />
+    <None Include="uefi_kmd.asm" />
     <None Include="wx64_common_a.asm" />
     <None Include="wx64_exec_user.asm" />
     <None Include="wx64_pageinfo.asm" />
@@ -105,13 +110,11 @@
     <ClInclude Include="lx64_common.h" />
     <ClInclude Include="macos_common.h" />
     <ClInclude Include="statuscodes.h" />
+    <ClInclude Include="uefi_common.h" />
     <ClInclude Include="wx64_common.h" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="fbsdx64_info.txt" />
-    <Text Include="lx64_info.txt" />
-    <Text Include="macos_info.txt" />
-    <Text Include="wx64_info.txt" />
+    <Text Include="info_kmd_core.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

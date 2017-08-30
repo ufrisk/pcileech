@@ -45,6 +45,15 @@ BOOL DeviceWriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE
 	return result;
 }
 
+BOOL DeviceProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap)
+{
+	if(PCILEECH_DEVICE_SP605 == ctx->cfg->tpDevice) {
+		Device605_ProbeDMA(ctx, qwAddr, cPages, pbResultMap);
+		return TRUE;
+	}
+	return FALSE;
+}
+
 VOID DeviceClose(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	if(ctx->hDevice) {
