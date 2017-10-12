@@ -1,11 +1,11 @@
-// device.c : implementation related to the Xilinx SP605 dev board flashed with @d_olex early access bitstream. (UART communication).
+// device605_uart.c : implementation related to the Xilinx SP605 dev board flashed with @d_olex early access bitstream. (UART communication).
 //
 // (c) Ulf Frisk, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifdef WIN32
 
-#include "device605.h"
+#include "device605_uart.h"
 #include "device.h"
 #include "tlp.h"
 
@@ -26,12 +26,6 @@
 
 #define ENDIAN_SWAP_DWORD(x)	(x = (x << 24) | ((x >> 8) & 0xff00) | ((x << 8) & 0xff0000) | (x >> 24))
 
-typedef struct tdDEVICE_CONTEXT_SP605_RXBUF {
-	DWORD cbMax;
-	DWORD cb;
-	PBYTE pb;
-} DEVICE_CONTEXT_SP605_RXBUF, *PDEVICE_CONTEXT_SP605_RXBUF;
-
 typedef struct tdDEVICE_CONTEXT_SP605 {
 	HANDLE hCommCfg;
 	HANDLE hCommPcie;
@@ -43,17 +37,15 @@ typedef struct tdDEVICE_CONTEXT_SP605 {
 	OVERLAPPED oRx;
 	OVERLAPPED oCfg;
 	HANDLE hRxBufferEvent;
-	PDEVICE_CONTEXT_SP605_RXBUF pRxBuffer;
-	VOID(*hRxTlpCallbackFn)(_Inout_ struct tdDEVICE_CONTEXT_SP605 *ctx605, _In_ PBYTE pb, _In_ DWORD cb);
+	PTLP_CALLBACK_BUF_MRd pMRdBuffer;
+	BOOL(*hRxTlpCallbackFn)(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMrd, _In_ PBYTE pb, _In_ DWORD cb, _In_opt_ HANDLE hEventCompleted);
 } DEVICE_CONTEXT_SP605, *PDEVICE_CONTEXT_SP605;
-
-VOID Device605_RxTlp_Thread(PDEVICE_CONTEXT_SP605 ctx605);
 
 //-------------------------------------------------------------------------------
 // SP605 implementation below.
 //-------------------------------------------------------------------------------
 
-VOID Device605_Close(_Inout_ PPCILEECH_CONTEXT ctx)
+VOID Device605_UART_Close(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	PDEVICE_CONTEXT_SP605 ctx605 = (PDEVICE_CONTEXT_SP605)ctx->hDevice;
 	if(!ctx605) { return; }
@@ -63,7 +55,7 @@ VOID Device605_Close(_Inout_ PPCILEECH_CONTEXT ctx)
 	}
 	if(ctx605->hRxBufferEvent) {
 		WaitForSingleObject(ctx605->hRxBufferEvent, INFINITE);
-		while(ctx605->pRxBuffer) { SwitchToThread(); }
+		while(ctx605->pMRdBuffer) { SwitchToThread(); }
 		CloseHandle(ctx605->hRxBufferEvent);
 	}
 	if(ctx605->hCommCfg) { CloseHandle(ctx605->hCommCfg); }
@@ -75,7 +67,7 @@ VOID Device605_Close(_Inout_ PPCILEECH_CONTEXT ctx)
 	ctx->hDevice = 0;
 }
 
-HANDLE Device605_Open_COM(_In_ LPSTR szCOM)
+HANDLE Device605_UART_Open_COM(_In_ LPSTR szCOM)
 {
 	DCB dcb = { 0 };
 	HANDLE hComm;
@@ -90,7 +82,7 @@ HANDLE Device605_Open_COM(_In_ LPSTR szCOM)
 	return hComm;
 }
 
-WORD Device605_GetDeviceID(_In_ PDEVICE_CONTEXT_SP605 ctx605)
+WORD Device605_UART_GetDeviceID(_In_ PDEVICE_CONTEXT_SP605 ctx605)
 {
 	DWORD dw, txrx[] = { 0x00000000, 0x00000000 };
 	if(!WriteFile(ctx605->hCommCfg, txrx, sizeof(txrx), &dw, &ctx605->oCfg)) {
@@ -100,52 +92,12 @@ WORD Device605_GetDeviceID(_In_ PDEVICE_CONTEXT_SP605 ctx605)
 	if(!ReadFile(ctx605->hCommCfg, txrx, sizeof(txrx), &dw, &ctx605->oCfg)) {
 		if(ERROR_IO_PENDING != GetLastError()) { return 0; }
 		if(WAIT_TIMEOUT == WaitForSingleObject(ctx605->oCfg.hEvent, SP605_COM_TIMEOUT)) { return 0; }
-		if(!GetOverlappedResult(ctx605->hCommPcie, &ctx605->oCfg, &dw, FALSE)) { return 0; }
+		if(!GetOverlappedResult(ctx605->hCommCfg, &ctx605->oCfg, &dw, FALSE)) { return 0; }
 	}
 	return (WORD)_byteswap_ulong(txrx[0]);
 }
 
-BOOL Device605_Open(_Inout_ PPCILEECH_CONTEXT ctx)
-{
-	DWORD i;
-	CHAR szCOM[] = { 'C', 'O', 'M', 'x', 0 };
-	PDEVICE_CONTEXT_SP605 ctx605;
-	ctx605 = LocalAlloc(LMEM_ZEROINIT, sizeof(DEVICE_CONTEXT_SP605));
-	if(!ctx605) { return FALSE; }
-	ctx->hDevice = (HANDLE)ctx605;
-	// open COM ports
-	for(i = 1; i <= 9; i++) {
-		szCOM[3] = (CHAR)('0' + i);
-		if(!ctx605->hCommPcie) {
-			ctx605->hCommPcie = Device605_Open_COM(szCOM);
-		} else {
-			ctx605->hCommCfg = Device605_Open_COM(szCOM);
-			if(ctx605->hCommCfg) { break; }
-		}
-	}
-	if(!ctx605->hCommPcie || !ctx605->hCommCfg) { goto fail; }
-	SetupComm(ctx605->hCommPcie, 0x8000, 0x8000);
-	ctx605->oTx.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!ctx605->oTx.hEvent) { goto fail; }
-	ctx605->oRx.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!ctx605->oRx.hEvent) { goto fail; }
-	ctx605->oCfg.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if(!ctx605->oCfg.hEvent) { goto fail; }
-	ctx605->hRxBufferEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
-	if(!ctx605->hRxBufferEvent) { goto fail; }
-	ctx605->wDeviceId = Device605_GetDeviceID(ctx605);
-	if(!ctx605->wDeviceId) { goto fail; }
-	ctx605->isPrintTlp = ctx->cfg->fVerboseExtra;
-	ctx605->hThreadRx = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Device605_RxTlp_Thread, ctx605, 0, NULL); // start rx thread, must be last in open
-	if(!ctx605->hThreadRx) { goto fail; }
-	if(ctx->cfg->fVerbose) { printf("Device Info: SP605.\n"); }
-	return TRUE;
-fail:
-	Device605_Close(ctx);
-	return FALSE;
-}
-
-BOOL Device605_TxTlp(_In_ PDEVICE_CONTEXT_SP605 ctx605, _In_ PBYTE pbTlp, _In_ DWORD cbTlp)
+BOOL Device605_UART_TxTlp(_In_ PDEVICE_CONTEXT_SP605 ctx605, _In_ PBYTE pbTlp, _In_ DWORD cbTlp)
 {
 	DWORD pdwTx[1024], cTx, i, dwTxed;
 	if(!cbTlp) { return TRUE; }
@@ -166,30 +118,7 @@ BOOL Device605_TxTlp(_In_ PDEVICE_CONTEXT_SP605 ctx605, _In_ PBYTE pbTlp, _In_ D
 		(GetLastError() == ERROR_IO_PENDING && GetOverlappedResult(ctx605->hCommPcie, &ctx605->oTx, &dwTxed, TRUE));
 }
 
-VOID Device605_RxTlp_CallbackMRd(_Inout_ PDEVICE_CONTEXT_SP605 ctx605, _In_ PBYTE pb, _In_ DWORD cb)
-{
-	PDEVICE_CONTEXT_SP605_RXBUF prxbuf = ctx605->pRxBuffer;
-	PTLP_HDR_CplD hdrC = (PTLP_HDR_CplD)pb;
-	PTLP_HDR hdr = (PTLP_HDR)pb;
-	PDWORD buf = (PDWORD)pb;
-	DWORD o, c;
-	buf[0] = _byteswap_ulong(buf[0]);
-	if(cb < ((DWORD)hdr->Length << 2) - 12) { return; }
-	if((hdr->TypeFmt == TLP_CplD) && prxbuf) {
-		buf[1] = _byteswap_ulong(buf[1]);
-		buf[2] = _byteswap_ulong(buf[2]);
-		// NB! read algorithm below only support reading full 4kB pages _or_
-		//     partial page if starting at page boundry and read is less than 4kB.
-		o = (hdrC->Tag << 12) + min(0x1000, prxbuf->cbMax) - (hdrC->ByteCount ? hdrC->ByteCount : 0x1000);
-		c = (DWORD)hdr->Length << 2;
-		memcpy(prxbuf->pb + o, pb + 12, c);
-		if(prxbuf->cbMax <= (DWORD)InterlockedAdd(&prxbuf->cb, c)) {
-			SetEvent(ctx605->hRxBufferEvent);
-		}
-	}
-}
-
-VOID Device605_RxTlp_Thread(_In_ PDEVICE_CONTEXT_SP605 ctx605)
+VOID Device605_UART_RxTlp_Thread(_In_ PDEVICE_CONTEXT_SP605 ctx605)
 {
 	DWORD rx[2], dwTlp[1024], cbRead, dwResult, cdwTlp = 0;
 	while(!ctx605->isTerminateThreadRx) {
@@ -213,8 +142,8 @@ VOID Device605_RxTlp_Thread(_In_ PDEVICE_CONTEXT_SP605 ctx605)
 				if(ctx605->isPrintTlp) {
 					TLP_Print((PBYTE)dwTlp, cdwTlp << 2, FALSE);
 				}
-				if(ctx605->hRxTlpCallbackFn) {
-					ctx605->hRxTlpCallbackFn(ctx605, (PBYTE)dwTlp, cdwTlp << 2);
+				if(ctx605->hRxTlpCallbackFn && ctx605->pMRdBuffer) {
+					ctx605->hRxTlpCallbackFn(ctx605->pMRdBuffer, (PBYTE)dwTlp, cdwTlp << 2, ctx605->hRxBufferEvent);
 				}
 			}
 			cdwTlp = 0;
@@ -225,10 +154,10 @@ fail:
 	ctx605->isTerminateThreadRx = TRUE;
 }
 
-BOOL Device605_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
+BOOL Device605_UART_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
 {
 	PDEVICE_CONTEXT_SP605 ctx605 = (PDEVICE_CONTEXT_SP605)ctx->hDevice;
-	DEVICE_CONTEXT_SP605_RXBUF rxbuf;
+	TLP_CALLBACK_BUF_MRd rxbuf;
 	DWORD tx[4], o, i;
 	BOOL is32;
 	PTLP_HDR_MRdWr64 hdrRd64 = (PTLP_HDR_MRdWr64)tx;
@@ -241,9 +170,9 @@ BOOL Device605_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ P
 	rxbuf.cb = 0;
 	rxbuf.pb = pb;
 	rxbuf.cbMax = cb;
-	ctx605->pRxBuffer = &rxbuf;
+	ctx605->pMRdBuffer = &rxbuf;
 	ResetEvent(ctx605->hRxBufferEvent);
-	ctx605->hRxTlpCallbackFn = Device605_RxTlp_CallbackMRd;
+	ctx605->hRxTlpCallbackFn = TLP_CallbackMRd;
 	// transmit TLPs
 	for(o = 0; o < cb; o += 0x1000) {
 		memset(tx, 0, 16);
@@ -258,7 +187,7 @@ BOOL Device605_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ P
 			hdrRd32->Address = (DWORD)(qwAddr + o);
 		} else {
 			hdrRd64->h.TypeFmt = TLP_MRd64;
-			hdrRd32->h.Length = (WORD)((cb < 0x1000) ? cb >> 2 : 0);
+			hdrRd64->h.Length = (WORD)((cb < 0x1000) ? cb >> 2 : 0);
 			hdrRd64->RequesterID = ctx605->wDeviceId;
 			hdrRd64->Tag = (BYTE)(o >> 12);
 			hdrRd64->FirstBE = 0xf;
@@ -269,48 +198,28 @@ BOOL Device605_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ P
 		for(i = 0; i < 4; i++) {
 			ENDIAN_SWAP_DWORD(tx[i]);
 		}
-		Device605_TxTlp(ctx605, (PBYTE)tx, is32 ? 12 : 16);
+		Device605_UART_TxTlp(ctx605, (PBYTE)tx, is32 ? 12 : 16);
 	}
 	// wait for result
 	WaitForSingleObject(ctx605->hRxBufferEvent, SP605_READ_TIMEOUT);
 	ctx605->hRxTlpCallbackFn = NULL;
-	ctx605->pRxBuffer = NULL;
+	ctx605->pMRdBuffer = NULL;
 	SetEvent(ctx605->hRxBufferEvent);
 	return rxbuf.cb >= rxbuf.cbMax;
 }
 
-VOID Device605_RxTlp_CallbackProbeDMA(_Inout_ PDEVICE_CONTEXT_SP605 ctx605, _In_ PBYTE pb, _In_ DWORD cb)
-{
-	PDEVICE_CONTEXT_SP605_RXBUF prxbuf = ctx605->pRxBuffer;
-	PTLP_HDR_CplD hdrC = (PTLP_HDR_CplD)pb;
-	PDWORD buf = (PDWORD)pb;
-	DWORD i;
-	if(cb < 16) { return; } // min size CplD = 16 bytes.
-	buf[0] = _byteswap_ulong(buf[0]);
-	buf[1] = _byteswap_ulong(buf[1]);
-	buf[2] = _byteswap_ulong(buf[2]);
-	if((hdrC->h.TypeFmt == TLP_CplD) && prxbuf) {
-		// 5 low address bits coded into the dword read, 5 high address bits coded into tag.
-		i = ((hdrC->Tag & 0x1f) << 5) + ((hdrC->LowerAddress >> 2) & 0x1f);
-		prxbuf->pb[i] = 1;
-		if(prxbuf->cbMax <= (DWORD)InterlockedAdd(&prxbuf->cb, 1)) {
-			SetEvent(ctx605->hRxBufferEvent);
-		}
-	}
-}
-
-VOID Device605_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap)
+VOID Device605_UART_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap)
 {
 	DWORD i, j;
 	PDEVICE_CONTEXT_SP605 ctx605 = (PDEVICE_CONTEXT_SP605)ctx->hDevice;
-	DEVICE_CONTEXT_SP605_RXBUF rxbuf;
+	TLP_CALLBACK_BUF_MRd rxbuf;
 	DWORD tx[4];
 	BOOL is32;
 	PTLP_HDR_MRdWr64 hdrRd64 = (PTLP_HDR_MRdWr64)tx;
 	PTLP_HDR_MRdWr32 hdrRd32 = (PTLP_HDR_MRdWr32)tx;
 	// split probe into processing chunks if too large...
 	while(cPages > SP605_PROBE_MAXPAGES) {
-		Device605_ProbeDMA(ctx, qwAddr, SP605_PROBE_MAXPAGES, pbResultMap);
+		Device605_UART_ProbeDMA(ctx, qwAddr, SP605_PROBE_MAXPAGES, pbResultMap);
 		cPages -= SP605_PROBE_MAXPAGES;
 		pbResultMap += SP605_PROBE_MAXPAGES;
 		qwAddr += SP605_PROBE_MAXPAGES << 12;
@@ -320,9 +229,9 @@ VOID Device605_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ D
 	rxbuf.cb = 0;
 	rxbuf.pb = pbResultMap;
 	rxbuf.cbMax = cPages;
-	ctx605->pRxBuffer = &rxbuf;
+	ctx605->pMRdBuffer = &rxbuf;
 	ResetEvent(ctx605->hRxBufferEvent);
-	ctx605->hRxTlpCallbackFn = Device605_RxTlp_CallbackProbeDMA;
+	ctx605->hRxTlpCallbackFn = TLP_CallbackMRdProbe;
 	// transmit TLPs
 	for(i = 0; i < cPages; i++) {
 		memset(tx, 0, 16);
@@ -337,27 +246,27 @@ VOID Device605_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ D
 			hdrRd32->Tag = (BYTE)((i >> 5) & 0x1f); // 5 high address bits coded into tag.
 		} else {
 			hdrRd64->h.TypeFmt = TLP_MRd64;
-			hdrRd32->h.Length = 1;
-			hdrRd32->RequesterID = ctx605->wDeviceId;
-			hdrRd32->FirstBE = 0xf;
-			hdrRd32->LastBE = 0;
+			hdrRd64->h.Length = 1;
+			hdrRd64->RequesterID = ctx605->wDeviceId;
+			hdrRd64->FirstBE = 0xf;
+			hdrRd64->LastBE = 0;
 			hdrRd64->AddressHigh = (DWORD)((qwAddr + (i << 12)) >> 32);
-			hdrRd32->Address = (DWORD)(qwAddr + (i << 12) + ((i & 0x1f) << 2)); // 5 low address bits coded into the dword read.
-			hdrRd32->Tag = (BYTE)((i >> 5) & 0x1f); // 5 high address bits coded into tag.
+			hdrRd64->AddressLow = (DWORD)(qwAddr + (i << 12) + ((i & 0x1f) << 2)); // 5 low address bits coded into the dword read.
+			hdrRd64->Tag = (BYTE)((i >> 5) & 0x1f); // 5 high address bits coded into tag.
 		}
 		for(j = 0; j < 4; j++) {
 			ENDIAN_SWAP_DWORD(tx[j]);
 		}
-		Device605_TxTlp(ctx605, (PBYTE)tx, is32 ? 12 : 16);
+		Device605_UART_TxTlp(ctx605, (PBYTE)tx, is32 ? 12 : 16);
 	}
 	// wait for result
 	WaitForSingleObject(ctx605->hRxBufferEvent, SP605_PROBE_TIMEOUT);
 	ctx605->hRxTlpCallbackFn = NULL;
-	ctx605->pRxBuffer = NULL;
+	ctx605->pMRdBuffer = NULL;
 	SetEvent(ctx605->hRxBufferEvent);
 }
 
-BOOL Device605_WriteDMA_TXP(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwA, _In_ BYTE bFirstBE, _In_ BYTE bLastBE, _In_ PBYTE pb, _In_ DWORD cb)
+BOOL Device605_UART_WriteDMA_TXP(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwA, _In_ BYTE bFirstBE, _In_ BYTE bLastBE, _In_ PBYTE pb, _In_ DWORD cb)
 {
 	PDEVICE_CONTEXT_SP605 ctx605 = (PDEVICE_CONTEXT_SP605)ctx->hDevice;
 	DWORD txbuf[36], i, cbTlp;
@@ -391,10 +300,10 @@ BOOL Device605_WriteDMA_TXP(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwA, _In_ 
 		memcpy(pbTlp + 16, pb, cb);
 		cbTlp = (16 + cb + 3) & ~0x3;
 	}
-	return Device605_TxTlp(ctx605, pbTlp, cbTlp);
+	return Device605_UART_TxTlp(ctx605, pbTlp, cbTlp);
 }
 
-BOOL Device605_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwA, _In_ PBYTE pb, _In_ DWORD cb)
+BOOL Device605_UART_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwA, _In_ PBYTE pb, _In_ DWORD cb)
 {
 	BOOL result = TRUE;
 	BYTE be, pbb[4];
@@ -406,7 +315,7 @@ BOOL Device605_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwA, _In_ PBYT
 		be <<= qwA & 0x3;
 		cbtx = min(cb, 4 - (qwA & 0x3));
 		memcpy(pbb + (qwA & 0x3), pb, cbtx);
-		result = Device605_WriteDMA_TXP(ctx, qwA & ~0x3, be, 0, pbb, 4);
+		result = Device605_UART_WriteDMA_TXP(ctx, qwA & ~0x3, be, 0, pbb, 4);
 		pb += cbtx;
 		cb -= cbtx;
 		qwA += cbtx;
@@ -416,8 +325,8 @@ BOOL Device605_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwA, _In_ PBYT
 		cbtx = min(128 - (qwA & 0x7f), cb);
 		be = (cbtx & 0x3) ? (0xf >> (4 - (cbtx & 0x3))) : 0xf;
 		result = (cbtx <= 4) ?
-			Device605_WriteDMA_TXP(ctx, qwA, be, 0, pb, 4) :
-			Device605_WriteDMA_TXP(ctx, qwA, 0xf, be, pb, cbtx);
+			Device605_UART_WriteDMA_TXP(ctx, qwA, be, 0, pb, 4) :
+			Device605_UART_WriteDMA_TXP(ctx, qwA, 0xf, be, pb, cbtx);
 		pb += cbtx;
 		cb -= cbtx;
 		qwA += cbtx;
@@ -425,57 +334,80 @@ BOOL Device605_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwA, _In_ PBYT
 	return result;
 }
 
-VOID Action_Device605_TlpTx(_Inout_ PPCILEECH_CONTEXT ctx)
+BOOL Device605_UART_ListenTlp(_Inout_ PPCILEECH_CONTEXT ctx, _In_ DWORD dwTime)
 {
-	if(ctx->cfg->tpDevice != PCILEECH_DEVICE_SP605) {
-		printf("TLP: Failed. unsupported device.\n");
-		return;
-	}
-	if(Device605_TxTlp((PDEVICE_CONTEXT_SP605)ctx->hDevice, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn)) {
-		printf("TLP: Success.\n");
-		// If no custom exit timeout is set wait 500ms to receive any TLP responses.
-		if(ctx->cfg->qwWaitBeforeExit == 0) {
-			Sleep(500);
+	Sleep(dwTime);
+	return TRUE;
+}
+
+BOOL Device605_UART_WriteTlp(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PBYTE pbTlp, _In_ DWORD cbTlp)
+{
+	return Device605_UART_TxTlp((PDEVICE_CONTEXT_SP605)ctx->hDevice, pbTlp, cbTlp);
+}
+
+BOOL Device605_UART_Open(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	DWORD i;
+	CHAR szCOM[] = { 'C', 'O', 'M', 'x', 0 };
+	PDEVICE_CONTEXT_SP605 ctx605;
+	ctx605 = LocalAlloc(LMEM_ZEROINIT, sizeof(DEVICE_CONTEXT_SP605));
+	if(!ctx605) { return FALSE; }
+	ctx->hDevice = (HANDLE)ctx605;
+	// open COM ports
+	for(i = 1; i <= 9; i++) {
+		szCOM[3] = (CHAR)('0' + i);
+		if(!ctx605->hCommPcie) {
+			ctx605->hCommPcie = Device605_UART_Open_COM(szCOM);
+		} else {
+			ctx605->hCommCfg = Device605_UART_Open_COM(szCOM);
+			if(ctx605->hCommCfg) { break; }
 		}
-	} else {
-		printf("TLP: Failed. TX error.\n");
 	}
+	if(!ctx605->hCommPcie || !ctx605->hCommCfg) { goto fail; }
+	SetupComm(ctx605->hCommPcie, 0x8000, 0x8000);
+	ctx605->oTx.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!ctx605->oTx.hEvent) { goto fail; }
+	ctx605->oRx.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!ctx605->oRx.hEvent) { goto fail; }
+	ctx605->oCfg.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if(!ctx605->oCfg.hEvent) { goto fail; }
+	ctx605->hRxBufferEvent = CreateEvent(NULL, TRUE, TRUE, NULL);
+	if(!ctx605->hRxBufferEvent) { goto fail; }
+	ctx605->wDeviceId = Device605_UART_GetDeviceID(ctx605);
+	if(!ctx605->wDeviceId) { goto fail; }
+	ctx605->isPrintTlp = ctx->cfg->fVerboseExtra;
+	ctx605->hThreadRx = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Device605_UART_RxTlp_Thread, ctx605, 0, NULL); // start rx thread, must be last in open
+	if(!ctx605->hThreadRx) { goto fail; }
+	// set callback functions and fix up config
+	ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_UART;
+	ctx->cfg->dev.qwMaxSizeDmaIo = 0x4000;
+	ctx->cfg->dev.qwAddrMaxNative = 0x0000ffffffffffff;
+	ctx->cfg->dev.fPartialPageReadSupported = TRUE;
+	ctx->cfg->dev.pfnClose = Device605_UART_Close;
+	ctx->cfg->dev.pfnProbeDMA = Device605_UART_ProbeDMA;
+	ctx->cfg->dev.pfnReadDMA = Device605_UART_ReadDMA;
+	ctx->cfg->dev.pfnWriteDMA = Device605_UART_WriteDMA;
+	ctx->cfg->dev.pfnWriteTlp = Device605_UART_WriteTlp;
+	ctx->cfg->dev.pfnListenTlp = Device605_UART_ListenTlp;
+	// return
+	if(ctx->cfg->fVerbose) { printf("Device Info: SP605 / UART.\n"); }
+	return TRUE;
+fail:
+	Device605_UART_Close(ctx);
+	return FALSE;
 }
 
 #endif /* WIN32 */
 #if defined(LINUX) || defined(ANDROID)
 
-#include "device605.h"
+#include "device605_uart.h"
 
-BOOL Device605_Open(_Inout_ PPCILEECH_CONTEXT ctx)
+BOOL Device605_UART_Open(_Inout_ PPCILEECH_CONTEXT ctx)
 {
-	printf("SP605: Failed. Device only supported in PCILeech for Windows.");
+	if(ctx->cfg->dev.tp == PCILEECH_DEVICE_SP605_UART) {
+		printf("SP605 / UART: Failed. Device currently only supported in PCILeech for Windows.");
+	}
 	return FALSE;
-}
-
-VOID Device605_Close(_Inout_ PPCILEECH_CONTEXT ctx)
-{
-	return;
-}
-
-VOID Action_Device605_TlpTx(_Inout_ PPCILEECH_CONTEXT ctx)
-{
-	printf("TLP: Failed. Operation only supported in PCILeech for Windows.");
-}
-
-BOOL Device605_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
-{
-	return FALSE;
-}
-
-BOOL Device605_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb)
-{
-	return FALSE;
-}
-
-VOID Device605_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap)
-{
-	;
 }
 
 #endif /* LINUX || ANDROID */

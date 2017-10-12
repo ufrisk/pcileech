@@ -6,7 +6,6 @@
 #include "pcileech.h"
 #include "device.h"
 #include "device3380.h"
-#include "device605.h"
 #include "executor.h"
 #include "extra.h"
 #include "help.h"
@@ -16,7 +15,7 @@
 #include "kmd.h"
 #include "vfs.h"
 
-BOOL PCILeechInitializeConfig(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEECH_CONTEXT ctx)
+BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEECH_CONTEXT ctx)
 {
 	struct ACTION {
 		ACTION_TYPE tp;
@@ -44,7 +43,6 @@ BOOL PCILeechInitializeConfig(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILE
 		{.tp = TLP,.sz = "tlp" },
 		{.tp = PROBE,.sz = "probe" },
 	};
-	QWORD qw;
 	DWORD j, i = 1;
 	if(argc < 2) { return FALSE; }
 	// allocate memory for config struct
@@ -55,7 +53,6 @@ BOOL PCILeechInitializeConfig(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILE
 	ctx->cfg->qwAddrMax = ~0;
 	ctx->cfg->fOutFile = TRUE;
 	ctx->cfg->qwMaxSizeDmaIo = ~0;
-	ctx->cfg->tpDevice = PCILEECH_DEVICE_USB3380;
 	// fetch command line actions/options
 	loop:
 	while(i < argc) {
@@ -114,14 +111,17 @@ BOOL PCILeechInitializeConfig(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILE
 			ctx->cfg->qwEFI_IBI_SYST = Util_GetNumeric(argv[i + 1]);
 		} else if(0 == strcmp(argv[i], "-iosize")) {
 			ctx->cfg->qwMaxSizeDmaIo = Util_GetNumeric(argv[i + 1]);
-		} else if(0 == strcmp(argv[i], "-wait")) {
-			ctx->cfg->qwWaitBeforeExit = Util_GetNumeric(argv[i + 1]);
+			ctx->cfg->qwMaxSizeDmaIo = ~0xfff & max(0x1000, ctx->cfg->qwMaxSizeDmaIo);
+		} else if(0 == strcmp(argv[i], "-tlpwait")) {
+			ctx->cfg->dwListenTlpTimeMs = (DWORD)(1000 * Util_GetNumeric(argv[i + 1]));
 		} else if(0 == strcmp(argv[i], "-device")) {
-			ctx->cfg->tpDevice = PCILEECH_DEVICE_NA;
+			ctx->cfg->dev.tp = PCILEECH_DEVICE_NA;
 			if(0 == _stricmp(argv[i + 1], "usb3380")) { 
-				ctx->cfg->tpDevice = PCILEECH_DEVICE_USB3380;
-			} else if(0 == _stricmp(argv[i + 1], "sp605")) { 
-				ctx->cfg->tpDevice = PCILEECH_DEVICE_SP605; 
+				ctx->cfg->dev.tp = PCILEECH_DEVICE_USB3380;
+			} else if(0 == _stricmp(argv[i + 1], "sp605_uart")) { 
+				ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_UART;
+			} else if(0 == _stricmp(argv[i + 1], "sp605_ft601")) {
+				ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_FT601;
 			}
 		} else if(0 == strcmp(argv[i], "-out")) {
 			if((0 == _stricmp(argv[i + 1], "none")) || (0 == _stricmp(argv[i + 1], "null"))) {
@@ -130,7 +130,10 @@ BOOL PCILeechInitializeConfig(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILE
 				strcpy_s(ctx->cfg->szFileOut, MAX_PATH, argv[i + 1]);
 			}
 		} else if(0 == strcmp(argv[i], "-in")) {
-			if(!Util_ParseHexFileBuiltin(argv[i + 1], ctx->cfg->pbIn, CONFIG_MAX_INSIZE, (PDWORD)&ctx->cfg->cbIn)) { return FALSE; }
+			ctx->cfg->cbIn = max(0x40000, 0x1000 + Util_GetFileSize(argv[i + 1]));
+			ctx->cfg->pbIn = LocalAlloc(LMEM_ZEROINIT, ctx->cfg->cbIn);
+			if(!ctx->cfg->pbIn) { return FALSE; }
+			if(!Util_ParseHexFileBuiltin(argv[i + 1], ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn, (PDWORD)&ctx->cfg->cbIn)) { return FALSE; }
 		} else if(0 == strcmp(argv[i], "-s")) {
 			strcpy_s(ctx->cfg->szInS, MAX_PATH, argv[i + 1]);
 		} else if(0 == strcmp(argv[i], "-sig")) {
@@ -147,24 +150,25 @@ BOOL PCILeechInitializeConfig(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILE
 		} 
 		i += 2;
 	}
+	if(!ctx->cfg->pbIn) {
+		ctx->cfg->pbIn = LocalAlloc(LMEM_ZEROINIT, 0x40000);
+	}
 	// try correct erroneous options, if needed
-	if((ctx->cfg->tpAction == NA) || (ctx->cfg->tpDevice == PCILEECH_DEVICE_NA)) {
+	if(ctx->cfg->tpAction == NA) {
 		return FALSE;
 	}
+	return TRUE;
+}
+
+VOID PCILeechConfigFixup(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	QWORD qw;
 	// device specific configuration
-	if(ctx->cfg->tpDevice == PCILEECH_DEVICE_USB3380) {
-		ctx->cfg->qwAddrMaxDeviceNative = 0xffffffff;
-		ctx->cfg->qwMaxSizeDmaIo = min(0x01000000, ctx->cfg->qwMaxSizeDmaIo);
-	}
-	if(ctx->cfg->tpDevice == PCILEECH_DEVICE_SP605) {
-		ctx->cfg->qwAddrMaxDeviceNative = 0x0000ffffffffffff;
-		ctx->cfg->qwMaxSizeDmaIo = min(0x00004000, ctx->cfg->qwMaxSizeDmaIo);
-		ctx->cfg->fPartialPageReadSupported = TRUE;
-	}
+	ctx->cfg->qwMaxSizeDmaIo = min(ctx->cfg->qwMaxSizeDmaIo, ctx->cfg->dev.qwMaxSizeDmaIo);
 	// no kmd -> max address == max address that device support
 	if(!ctx->cfg->szKMDName[0] && !ctx->cfg->qwKMD) {
-		if(ctx->cfg->qwAddrMax == 0 || ctx->cfg->qwAddrMax > ctx->cfg->qwAddrMaxDeviceNative) {
-			ctx->cfg->qwAddrMax = ctx->cfg->qwAddrMaxDeviceNative;
+		if(ctx->cfg->qwAddrMax == 0 || ctx->cfg->qwAddrMax > ctx->cfg->dev.qwAddrMaxNative) {
+			ctx->cfg->qwAddrMax = ctx->cfg->dev.qwAddrMaxNative;
 		}
 	}
 	// fixup addresses
@@ -175,7 +179,6 @@ BOOL PCILeechInitializeConfig(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILE
 	}
 	ctx->cfg->qwCR3 &= ~0xfff;
 	ctx->cfg->qwKMD &= ~0xfff;
-	return TRUE;
 }
 
 VOID PCILeechFreeContext(_Inout_ PPCILEECH_CONTEXT ctx)
@@ -183,7 +186,10 @@ VOID PCILeechFreeContext(_Inout_ PPCILEECH_CONTEXT ctx)
 	if(!ctx) { return; }
 	KMDClose(ctx);
 	DeviceClose(ctx);
-	if(ctx->cfg) { LocalFree(ctx->cfg); }
+	if(ctx->cfg) { 
+		if(ctx->cfg->pbIn) { LocalFree(ctx->cfg->pbIn); }
+		LocalFree(ctx->cfg); 
+	}
 	if(ctx) { LocalFree(ctx); }
 }
 
@@ -198,11 +204,11 @@ int main(_In_ int argc, _In_ char* argv[])
 		printf("PCILEECH: Out of memory.\n");
 		return 1;
 	}
-	result = PCILeechInitializeConfig((DWORD)argc, argv, ctx);
+	result = PCILeechConfigIntialize((DWORD)argc, argv, ctx);
 	if(!result) {
 		Help_ShowGeneral();
 		PCILeechFreeContext(ctx);
-		return FALSE;
+		return 1;
 	}
 	if(ctx->cfg->tpAction == EXEC) {
 		result = Util_LoadKmdExecShellcode(ctx->cfg->szShellcodeName, &pKmdExec);
@@ -234,6 +240,7 @@ int main(_In_ int argc, _In_ char* argv[])
 		PCILeechFreeContext(ctx);
 		return 1;
 	}
+	PCILeechConfigFixup(ctx); // post device config adjustments
 	if(ctx->cfg->szKMDName[0] || ctx->cfg->qwKMD) {
 		result = KMDOpen(ctx);
 		if(!result) {
@@ -267,7 +274,7 @@ int main(_In_ int argc, _In_ char* argv[])
 	} else if(ctx->cfg->tpAction == PT_PHYS2VIRT) {
 		Action_PT_Phys2Virt(ctx);
 	} else if(ctx->cfg->tpAction == TLP) {
-		Action_Device605_TlpTx(ctx);
+		Action_TlpTx(ctx);
 	} else if(ctx->cfg->tpAction == PROBE) {
 		ActionMemoryProbe(ctx);
 	} else if(ctx->cfg->tpAction == MOUNT) {
@@ -284,11 +291,11 @@ int main(_In_ int argc, _In_ char* argv[])
 	} else {
 		printf("Failed. Not yet implemented.\n");
 	}
-	if((ctx->cfg->tpAction != KMDLOAD) && !ctx->cfg->fAddrKMDSetByArgument) {
+	if(ctx->phKMD && (ctx->cfg->tpAction != KMDLOAD) && !ctx->cfg->fAddrKMDSetByArgument) {
 		KMDUnload(ctx);
 		printf("KMD: Hopefully unloaded.\n");
 	}
-	Sleep(1000 * (DWORD)ctx->cfg->qwWaitBeforeExit);
+	DeviceListenTlp(ctx, ctx->cfg->dwListenTlpTimeMs);
 	PCILeechFreeContext(ctx);
 	ExitProcess(0);
 	return 0;

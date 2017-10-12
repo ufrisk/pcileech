@@ -109,6 +109,13 @@ VOID Util_GenRandom(_Out_ PBYTE pb, _In_ DWORD cb);
 BOOL Util_LoadKmdExecShellcode(_In_ LPSTR szKmdExecName, _Out_ PKMDEXEC* ppKmdExec);
 
 /*
+* Retrieve the file size of the file. If the file isn't found 0 is returned.
+* -- sz = file to retrieve size of.
+* -- return = file size, or 0 on fail.
+*/
+DWORD Util_GetFileSize(_In_ LPSTR sz);
+
+/*
 * Parse an input line consisting of either builtin, hexascii or file name to
 * data buffer.
 */

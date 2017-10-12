@@ -33,4 +33,10 @@ VOID Action_MacDisableVtd(_Inout_ PPCILEECH_CONTEXT ctx);
 */
 VOID Action_PT_Phys2Virt(_Inout_ PPCILEECH_CONTEXT ctx);
 
+/*
+* Transmit the TLP data specified in the -in parameter.
+* -- ctx
+*/
+VOID Action_TlpTx(_Inout_ PPCILEECH_CONTEXT ctx);
+
 #endif /* __EXTRA_H__ */

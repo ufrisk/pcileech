@@ -17,6 +17,8 @@ typedef struct tdSignaturePTE {
 } SIGNATUREPTE, *PSIGNATUREPTE;
 #pragma pack(pop) /* RE-ENABLE STRUCT PADDINGS */
 
+typedef struct tdPCILEECH_CONTEXT		PCILEECH_CONTEXT, *PPCILEECH_CONTEXT;
+
 typedef enum tdActionType {
 	NA,
 	INFO,
@@ -45,40 +47,54 @@ typedef enum tdActionType {
 typedef enum tdPCILEECH_DEVICE_TYPE {
 	PCILEECH_DEVICE_NA,
 	PCILEECH_DEVICE_USB3380,
-	PCILEECH_DEVICE_SP605
+	PCILEECH_DEVICE_SP605_UART,
+	PCILEECH_DEVICE_SP605_FT601
 } PCILEECH_DEVICE_TYPE;
 
-#define CONFIG_MAX_INSIZE 0x400000 // 4MB
+typedef struct tdDeviceConfig {
+	QWORD qwMaxSizeDmaIo;
+	QWORD qwAddrMaxNative;
+	PCILEECH_DEVICE_TYPE tp;
+	BOOL fPartialPageReadSupported;
+	BOOL(*pfnReadDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb);
+	BOOL(*pfnWriteDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb);
+	VOID(*pfnProbeDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap);
+	BOOL(*pfnWriteTlp)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PBYTE pb, _In_ DWORD cb);
+	BOOL(*pfnListenTlp)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ DWORD dwTime);
+	VOID(*pfnClose)(_Inout_ PPCILEECH_CONTEXT ctx);
+} DEVICE_CONFIG;
+
 typedef struct tdConfig {
 	QWORD qwAddrMin;
 	QWORD qwAddrMax;
-	QWORD qwAddrMaxDeviceNative;
 	QWORD qwCR3;
 	QWORD qwEFI_IBI_SYST;
 	QWORD qwKMD;
 	CHAR szFileOut[MAX_PATH];
-	BYTE  pbIn[CONFIG_MAX_INSIZE]; 
+	PBYTE pbIn; 
 	QWORD cbIn;
 	CHAR szInS[MAX_PATH];
 	QWORD qwDataIn[10];
 	ACTION_TYPE tpAction;
-	PCILEECH_DEVICE_TYPE tpDevice;
 	CHAR szSignatureName[MAX_PATH];
 	CHAR szKMDName[MAX_PATH];
 	CHAR szShellcodeName[MAX_PATH];
 	QWORD qwMaxSizeDmaIo;
-	QWORD qwWaitBeforeExit;
+	DWORD dwListenTlpTimeMs;
+	// flags below
 	BOOL fPageTableScan;
 	BOOL fPatchAll;
 	BOOL fForceRW;
 	BOOL fShowHelp;
 	BOOL fOutFile;
-	BOOL fForceUsb2;
+	BOOL fForceUsb2;	// USB3380
 	BOOL fVerbose;
 	BOOL fVerboseExtra;
 	BOOL fDebug;
 	BOOL fPartialPageReadSupported;
 	BOOL fAddrKMDSetByArgument;
+	// device information below
+	DEVICE_CONFIG dev;
 } CONFIG, *PCONFIG;
 
 #define SIGNATURE_CHUNK_TP_OFFSET_FIXED		0
@@ -193,11 +209,11 @@ typedef struct tdKMDHANDLE {
 	BYTE pbPageData[4096];
 } KMDHANDLE, *PKMDHANDLE;
 
-typedef struct tdPCILEECH_CONTEXT {
+struct tdPCILEECH_CONTEXT {
 	PCONFIG cfg;
 	HANDLE hDevice;
 	PKMDHANDLE phKMD;
 	PKMDDATA pk;
-} PCILEECH_CONTEXT, *PPCILEECH_CONTEXT;
+};
 
 #endif /* __PCILEECH_H__ */

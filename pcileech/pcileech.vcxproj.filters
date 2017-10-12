@@ -57,9 +57,6 @@
     <ClInclude Include="dokan.h">
       <Filter>Header Files\dokan</Filter>
     </ClInclude>
-    <ClInclude Include="device605.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="device3380.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -67,6 +64,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="oscompatibility.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="device605_601.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="device605_uart.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -104,9 +107,6 @@
     <ClCompile Include="vfs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="device605.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="device3380.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -114,6 +114,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="oscompatibility.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="device605_601.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="device605_uart.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

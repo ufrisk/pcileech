@@ -1,4 +1,4 @@
-// device605.h : definitions related PCIe TLPs (transaction layper packets).
+// tlp.h : definitions related PCIe TLPs (transaction layper packets).
 //
 // (c) Ulf Frisk, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
@@ -74,5 +74,33 @@ typedef struct tdTLP_HDR_CplD {
 * -- isTx = TRUE = packet is transmited, FALSE = packet is received.
 */
 VOID TLP_Print(_In_ PBYTE pbTlp, _In_ DWORD cbTlp, _In_ BOOL isTx);
+
+typedef struct tdTLP_CALLBACK_BUF_MRd {
+	DWORD cbMax;
+	DWORD cb;
+	PBYTE pb;
+} TLP_CALLBACK_BUF_MRd, *PTLP_CALLBACK_BUF_MRd;
+
+/*
+* Generic callback function that may be used by TLP capable devices to aid the
+* collection of memory read completions. Receives single TLP packet.
+* -- pBufferMrd
+* -- pb
+* -- cb
+* -- hEventCompleted = optional Event that will be signaled once all MRd's are completed.
+* -- return = TRUE if all required TLPs required to fill up buffer have been processed, otherwise FALSE.
+*/
+BOOL TLP_CallbackMRd(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMrd, _In_ PBYTE pb, _In_ DWORD cb, _In_opt_ HANDLE hEventCompleted);
+
+/*
+* Generic callback function that may be used by TLP capable devices to aid the
+* collection of completions from the probe function. Receives single TLP packet.
+* -- pBufferMrd
+* -- pb
+* -- cb
+* -- hEventCompleted = optional Event that will be signaled once all MRd's are completed.
+* -- return = TRUE if all required TLPs required TLPs have been processed, otherwise FALSE.
+*/
+BOOL TLP_CallbackMRdProbe(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMRd, _In_ PBYTE pb, _In_ DWORD cb, _In_opt_ HANDLE hEventCompleted);
 
 #endif /* __TLP_H__ */

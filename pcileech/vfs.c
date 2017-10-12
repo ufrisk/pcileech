@@ -358,7 +358,7 @@ BOOL UnicodeToAscii(_Out_ LPSTR szDst, _In_ SIZE_T cDst, _In_ LPCWSTR wcsSrc)
 VOID Vfs_UtilSplitPathFile(_Out_ WCHAR wszPath[MAX_PATH], _Out_ LPWSTR *pwcsFile, _In_ LPCWSTR wcsFileName)
 {
 	DWORD i, iSplitFilePath;
-	wcscpy_s(wszPath, MAX_PATH, wcsFileName);
+	wcsncpy_s(wszPath, MAX_PATH, wcsFileName, _TRUNCATE);
 	for(i = 0; i < MAX_PATH; i++) {
 		if(wszPath[i] == '\\') {
 			iSplitFilePath = i;

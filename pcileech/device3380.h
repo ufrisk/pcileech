@@ -15,32 +15,6 @@
 BOOL Device3380_Open(_Inout_ PPCILEECH_CONTEXT ctx);
 
 /*
-* Clean up various device related stuff and deallocate memory buffers.
-* -- ctx
-*/
-VOID Device3380_Close(_Inout_ PPCILEECH_CONTEXT ctx);
-
-/*
-* Read data from the target system using DMA.
-* -- ctx
-* -- qwAddr - max supported address = 0x100000000 - cb - (32-bit address space)
-* -- pb
-* -- cb
-* -- return
-*/
-BOOL Device3380_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb);
-
-/*
-* Write data to the target system using DMA.
-* -- ctx
-* -- qwAddr - max supported address = 0x100000000 - cb - (32-bit address space)
-* -- pb
-* -- cb
-* -- return
-*/
-BOOL Device3380_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb);
-
-/*
 * Flash a new firmware into the onboard memory of the USB3380 card.
 * This may be dangerious and the device may stop working after a reflash!
 * -- ctx

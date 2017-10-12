@@ -3,6 +3,22 @@
 // (c) Ulf Frisk, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
+#ifdef WIN32
+
+#include "oscompatibility.h"
+
+VOID usleep(_In_ DWORD us)
+{
+	QWORD tmFreq, tmStart, tmNow, tmThreshold;
+	QueryPerformanceFrequency((PLARGE_INTEGER)&tmFreq);
+	tmThreshold = tmFreq * us / (1000 * 1000);	// dw_uS uS
+	QueryPerformanceCounter((PLARGE_INTEGER)&tmStart);
+	while(QueryPerformanceCounter((PLARGE_INTEGER)&tmNow) && ((tmNow - tmStart) < tmThreshold)) {
+		;
+	}
+}
+
+#endif /* WIN32 */
 #if defined(LINUX) || defined(ANDROID)
 
 #include "oscompatibility.h"
@@ -133,6 +149,11 @@ BOOL WinUsb_Free(WINUSB_INTERFACE_HANDLE InterfaceHandle)
 	libusb_reset_device(InterfaceHandle);
 	libusb_close(InterfaceHandle);
 	return TRUE;
+}
+
+DWORD InterlockedAdd(DWORD *Addend, DWORD Value)
+{
+	return __sync_add_and_fetch(Addend, Value);
 }
 
 #endif /* LINUX || ANDROID */

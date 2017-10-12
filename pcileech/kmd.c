@@ -92,12 +92,11 @@ BOOL KMD_FindSignature1(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PSIGNATURE pSigna
 		return FALSE;
 	}
 	// loop kmd-find
-	qwAddrMax = min(ctx->cfg->qwAddrMax, ((ctx->cfg->tpDevice == PCILEECH_DEVICE_USB3380) ? 0xffffffffUL : 0x0000ffffffffffffULL));
+	qwAddrMax = min(ctx->cfg->qwAddrMax, ctx->cfg->dev.qwAddrMaxNative);
 	PageStatInitialize(&pageStat, qwAddrCurrent, qwAddrMax, "Searching for KMD location", FALSE, FALSE);
 	while(qwAddrCurrent < qwAddrMax) {
 		pageStat.qwAddr = qwAddrCurrent;
-		if(DeviceReadDMA(ctx, qwAddrCurrent, pbBuffer8M, 0x800000, 0)) {
-			pageStat.cPageSuccess += 2048;
+		if(DeviceReadDMAEx(ctx, qwAddrCurrent, pbBuffer8M, 0x800000, &pageStat)) {
 			result = KMD_FindSignature2(pbBuffer8M, 2048, qwAddrCurrent, pSignatures, cSignatures, pdwSignatureMatchIdx);
 			if(result) {
 				LocalFree(pbBuffer8M);
@@ -105,8 +104,6 @@ BOOL KMD_FindSignature1(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PSIGNATURE pSigna
 				PageStatClose(&pageStat);
 				return TRUE;
 			}
-		} else {
-			pageStat.cPageFail += 2048;
 		}
 		qwAddrCurrent += 0x800000;
 	}
@@ -210,7 +207,7 @@ BOOL KMD_MacOSKernelSeekSignature(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PSIGNATUR
 	cbTextHIB = (cbTextHIB + 0xfff) & 0xfffff000;
 	pbTextHIB = LocalAlloc(0, cbTextHIB);
 	if(!pbTextHIB) { return FALSE; }
-	if(!DeviceReadDMA(ctx, dwTextHIB, pbTextHIB, cbTextHIB, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
+	if(!DeviceReadDMAEx(ctx, dwTextHIB, pbTextHIB, cbTextHIB, NULL)) {
 		LocalFree(pbTextHIB);
 		return FALSE;
 	}
@@ -235,7 +232,7 @@ BOOL KMD_FreeBSDKernelSeekSignature(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PSIGNAT
 	PBYTE pb64M = LocalAlloc(LMEM_ZEROINIT, 0x04000000);
 	if(!pb64M) { return FALSE; }
 	for(i = 0x01000000; i < 0x04000000; i += 0x01000000) {
-		DeviceReadDMA(ctx, i, pb64M + i, 0x01000000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+		DeviceReadDMAEx(ctx, i, pb64M + i, 0x01000000, NULL);
 	}
 	// 1: search for string 'vn_open'
 	i = 0;
@@ -357,7 +354,7 @@ BOOL KMD_Linux46KernelSeekSignature(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PSIGNAT
 		// read 16M of memory first, if KASLR read 2M chunks at top of analysis buffer (performance reasons).
 		dwKernelBase = 0x01000000 + cKSlide * 0x00200000; // KASLR = 16M + ([RND:0..511] * 2M) ???
 		if(cKSlide == 0) {
-			DeviceReadDMA(ctx, dwKernelBase, pb, 0x01000000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+			DeviceReadDMAEx(ctx, dwKernelBase, pb, 0x01000000, NULL);
 		} else {
 			memmove(pb, pb + 0x00200000, CONFIG_LINUX_SEEK_BUFFER_SIZE - 0x00200000);
 			result = DeviceReadDMA(
@@ -388,16 +385,16 @@ QWORD KMD_Linux48KernelBaseSeek(_Inout_ PPCILEECH_CONTEXT ctx)
 	memset(pbCMP90, 0x90, 0x400);
 	memset(pbCMP00, 0x00, 0x100);
 	qwA = max(0x01000000, ctx->cfg->qwAddrMin) & 0xffffffffffe00000;
-	qwAddrMax = (ctx->cfg->tpDevice == PCILEECH_DEVICE_USB3380) ?
-		max(0x01000000, (ctx->cfg->qwAddrMax - 0x01000000) & 0xffe00000) :
-		max(0x01000000, (ctx->cfg->qwAddrMax - 0x01000000) & 0xffffffffffe00000);
+	qwAddrMax = max(0x01000000, (ctx->cfg->dev.qwAddrMaxNative - 0x01000000) & 0xffffffffffe00000);
 	PageStatInitialize(&ps, qwA, qwAddrMax, "Scanning for Linux kernel base", FALSE, FALSE);
 	// Linux kernel uses 2MB pages. Base of kernel is assumed to have AuthenticAMD and GenuineIntel strings
 	// in first page. First page should also end with at least 0x400 0x90's. 2nd page (hypercall page?) is
 	// assumed to end with 0x100 0x00's.
 	for(; qwA <= qwAddrMax; qwA += 0x00200000) {
 		ps.qwAddr = qwA;
-		if(!DeviceReadDMA(ctx, qwA, pb, ctx->cfg->fPartialPageReadSupported ? 0x400 : 0x1000, 0)) { // only read partial page to speed up SP605 if connected via UART
+		// only read partial page to speed up SP605 if connected via UART
+		// TODO: investigate if this is slower/faster than reading whole pages on FPGA solution.
+		if(!DeviceReadDMA(ctx, qwA, pb, ctx->cfg->fPartialPageReadSupported ? 0x400 : 0x1000, 0)) {
 			ps.cPageFail += 512;
 			continue;
 		}
@@ -576,8 +573,7 @@ BOOL KMDOpen_UEFI_FindEfiBase(_Inout_ PPCILEECH_CONTEXT ctx)
 	PageStatInitialize(&ps, dwAddrCurrent, dwAddrMax, "Searching for EFI BASE", FALSE, FALSE);
 	// loop EFI BASE (IBI SYST) find
 	while(dwAddrCurrent <= dwAddrMax - 0x100000) {
-		if(DeviceReadDMA(ctx, dwAddrCurrent, pb, 0x100000, 0)) {
-			PageStatUpdate(&ps, dwAddrCurrent + 0x100000, 0x100, 0);
+		if(DeviceReadDMAEx(ctx, dwAddrCurrent, pb, 0x100000, &ps)) {
 			for(o = 0; o < 0x100000 - 0x100; o += 8) {
 				if(0x5453595320494249 != *(PQWORD)(pb + o)) { continue; } // IBI SYST
 				qwAddr_BOOTSERV = *(PQWORD)(pb + o + 0x60);
@@ -648,8 +644,8 @@ BOOL KMDOpen_UEFI(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BYTE bOffsetHookBootServic
 	// 3: Patch
 	//------------------------------------------------
 	if(ctx->cfg->fVerbose) {
-		printf("INFO: IBI SYST:   0x%08x\n", ctx->cfg->qwEFI_IBI_SYST);
-		printf("INFO: BOOTSERV:   0x%08x\n", qwAddrEFI_BOOTSERV);
+		printf("INFO: IBI SYST:   0x%08x\n", (DWORD)ctx->cfg->qwEFI_IBI_SYST);
+		printf("INFO: BOOTSERV:   0x%08x\n", (DWORD)qwAddrEFI_BOOTSERV);
 	}
 	result = DeviceWriteDMA(ctx, qwAddrKMDDATA, pb, 0x2000, PCILEECH_MEM_FLAG_RETRYONFAIL);
 	if(!result) {
@@ -848,7 +844,7 @@ BOOL KMD_GetPhysicalMemoryMap(_Inout_ PPCILEECH_CONTEXT ctx)
 	}
 	ctx->phKMD->pPhysicalMap = LocalAlloc(LMEM_ZEROINIT, (ctx->pk->_size + 0x1000) & 0xfffff000);
 	if(!ctx->phKMD->pPhysicalMap) { return FALSE; }
-	DeviceReadDMA(ctx, ctx->pk->DMAAddrPhysical, (PBYTE)ctx->phKMD->pPhysicalMap, (DWORD)((ctx->pk->_size + 0x1000) & 0xfffff000), 0);
+	DeviceReadDMAEx(ctx, ctx->pk->DMAAddrPhysical, (PBYTE)ctx->phKMD->pPhysicalMap, (DWORD)((ctx->pk->_size + 0x1000) & 0xfffff000), NULL);
 	ctx->phKMD->cPhysicalMap = ctx->pk->_size / sizeof(PHYSICAL_MEMORY_RANGE);
 	if(ctx->phKMD->cPhysicalMap > 0x2000) { return FALSE; }
 	// adjust max memory according to physical memory
@@ -904,7 +900,7 @@ BOOL KMDReadMemory_DMABufferSized(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAd
 	if(!result) { return FALSE; }
 	result = KMD_SubmitCommand(ctx, KMD_CMD_READ);
 	if(!result) { return FALSE; }
-	return DeviceReadDMA(ctx, ctx->pk->DMAAddrPhysical, pb, cb, 0) && ctx->pk->_result;
+	return (cb == DeviceReadDMAEx(ctx, ctx->pk->DMAAddrPhysical, pb, cb, NULL)) && ctx->pk->_result;
 }
 
 BOOL KMDWriteMemory_DMABufferSized(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddress, _In_ PBYTE pb, _In_ DWORD cb)

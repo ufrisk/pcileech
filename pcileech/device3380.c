@@ -296,7 +296,7 @@ BOOL Device3380_FlashEEPROM(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PBYTE pbEEPROM, 
 VOID Action_Device3380_Flash(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	BOOL result;
-	if(ctx->cfg->tpDevice != PCILEECH_DEVICE_USB3380) {
+	if(ctx->cfg->dev.tp != PCILEECH_DEVICE_USB3380) {
 		printf("Flash failed: unsupported device.\n");
 		return;
 	}
@@ -320,7 +320,7 @@ VOID Action_Device3380_Flash(_Inout_ PPCILEECH_CONTEXT ctx)
 VOID Action_Device3380_8051Start(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	BOOL result;
-	if(ctx->cfg->tpDevice != PCILEECH_DEVICE_USB3380) {
+	if(ctx->cfg->dev.tp != PCILEECH_DEVICE_USB3380) {
 		printf("8051 startup failed: unsupported device.\n");
 		return;
 	}
@@ -339,7 +339,7 @@ VOID Action_Device3380_8051Start(_Inout_ PPCILEECH_CONTEXT ctx)
 
 VOID Action_Device3380_8051Stop(_Inout_ PPCILEECH_CONTEXT ctx)
 {
-	if(ctx->cfg->tpDevice != PCILEECH_DEVICE_USB3380) {
+	if(ctx->cfg->dev.tp != PCILEECH_DEVICE_USB3380) {
 		printf("Stopping 8051 failed: unsupported device.\n");
 		return;
 	}
@@ -376,32 +376,6 @@ BOOL DevicePciInReadDma(_In_ PDEVICE_DATA pDeviceData, _In_ QWORD qwAddr, _Out_ 
 
 BOOL Device3380_Open2(_Inout_ PPCILEECH_CONTEXT ctx);
 
-BOOL Device3380_Open(_Inout_ PPCILEECH_CONTEXT ctx)
-{
-	BOOL result;
-	DWORD dwReg;
-	result = Device3380_Open2(ctx);
-	if(!result) { return FALSE; }
-	Device3380_ReadCsr((PDEVICE_DATA)ctx->hDevice, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
-	if(ctx->cfg->fForceUsb2 && (dwReg & 0x0100 /* Super-Speed(USB3) */)) {
-		printf("Device Info: Device running at USB3 speed; downgrading to USB2 ...\n");
-		dwReg = 0x04; // USB2=ENABLE, USB3=DISABLE
-		Device3380_WriteCsr((PDEVICE_DATA)ctx->hDevice, REG_USBCTL2, dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTE0);
-		Device3380_Close(ctx);
-		Sleep(1000);
-		result = Device3380_Open2(ctx);
-		if(!result) { return FALSE; }
-		Device3380_ReadCsr((PDEVICE_DATA)ctx->hDevice, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
-	}
-	if(dwReg & 0xc0 /* Full-Speed(USB1)|High-Speed(USB2) */) {
-		printf("Device Info: Device running at USB2 speed.\n");
-	} else if(ctx->cfg->fVerbose) {
-		printf("Device Info: Device running at USB3 speed.\n");
-	}
-	if(ctx->cfg->fVerbose) { printf("Device Info: USB3380.\n"); }
-	return TRUE;
-}
-
 VOID Device3380_Close(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	PDEVICE_DATA pDeviceData = (PDEVICE_DATA)ctx->hDevice;
@@ -412,6 +386,40 @@ VOID Device3380_Close(_Inout_ PPCILEECH_CONTEXT ctx)
 	pDeviceData->HandlesOpen = FALSE;
 	LocalFree(ctx->hDevice);
 	ctx->hDevice = 0;
+}
+
+BOOL Device3380_Open(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	BOOL result;
+	DWORD dwReg;
+	result = Device3380_Open2(ctx);
+	if(!result) { return FALSE; }
+	Device3380_ReadCsr((PDEVICE_DATA)ctx->hDevice, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
+	if(ctx->cfg->fForceUsb2 && (dwReg & 0x0100 /* Super-Speed(USB3) */)) {
+		printf("Device Info: USB3380 running at USB3 speed; downgrading to USB2 ...\n");
+		dwReg = 0x04; // USB2=ENABLE, USB3=DISABLE
+		Device3380_WriteCsr((PDEVICE_DATA)ctx->hDevice, REG_USBCTL2, dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTE0);
+		Device3380_Close(ctx);
+		Sleep(1000);
+		result = Device3380_Open2(ctx);
+		if(!result) { return FALSE; }
+		Device3380_ReadCsr((PDEVICE_DATA)ctx->hDevice, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
+	}
+	if(dwReg & 0xc0 /* Full-Speed(USB1)|High-Speed(USB2) */) {
+		printf("Device Info: USB330 running at USB2 speed.\n");
+	} else if(ctx->cfg->fVerbose) {
+		printf("Device Info: USB330 running at USB3 speed.\n");
+	}
+	if(ctx->cfg->fVerbose) { printf("Device Info: USB3380.\n"); }
+	// set callback functions and fix up config
+	ctx->cfg->dev.tp = PCILEECH_DEVICE_USB3380;
+	ctx->cfg->dev.qwMaxSizeDmaIo = 0x01000000;
+	ctx->cfg->dev.qwAddrMaxNative = 0x00000000ffffffff;
+	ctx->cfg->dev.fPartialPageReadSupported = TRUE;
+	ctx->cfg->dev.pfnClose = Device3380_Close;
+	ctx->cfg->dev.pfnReadDMA = Device3380_ReadDMA;
+	ctx->cfg->dev.pfnWriteDMA = Device3380_WriteDMA;
+	return TRUE;
 }
 
 #ifdef WIN32

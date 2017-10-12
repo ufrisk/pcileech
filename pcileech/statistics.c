@@ -28,7 +28,7 @@ VOID _PageStatPrintMemMap(_Inout_ PPAGE_STATISTICS ps)
 		if(!ps->i.MemMap[i] || (i == PAGE_STATISTICS_MEM_MAP_MAX_ENTRY - 1)) {
 			break;
 		}
-		qwAddrEnd = qwAddrBase + ps->i.MemMap[i] * 0x1000;
+		qwAddrEnd = qwAddrBase + 0x1000 * (QWORD)ps->i.MemMap[i];
 		if((i % 2) == 0) {
 			fIsLinePrinted = TRUE;
 			printf(

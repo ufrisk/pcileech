@@ -23,6 +23,8 @@ typedef unsigned __int64					QWORD, *PQWORD;
 
 #pragma warning( disable : 4477)
 
+VOID usleep(_In_ DWORD us);
+
 #endif /* WIN32 */
 #ifdef LINUX
 
@@ -114,6 +116,7 @@ typedef uint64_t							SIZE_T, *PSIZE_T;
 #define ZeroMemory(pb, cb)					(memset(pb, 0, cb))
 #define WinUsb_SetPipePolicy(h, p, t, cb, pb)	// TODO: implement this for better USB2 performance.
 #define CloseHandle(h)							// TODO: remove this dummy implementation & replace with WARN.
+#define SetEvent(h)								// TODO: remove this dummy implementation!
 
 typedef struct _SYSTEMTIME {
 	WORD wYear;
@@ -137,6 +140,7 @@ HANDLE LocalAlloc(DWORD uFlags, SIZE_T uBytes);
 VOID LocalFree(HANDLE hMem);
 QWORD GetTickCount64();
 VOID GetLocalTime(LPSYSTEMTIME lpSystemTime);
+DWORD InterlockedAdd(DWORD *Addend, DWORD Value);
 BOOL WinUsb_Free(WINUSB_INTERFACE_HANDLE InterfaceHandle);
 
 HANDLE CreateThread(

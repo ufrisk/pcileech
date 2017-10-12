@@ -32,8 +32,9 @@ VOID Help_ShowGeneral()
 		" erted KMD. The already inserted KMD will be left intact upon exit.  If the KMD\n" \
 		" contains a kernel mode signature the kernel module will be loaded and then un-\n" \
 		" loaded on program exit ( except for the kmdload command ).                    \n" \
-		" KMD mode may access all memory.   DMA mode may only access memory below 4GB if\n" \
-		" USB3380 hardware is used.   Commands marked 'W' are only available on Windows.\n" \
+		" KMD mode may access all memory (available to the kernel of the target system).\n" \
+		" DMA mode may only access lower 4GB of memory if USB3380 hardware is used.     \n" \
+		" DMA mode may access all memory if FPGA based hardware such as SP605 is used.  \n" \
 		" For detailed help about a specific command type:  pcileech.exe <command> -help\n" \
 		" General syntax: pcileech.exe <command> [-<optionname1> <optionvalue1>] ...    \n" \
 		" Valid commands and valid MODEs     [ and options ]                            \n" \
@@ -45,17 +46,17 @@ VOID Help_ShowGeneral()
 		"   [implant]                  KMD   [ in, out, s, 0..9 ]                       \n" \
 		"   kmdload                DMA       [ pt, cr3 ]                                \n" \
 		"   kmdexit                    KMD                                              \n" \
-		"   mount                W     KMD   [ s ]                                      \n" \
+		"   mount                      KMD   [ s ]          (Windows only feature)      \n" \
 		"   pagedisplay            DMA,KMD   [ min ]                                    \n" \
 		"   pt_phys2virt           DMA,KMD   [ cr3, 0 ]                                 \n" \
 		"   testmemread            DMA       [ min ]                                    \n" \
 		"   testmemreadwrite       DMA       [ min ]                                    \n" \
 		" Device specific commands and valid MODEs [ and options ] (and device):        \n" \
-		"   usb3380_flash          DMA,KMD   [ in ] (USB3380)                           \n" \
-		"   usb3380_8051start      DMA,KMD   [ in ] (USB3380)                           \n" \
-		"   usb3380_8051stop       DMA,KMD          (USB3380)                           \n" \
-		"   tlp                  W DMA       [ in ] (SP605)                             \n" \
-		"   probe                W DMA       [ in ] (SP605)                             \n" \
+		"   usb3380_flash          DMA,KMD   [ in ]         (USB3380)                   \n" \
+		"   usb3380_8051start      DMA,KMD   [ in ]         (USB3380)                   \n" \
+		"   usb3380_8051stop       DMA,KMD                  (USB3380)                   \n" \
+		"   tlp                    DMA       [ in ]         (FPGA)                      \n" \
+		"   probe                  DMA       [ in ]         (FPGA)                      \n" \
 		" System specific commands and valid MODEs [ and options ]:                     \n" \
 		"   mac_fvrecover          DMA                                                  \n" \
 		"   mac_fvrecover2         DMA                                                  \n" \
@@ -72,6 +73,7 @@ VOID Help_ShowGeneral()
 		"   -all : search all memory for signature - do not stop at first occurrence.   \n" \
 		"          Option has no value. Example: -all                                   \n" \
 		"   -vv  : extra verbose option. Same as -v but even more detailed output.      \n" \
+		"          Option shows raw PCIe TLPs received/sent if FPGA is used.            \n" \
 		"   -v   : verbose option. Additional information is displayed in the output.   \n" \
 		"          The memory map is shown when searching/dumping memory as an example. \n" \
 		"          Affects all modes and commands.                                      \n" \
@@ -85,11 +87,11 @@ VOID Help_ShowGeneral()
 		"          Option has no value. Example: -usb2                                  \n" \
 		"   -iosize: max DMA i/o size. Hardware DMA requests larger than iosize will    \n" \
 		"          be discarded. Affects all modes and commands.                        \n" \
-		"   -wait: wait in seconds before exit. Useful when viewing received PCIe TLPs. \n" \
+		"   -tlpwait: Wait in seconds while listening for PCIe TLPs.                    \n" \
+		"          Wait occurs after any other actions have been completed.             \n" \
+		"   -device: force the use of a specific hardware device instead of auto-detect.\n" \
 		"          Affects all modes and commands.                                      \n" \
-		"   -device: specify a hardware device other than the USB3380 to use.           \n" \
-		"          Affects all modes and commands.                                      \n" \
-		"          Valid options: USB3380, SP605                                        \n" \
+		"          Valid options: USB3380, SP605_UART, SP605_FT601                      \n" \
 		"   -help: show help about the selected command or implant and then exit        \n" \
 		"          without running the command. Affects all modes and commands.         \n" \
 		"          Option has no value. Example: -help                                  \n" \
@@ -136,7 +138,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016, 2017 Ulf Frisk                                             \n" \
-		" Version: 2.2                                                                  \n" \
+		" Version: 2.3                                                                  \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \
@@ -145,9 +147,11 @@ VOID Help_ShowInfo()
 		"   Slotscreamer      - https://github.com/NSAPlayset/SLOTSCREAMER              \n" \
 		"   Inception         - https://github.com/carmaa/inception                     \n" \
 		"   Google USB driver - https://developer.android.com/sdk/win-usb.html#download \n" \
+		"   FTDI FT601:       - http://www.ftdichip.com/Drivers/D3XX.htm                \n" \
 		"   Dokany            - https://github.com/dokan-dev/dokany/releases/latest     \n" \
 		" ----------------                                                              \n" \
 		" Use with USB3380 hardware programmed as a PCILeech device.                    \n" \
+		" Use with SP605/FT601 harware programmed as a PCILeech FPGA device.            \n" \
 		" Use with SP605 hardware / 'PCI Express DIY hacking toolkit' by cr4sh/@d_olex. \n\n" \
 		" ----------------                                                              \n" \
 		" Driver information (USB3380/Windows):                                         \n" \
@@ -155,6 +159,12 @@ VOID Help_ShowInfo()
 		"   device masks as a Google Glass. Please download and install the Google USB  \n" \
 		"   driver before proceeding by using the USB3380 device. USB3 is recommended   \n" \
 		"   to performance reasons (USB2 will work but impact performance).             \n" \
+		" Driver information (SP605/FT601/Windows):                                     \n" \
+		"   The PCILeech programmed SP605 FPGA development board with the FT601 USB3    \n" \
+		"   addon board requires drivers for Windows. The drivers are on Windows update \n" \
+		"   and is installed automatically at first use. PCILeech also requires the FTDI\n" \
+		"   application library (DLL). Download this library from the FTDI web site and \n" \
+		"   place the 64-bit FTD3XX.dll alongside pcileech.exe.                         \n" \
 		" Driver information (Dokany/Windows):                                          \n" \
 		"   To be able to use the 'mount' functionality for filesystem browsing and live\n" \
 		"   memory file access PCILeech requires Dokany to be installed for virtual file\n" \

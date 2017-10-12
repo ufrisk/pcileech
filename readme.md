@@ -2,7 +2,7 @@ PCILeech Summary:
 =================
 PCILeech uses PCIe hardware devices to read and write from the target system memory. This is achieved by using DMA over PCIe. No drivers are needed on the target system. 
 
-PCILeech supports multiple hardware. Currently only the USB3380 hardware is publically available. The USB3380 is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel.
+PCILeech supports multiple hardware. USB3380 based hardware is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel. FPGA based hardware is able to read all memory.
 
 PCILeech is capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. PCIleech runs on Windows/Linux/Android. Supported target systems are currently the x64 versions of: UEFI, Linux, FreeBSD, macOS and Windows.
 
@@ -10,10 +10,12 @@ PCILeech is capable of inserting a wide range of kernel implants into the target
 
 Capabilities:
 =============
-* Retrieve memory from the target system at >150MB/s. 
+* Retrieve memory from the target system at >150MB/s.
 * Write data to the target system memory. 
-* 4GB memory can be accessed in native DMA mode.
+* 4GB memory can be accessed in native DMA mode (USB3380 hardware).
+* ALL memory can be accessed in native DMA mode (FPGA hardware).
 * ALL memory can be accessed if kernel module (KMD) is loaded.
+* Raw PCIe TLP access (FPGA hardware).
 * Mount live RAM as file [Linux, Windows, macOS].
 * Mount file system as drive [Linux, Windows, macOS].
 * Execute kernel code on the target system.
@@ -33,7 +35,9 @@ Please ensure you do have the most recent version of PCILeech by visiting the PC
 Clone the PCILeech Github repository. The binaries are found in pcileech_files and should work on 64-bit Windows and Linux. Please copy all files from pcileech_files since some files contains additional modules and signatures.
 
 #### Windows:
-The Google Android USB driver also have to be installed. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver. Open Device Manager. Right click on the computer, choose add legacy hardware. Select install the hardware manually. Click Have Disk. Navigate to the Android Driver, select android_winusb.inf and install.
+The Google Android USB driver also have to be installed if USB3380 hardware is used. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver. Open Device Manager. Right click on the computer, choose add legacy hardware. Select install the hardware manually. Click Have Disk. Navigate to the Android Driver, select android_winusb.inf and install.
+
+FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card. FTDI drivers will installed automatically on Windows from Windows Update at first connection. PCILeech also requires 64-bit [`FTD3XX.dll`](http://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.2.0.6.zip) which must be downloaded from FTDI and placed alongside `pcileech.exe`.
 
 To mount live ram and target file system as drive in Windows the Dokany file system library must be installed. Please download and install the latest version of Dokany at: https://github.com/dokan-dev/dokany/releases/latest
 
@@ -43,7 +47,11 @@ PCILeech on Linux must be run as root. PCILeech also requires libusb. Libusb is 
 #### Android:
 Separate instructions for [Android](Android.md).
 
-Hardware:
+Hardware (FPGA):
+=================
+Please check out the [PCILeech FPGA project](https://github.com/ufrisk/pcileech-fpga/) for information about supported FPGA based hardware.
+
+Hardware (USB3380):
 =================
 PCILeech use the PLX Technologies USB3380 chip. The actual chip can be purchased for around $15, but it's more convenient to purchase a development board on which the chip is already mounted. Development boards can be purchased from BPlus Technology, or on eBay / Ali Express. Please note that adapters may be required too depending on your requirements. In addition to the USB3380 PCILeech also supports not yet released FPGA based hardware.
 
@@ -67,7 +75,7 @@ Recommended adapters:
 
 Please note that other adapters may also work.
 
-Flashing Hardware:
+Flashing Hardware (USB3380):
 ==================
 In order to turn the USB3380 development board into a PCILeech device it must be flashed. Flashing may be done in Windows 10 (as administrator) or in Linux (as root). The board must be connected to the system via PCIe when performing the initial flash.
 
@@ -118,7 +126,7 @@ Dump all memory from the target system given that a kernel module is loaded at a
 Force dump memory below 4GB including accessible memory mapped devices using more stable USB2 approach.
 * ` pcileech.exe dump -force -usb2 `
 
-Exploit a vulnerable mac to retrieve the FileVault2 password.
+Exploit a vulnerable mac to retrieve the FileVault2 password. (USB3380 only).
 * ` pcileech.exe mac_fvrecover `
 
 Receive PCIe TLPs (Transaction Layer Packets) and print them on screen (correctly configured FPGA dev board required).
@@ -129,6 +137,15 @@ Load a "kernel" module by searching for and hooking UEFI BootServices.SignalEven
 
 Load a "kernel" module by hooking and BootServices.ExitBootServices(). Base memory location of UEFI specified manually (IBI SYST table).
 * ` pcileech.exe kmdload -kmd UEFI_EXIT_BOOT_SERVICES -efibase 0x7b399018 ` 
+
+Probe/Enumerate the memory of the target system for readable memory pages and maximum memory. (FPGA hardware only).
+* ` pcileech.exe probe ` 
+
+Dump all memory between addresses min and max, don't stop on failed pages. Native access to 64-bit memory is only supported on FPGA hardware.
+* ` pcileech.exe dump -min 0x0 -max 0x21e5fffff -force `
+
+Force the usage of a specific device (instead of default auto detecting it).
+* ` pcileech.exe pagedisplay -min 0x1000 -device usb3380 `
 
 Generating Signatures:
 ======================
@@ -143,6 +160,7 @@ Limitations/Known Issues:
 * Windows Vista: some shellcode modules such as wx64_pscmd does not work.
 * Windows 7: signatures are not published.
 * The Linux/Android versions of PCILeech dumps memory slightly slower than the Windows version. Mount target file system and live RAM are also not availabe in the Linux/Android versions.
+* FPGA support currently only exists if PCILeech is run on Windows. Linux and Android support is planned for the future.
 
 Building:
 =========
@@ -179,3 +197,7 @@ v2.2
 * UEFI support.
 * Linux 2.6.33-4.6 target support.
 * signature: Windows 10 updates to pcileech_gensig.exe
+
+v2.3
+* [FPGA hardware support (SP605/FT601)](https://github.com/ufrisk/pcileech-fpga).
+* Various changes.

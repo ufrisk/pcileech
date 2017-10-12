@@ -317,6 +317,17 @@ BOOL Util_HexAsciiToBinary(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out_ P
 	return TRUE;
 }
 
+DWORD Util_GetFileSize(_In_ LPSTR sz)
+{
+	FILE *pFile;
+	DWORD size;
+	if(fopen_s(&pFile, sz, "rb") || !pFile) { return 0; }
+	fseek(pFile, 0, SEEK_END); // seek to end of file
+	size = ftell(pFile); // get current file pointer
+	fclose(pFile);
+	return size;
+}
+
 BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcb)
 {
 	SIZE_T i;
@@ -401,7 +412,7 @@ BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension,
 	fclose(pFile);
 	if(!cbFile || cbFile == 0x10000) { return FALSE; }
 	// parse file
-	szLine = strtok_s(pbFile, "\r\n", &szContext);
+	szLine = strtok_s((char*)pbFile, "\r\n", &szContext);
 	while(szLine && cSignatureIdx < *cSignatures) {
 		if(Util_ParseSignatureLine(szLine, cSignatureChunks, pSignatures[cSignatureIdx].chunk)) {
 			cSignatureIdx++;
@@ -599,6 +610,9 @@ BOOL Util_Read16M(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PBYTE pbBuffer16M, _In_ Q
 {
 	BOOL isSuccess[4] = { FALSE, FALSE, FALSE, FALSE };
 	QWORD i, o, qwOffset;
+	if(!ctx->phKMD) { // Native DMA
+		return 0 != DeviceReadDMAEx(ctx, qwBaseAddress, pbBuffer16M, 0x01000000, pPageStat);
+	}
 	// try read 16M
 	if((qwBaseAddress + 0x01000000 <= ctx->cfg->qwAddrMax) && DeviceReadMEM(ctx, qwBaseAddress, pbBuffer16M, 0x01000000, 0)) {
 		PageStatUpdate(pPageStat, qwBaseAddress + 0x010000000, 4096, 0);
@@ -610,16 +624,11 @@ BOOL Util_Read16M(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PBYTE pbBuffer16M, _In_ Q
 		o = 0x00400000 * i;
 		isSuccess[i] = (qwBaseAddress + o + 0x00400000 <= ctx->cfg->qwAddrMax) && DeviceReadMEM(ctx, qwBaseAddress + o, pbBuffer16M + o, 0x00400000, 0);
 	}
-	// DMA mode + all memory inside scope + and all 4M reads fail + no force flag + iosize >= 1MB => fail
-	if(!ctx->cfg->fForceRW && !ctx->phKMD && (ctx->cfg->qwMaxSizeDmaIo >= 0x01000000) && qwBaseAddress + 0x01000000 <= ctx->cfg->qwAddrMax && !isSuccess[0] && !isSuccess[1] && !isSuccess[2] && !isSuccess[3]) {
-		PageStatUpdate(pPageStat, qwBaseAddress + 0x010000000, 0, 4096);
-		return FALSE;
-	}
-	// try read failed 4M chunks in 1M chunks
+	// try read failed chunks.
 	for(i = 0; i < 4; i++) {
 		if(isSuccess[i]) {
 			PageStatUpdate(pPageStat, qwBaseAddress + (i + 1) * 0x00400000, 1024, 0);
-		} else {
+		} else { 
 			qwOffset = 0x00400000 * i;
 			for(o = 0; o < 0x00400000; o += 0x00100000) {
 				Util_Read1M(ctx, pbBuffer16M + qwOffset + o, qwBaseAddress + qwOffset + o, pPageStat);

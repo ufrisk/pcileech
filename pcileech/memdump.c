@@ -127,7 +127,7 @@ cleanup:
 	}
 }
 
-#define MEMORY_PROBE_PAGES_PER_SWEEP	0x400
+#define MEMORY_PROBE_PAGES_PER_SWEEP	0x1000
 
 VOID ActionMemoryProbe(_Inout_ PPCILEECH_CONTEXT ctx)
 {
@@ -214,7 +214,7 @@ VOID ActionMemoryWrite(_Inout_ PPCILEECH_CONTEXT ctx)
 		printf("Memory Write: Failed. No data to write.\n");
 		return;
 	}
-	if(ctx->cfg->cbIn >= 0x01000000) {
+	if(ctx->cfg->cbIn > 0x01000000) {
 		printf("Memory Write: Failed. Data too large: >16MB.\n");
 		return;
 	}

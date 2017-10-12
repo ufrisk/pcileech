@@ -7,7 +7,7 @@
 #define __STATISTICS_H__
 #include "pcileech.h"
 
-#define PAGE_STATISTICS_MEM_MAP_MAX_ENTRY	512
+#define PAGE_STATISTICS_MEM_MAP_MAX_ENTRY	1024
 
 typedef struct tdPageStatistics {
 	QWORD qwAddr;

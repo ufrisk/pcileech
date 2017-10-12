@@ -6,6 +6,7 @@
 #ifndef __DEVICE_H__
 #define __DEVICE_H__
 #include "pcileech.h"
+#include "statistics.h"
 
 #define PCILEECH_MEM_FLAG_RETRYONFAIL			0x01
 #define PCILEECH_MEM_FLAG_VERIFYWRITE			0x02
@@ -33,6 +34,20 @@ VOID DeviceClose(_Inout_ PPCILEECH_CONTEXT ctx);
 * -- return
 */
 BOOL DeviceReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags);
+
+/*
+* Try read memory with DMA in a fairly optimal way considering device limits.
+* The number of total successfully read bytes is returned. Failed reads will
+* be zeroed out the he returned memory.
+* -- ctx
+* -- qwAddr
+* -- pb
+* -- cb
+* -- pPageStat = optional page statistics
+* -- return = the number of bytes successfully read.
+*
+*/
+DWORD DeviceReadDMAEx(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _Inout_opt_ PPAGE_STATISTICS pPageStat);
 
 /*
 * Write data to the target system using DMA.
@@ -81,5 +96,23 @@ BOOL DeviceWriteMEM(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE
 * -- return
 */
 BOOL DeviceReadMEM(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags);
+
+/*
+* Write PCIe Transaction Layer Packets (TLPs) to the device.
+* -- ctx
+* -- pb = PCIe TLP/TLPs to send.
+* -- cb =
+* -- return
+*/
+BOOL DeviceWriteTlp(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PBYTE pb, _In_ DWORD cb);
+
+/*
+* Listen for incoming PCIe Transaction Layer Packets (TLPs) for a specific
+* amount of time.
+* -- ctx
+* -- dwTime = time in ms
+* -- return
+*/
+BOOL DeviceListenTlp(_Inout_ PPCILEECH_CONTEXT ctx, _In_ DWORD dwTime);
 
 #endif /* __DEVICE_H__ */
