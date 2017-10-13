@@ -16,17 +16,19 @@ Capabilities:
 * ALL memory can be accessed in native DMA mode (FPGA hardware).
 * ALL memory can be accessed if kernel module (KMD) is loaded.
 * Raw PCIe TLP access (FPGA hardware).
-* Mount live RAM as file [Linux, Windows, macOS].
-* Mount file system as drive [Linux, Windows, macOS].
+* Mount live RAM as file [Linux, Windows, macOS*].
+* Mount file system as drive [Linux, Windows, macOS*].
 * Execute kernel code on the target system.
 * Spawn system shell [Windows].
 * Spawn any executable [Windows].
 * Load unsigned drivers [Windows].
-* Pull files [Linux, FreeBSD, Windows, macOS].
-* Push files [Linux, Windows, macOS].
-* Patch / Unlock (remove password requirement) [Windows, macOS].
+* Pull files [Linux, FreeBSD, Windows, macOS*].
+* Push files [Linux, Windows, macOS*].
+* Patch / Unlock (remove password requirement) [Windows, macOS*].
 * Easy to create own kernel shellcode and/or custom signatures.
 * Even more features not listed here ...
+
+\*) macOS High Sierra is not supported.
 
 Installing PCILeech:
 ====================
