@@ -75,27 +75,46 @@ VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
 	if(ps->i.fMemMap) {
 		_PageStatPrintMemMap(ps);
 	}
-	printf(
-		" Current Action: %s                             \n" \
-		" Access Mode:    %s                             \n" \
-		" Progress:       %llu / %llu (%llu%%)           \n" \
-		" Speed:          %llu %s                        \n" \
-		" Address:        0x%016llX                      \n" \
-		" Pages read:     %llu / %llu (%llu%%)           \n" \
-		" Pages failed:   %llu (%llu%%)                  \n",
-		ps->szAction,
-		ps->fKMD ? "KMD (kernel module assisted DMA)" : "DMA (hardware only)             ",
-		(ps->cPageSuccess + ps->cPageFail) / 256,
-		ps->cPageTotal / 256,
-		qwPercentTotal,
-		(isMBs ? qwSpeed >> 10 : qwSpeed),
-		(isMBs ? "MB/s" : "kB/s"),
-		ps->qwAddr,
-		ps->cPageSuccess,
-		ps->cPageTotal,
-		qwPercentSuccess,
-		ps->cPageFail,
-		qwPercentFail);
+	if(ps->cPageTotal < 0x0000000fffffffff) {
+		printf(
+			" Current Action: %s                             \n" \
+			" Access Mode:    %s                             \n" \
+			" Progress:       %llu / %llu (%llu%%)           \n" \
+			" Speed:          %llu %s                        \n" \
+			" Address:        0x%016llX                      \n" \
+			" Pages read:     %llu / %llu (%llu%%)           \n" \
+			" Pages failed:   %llu (%llu%%)                  \n",
+			ps->szAction,
+			ps->fKMD ? "KMD (kernel module assisted DMA)" : "DMA (hardware only)             ",
+			(ps->cPageSuccess + ps->cPageFail) / 256,
+			ps->cPageTotal / 256,
+			qwPercentTotal,
+			(isMBs ? qwSpeed >> 10 : qwSpeed),
+			(isMBs ? "MB/s" : "kB/s"),
+			ps->qwAddr,
+			ps->cPageSuccess,
+			ps->cPageTotal,
+			qwPercentSuccess,
+			ps->cPageFail,
+			qwPercentFail);
+	} else {
+		printf(
+			" Current Action: %s                             \n" \
+			" Access Mode:    %s                             \n" \
+			" Progress:       %llu / (unknown)               \n" \
+			" Speed:          %llu %s                        \n" \
+			" Address:        0x%016llX                      \n" \
+			" Pages read:     %llu                           \n" \
+			" Pages failed:   %llu                           \n",
+			ps->szAction,
+			ps->fKMD ? "KMD (kernel module assisted DMA)" : "DMA (hardware only)             ",
+			(ps->cPageSuccess + ps->cPageFail) / 256,
+			(isMBs ? qwSpeed >> 10 : qwSpeed),
+			(isMBs ? "MB/s" : "kB/s"),
+			ps->qwAddr,
+			ps->cPageSuccess,
+			ps->cPageFail);
+	}
 	ps->i.fIsFirstPrintCompleted = TRUE;
 }
 

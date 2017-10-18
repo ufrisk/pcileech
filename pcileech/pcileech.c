@@ -122,7 +122,13 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
 				ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_UART;
 			} else if(0 == _stricmp(argv[i + 1], "sp605_ft601")) {
 				ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_FT601;
+			} else if(0 == _stricmp(argv[i + 1], "sp605_tcp")) {
+				ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_TCP;
 			}
+		} else if(0 == strcmp(argv[i], "-device-addr")) {
+			ctx->cfg->TcpAddr = inet_addr(argv[i + 1]);
+		} else if(0 == strcmp(argv[i], "-device-port")) {
+			ctx->cfg->TcpPort = atoi(argv[i + 1]);
 		} else if(0 == strcmp(argv[i], "-out")) {
 			if((0 == _stricmp(argv[i + 1], "none")) || (0 == _stricmp(argv[i + 1], "null"))) {
 				ctx->cfg->fOutFile = FALSE;
@@ -236,7 +242,7 @@ int main(_In_ int argc, _In_ char* argv[])
 	}
 	result = DeviceOpen(ctx);
 	if(!result) {
-		printf("PCILEECH: Failed to connect to USB device.\n");
+		printf("PCILEECH: Failed to connect to the device.\n");
 		PCILeechFreeContext(ctx);
 		return 1;
 	}

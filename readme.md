@@ -49,9 +49,16 @@ PCILeech on Linux must be run as root. PCILeech also requires libusb. Libusb is 
 #### Android:
 Separate instructions for [Android](Android.md).
 
-Hardware (FPGA):
+Hardware:
 =================
-Please check out the [PCILeech FPGA project](https://github.com/ufrisk/pcileech-fpga/) for information about supported FPGA based hardware.
+PCILeech supports multiple hardware devices. Please check out the [PCILeech FPGA project](https://github.com/ufrisk/pcileech-fpga/) for information about supported FPGA based hardware. Please find a device comparision table below. More information about USB3380 devices are also found below.
+
+| Device      | Type    | Interface | Speed   | 64-bit memory access | PCIe TLP access |
+| ----------- | ------- | --------- | ------- | -------------------- | --------------- |
+| USB3380-EVB | USB3380 | USB3      | 150MB/s | No (via KMD only)    | No              |
+| PP3380      | USB3380 | USB3      | 150MB/s | No (via KMD only)    | No              |
+| SP605/FT601 | FPGA    | USB3      |  85MB/s | Yes                  | Yes             |
+| SP605/TCP   | FPGA    | TCP/IP    | 100kB/s | Yes                  | Yes             |
 
 Hardware (USB3380):
 =================
@@ -146,8 +153,8 @@ Probe/Enumerate the memory of the target system for readable memory pages and ma
 Dump all memory between addresses min and max, don't stop on failed pages. Native access to 64-bit memory is only supported on FPGA hardware.
 * ` pcileech.exe dump -min 0x0 -max 0x21e5fffff -force `
 
-Force the usage of a specific device (instead of default auto detecting it).
-* ` pcileech.exe pagedisplay -min 0x1000 -device usb3380 `
+Force the usage of a specific device (instead of default auto detecting it). The sp605_tcp device is not auto detected.
+* ` pcileech.exe pagedisplay -min 0x1000 -device sp605_tcp -device-addr 192.168.1.2 `
 
 Generating Signatures:
 ======================
@@ -159,10 +166,9 @@ Limitations/Known Issues:
 * Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10 with Virtualization based security features enabled does not work fully - this is however not the default setting in Windows 10 or Linux.
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * Linux based on the 4.8 kernel and later might not work with the USB3380 hardware. As an alternative, if target root access exists, compile and insert .ko (pcileech_kmd/linux). If the system is EFI booted an alternative signature exists.
-* Windows Vista: some shellcode modules such as wx64_pscmd does not work.
 * Windows 7: signatures are not published.
 * The Linux/Android versions of PCILeech dumps memory slightly slower than the Windows version. Mount target file system and live RAM are also not availabe in the Linux/Android versions.
-* FPGA support currently only exists if PCILeech is run on Windows. Linux and Android support is planned for the future.
+* FPGA support for the SP605/FT601 device only exists for Windows. Linux and Android support is planned for the future.
 
 Building:
 =========
@@ -203,3 +209,10 @@ v2.2
 v2.3
 * [FPGA hardware support (SP605/FT601)](https://github.com/ufrisk/pcileech-fpga).
 * Various changes.
+
+v2.4
+* Support for FPGA SP605/TCP added by [Dmytro Oleksiuk](https://github.com/Cr4sh).
+* Signature updates for various Windows versions including "fall creators update".
+* Linux file system mount support for kernel version 4.11 later.
+* Improved memory reading algorithm for FPGA devices.
+* Various bug fixes.

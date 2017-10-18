@@ -11,6 +11,9 @@
 #define PCILEECH_MEM_FLAG_RETRYONFAIL			0x01
 #define PCILEECH_MEM_FLAG_VERIFYWRITE			0x02
 
+// return all fail on first fail instead of trying to re-read in smaller chunks.
+#define PCILEECH_FLAG_MEM_EX_FASTFAIL			0x01
+
 /*
 * Open a USB connection to the target device.
 * -- ctx
@@ -44,10 +47,11 @@ BOOL DeviceReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE
 * -- pb
 * -- cb
 * -- pPageStat = optional page statistics
+* -- flags = PCILEECH_FLAG_MEM_EX_* flags
 * -- return = the number of bytes successfully read.
 *
 */
-DWORD DeviceReadDMAEx(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _Inout_opt_ PPAGE_STATISTICS pPageStat);
+DWORD DeviceReadDMAEx(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _Inout_opt_ PPAGE_STATISTICS pPageStat, _In_ QWORD flags);
 
 /*
 * Write data to the target system using DMA.

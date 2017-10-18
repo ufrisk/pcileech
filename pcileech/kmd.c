@@ -75,7 +75,7 @@ BOOL KMD_FindSignature2(_Inout_ PBYTE pbPages, _In_ DWORD cPages, _In_ QWORD qwA
 
 BOOL KMD_FindSignature1(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PSIGNATURE pSignatures, _In_ DWORD cSignatures, _Out_ PDWORD pdwSignatureMatchIdx)
 {
-	QWORD i, qwAddrMax, qwAddrCurrent = 0x100000;
+	QWORD i, qwAddrMax, qwAddrCurrent = max(0x100000, ctx->cfg->qwAddrMin);
 	PBYTE pbBuffer8M;
 	BOOL result;
 	PAGE_STATISTICS pageStat;
@@ -96,7 +96,7 @@ BOOL KMD_FindSignature1(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PSIGNATURE pSigna
 	PageStatInitialize(&pageStat, qwAddrCurrent, qwAddrMax, "Searching for KMD location", FALSE, FALSE);
 	while(qwAddrCurrent < qwAddrMax) {
 		pageStat.qwAddr = qwAddrCurrent;
-		if(DeviceReadDMAEx(ctx, qwAddrCurrent, pbBuffer8M, 0x800000, &pageStat)) {
+		if(DeviceReadDMAEx(ctx, qwAddrCurrent, pbBuffer8M, 0x800000, &pageStat, 0)) {
 			result = KMD_FindSignature2(pbBuffer8M, 2048, qwAddrCurrent, pSignatures, cSignatures, pdwSignatureMatchIdx);
 			if(result) {
 				LocalFree(pbBuffer8M);
@@ -207,7 +207,7 @@ BOOL KMD_MacOSKernelSeekSignature(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PSIGNATUR
 	cbTextHIB = (cbTextHIB + 0xfff) & 0xfffff000;
 	pbTextHIB = LocalAlloc(0, cbTextHIB);
 	if(!pbTextHIB) { return FALSE; }
-	if(!DeviceReadDMAEx(ctx, dwTextHIB, pbTextHIB, cbTextHIB, NULL)) {
+	if(!DeviceReadDMAEx(ctx, dwTextHIB, pbTextHIB, cbTextHIB, NULL, 0)) {
 		LocalFree(pbTextHIB);
 		return FALSE;
 	}
@@ -232,7 +232,7 @@ BOOL KMD_FreeBSDKernelSeekSignature(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PSIGNAT
 	PBYTE pb64M = LocalAlloc(LMEM_ZEROINIT, 0x04000000);
 	if(!pb64M) { return FALSE; }
 	for(i = 0x01000000; i < 0x04000000; i += 0x01000000) {
-		DeviceReadDMAEx(ctx, i, pb64M + i, 0x01000000, NULL);
+		DeviceReadDMAEx(ctx, i, pb64M + i, 0x01000000, NULL, 0);
 	}
 	// 1: search for string 'vn_open'
 	i = 0;
@@ -354,7 +354,7 @@ BOOL KMD_Linux46KernelSeekSignature(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PSIGNAT
 		// read 16M of memory first, if KASLR read 2M chunks at top of analysis buffer (performance reasons).
 		dwKernelBase = 0x01000000 + cKSlide * 0x00200000; // KASLR = 16M + ([RND:0..511] * 2M) ???
 		if(cKSlide == 0) {
-			DeviceReadDMAEx(ctx, dwKernelBase, pb, 0x01000000, NULL);
+			DeviceReadDMAEx(ctx, dwKernelBase, pb, 0x01000000, NULL, 0);
 		} else {
 			memmove(pb, pb + 0x00200000, CONFIG_LINUX_SEEK_BUFFER_SIZE - 0x00200000);
 			result = DeviceReadDMA(
@@ -573,7 +573,7 @@ BOOL KMDOpen_UEFI_FindEfiBase(_Inout_ PPCILEECH_CONTEXT ctx)
 	PageStatInitialize(&ps, dwAddrCurrent, dwAddrMax, "Searching for EFI BASE", FALSE, FALSE);
 	// loop EFI BASE (IBI SYST) find
 	while(dwAddrCurrent <= dwAddrMax - 0x100000) {
-		if(DeviceReadDMAEx(ctx, dwAddrCurrent, pb, 0x100000, &ps)) {
+		if(DeviceReadDMAEx(ctx, dwAddrCurrent, pb, 0x100000, &ps, 0)) {
 			for(o = 0; o < 0x100000 - 0x100; o += 8) {
 				if(0x5453595320494249 != *(PQWORD)(pb + o)) { continue; } // IBI SYST
 				qwAddr_BOOTSERV = *(PQWORD)(pb + o + 0x60);
@@ -844,7 +844,7 @@ BOOL KMD_GetPhysicalMemoryMap(_Inout_ PPCILEECH_CONTEXT ctx)
 	}
 	ctx->phKMD->pPhysicalMap = LocalAlloc(LMEM_ZEROINIT, (ctx->pk->_size + 0x1000) & 0xfffff000);
 	if(!ctx->phKMD->pPhysicalMap) { return FALSE; }
-	DeviceReadDMAEx(ctx, ctx->pk->DMAAddrPhysical, (PBYTE)ctx->phKMD->pPhysicalMap, (DWORD)((ctx->pk->_size + 0x1000) & 0xfffff000), NULL);
+	DeviceReadDMAEx(ctx, ctx->pk->DMAAddrPhysical, (PBYTE)ctx->phKMD->pPhysicalMap, (DWORD)((ctx->pk->_size + 0x1000) & 0xfffff000), NULL, 0);
 	ctx->phKMD->cPhysicalMap = ctx->pk->_size / sizeof(PHYSICAL_MEMORY_RANGE);
 	if(ctx->phKMD->cPhysicalMap > 0x2000) { return FALSE; }
 	// adjust max memory according to physical memory
@@ -900,7 +900,7 @@ BOOL KMDReadMemory_DMABufferSized(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAd
 	if(!result) { return FALSE; }
 	result = KMD_SubmitCommand(ctx, KMD_CMD_READ);
 	if(!result) { return FALSE; }
-	return (cb == DeviceReadDMAEx(ctx, ctx->pk->DMAAddrPhysical, pb, cb, NULL)) && ctx->pk->_result;
+	return (cb == DeviceReadDMAEx(ctx, ctx->pk->DMAAddrPhysical, pb, cb, NULL, 0)) && ctx->pk->_result;
 }
 
 BOOL KMDWriteMemory_DMABufferSized(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddress, _In_ PBYTE pb, _In_ DWORD cb)

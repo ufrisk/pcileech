@@ -29,8 +29,8 @@
 #define FPGA_LOOP_TX_VALID     			0x77010000
 
 #define SP605_601_PROBE_MAXPAGES		0x400
-#define SP601_601_MAX_SIZE_RX			0x001e000	// in data bytes (excl. overhead/TLP headers)
-#define SP601_601_MAX_SIZE_TX			0x0002000   // in total data (incl. overhead/TLP headers)
+#define SP605_601_MAX_SIZE_RX			0x0001e000	// in data bytes (excl. overhead/TLP headers)
+#define SP605_601_MAX_SIZE_TX			0x00002000   // in total data (incl. overhead/TLP headers)
 
 #define ENDIAN_SWAP_WORD(x)		(x = (x << 8) | (x >> 8))
 #define ENDIAN_SWAP_DWORD(x)	(x = (x << 24) | ((x >> 8) & 0xff00) | ((x << 8) & 0xff0000) | (x >> 24))
@@ -186,7 +186,7 @@ BOOL Device605_601_TxTlp(_In_ PDEVICE_CONTEXT_SP605_601 ctx, _In_ PBYTE pbTlp, _
 	}
 	ctx->txbuf.cb += cbTx;
 	// transmit
-	if((ctx->txbuf.cb > SP601_601_MAX_SIZE_TX) || (fFlush && ctx->txbuf.cb)) {
+	if((ctx->txbuf.cb > SP605_601_MAX_SIZE_TX) || (fFlush && ctx->txbuf.cb)) {
 		status = ctx->dev.pfnFT_WritePipe(ctx->dev.hFTDI, 0x02, ctx->txbuf.pb, ctx->txbuf.cb, &cbTxed, NULL);
 		ctx->txbuf.cb = 0;
 		return (0 == status);
@@ -209,7 +209,7 @@ VOID Device605_601_RxTlpSynchronous(_In_ PDEVICE_CONTEXT_SP605_601 ctx)
 		ctx->dev.pfnFT_AbortPipe(ctx->dev.hFTDI, 0x82);
 		return;
 	}
-	if(ctx->rxbuf.cb % 8) {
+	if((ctx->rxbuf.cb % 8) && (ctx->rxbuf.cb > 4)) {
 		printf("Device Info: SP605 / FT601: Bad read from device. Should not happen!\n");
 		return;
 	}
@@ -245,7 +245,7 @@ BOOL Device605_601_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwA
 	BOOL is32;
 	PTLP_HDR_MRdWr64 hdrRd64 = (PTLP_HDR_MRdWr64)tx;
 	PTLP_HDR_MRdWr32 hdrRd32 = (PTLP_HDR_MRdWr32)tx;
-	if(cb > SP601_601_MAX_SIZE_RX) { return FALSE; }
+	if(cb > SP605_601_MAX_SIZE_RX) { return FALSE; }
 	if(qwAddr % 0x1000) { return FALSE; }
 	if((cb >= 0x1000) && (cb % 0x1000)) { return FALSE; }
 	if((cb < 0x1000) && (cb % 0x8)) { return FALSE; }
@@ -267,8 +267,7 @@ BOOL Device605_601_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwA
 			hdrRd32->FirstBE = 0xf;
 			hdrRd32->LastBE = 0xf;
 			hdrRd32->Address = (DWORD)(qwAddr + o);
-		}
-		else {
+		} else {
 			hdrRd64->h.TypeFmt = TLP_MRd64;
 			hdrRd64->h.Length = (WORD)((cb < 0x1000) ? cb >> 2 : 0);
 			hdrRd64->RequesterID = ctx->wDeviceId;
@@ -446,16 +445,16 @@ BOOL Device605_601_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
 	if(!ctx->dev.hFTDI) { goto fail; }
 	Device605_601_GetDeviceID_FpgaVersion(ctx);
 	if(!ctx->wDeviceId) { goto fail; }
-	ctx->rxbuf.cbMax = (DWORD)(2.3 * SP601_601_MAX_SIZE_RX);  // buffer size tuned to lowest possible (+margin) for performance.
+	ctx->rxbuf.cbMax = (DWORD)(2.3 * SP605_601_MAX_SIZE_RX);  // buffer size tuned to lowest possible (+margin) for performance.
 	ctx->rxbuf.pb = LocalAlloc(0, ctx->rxbuf.cbMax);
 	if(!ctx->rxbuf.pb) { goto fail; }
-	ctx->txbuf.cbMax = SP601_601_MAX_SIZE_TX + 0x10000;
+	ctx->txbuf.cbMax = SP605_601_MAX_SIZE_TX + 0x10000;
 	ctx->txbuf.pb = LocalAlloc(0, ctx->txbuf.cbMax);
 	if(!ctx->txbuf.pb) { goto fail; }
 	ctx->isPrintTlp = ctxPcileech->cfg->fVerboseExtra;
 	// set callback functions and fix up config
 	ctxPcileech->cfg->dev.tp = PCILEECH_DEVICE_SP605_FT601;
-	ctxPcileech->cfg->dev.qwMaxSizeDmaIo = SP601_601_MAX_SIZE_RX;
+	ctxPcileech->cfg->dev.qwMaxSizeDmaIo = SP605_601_MAX_SIZE_RX;
 	ctxPcileech->cfg->dev.qwAddrMaxNative = 0x0000ffffffffffff;
 	ctxPcileech->cfg->dev.fPartialPageReadSupported = TRUE;
 	ctxPcileech->cfg->dev.pfnClose = Device605_601_Close;

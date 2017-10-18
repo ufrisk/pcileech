@@ -13,3 +13,6 @@
 #
 # signature for Windows 10 x64 [NtlmShared.dll (2017-03-18)]
 615,FF15C51C,61e,0F852EFB,61e,909090909090
+#
+# signature for Windows 10 x64 [NtlmShared.dll (2017-09-29)/10.0.16299.15]
+615,FF15D51C,61e,0F852EFB,61e,909090909090

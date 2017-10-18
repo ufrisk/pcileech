@@ -91,7 +91,9 @@ VOID Help_ShowGeneral()
 		"          Wait occurs after any other actions have been completed.             \n" \
 		"   -device: force the use of a specific hardware device instead of auto-detect.\n" \
 		"          Affects all modes and commands.                                      \n" \
-		"          Valid options: USB3380, SP605_UART, SP605_FT601                      \n" \
+		"          Valid options: USB3380, SP605_UART, SP605_FT601, SP605_TCP           \n" \
+		"   -device-addr: Remote address for -device SP605_TCP.                         \n" \
+		"   -device-port: Remote TCP port for -device SP605_TCP. Default value: 28472.  \n" \
 		"   -help: show help about the selected command or implant and then exit        \n" \
 		"          without running the command. Affects all modes and commands.         \n" \
 		"          Option has no value. Example: -help                                  \n" \
@@ -138,7 +140,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016, 2017 Ulf Frisk                                             \n" \
-		" Version: 2.3                                                                  \n" \
+		" Version: 2.4                                                                  \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \

@@ -158,11 +158,11 @@ VOID ActionMemoryPageDisplay(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	BYTE pb[4096];
 	QWORD qwAddr = ctx->cfg->qwAddrMin & 0x0fffffffffffff000;
-	printf("Memory Page Read: Page contents for address: 0x%016llX\n", qwAddr);
 	if(!DeviceReadMEM(ctx, qwAddr, pb, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
-		printf("Memory Page Read: Failed.\n");
+		printf("Memory Page Read: Failed reading memory at address: 0x%016llX.\n", qwAddr);
 		return;
 	}
+	printf("Memory Page Read: Page contents for address: 0x%016llX\n", qwAddr);
 	Util_PrintHexAscii(pb, 4096);
 }
 

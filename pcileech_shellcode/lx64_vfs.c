@@ -59,30 +59,36 @@ typedef struct tdVFS_RESULT_FILEINFO {
 // Other required defines and typedefs.
 //-----------------------------------------------------------------------------
 
-#define O_RDONLY        00000000
-#define O_WRONLY        00000001
-#define O_CREAT         00000100
-#define O_TRUNC         00001000
-#define O_APPEND        00002000
-#define O_DIRECTORY     00200000
-#define O_NOATIME       01000000
+#define O_RDONLY			00000000
+#define O_WRONLY			00000001
+#define O_CREAT				00000100
+#define O_TRUNC				00001000
+#define O_APPEND			00002000
+#define O_DIRECTORY			00200000
+#define O_NOATIME			01000000
 
-#define DT_UNKNOWN      0
-#define DT_FIFO         1
-#define DT_CHR          2
-#define DT_DIR          4
-#define DT_BLK          6
-#define DT_REG          8
-#define DT_LNK          10
-#define DT_SOCK         12
-#define DT_WHT          14
+#define DT_UNKNOWN			0
+#define DT_FIFO				1
+#define DT_CHR				2
+#define DT_DIR				4
+#define DT_BLK				6
+#define DT_REG				8
+#define DT_LNK				10
+#define DT_SOCK				12
+#define DT_WHT				14
+
+#define AT_FDCWD			-100
+#define AT_NO_AUTOMOUNT		0x800
+#define STATX_BASIC_STATS	0x000007ffU
+
 
 struct timespec {
 	QWORD	tv_sec;		// seconds
 	QWORD	tv_nsec;	// nanoseconds
 };
 
-struct kstat {
+// kstat struct - kernels 4.10 and earlier.
+struct kstat_4_10 {
 	QWORD	ino;
 	DWORD	dev;
 	DWORD	mode;
@@ -99,6 +105,28 @@ struct kstat {
 	QWORD	_pcileech_dummy_extra[2];
 };
 
+// kstat struct - kernels 4.11 and later.
+struct kstat_4_11 {
+	DWORD	result_mask;
+	DWORD	mode;
+	DWORD	nlink;
+	DWORD	blksize;
+	QWORD	attributes;
+	QWORD	attributes_mask;
+	QWORD	ino;
+	DWORD	dev;
+	DWORD	rdev;
+	DWORD	uid;
+	DWORD	gid;
+	QWORD	size;
+	struct timespec atime;
+	struct timespec mtime;
+	struct timespec ctime;
+	struct timespec btime;
+	QWORD	blocks;
+	QWORD	_pcileech_dummy_extra[2];
+};
+
 //-----------------------------------------------------------------------------
 // Functions below.
 //-----------------------------------------------------------------------------
@@ -111,10 +139,11 @@ typedef struct tdFN2 {
 	QWORD filp_open;
 	QWORD vfs_read;
 	QWORD vfs_write;
-	QWORD vfs_stat;
 	QWORD yield;
 	QWORD iterate_dir_opt;
 	QWORD vfs_readdir_opt;
+	QWORD vfs_stat_opt;
+	QWORD vfs_statx_opt;
 } FN2, *PFN2;
 
 typedef struct tdDIR_CONTEXT {
@@ -138,12 +167,17 @@ BOOL LookupFunctions2(PKMDDATA pk, PFN2 pfn2) {
 	NAMES[i++] = (QWORD)(CHAR[]) { 'f', 'i', 'l', 'p', '_', 'c', 'l', 'o', 's', 'e', 0 };
 	NAMES[i++] = (QWORD)(CHAR[]) { 'f', 'i', 'l', 'p', '_', 'o', 'p', 'e', 'n', 0 };
 	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 'r', 'e', 'a', 'd', 0 };
-	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 'w', 'r', 'i', 't', 'e', 0 };
-	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 0 };
+	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 'w', 'r', 'i', 't', 'e', 0 };	
 	NAMES[i++] = (QWORD)(CHAR[]) { 'y', 'i', 'e', 'l', 'd', 0 };
 	if(!LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)NAMES, (QWORD)pfn2, i)) { return FALSE; }
+	// optional lookup 1#: (due to kernel version differences)
 	pfn2->iterate_dir_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'i', 't', 'e', 'r', 'a', 't', 'e', '_', 'd', 'i', 'r', 0 }));
 	pfn2->vfs_readdir_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 'r', 'e', 'a', 'd', 'd', 'i', 'r', 0 }));
+	if(!pfn2->iterate_dir_opt && !pfn2->vfs_readdir_opt) { return FALSE; }
+	// optional lookup 2#:
+	pfn2->vfs_stat_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 0 }));
+	pfn2->vfs_statx_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 'x', 0 }));
+	if(!pfn2->vfs_stat_opt && !pfn2->vfs_statx_opt) { return FALSE; }
 	return TRUE;
 }
 
@@ -190,7 +224,8 @@ VOID VfsList_SetSizeTime(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 {
 	QWORD i, o, p, cfi, result;
 	CHAR sz[2 * MAX_PATH];
-	struct kstat kstat;
+	struct kstat_4_10 kstat_4_10;
+	struct kstat_4_11 kstat_4_11;
 	PVFS_RESULT_FILEINFO pfi;
 	cfi = pk->dataOutExtraLength / sizeof(VFS_RESULT_FILEINFO);
 	for(o = 0; o < MAX_PATH; o++) {
@@ -208,12 +243,22 @@ VOID VfsList_SetSizeTime(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 			sz[o + i] = (CHAR)pfi->wszFileName[i];
 		}
 		sz[o + i] = 0;
-		result = SysVCall(pfn2->vfs_stat, sz, &kstat);
-		if(0 == result) {
-			pfi->cb = kstat.size;
-			pfi->tAccessOpt = UnixToWindowsFiletime(kstat.atime.tv_sec);
-			pfi->tCreateOpt = UnixToWindowsFiletime(kstat.ctime.tv_sec);
-			pfi->tModifyOpt = UnixToWindowsFiletime(kstat.mtime.tv_sec);
+		if(pfn2->vfs_statx_opt) { // 4.11 kernels and later.
+			result = SysVCall(pfn2->vfs_statx_opt, AT_FDCWD, sz, AT_NO_AUTOMOUNT, &kstat_4_11, STATX_BASIC_STATS);
+			if(0 == result) {
+				pfi->cb = kstat_4_11.size;
+				pfi->tAccessOpt = UnixToWindowsFiletime(kstat_4_11.atime.tv_sec);
+				pfi->tCreateOpt = UnixToWindowsFiletime(kstat_4_11.ctime.tv_sec);
+				pfi->tModifyOpt = UnixToWindowsFiletime(kstat_4_11.mtime.tv_sec);
+			}
+		} else { // 4.10 kernels and earlier.
+			result = SysVCall(pfn2->vfs_stat_opt, sz, &kstat_4_10);
+			if(0 == result) {
+				pfi->cb = kstat_4_10.size;
+				pfi->tAccessOpt = UnixToWindowsFiletime(kstat_4_10.atime.tv_sec);
+				pfi->tCreateOpt = UnixToWindowsFiletime(kstat_4_10.ctime.tv_sec);
+				pfi->tModifyOpt = UnixToWindowsFiletime(kstat_4_10.mtime.tv_sec);
+			}
 		}
 		if(0 == (p % 50)) { SysVCall(pfn2->yield); } // yield at intervals to avoid problems...
 	}

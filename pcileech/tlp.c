@@ -19,16 +19,48 @@ VOID TLP_Print(_In_ PBYTE pbTlp, _In_ DWORD cbTlp, _In_ BOOL isTx)
 	for(i = 0; i < cbTlp; i += 4) {
 		buf[i >> 2] = _byteswap_ulong(*(PDWORD)(pbTlp + i));
 	}
-	printf("%s_TLP: TypeFmt: %02x Length: %03x(%04x)", (isTx ? "TX" : "RX"), hdr->TypeFmt, hdr->Length, (hdr->Length << 2));
 	if(hdr->TypeFmt == TLP_CplD) {
 		hdrC = (PTLP_HDR_CplD)pb;
-		printf("\nCplD: CplID: %04x ReqID: %04x Status: %01x BC: %03x Tag: %02x LowAddr: %02x", hdrC->RequesterID, hdrC->CompleterID, hdrC->Status, hdrC->ByteCount, hdrC->Tag, hdrC->LowerAddress);
+		printf(
+			"\n%s: CplD:  ReqID: %04x CplID: %04x Status: %01x BC: %03x Tag: %02x LowAddr: %02x",
+			(isTx ? "TX" : "RX"), 
+			hdrC->RequesterID, 
+			hdrC->CompleterID, 
+			hdrC->Status, 
+			hdrC->ByteCount, 
+			hdrC->Tag, 
+			hdrC->LowerAddress
+		);
 	} else if(hdr->TypeFmt == TLP_MRd32 || hdr->TypeFmt == TLP_MWr32) {
 		hdrM32 = (PTLP_HDR_MRdWr32)pb;
-		printf("\n%s: ReqID: %04x BE1: %01x BEL: %01x Tag: %02x Addr: %08x", (hdr->TypeFmt == TLP_MRd32) ? "MRd32" : "MWr32", hdrM32->RequesterID, hdrM32->FirstBE, hdrM32->LastBE, hdrM32->Tag, hdrM32->Address);
+		printf(
+			"\n%s: %s: ReqID: %04x BE_FL: %01x%01x Tag: %02x Addr: %08x", 
+			(isTx ? "TX" : "RX"),
+			(hdr->TypeFmt == TLP_MRd32) ? "MRd32" : "MWr32", 
+			hdrM32->RequesterID, 
+			hdrM32->FirstBE, 
+			hdrM32->LastBE, 
+			hdrM32->Tag, 
+			hdrM32->Address);
 	} else if(hdr->TypeFmt == TLP_MRd64 || hdr->TypeFmt == TLP_MWr64) {
 		hdrM64 = (PTLP_HDR_MRdWr64)pb;
-		printf("\n%s: ReqID: %04x BE1: %01x BEL: %01x Tag: %02x Addr: %016llx", (hdr->TypeFmt == TLP_MRd64) ? "MRd64" : "MWr64", hdrM64->RequesterID, hdrM64->FirstBE, hdrM64->LastBE, hdrM64->Tag, ((QWORD)hdrM64->AddressHigh << 32) + hdrM64->AddressLow);
+		printf(
+			"\n%s: %s: ReqID: %04x BE_FL: %01x%01x Tag: %02x Addr: %016llx", 
+			(isTx ? "TX" : "RX"),
+			(hdr->TypeFmt == TLP_MRd64) ? "MRd64" : "MWr64",
+			hdrM64->RequesterID,
+			hdrM64->FirstBE,
+			hdrM64->LastBE,
+			hdrM64->Tag,
+			((QWORD)hdrM64->AddressHigh << 32) + hdrM64->AddressLow
+		);
+	} else { 
+		printf(
+			"\n%s: TLP??: TypeFmt: %02x dwLen: %03x", 
+			(isTx ? "TX" : "RX"), 
+			hdr->TypeFmt, 
+			hdr->Length
+		);
 	}
 	printf("\n");
 	Util_PrintHexAscii(pbTlp, cbTlp);
@@ -59,11 +91,6 @@ BOOL TLP_CallbackMRd(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMRd, _In_ PBYTE pb, _I
 				return TRUE;
 			}
 		}
-	} else {
-		QWORD qwDebug[16];
-		memset(qwDebug, 0xcc, 16 * 8);
-		memcpy(qwDebug, pb, min(cb, 16 * 8));
-		DWORD DEBUGX = 0x01;
 	}
 	return FALSE;
 }

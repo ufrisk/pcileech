@@ -48,7 +48,8 @@ typedef enum tdPCILEECH_DEVICE_TYPE {
 	PCILEECH_DEVICE_NA,
 	PCILEECH_DEVICE_USB3380,
 	PCILEECH_DEVICE_SP605_UART,
-	PCILEECH_DEVICE_SP605_FT601
+	PCILEECH_DEVICE_SP605_FT601,
+	PCILEECH_DEVICE_SP605_TCP
 } PCILEECH_DEVICE_TYPE;
 
 typedef struct tdDeviceConfig {
@@ -81,6 +82,8 @@ typedef struct tdConfig {
 	CHAR szShellcodeName[MAX_PATH];
 	QWORD qwMaxSizeDmaIo;
 	DWORD dwListenTlpTimeMs;
+	DWORD TcpAddr;
+	WORD TcpPort;
 	// flags below
 	BOOL fPageTableScan;
 	BOOL fPatchAll;

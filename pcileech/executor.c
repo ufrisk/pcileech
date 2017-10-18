@@ -161,7 +161,7 @@ VOID Exec_Callback(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PHANDLE phCallback)
 	if(ph->is.bin.seqAck >= ph->os.bin.seq) { return; }
 	cbLength = 0;
 	result =
-		DeviceReadDMAEx(ctx, ctx->pk->DMAAddrPhysical + ctx->pk->dataOutExtraOffset, ph->pbDMA, (DWORD)SIZE_PAGE_ALIGN_4K(ctx->pk->dataOutExtraLength), NULL) &&
+		DeviceReadDMAEx(ctx, ctx->pk->DMAAddrPhysical + ctx->pk->dataOutExtraOffset, ph->pbDMA, (DWORD)SIZE_PAGE_ALIGN_4K(ctx->pk->dataOutExtraLength), NULL, 0) &&
 		(cbLength = fwrite(ph->pbDMA, 1, ctx->pk->dataOutExtraLength, ph->pFileOutput)) &&
 		(ctx->pk->dataOutExtraLength == cbLength);
 	ph->qwFileWritten += cbLength;
@@ -237,7 +237,7 @@ BOOL Exec_ExecSilent(_Inout_ PPCILEECH_CONTEXT ctx, _In_ LPSTR szShellcodeName, 
 		*pcbOut = pk->dataOutExtraLength;
 		*ppbOut = (PBYTE)LocalAlloc(0, SIZE_PAGE_ALIGN_4K(*pcbOut));
 		if(!*ppbOut) { result = FALSE; goto fail; }
-		result = SIZE_PAGE_ALIGN_4K(*pcbOut) == DeviceReadDMAEx(ctx, pk->DMAAddrPhysical + pk->dataOutExtraOffset, *ppbOut, SIZE_PAGE_ALIGN_4K(*pcbOut), NULL);
+		result = SIZE_PAGE_ALIGN_4K(*pcbOut) == DeviceReadDMAEx(ctx, pk->DMAAddrPhysical + pk->dataOutExtraOffset, *ppbOut, SIZE_PAGE_ALIGN_4K(*pcbOut), NULL, 0);
 	}
 fail:
 	LocalFree(pKmdExec);
@@ -337,7 +337,7 @@ VOID ActionExecShellcode(_Inout_ PPCILEECH_CONTEXT ctx)
 	if(cbLength > 0) {
 		// read extra output buffer
 		if(!(pbBuffer = LocalAlloc(LMEM_ZEROINIT, SIZE_PAGE_ALIGN_4K(cbLength))) ||
-			!DeviceReadDMAEx(ctx, pk->DMAAddrPhysical + pk->dataOutExtraOffset, pbBuffer, SIZE_PAGE_ALIGN_4K(cbLength), NULL)) {
+			!DeviceReadDMAEx(ctx, pk->DMAAddrPhysical + pk->dataOutExtraOffset, pbBuffer, SIZE_PAGE_ALIGN_4K(cbLength), NULL, 0)) {
 			printf("EXEC: Error reading output.\n");
 			goto fail;
 		}

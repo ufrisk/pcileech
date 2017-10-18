@@ -9,6 +9,14 @@
 #include "device3380.h"
 #include "device605_uart.h"
 #include "device605_601.h"
+#include "device605_tcp.h"
+
+typedef struct tdREAD_DMA_EX_MEMORY_MAP {
+	BOOL fProbeExecuted;
+	QWORD qwAddrBase;
+	DWORD cPages;
+	PBYTE pb;
+} READ_DMA_EX_MEMORY_MAP, *PREAD_DMA_EX_MEMORY_MAP;
 
 BOOL DeviceReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)
 {
@@ -18,12 +26,26 @@ BOOL DeviceReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE
 	return ctx->cfg->dev.pfnReadDMA ? ctx->cfg->dev.pfnReadDMA(ctx, qwAddr, pb, cb) : FALSE;
 }
 
+BOOL DeviceReadDMAEx_IsMemoryMapOK(_In_ PREAD_DMA_EX_MEMORY_MAP pMemoryMap, _In_ QWORD qwAddr, _In_ DWORD dwSize)
+{
+	DWORD i;
+	DWORD cPages = (dwSize + 0xfff) / 0x1000;
+	DWORD cPageStart = (DWORD)(((qwAddr + 0xfff) - pMemoryMap->qwAddrBase) / 0x1000);
+	for(i = cPageStart; i < cPageStart + cPages; i++) {
+		if(0 == pMemoryMap->pb[i]) { 
+			return FALSE; 
+		}
+	}
+	return TRUE;
+}
+
 #define CHUNK_FAIL_DIVISOR	16
-DWORD DeviceReadDMAEx_DoWork(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _Inout_opt_ PPAGE_STATISTICS pPageStat, _In_ DWORD cbMaxSizeIo)
+DWORD DeviceReadDMAEx_DoWork(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _Inout_opt_ PPAGE_STATISTICS pPageStat, _In_ DWORD cbMaxSizeIo, _Inout_ PREAD_DMA_EX_MEMORY_MAP pMemoryMap, _In_ QWORD flags)
 {
 	DWORD cbRd, cbRdOff;
 	DWORD cbChunk, cChunkTotal, cChunkSuccess = 0;
 	DWORD i, cbSuccess = 0;
+	BOOL result;
 	// calculate current chunk sizes
 	cbChunk = ~0xfff & min(cb, cbMaxSizeIo);
 	cbChunk = (cbChunk > 0x3000) ? cbChunk : 0x1000;
@@ -33,29 +55,51 @@ DWORD DeviceReadDMAEx_DoWork(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _
 	for(i = 0; i < cChunkTotal; i++) {
 		cbRdOff = i * cbChunk;
 		cbRd = ((i == cChunkTotal - 1) && (cb % cbChunk)) ? (cb % cbChunk) : cbChunk; // (last chunk may be smaller)
-		if(DeviceReadDMA(ctx, qwAddr + cbRdOff, pb + cbRdOff, cbRd, 0)) {
+		result =
+			DeviceReadDMAEx_IsMemoryMapOK(pMemoryMap, qwAddr + cbRdOff, cbRd) &&
+			DeviceReadDMA(ctx, qwAddr + cbRdOff, pb + cbRdOff, cbRd, 0);
+		if(!result && !pMemoryMap->fProbeExecuted && ctx->cfg->dev.pfnProbeDMA) { // probe memory on 1st fail (if supported)
+			DeviceProbeDMA(ctx, pMemoryMap->qwAddrBase, pMemoryMap->cPages, pMemoryMap->pb);
+			pMemoryMap->fProbeExecuted = TRUE;
+		}
+		if(result) {
 			cbSuccess += cbRd;
 			PageStatUpdate(pPageStat, qwAddr + cbRdOff + cbRd, cbRd / 0x1000, 0);
+		} else if(flags & PCILEECH_FLAG_MEM_EX_FASTFAIL) {
+			PageStatUpdate(pPageStat, qwAddr + cb, 0, (cb - cbRdOff) / 0x1000);
+			return cbSuccess;
 		} else if(cbRd == 0x1000) {
+			ZeroMemory(pb + cbRdOff, cbRd);
 			PageStatUpdate(pPageStat, qwAddr + cbRdOff + cbRd, 0, 1);
 		} else {
-			cbSuccess += DeviceReadDMAEx_DoWork(ctx, qwAddr + cbRdOff, pb + cbRdOff, cbRd, pPageStat, cbRd / CHUNK_FAIL_DIVISOR);
+			cbSuccess += DeviceReadDMAEx_DoWork(ctx, qwAddr + cbRdOff, pb + cbRdOff, cbRd, pPageStat, cbRd / CHUNK_FAIL_DIVISOR, pMemoryMap, flags);
 		}
 	}
 	return cbSuccess;
 }
 
-DWORD DeviceReadDMAEx(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _Inout_opt_ PPAGE_STATISTICS pPageStat)
+DWORD DeviceReadDMAEx(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _Inout_opt_ PPAGE_STATISTICS pPageStat, _In_ QWORD flags)
 {
+	READ_DMA_EX_MEMORY_MAP oMemoryMap;
 	BYTE pbWorkaround[4096];
-	DWORD cbWorkaround;
+	DWORD cbDataRead;
+	// set probe memory map to all mem readable
+	oMemoryMap.fProbeExecuted = FALSE;
+	oMemoryMap.qwAddrBase = qwAddr & ~0xfff;
+	oMemoryMap.cPages = (cb + 0xfff) / 0x1000;
+	oMemoryMap.pb = LocalAlloc(0, oMemoryMap.cPages);
+	if(!oMemoryMap.pb) { return 0; }
+	memset(oMemoryMap.pb, 0x01, oMemoryMap.cPages);
+	// read memory (with strange workaround for 1-page reads...)
 	if(cb != 0x1000) {
-		return DeviceReadDMAEx_DoWork(ctx, qwAddr, pb, cb, pPageStat, (DWORD)ctx->cfg->qwMaxSizeDmaIo);
+		cbDataRead = DeviceReadDMAEx_DoWork(ctx, qwAddr, pb, cb, pPageStat, (DWORD)ctx->cfg->qwMaxSizeDmaIo, &oMemoryMap, flags);
+	} else { 
+		// why is this working ??? if not here console is screwed up... (threading issue?)
+		cbDataRead = DeviceReadDMAEx_DoWork(ctx, qwAddr, pbWorkaround, 0x1000, pPageStat, (DWORD)ctx->cfg->qwMaxSizeDmaIo, &oMemoryMap, flags);
+		memcpy(pb, pbWorkaround, 0x1000);
 	}
-	// why is this working ??? if not here console is screwed up... (threading issue?)
-	cbWorkaround = DeviceReadDMAEx_DoWork(ctx, qwAddr, pbWorkaround, 0x1000, pPageStat, (DWORD)ctx->cfg->qwMaxSizeDmaIo);
-	memcpy(pb, pbWorkaround, 0x1000);
-	return cbWorkaround;
+	LocalFree(oMemoryMap.pb);
+	return cbDataRead;
 }
 
 BOOL DeviceWriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)
@@ -116,6 +160,9 @@ BOOL DeviceOpen(_Inout_ PPCILEECH_CONTEXT ctx)
 	if(PCILEECH_DEVICE_SP605_UART == ctx->cfg->dev.tp) {
 		result = Device605_UART_Open(ctx);
 	}
+	if(PCILEECH_DEVICE_SP605_TCP == ctx->cfg->dev.tp) {
+		result = Device605_TCP_Open(ctx);
+	}
 	return result;
 }
 
@@ -135,6 +182,6 @@ BOOL DeviceReadMEM(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE
 	} else if(flags || cb == 0x1000) {
 		return DeviceReadDMA(ctx, qwAddr, pb, cb, flags);
 	} else {
-		return cb == DeviceReadDMAEx(ctx, qwAddr, pb, cb, NULL);
+		return cb == DeviceReadDMAEx(ctx, qwAddr, pb, cb, NULL, 0);
 	}
 }

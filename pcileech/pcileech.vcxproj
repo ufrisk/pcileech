@@ -86,6 +86,7 @@
     <ClInclude Include="device.h" />
     <ClInclude Include="device3380.h" />
     <ClInclude Include="device605_601.h" />
+    <ClInclude Include="device605_tcp.h" />
     <ClInclude Include="device605_uart.h" />
     <ClInclude Include="dokan.h" />
     <ClInclude Include="executor.h" />
@@ -106,6 +107,7 @@
     <ClCompile Include="device.c" />
     <ClCompile Include="device3380.c" />
     <ClCompile Include="device605_601.c" />
+    <ClCompile Include="device605_tcp.c" />
     <ClCompile Include="device605_uart.c" />
     <ClCompile Include="executor.c" />
     <ClCompile Include="extra.c" />

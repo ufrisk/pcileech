@@ -609,9 +609,11 @@ VOID Util_Read1M(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PBYTE pbBuffer1M, _In_ QWO
 BOOL Util_Read16M(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat)
 {
 	BOOL isSuccess[4] = { FALSE, FALSE, FALSE, FALSE };
-	QWORD i, o, qwOffset;
+	QWORD i, o, qwOffset, cbRead;
+	if(qwBaseAddress >= ctx->cfg->qwAddrMax) { return FALSE; }
 	if(!ctx->phKMD) { // Native DMA
-		return 0 != DeviceReadDMAEx(ctx, qwBaseAddress, pbBuffer16M, 0x01000000, pPageStat);
+		cbRead = min(0x01000000, ctx->cfg->qwAddrMax - qwBaseAddress);
+		return 0 != DeviceReadDMAEx(ctx, qwBaseAddress, pbBuffer16M, (DWORD)cbRead, pPageStat, 0);
 	}
 	// try read 16M
 	if((qwBaseAddress + 0x01000000 <= ctx->cfg->qwAddrMax) && DeviceReadMEM(ctx, qwBaseAddress, pbBuffer16M, 0x01000000, 0)) {
