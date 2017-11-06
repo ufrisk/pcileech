@@ -69,9 +69,6 @@
     <ClInclude Include="device605_601.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="device605_uart.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="device605_tcp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -120,9 +117,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="device605_601.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="device605_uart.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="device605_tcp.c">

@@ -22,7 +22,7 @@
 #define TLP_Cpl			0x0A
 #define TLP_CplD		0x4A
 #define TLP_CplLk		0x0B
-#define TLP_CplLkD		0x4B
+#define TLP_CplDLk		0x4B
 
 typedef struct tdTLP_HDR {
 	WORD Length : 10;
@@ -66,6 +66,21 @@ typedef struct tdTLP_HDR_CplD {
 	BYTE Tag;
 	WORD RequesterID;
 } TLP_HDR_CplD, *PTLP_HDR_CplD;
+
+typedef struct tdTLP_HDR_Cfg {
+	TLP_HDR h;
+	BYTE FirstBE : 4;
+	BYTE LastBE : 4;
+	BYTE Tag;
+	WORD RequesterID;
+	BYTE _R1 : 2;
+	BYTE RegNum : 6;
+	BYTE ExtRegNum : 4;
+	BYTE _R2 : 4;
+	BYTE FunctionNum : 3;
+	BYTE DeviceNum : 5;
+	BYTE BusNum;
+} TLP_HDR_Cfg, *PTLP_HDR_Cfg;
 
 /*
 * Print a PCIe TLP packet on the screen in a human readable format.

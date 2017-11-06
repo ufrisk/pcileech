@@ -118,8 +118,6 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
 			ctx->cfg->dev.tp = PCILEECH_DEVICE_NA;
 			if(0 == _stricmp(argv[i + 1], "usb3380")) { 
 				ctx->cfg->dev.tp = PCILEECH_DEVICE_USB3380;
-			} else if(0 == _stricmp(argv[i + 1], "sp605_uart")) { 
-				ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_UART;
 			} else if(0 == _stricmp(argv[i + 1], "sp605_ft601")) {
 				ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_FT601;
 			} else if(0 == _stricmp(argv[i + 1], "sp605_tcp")) {

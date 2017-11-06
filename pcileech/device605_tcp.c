@@ -5,6 +5,7 @@
 #ifdef WIN32
 
 #include <winsock2.h>
+#include <stdio.h>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -59,7 +60,7 @@ PCIE_CTL;
 #define TLP_RX_SIZE				128
 #define TLP_RX_MAX_SIZE			1024
 
-#define SP605_PROBE_MAXPAGES	1024
+#define SP605_PROBE_MAXPAGES	1
 #define SP605_TCP_MAX_SIZE_RX	0x00001000
 #define SP605_TCP_MAX_SIZE_TX	0x00001000
 
@@ -157,7 +158,7 @@ BOOL Device605_TCP_TxTlp(_In_ PDEVICE_CONTEXT_SP605_TCP ctx, _In_ PBYTE pbTlp, _
 	}
 	// prepare transmit buffer
 	pbTx = ctx->txbuf.pb + ctx->txbuf.cb;
-	cbTx = sizeof(PCIE_CTL) * cbTlp;
+	cbTx = sizeof(PCIE_CTL) * (cbTlp / sizeof(DWORD));
 	for (Tx = (PCIE_CTL *)pbTx, i = 0; i < cbTlp; Tx++, i += 4) {
 		Tx->data = ENDIAN_SWAP_DWORD(*(PDWORD)(pbTlp + i));
 		Tx->flags = PCIE_F_HAS_DATA;		
@@ -170,7 +171,7 @@ BOOL Device605_TCP_TxTlp(_In_ PDEVICE_CONTEXT_SP605_TCP ctx, _In_ PBYTE pbTlp, _
 	// transmit
 	if (ctx->txbuf.cb && (fFlush || (ctx->txbuf.cb > ctx->txbuf.cbMax - 0x1000))) {
 		while (Total < ctx->txbuf.cb) {
-			len = send(ctx->Sock, (const char *)ctx->txbuf.pb + Total, ctx->txbuf.cb - Total, 0);
+			len = send(ctx->Sock, (const char *)(ctx->txbuf.pb + Total), ctx->txbuf.cb - Total, 0);
 			if (len == 0 || len == SOCKET_ERROR) {
 				fprintf(stderr, "ERROR: send() fails\n");
 				return FALSE;
@@ -182,41 +183,33 @@ BOOL Device605_TCP_TxTlp(_In_ PDEVICE_CONTEXT_SP605_TCP ctx, _In_ PBYTE pbTlp, _
 	return TRUE;
 }
 
-BOOL Device605_TCP_RxTlpSynchronous(_In_ PDEVICE_CONTEXT_SP605_TCP ctx)
+VOID Device605_TCP_RxTlpSynchronous(_In_ PDEVICE_CONTEXT_SP605_TCP ctx)
 {
 	DWORD i = 0, cdwTlp = 0, Total = 0, len;
-	PCIE_CTL Rx, Tx;
+	PCIE_CTL *pRx, Tx;
 	BYTE pbTlp[TLP_RX_MAX_SIZE];
 	PDWORD pdwTlp = (PDWORD)pbTlp;
-	PDWORD pdwRx = (PDWORD)ctx->rxbuf.pb;
+	//PDWORD pdwRx = (PDWORD)ctx->rxbuf.pb;
+	// Request Replies
 	Tx.flags = PCIE_F_RECV_REPLY | PCIE_F_TIMEOUT;
 	Tx.data = 0;
-	while (Total < sizeof(Tx)) {
-		len = send(ctx->Sock, (const char *)&Tx + Total, sizeof(Tx) - Total, 0);
-		if (len == 0 || len == SOCKET_ERROR) {
-			fprintf(stderr, "ERROR: send() fails\n");
-			return FALSE;
-		}
-		Total += len;
+	len = send(ctx->Sock, (const char *)&Tx, sizeof(Tx), 0);
+	if(len == 0 || len == SOCKET_ERROR) {
+		fprintf(stderr, "ERROR: send() fails\n");
+		return;
 	}
-	while (cdwTlp < TLP_RX_MAX_SIZE / sizeof(DWORD)) {
-		Total = 0;
-		while (Total < sizeof(Rx)) {
-			len = recv(ctx->Sock, (char *)&Rx + Total, sizeof(Rx) - Total, 0);
-			if (len == 0 || len == SOCKET_ERROR) {
-				fprintf(stderr, "ERROR: recv() fails\n");
-				return FALSE;
-			}
-			Total += len;
-		}		
-		if (Rx.flags & PCIE_F_ERROR) { 
+	// Receive Data
+	ctx->rxbuf.cb = recv(ctx->Sock, ctx->rxbuf.pb, ctx->rxbuf.cbMax, 0);
+	pRx = (PCIE_CTL*)ctx->rxbuf.pb;
+	for(i = 0; i < ctx->rxbuf.cb; i += sizeof(PCIE_CTL)) {
+		if(pRx->flags & PCIE_F_ERROR) { 
 			fprintf(stderr, "ERROR: failed to receive TLP\n");
-			return FALSE; 
+			return; 
 		}
-		if (!(Rx.flags & PCIE_F_HAS_DATA)) { return FALSE; }
-		pdwTlp[cdwTlp] = ENDIAN_SWAP_DWORD(Rx.data);
+		if(!(pRx->flags & PCIE_F_HAS_DATA)) { return; }
+		pdwTlp[cdwTlp] = ENDIAN_SWAP_DWORD(pRx->data);
 		cdwTlp++;
-		if (Rx.flags & PCIE_F_TLAST) { 
+		if(pRx->flags & PCIE_F_TLAST) { 
 			if (cdwTlp >= 3) {
 				if (ctx->isPrintTlp) {
 					TLP_Print(pbTlp, cdwTlp << 2, FALSE);
@@ -224,15 +217,14 @@ BOOL Device605_TCP_RxTlpSynchronous(_In_ PDEVICE_CONTEXT_SP605_TCP ctx)
 				if (ctx->hRxTlpCallbackFn) {
 					ctx->hRxTlpCallbackFn(ctx->pMRdBuffer, pbTlp, cdwTlp << 2, NULL);
 				}
-			}
-			else {
+			} else {
 				fprintf(stderr, "WARNING: BAD PCIe TLP RECEIVED! THIS SHOULD NOT HAPPEN!\n");
-				return FALSE;
+				return;
 			}
-			break; 
+			cdwTlp = 0;
 		}
+		pRx++;
 	}
-	return TRUE;
 }
 
 BOOL Device605_TCP_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
@@ -250,11 +242,10 @@ BOOL Device605_TCP_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwA
 	// prepare
 	ctx->pMRdBuffer = &rxbuf;
 	ctx->hRxTlpCallbackFn = TLP_CallbackMRd;
+	rxbuf.cb = 0;
+	rxbuf.pb = pb;
 	// transmit TLPs
 	while (o < cb) {
-		rxbuf.cb = 0;
-		rxbuf.pb = pb + o;
-		rxbuf.cbMax = TLP_RX_SIZE;
 		memset(tx, 0, 16);
 		is32 = qwAddr + o < 0x100000000;
 		if (is32) {
@@ -279,22 +270,16 @@ BOOL Device605_TCP_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwA
 		for (i = 0; i < 4; i++) {
 			ENDIAN_SWAP_DWORD(tx[i]);
 		}
-		if (!Device605_TCP_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, TRUE) ||
-			!Device605_TCP_RxTlpSynchronous(ctx)) {
-			ctx->hRxTlpCallbackFn = NULL;
-			ctx->pMRdBuffer = NULL;
-			return FALSE;
+		if (!Device605_TCP_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, TRUE)) {
+			break;
 		}
-		if (rxbuf.cb == 0) {
-			ctx->hRxTlpCallbackFn = NULL;
-			ctx->pMRdBuffer = NULL;
-			return FALSE;
-		}
-		o += rxbuf.cb;
+		o += TLP_RX_SIZE;
+		rxbuf.cbMax = o;
+		Device605_TCP_RxTlpSynchronous(ctx);
 	}
 	ctx->hRxTlpCallbackFn = NULL;
-	ctx->pMRdBuffer = NULL;	
-	return TRUE;
+	ctx->pMRdBuffer = NULL;
+	return rxbuf.cb >= cb;
 }
 
 VOID Device605_TCP_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap)
@@ -346,11 +331,10 @@ VOID Device605_TCP_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qw
 		for (j = 0; j < 4; j++) {
 			ENDIAN_SWAP_DWORD(tx[j]);
 		}
-		if(!Device605_TCP_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, TRUE) || !Device605_TCP_RxTlpSynchronous(ctx)) {
-			goto err;
-		}
-	}	
-err:
+		Device605_TCP_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE);
+	}
+	Device605_TCP_TxTlp(ctx, NULL, 0, TRUE);
+	Device605_TCP_RxTlpSynchronous(ctx);
 	ctx->hRxTlpCallbackFn = NULL;
 	ctx->pMRdBuffer = NULL;
 }
@@ -433,9 +417,7 @@ BOOL Device605_TCP_ListenTlp(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ DWORD d
 			return FALSE;
 		}
 		Sleep(10);
-		if (!Device605_TCP_RxTlpSynchronous(ctx)) {
-			return FALSE;
-		}
+		Device605_TCP_RxTlpSynchronous(ctx);
 	}
 	return TRUE;
 }
@@ -468,7 +450,7 @@ BOOL Device605_TCP_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
 	if (!ctx->Sock) { goto fail; }	
 	ctx->wDeviceId = Device605_TCP_GetDeviceID(ctx);
 	if (!ctx->wDeviceId) { goto fail; }	
-	ctx->rxbuf.cbMax = (DWORD)(2.3 * SP605_TCP_MAX_SIZE_RX);
+	ctx->rxbuf.cbMax = (DWORD)(1.5 * SP605_TCP_MAX_SIZE_RX * 0x1000);
 	ctx->rxbuf.pb = LocalAlloc(0, ctx->rxbuf.cbMax);
 	if (!ctx->rxbuf.pb) { goto fail; }
 	ctx->txbuf.cbMax = SP605_TCP_MAX_SIZE_TX + 0x10000;

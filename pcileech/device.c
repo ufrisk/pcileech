@@ -7,7 +7,6 @@
 #include "kmd.h"
 #include "statistics.h"
 #include "device3380.h"
-#include "device605_uart.h"
 #include "device605_601.h"
 #include "device605_tcp.h"
 
@@ -156,9 +155,6 @@ BOOL DeviceOpen(_Inout_ PPCILEECH_CONTEXT ctx)
 	}
 	if(PCILEECH_DEVICE_SP605_FT601 == ctx->cfg->dev.tp || PCILEECH_DEVICE_NA == ctx->cfg->dev.tp) {
 		result = Device605_601_Open(ctx);
-	}
-	if(PCILEECH_DEVICE_SP605_UART == ctx->cfg->dev.tp) {
-		result = Device605_UART_Open(ctx);
 	}
 	if(PCILEECH_DEVICE_SP605_TCP == ctx->cfg->dev.tp) {
 		result = Device605_TCP_Open(ctx);

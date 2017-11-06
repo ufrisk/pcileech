@@ -14,30 +14,30 @@
 // FPGA/SP605/FT601 defines below.
 //-------------------------------------------------------------------------------
 
-#define FPGA_CFG_RX_VALID				0x77000000
-#define FPGA_CFG_RX_VALID_MASK			0xff070000
-#define FPGA_CMD_RX_VALID				0x77020000
-#define FPGA_CMD_RX_VALID_MASK			0xff070000
-
-#define FPGA_TLP_RX_VALID				0x77030000
-#define FPGA_TLP_RX_VALID_MASK			0xff030000
-#define FPGA_TLP_RX_VALID_LAST			0x77070000
-#define FPGA_TLP_RX_VALID_LAST_MASK		0xff070000
-
-#define FPGA_TLP_TX_VALID				0x77030000
-#define FPGA_TLP_TX_VALID_LAST			0x77070000
-#define FPGA_LOOP_TX_VALID     			0x77010000
+#define FPGA_TLP_TX_VALID				0x77000000
+#define FPGA_TLP_TX_VALID_LAST			0x77040000
+#define FPGA_LOOP_TX_VALID     			0x77020000
 
 #define SP605_601_PROBE_MAXPAGES		0x400
-#define SP605_601_MAX_SIZE_RX			0x0001e000	// in data bytes (excl. overhead/TLP headers)
-#define SP605_601_MAX_SIZE_TX			0x00002000   // in total data (incl. overhead/TLP headers)
+#define SP605_601_MAX_SIZE_RX			0x0001f000	// in data bytes (excl. overhead/TLP headers)
+#define SP605_601_MAX_SIZE_TX			0x00002000  // in total data (incl. overhead/TLP headers)
+
+#define FPGA_CMD_VERSION				0x01
+#define FPGA_CMD_PCIE_STATUS			0x02
 
 #define ENDIAN_SWAP_WORD(x)		(x = (x << 8) | (x >> 8))
 #define ENDIAN_SWAP_DWORD(x)	(x = (x << 24) | ((x >> 8) & 0xff00) | ((x << 8) & 0xff0000) | (x >> 24))
 
+// Delay in uS. DELAY_READ=300, DELAY_WRITE=150 -> 85MB/s.
+// Values below are a bit more conservative for hw tolerance reasons.
+#define DELAY_READ				400
+#define DELAY_WRITE				175
+#define DELAY_PROBE				500
+
 typedef struct tdDEVICE_CONTEXT_SP605_601 {
 	WORD wDeviceId;
 	WORD wFpgaVersion;
+	WORD wFpgaStatus;
 	BOOL isPrintTlp;
 	PTLP_CALLBACK_BUF_MRd pMRdBuffer;
 	struct {
@@ -130,29 +130,43 @@ VOID Device605_601_Close(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
 VOID Device605_601_GetDeviceID_FpgaVersion(_In_ PDEVICE_CONTEXT_SP605_601 ctx)
 {
 	DWORD status;
-	DWORD cbTX, cbRX, i, dwStatus, dwData;
+	DWORD cbTX, cbRX, i, j;
 	PBYTE pbRX = LocalAlloc(0, 0x01000000);
+	DWORD dwStatus, dwData, cdwCfg = 0;
+	PDWORD pdwData;
 	BYTE pbTX[24] = {
 		// cfg read addr 0
-		0x00, 0x00, 0x00, 0x00,  0x00, 0x00, 0x00, 0x77,
+		0x00, 0x00, 0x00, 0x00,  0x00, 0x00, 0x01, 0x77,
 		// cmd msg: version
-		0x00, 0x00, 0x00, 0x00,  0x00, 0x00, 0x02, 0x77,
-		// mirror msg -> at least something to read back -> no ft601 freeze.
-		0xff, 0xee, 0xdd, 0xcc,  0x00, 0x00, 0x01, 0x77  
+		0x00, 0x00, 0x00, 0x00,  0x01, 0x00, 0x03, 0x77,
+		// cmd msg: PCIe status
+		0x00, 0x00, 0x00, 0x00,  0x02, 0x00, 0x03, 0x77
 	};
 	status = ctx->dev.pfnFT_WritePipe(ctx->dev.hFTDI, 0x02, pbTX, 24, &cbTX, NULL);
 	if(status) { goto fail; }
 	status = ctx->dev.pfnFT_ReadPipe(ctx->dev.hFTDI, 0x82, pbRX, 0x01000000, &cbRX, NULL);
-	if(status || cbRX < 16) { goto fail; }
-	for(i = 0; i < cbRX - 7; i += 8) {
-		dwData = *(PDWORD)(pbRX + i);
-		dwStatus = *(PDWORD)(pbRX + i + 4);
-		if(!ctx->wDeviceId && (FPGA_CFG_RX_VALID == (FPGA_CFG_RX_VALID_MASK & dwStatus))) {
-			ctx->wDeviceId = dwStatus & 0xffff;
-		}
-		if(!ctx->wFpgaVersion && (FPGA_CMD_RX_VALID == (FPGA_CMD_RX_VALID_MASK & dwStatus))) {
-			ctx->wFpgaVersion = dwData & 0xffff;
-			ENDIAN_SWAP_WORD(ctx->wFpgaVersion);
+	if(status) { goto fail; }
+	for(i = 0; i < cbRX; i += 32) {
+		dwStatus = *(PDWORD)(pbRX + i);
+		pdwData = (PDWORD)(pbRX + i + 4);
+		if((dwStatus & 0xf0000000) != 0xe0000000) { continue; }
+		for(j = 0; j < 7; j++) {
+			dwData = *pdwData;
+			if((dwStatus & 0x03) == 0x03) { // CMD REPLY (or filler)
+				if((dwData >> 24) == FPGA_CMD_VERSION) { // FPGA bitstream version
+					ctx->wFpgaVersion = (WORD)dwData;
+				}
+				if((dwData >> 24) == FPGA_CMD_PCIE_STATUS) { // PCIe status
+					ctx->wFpgaStatus = (WORD)dwData;
+				}
+			}
+			if((dwStatus & 0x03) == 0x01) { // PCIe CFG REPLY
+				if(((++cdwCfg % 2) == 0) && (WORD)dwData) {	// DeviceID
+					ctx->wDeviceId = (WORD)dwData;
+				}
+			}
+			pdwData++;
+			dwStatus >>= 4;
 		}
 	}
 fail:
@@ -198,41 +212,41 @@ BOOL Device605_601_TxTlp(_In_ PDEVICE_CONTEXT_SP605_601 ctx, _In_ PBYTE pbTlp, _
 VOID Device605_601_RxTlpSynchronous(_In_ PDEVICE_CONTEXT_SP605_601 ctx)
 {
 	DWORD status;
-	DWORD dwTlp, dwStatus;
-	DWORD i, cdwTlp = 0;
+	DWORD i, j, cdwTlp = 0;
 	BYTE pbTlp[TLP_RX_MAX_SIZE];
 	PDWORD pdwTlp = (PDWORD)pbTlp;
 	PDWORD pdwRx = (PDWORD)ctx->rxbuf.pb;
-
+	DWORD dwStatus, *pdwData;
 	status = ctx->dev.pfnFT_ReadPipe(ctx->dev.hFTDI, 0x82, ctx->rxbuf.pb, ctx->rxbuf.cbMax, &ctx->rxbuf.cb, NULL);
 	if(status) {
 		ctx->dev.pfnFT_AbortPipe(ctx->dev.hFTDI, 0x82);
 		return;
 	}
-	if((ctx->rxbuf.cb % 8) && (ctx->rxbuf.cb > 4)) {
-		printf("Device Info: SP605 / FT601: Bad read from device. Should not happen!\n");
-		return;
-	}
-	for(i = 0; i < ctx->rxbuf.cb / sizeof(QWORD); i++) { // index in 64-bit (QWORD)
-		dwTlp = pdwRx[i << 1];
-		dwStatus = pdwRx[1 + (i << 1)];
-		if(FPGA_TLP_RX_VALID == (FPGA_TLP_RX_VALID_MASK & dwStatus)) {
-			pdwTlp[cdwTlp] = dwTlp;
-			cdwTlp++;
-			if(cdwTlp >= TLP_RX_MAX_SIZE / sizeof(DWORD)) { return; }
-		}
-		if(FPGA_TLP_RX_VALID_LAST == (FPGA_TLP_RX_VALID_LAST_MASK & dwStatus)) {
-			if(cdwTlp >= 3) {
-				if(ctx->isPrintTlp) {
-					TLP_Print(pbTlp, cdwTlp << 2, FALSE);
-				}
-				if(ctx->hRxTlpCallbackFn) {
-					ctx->hRxTlpCallbackFn(ctx->pMRdBuffer, pbTlp, cdwTlp << 2, NULL);
-				}
-			} else {
-				printf("Device Info: SP605 / FT601: Bad PCIe TLP received! Should not happen!\n");
+	for(i = 0; i < ctx->rxbuf.cb; i += 32) { // index in 64-bit (QWORD)
+		dwStatus = *(PDWORD)(ctx->rxbuf.pb + i);
+		pdwData = (PDWORD)(ctx->rxbuf.pb + i + 4);
+		if((dwStatus & 0xf0000000) != 0xe0000000) { continue; }
+		for(j = 0; j < 7; j++) {
+			if((dwStatus & 0x03) == 0x00) { // PCIe TLP
+				pdwTlp[cdwTlp] = *pdwData;
+				cdwTlp++;
+				if(cdwTlp >= TLP_RX_MAX_SIZE / sizeof(DWORD)) { return; }
 			}
-			cdwTlp = 0;
+			if((dwStatus & 0x07) == 0x04) { // PCIe TLP and LAST
+				if(cdwTlp >= 3) {
+					if(ctx->isPrintTlp) {
+						TLP_Print(pbTlp, cdwTlp << 2, FALSE);
+					}
+					if(ctx->hRxTlpCallbackFn) {
+						ctx->hRxTlpCallbackFn(ctx->pMRdBuffer, pbTlp, cdwTlp << 2, NULL);
+					}
+				} else {
+					printf("Device Info: SP605 / FT601: Bad PCIe TLP received! Should not happen!\n");
+				}
+				cdwTlp = 0;
+			}
+			pdwData++;
+			dwStatus >>= 4;
 		}
 	}
 }
@@ -242,7 +256,7 @@ BOOL Device605_601_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwA
 	PDEVICE_CONTEXT_SP605_601 ctx = (PDEVICE_CONTEXT_SP605_601)ctxPcileech->hDevice;
 	TLP_CALLBACK_BUF_MRd rxbuf;
 	DWORD tx[4], o, i;
-	BOOL is32;
+	BOOL is32, isFlush;
 	PTLP_HDR_MRdWr64 hdrRd64 = (PTLP_HDR_MRdWr64)tx;
 	PTLP_HDR_MRdWr32 hdrRd32 = (PTLP_HDR_MRdWr32)tx;
 	if(cb > SP605_601_MAX_SIZE_RX) { return FALSE; }
@@ -280,10 +294,16 @@ BOOL Device605_601_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwA
 		for(i = 0; i < 4; i++) {
 			ENDIAN_SWAP_DWORD(tx[i]);
 		}
-		Device605_601_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, TRUE, (o % 0x8000 == 0x7000));
+		isFlush = ((o % 0x8000) == 0x7000);
+		if(isFlush) {
+			Device605_601_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE, TRUE);
+			usleep(DELAY_WRITE);
+		} else {
+			Device605_601_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE, FALSE);
+		}
 	}
 	Device605_601_TxTlp(ctx, NULL, 0, TRUE, TRUE);
-	usleep(300);
+	usleep(DELAY_READ);
 	Device605_601_RxTlpSynchronous(ctx);
 	ctx->pMRdBuffer = NULL;
 	return rxbuf.cb >= rxbuf.cbMax;
@@ -340,7 +360,7 @@ VOID Device605_601_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qw
 		Device605_601_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE, (i % 24 == 0));
 	}
 	Device605_601_TxTlp(ctx, NULL, 0, TRUE, TRUE);
-	usleep(300);
+	usleep(DELAY_PROBE);
 	Device605_601_RxTlpSynchronous(ctx);
 	ctx->hRxTlpCallbackFn = NULL;
 	ctx->pMRdBuffer = NULL;
@@ -445,7 +465,7 @@ BOOL Device605_601_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
 	if(!ctx->dev.hFTDI) { goto fail; }
 	Device605_601_GetDeviceID_FpgaVersion(ctx);
 	if(!ctx->wDeviceId) { goto fail; }
-	ctx->rxbuf.cbMax = (DWORD)(2.3 * SP605_601_MAX_SIZE_RX);  // buffer size tuned to lowest possible (+margin) for performance.
+	ctx->rxbuf.cbMax = (DWORD)(1.25 * SP605_601_MAX_SIZE_RX + 0x1000);  // buffer size tuned to lowest possible (+margin) for performance.
 	ctx->rxbuf.pb = LocalAlloc(0, ctx->rxbuf.cbMax);
 	if(!ctx->rxbuf.pb) { goto fail; }
 	ctx->txbuf.cbMax = SP605_601_MAX_SIZE_TX + 0x10000;
@@ -478,7 +498,7 @@ fail:
 
 BOOL Device605_601_Open(_Inout_ PPCILEECH_CONTEXT ctx)
 {
-	if(ctx->cfg->dev.tp == PCILEECH_DEVICE_SP605_UART) {
+	if(ctx->cfg->dev.tp == PCILEECH_DEVICE_SP605_FT601) {
 		printf("SP605 / FT601: Failed. Device currently only supported in PCILeech for Windows.");
 	}
 	return FALSE;

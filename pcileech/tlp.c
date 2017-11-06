@@ -9,54 +9,98 @@
 VOID TLP_Print(_In_ PBYTE pbTlp, _In_ DWORD cbTlp, _In_ BOOL isTx)
 {
 	DWORD i;
+	LPSTR tp = "";
 	BYTE pb[0x1000];
 	PDWORD buf = (PDWORD)pb;
 	PTLP_HDR hdr = (PTLP_HDR)pb;
 	PTLP_HDR_CplD hdrC;
 	PTLP_HDR_MRdWr32 hdrM32;
 	PTLP_HDR_MRdWr64 hdrM64;
+	PTLP_HDR_Cfg hdrCfg;
 	if(cbTlp < 12 || cbTlp > 0x1000 || cbTlp & 0x3) { return; }
 	for(i = 0; i < cbTlp; i += 4) {
 		buf[i >> 2] = _byteswap_ulong(*(PDWORD)(pbTlp + i));
 	}
-	if(hdr->TypeFmt == TLP_CplD) {
+	if((hdr->TypeFmt == TLP_Cpl) || (hdr->TypeFmt == TLP_CplD) || (hdr->TypeFmt == TLP_CplLk) || (hdr->TypeFmt == TLP_CplDLk)) {
+		if(hdr->TypeFmt == TLP_Cpl)    { tp = "Cpl:   "; }
+		if(hdr->TypeFmt == TLP_CplD)   { tp = "CplD:  "; }
+		if(hdr->TypeFmt == TLP_CplLk)  { tp = "CplLk: "; }
+		if(hdr->TypeFmt == TLP_CplDLk) { tp = "CplDLk:"; }
 		hdrC = (PTLP_HDR_CplD)pb;
 		printf(
-			"\n%s: CplD:  ReqID: %04x CplID: %04x Status: %01x BC: %03x Tag: %02x LowAddr: %02x",
-			(isTx ? "TX" : "RX"), 
-			hdrC->RequesterID, 
-			hdrC->CompleterID, 
-			hdrC->Status, 
-			hdrC->ByteCount, 
-			hdrC->Tag, 
+			"\n%s: %s Len: %03x ReqID: %04x CplID: %04x Status: %01x BC: %03x Tag: %02x LowAddr: %02x",
+			(isTx ? "TX" : "RX"),
+			tp,
+			hdr->Length,
+			hdrC->RequesterID,
+			hdrC->CompleterID,
+			hdrC->Status,
+			hdrC->ByteCount,
+			hdrC->Tag,
 			hdrC->LowerAddress
 		);
-	} else if(hdr->TypeFmt == TLP_MRd32 || hdr->TypeFmt == TLP_MWr32) {
+	} else if((hdr->TypeFmt == TLP_MRd32) || (hdr->TypeFmt == TLP_MWr32)) {
 		hdrM32 = (PTLP_HDR_MRdWr32)pb;
 		printf(
-			"\n%s: %s: ReqID: %04x BE_FL: %01x%01x Tag: %02x Addr: %08x", 
+			"\n%s: %s Len: %03x ReqID: %04x BE_FL: %01x%01x Tag: %02x Addr: %08x", 
 			(isTx ? "TX" : "RX"),
-			(hdr->TypeFmt == TLP_MRd32) ? "MRd32" : "MWr32", 
+			(hdr->TypeFmt == TLP_MRd32) ? "MRd32: " : "MWr32: ", 
+			hdr->Length,
 			hdrM32->RequesterID, 
 			hdrM32->FirstBE, 
 			hdrM32->LastBE, 
 			hdrM32->Tag, 
 			hdrM32->Address);
-	} else if(hdr->TypeFmt == TLP_MRd64 || hdr->TypeFmt == TLP_MWr64) {
+	} else if((hdr->TypeFmt == TLP_MRd64) || (hdr->TypeFmt == TLP_MWr64)) {
 		hdrM64 = (PTLP_HDR_MRdWr64)pb;
 		printf(
-			"\n%s: %s: ReqID: %04x BE_FL: %01x%01x Tag: %02x Addr: %016llx", 
+			"\n%s: %s Len: %03x ReqID: %04x BE_FL: %01x%01x Tag: %02x Addr: %016llx",
 			(isTx ? "TX" : "RX"),
-			(hdr->TypeFmt == TLP_MRd64) ? "MRd64" : "MWr64",
+			(hdr->TypeFmt == TLP_MRd64) ? "MRd64: " : "MWr64: ",
+			hdr->Length,
 			hdrM64->RequesterID,
 			hdrM64->FirstBE,
 			hdrM64->LastBE,
 			hdrM64->Tag,
 			((QWORD)hdrM64->AddressHigh << 32) + hdrM64->AddressLow
 		);
+	} else if((hdr->TypeFmt == TLP_IORd) || (hdr->TypeFmt == TLP_IOWr)) {
+		hdrM32 = (PTLP_HDR_MRdWr32)pb; // same format for IO Rd/Wr
+		printf(
+			"\n%s: %s Len: %03x ReqID: %04x BE_FL: %01x%01x Tag: %02x Addr: %08x",
+			(isTx ? "TX" : "RX"),
+			(hdr->TypeFmt == TLP_IORd) ? "IORd:  " : "IOWr:  ",
+			hdr->Length,
+			hdrM32->RequesterID,
+			hdrM32->FirstBE,
+			hdrM32->LastBE,
+			hdrM32->Tag,
+			hdrM32->Address
+		);
+	} else if((hdr->TypeFmt == TLP_CfgRd0) || (hdr->TypeFmt == TLP_CfgRd1) || (hdr->TypeFmt == TLP_CfgWr0) || (hdr->TypeFmt == TLP_CfgWr1)) {
+		if(hdr->TypeFmt == TLP_CfgRd0) { tp = "CfgRd0:"; }
+		if(hdr->TypeFmt == TLP_CfgRd1) { tp = "CfgRd1:"; }
+		if(hdr->TypeFmt == TLP_CfgWr0) { tp = "CfgWr0:"; }
+		if(hdr->TypeFmt == TLP_CfgWr1) { tp = "CfgWr1:"; }
+		hdrCfg = (PTLP_HDR_Cfg)pb;
+		printf(
+			"\n%s: %s Len: %03x ReqID: %04x BE_FL: %01x%01x Tag: %02x Dev: %i:%i.%i ExtRegNum: %01x RegNum: %02x",
+			(isTx ? "TX" : "RX"),
+			tp,
+			hdr->Length,
+			hdrCfg->RequesterID,
+			hdrCfg->FirstBE,
+			hdrCfg->LastBE,
+			hdrCfg->Tag,
+			hdrCfg->BusNum,
+			hdrCfg->DeviceNum,
+			hdrCfg->FunctionNum,
+			hdrCfg->ExtRegNum,
+			hdrCfg->RegNum			
+		);
 	} else { 
 		printf(
-			"\n%s: TLP??: TypeFmt: %02x dwLen: %03x", 
+			"\n%s: TLP???: TypeFmt: %02x dwLen: %03x", 
 			(isTx ? "TX" : "RX"), 
 			hdr->TypeFmt, 
 			hdr->Length

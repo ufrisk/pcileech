@@ -57,7 +57,7 @@ PCILeech supports multiple hardware devices. Please check out the [PCILeech FPGA
 | ----------- | ------- | --------- | ------- | -------------------- | --------------- |
 | USB3380-EVB | USB3380 | USB3      | 150MB/s | No (via KMD only)    | No              |
 | PP3380      | USB3380 | USB3      | 150MB/s | No (via KMD only)    | No              |
-| SP605/FT601 | FPGA    | USB3      |  85MB/s | Yes                  | Yes             |
+| SP605/FT601 | FPGA    | USB3      |  75MB/s | Yes                  | Yes             |
 | SP605/TCP   | FPGA    | TCP/IP    | 100kB/s | Yes                  | Yes             |
 
 Hardware (USB3380):
@@ -216,3 +216,7 @@ v2.4
 * Linux file system mount support for kernel version 4.11 later.
 * Improved memory reading algorithm for FPGA devices.
 * Various bug fixes.
+
+v2.5
+* SP605/FT601: re-designed and improved. NB! FPGA device have to be re-flashed with new bitstream!
+* SP605/TCP: bug fixes.

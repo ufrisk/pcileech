@@ -392,13 +392,11 @@ QWORD KMD_Linux48KernelBaseSeek(_Inout_ PPCILEECH_CONTEXT ctx)
 	// assumed to end with 0x100 0x00's.
 	for(; qwA <= qwAddrMax; qwA += 0x00200000) {
 		ps.qwAddr = qwA;
-		// only read partial page to speed up SP605 if connected via UART
-		// TODO: investigate if this is slower/faster than reading whole pages on FPGA solution.
 		if(!DeviceReadDMA(ctx, qwA, pb, ctx->cfg->fPartialPageReadSupported ? 0x400 : 0x1000, 0)) {
-			ps.cPageFail += 512;
+			PageStatUpdate(&ps, qwA, 0, 512);
 			continue;
 		}
-		ps.cPageSuccess += 512;
+		PageStatUpdate(&ps, qwA, 512, 0);
 		// Search for GenuineIntel and AuthenticAMD strings.
 		isGenuineIntel = isAuthenticAMD = FALSE;
 		for(i = 0; i < 0x400; i++) {
