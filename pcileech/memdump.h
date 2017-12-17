@@ -47,4 +47,11 @@ VOID ActionMemoryTestReadWrite(_Inout_ PPCILEECH_CONTEXT ctx);
 */
 VOID ActionMemoryPageDisplay(_Inout_ PPCILEECH_CONTEXT ctx);
 
+/*
+* Print out a maximum of 16kB (0x10000) memory limited by the min and max
+* parameters in pCfg. By default 0x100 bytes are displayed.
+* -- ctx
+*/
+VOID ActionMemoryDisplay(_Inout_ PPCILEECH_CONTEXT ctx);
+
 #endif /* __MEMDUMP_H__ */

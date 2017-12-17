@@ -30,9 +30,9 @@
 
 // Delay in uS. DELAY_READ=300, DELAY_WRITE=150 -> 85MB/s.
 // Values below are a bit more conservative for hw tolerance reasons.
-#define DELAY_READ				400
-#define DELAY_WRITE				175
-#define DELAY_PROBE				500
+#define DELAY_READ_DEFAULT				400
+#define DELAY_WRITE_DEFAULT				175
+#define DELAY_PROBE_DEFAULT				500
 
 typedef struct tdDEVICE_CONTEXT_SP605_601 {
 	WORD wDeviceId;
@@ -84,8 +84,9 @@ typedef struct tdDEVICE_CONTEXT_SP605_601 {
 
 	} dev;
 	BOOL(*hRxTlpCallbackFn)(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMrd, _In_ PBYTE pb, _In_ DWORD cb, _In_opt_ HANDLE hEventCompleted);
-	QWORD dbg_qwLastTx[8];
-	DWORD dbg_cbLastTx;
+	DWORD DELAY_READ;
+	DWORD DELAY_WRITE;
+	DWORD DELAY_PROBE;
 } DEVICE_CONTEXT_SP605_601, *PDEVICE_CONTEXT_SP605_601;
 
 //-------------------------------------------------------------------------------
@@ -297,13 +298,13 @@ BOOL Device605_601_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwA
 		isFlush = ((o % 0x8000) == 0x7000);
 		if(isFlush) {
 			Device605_601_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE, TRUE);
-			usleep(DELAY_WRITE);
+			usleep(ctx->DELAY_WRITE);
 		} else {
 			Device605_601_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE, FALSE);
 		}
 	}
 	Device605_601_TxTlp(ctx, NULL, 0, TRUE, TRUE);
-	usleep(DELAY_READ);
+	usleep(ctx->DELAY_READ);
 	Device605_601_RxTlpSynchronous(ctx);
 	ctx->pMRdBuffer = NULL;
 	return rxbuf.cb >= rxbuf.cbMax;
@@ -360,7 +361,7 @@ VOID Device605_601_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qw
 		Device605_601_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE, (i % 24 == 0));
 	}
 	Device605_601_TxTlp(ctx, NULL, 0, TRUE, TRUE);
-	usleep(DELAY_PROBE);
+	usleep(ctx->DELAY_PROBE);
 	Device605_601_RxTlpSynchronous(ctx);
 	ctx->hRxTlpCallbackFn = NULL;
 	ctx->pMRdBuffer = NULL;
@@ -472,6 +473,9 @@ BOOL Device605_601_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
 	ctx->txbuf.pb = LocalAlloc(0, ctx->txbuf.cbMax);
 	if(!ctx->txbuf.pb) { goto fail; }
 	ctx->isPrintTlp = ctxPcileech->cfg->fVerboseExtra;
+	ctx->DELAY_READ = ctxPcileech->cfg->qwDeviceOpt[0] ? (DWORD)ctxPcileech->cfg->qwDeviceOpt[0] : DELAY_READ_DEFAULT;
+	ctx->DELAY_WRITE = ctxPcileech->cfg->qwDeviceOpt[1] ? (DWORD)ctxPcileech->cfg->qwDeviceOpt[1] : DELAY_WRITE_DEFAULT;
+	ctx->DELAY_PROBE = ctxPcileech->cfg->qwDeviceOpt[2] ? (DWORD)ctxPcileech->cfg->qwDeviceOpt[2] : DELAY_PROBE_DEFAULT;
 	// set callback functions and fix up config
 	ctxPcileech->cfg->dev.tp = PCILEECH_DEVICE_SP605_FT601;
 	ctxPcileech->cfg->dev.qwMaxSizeDmaIo = SP605_601_MAX_SIZE_RX;
@@ -484,7 +488,13 @@ BOOL Device605_601_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
 	ctxPcileech->cfg->dev.pfnWriteTlp = Device605_601_WriteTlp;
 	ctxPcileech->cfg->dev.pfnListenTlp = Device605_601_ListenTlp;
 	// return
-	if(ctxPcileech->cfg->fVerbose) { printf("Device Info: SP605 / FT601.\n"); }
+	if(ctxPcileech->cfg->fVerbose) { 
+		if((ctx->DELAY_READ != DELAY_READ_DEFAULT) || (ctx->DELAY_WRITE != DELAY_WRITE_DEFAULT) || (ctx->DELAY_PROBE != DELAY_PROBE_DEFAULT)) {
+			printf("Device Info: SP605 / FT601 [%i,%i,%i]\n", ctx->DELAY_READ, ctx->DELAY_WRITE, ctx->DELAY_PROBE);
+		} else {
+			printf("Device Info: SP605 / FT601.\n");
+		}
+	}
 	return TRUE;
 fail:
 	Device605_601_Close(ctxPcileech);

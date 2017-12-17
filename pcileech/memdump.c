@@ -154,16 +154,37 @@ VOID ActionMemoryProbe(_Inout_ PPCILEECH_CONTEXT ctx)
 	printf("Memory Probe: Completed.\n");
 }
 
-VOID ActionMemoryPageDisplay(_Inout_ PPCILEECH_CONTEXT ctx)
+VOID ActionMemoryDisplay(_Inout_ PPCILEECH_CONTEXT ctx)
 {
-	BYTE pb[4096];
-	QWORD qwAddr = ctx->cfg->qwAddrMin & 0x0fffffffffffff000;
-	if(!DeviceReadMEM(ctx, qwAddr, pb, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
-		printf("Memory Page Read: Failed reading memory at address: 0x%016llX.\n", qwAddr);
+	QWORD qwAddrBase, qwAddrOffset, qwSize, qwSize_4kAlign;
+	PBYTE pb;
+	// allocate and calculate values
+	pb = LocalAlloc(0, 0x10000);
+	if(!pb) { return; }
+	qwAddrBase = ctx->cfg->qwAddrMin & 0x0fffffffffffff000;
+	qwAddrOffset = ctx->cfg->qwAddrMin & 0xff0;
+	qwSize_4kAlign = SIZE_PAGE_ALIGN_4K(ctx->cfg->qwAddrMax) - qwAddrBase;
+	qwSize = ((ctx->cfg->qwAddrMax + 0xf) & 0x0fffffffffffffff0) - (qwAddrBase + qwAddrOffset);
+	if(qwSize_4kAlign > 0x10000) {
+		qwSize = 0x100;
+		qwSize_4kAlign = (qwAddrOffset <= 0xf00) ? 0x1000 : 0x2000;
+	}
+	// read memory and display output
+	if(!DeviceReadMEM(ctx, qwAddrBase, pb, (DWORD)qwSize_4kAlign, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
+		printf("Memory Display: Failed reading memory at address: 0x%016llX.\n", qwAddrBase);
+		LocalFree(pb);
 		return;
 	}
-	printf("Memory Page Read: Page contents for address: 0x%016llX\n", qwAddr);
-	Util_PrintHexAscii(pb, 4096);
+	printf("Memory Display: Contents for address: 0x%016llX\n", qwAddrBase);
+	Util_PrintHexAscii(pb, (DWORD)qwSize, (DWORD)qwAddrOffset);
+	LocalFree(pb);
+}
+
+VOID ActionMemoryPageDisplay(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	ctx->cfg->qwAddrMin = ctx->cfg->qwAddrMin & 0x0fffffffffffff000;
+	ctx->cfg->qwAddrMax = ctx->cfg->qwAddrMin + 0x1000;
+	ActionMemoryDisplay(ctx);
 }
 
 VOID ActionMemoryTestReadWrite(_Inout_ PPCILEECH_CONTEXT ctx)

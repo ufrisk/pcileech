@@ -1,7 +1,7 @@
 // wx64_common.c : support functions used by Windows x64 KMDs started by stage3 EXEC.
 // Compatible with Windows x64.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 
@@ -70,36 +70,35 @@ QWORD KernelGetModuleBase(_In_ PKERNEL_FUNCTIONS fnk, _In_ LPSTR szModuleName)
 
 VOID InitializeKernelFunctions(_In_ QWORD qwNtosBase, _Out_ PKERNEL_FUNCTIONS fnk)
 {
-	QWORD FUNC2[][2] = {
-		{ &fnk->_stricmp,					H__stricmp },
-		{ &fnk->ExAllocatePool,				H_ExAllocatePool },
-		{ &fnk->ExFreePool,					H_ExFreePool },
-		{ &fnk->IoCreateDriver,				H_IoCreateDriver },
-		{ &fnk->KeDelayExecutionThread,		H_KeDelayExecutionThread },
-		{ &fnk->KeGetCurrentIrql,			H_KeGetCurrentIrql },
-		{ &fnk->MmGetPhysicalAddress,		H_MmGetPhysicalAddress },
-		{ &fnk->MmLoadSystemImage,			H_MmLoadSystemImage },
-		{ &fnk->MmMapIoSpace,				H_MmMapIoSpace },
-		{ &fnk->MmUnloadSystemImage,		H_MmUnloadSystemImage },
-		{ &fnk->MmUnmapIoSpace,				H_MmUnmapIoSpace },
-		{ &fnk->RtlAnsiStringToUnicodeString, H_RtlAnsiStringToUnicodeString },
-		{ &fnk->RtlCopyMemory,				H_RtlCopyMemory },
-		{ &fnk->RtlFreeUnicodeString,		H_RtlFreeUnicodeString },
-		{ &fnk->RtlInitAnsiString,			H_RtlInitAnsiString },
-		{ &fnk->RtlInitUnicodeString,		H_RtlInitUnicodeString },
-		{ &fnk->RtlInitUnicodeString,		H_RtlInitUnicodeString },
-		{ &fnk->RtlZeroMemory,				H_RtlZeroMemory },
-		{ &fnk->ZwClose,					H_ZwClose },
-		{ &fnk->ZwCreateFile,				H_ZwCreateFile },
-		{ &fnk->ZwOpenFile,					H_ZwOpenFile },
-		{ &fnk->ZwReadFile,					H_ZwReadFile },
-		{ &fnk->ZwQueryDirectoryFile,		H_ZwQueryDirectoryFile },
-		{ &fnk->ZwQuerySystemInformation,	H_ZwQuerySystemInformation },
-		{ &fnk->ZwSetSystemInformation,		H_ZwSetSystemInformation },
-		{ &fnk->ZwWriteFile,				H_ZwWriteFile }
-	};
-	for(QWORD j = 0; j < (sizeof(FUNC2) / sizeof(QWORD[2])); j++) {
-		*(PQWORD)FUNC2[j][0] = PEGetProcAddressH(qwNtosBase, (DWORD)FUNC2[j][1]);
+	DWORD i = 0, NAMES[25];
+	NAMES[i++] = H__stricmp;
+	NAMES[i++] = H_ExAllocatePool;
+	NAMES[i++] = H_ExFreePool;
+	NAMES[i++] = H_IoCreateDriver;
+	NAMES[i++] = H_KeDelayExecutionThread;
+	NAMES[i++] = H_KeGetCurrentIrql;
+	NAMES[i++] = H_MmGetPhysicalAddress;
+	NAMES[i++] = H_MmLoadSystemImage;
+	NAMES[i++] = H_MmMapIoSpace;
+	NAMES[i++] = H_MmUnloadSystemImage;
+	NAMES[i++] = H_MmUnmapIoSpace;
+	NAMES[i++] = H_RtlAnsiStringToUnicodeString;
+	NAMES[i++] = H_RtlCopyMemory;
+	NAMES[i++] = H_RtlFreeUnicodeString;
+	NAMES[i++] = H_RtlInitAnsiString;
+	NAMES[i++] = H_RtlInitUnicodeString;
+	NAMES[i++] = H_RtlZeroMemory;
+	NAMES[i++] = H_ZwClose;
+	NAMES[i++] = H_ZwCreateFile;
+	NAMES[i++] = H_ZwOpenFile;
+	NAMES[i++] = H_ZwQueryDirectoryFile;
+	NAMES[i++] = H_ZwQuerySystemInformation;
+	NAMES[i++] = H_ZwSetSystemInformation;
+	NAMES[i++] = H_ZwReadFile;
+	NAMES[i++] = H_ZwWriteFile;
+	while(i) {
+		i--;
+		*((PQWORD)fnk + i) = (QWORD)PEGetProcAddressH(qwNtosBase, NAMES[i]);
 	}
 }
 

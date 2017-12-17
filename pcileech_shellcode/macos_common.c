@@ -89,7 +89,7 @@ BOOL GetMemoryMap(PKMDDATA pk, PBYTE pbBuffer4k_PhysicalMemoryRange, PQWORD pcbB
 QWORD MapMemoryPhysical(PKMDDATA pk, QWORD qwMemoryBase)
 {
 	for(DWORD i = 0; i < 512 * 8; i++) { // PT*8 -> Pages (16MB)
-		((PQWORD)(pk->ReservedKMD + 0x2000))[i] = 0x0000000000000003 | (qwMemoryBase + 0x1000 * i);
+		((PQWORD)(pk->ReservedKMD[0] + 0x2000))[i] = 0x0000000000000003 | (qwMemoryBase + 0x1000 * i);
 	}
 	PageFlush();
 	return 0xffffee8000000000;

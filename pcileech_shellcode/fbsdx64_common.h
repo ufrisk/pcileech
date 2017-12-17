@@ -27,7 +27,7 @@ typedef unsigned long			STATUS;
 * KMD DATA struct. This struct must be contained in a 4096 byte section (page).
 * This page/struct is used to communicate between the inserted kernel code and
 * the pcileech program.
-* VNR: 002
+* VNR: 003
 */
 typedef struct tdKMDDATA {
 	QWORD MAGIC;					// [0x000] magic number 0x0ff11337711333377.
@@ -38,11 +38,11 @@ typedef struct tdKMDDATA {
 	QWORD DMAAddrVirtual;			// [0x028] virtual address of DMA buffer.
 	QWORD _status;					// [0x030] status of operation
 	QWORD _result;					// [0x038] result of operation TRUE|FALSE
-	QWORD _address;					// [0x040] virtual address to operate on.
+	QWORD _address;					// [0x040] address to operate on.
 	QWORD _size;					// [0x048] size of operation / data in DMA buffer.
 	QWORD OperatingSystem;			// [0x050] operating system type
-	QWORD ReservedKMD;				// [0x058] reserved for specific kmd data (dependant on KMD version).
-	QWORD ReservedFutureUse1[20];	// [0x060] reserved for future use.
+	QWORD ReservedKMD[8];			// [0x058] reserved for specific kmd data (dependant on KMD version).
+	QWORD ReservedFutureUse1[13];	// [0x098] reserved for future use.
 	QWORD dataInExtraLength;		// [0x100] length of extra in-data.
 	QWORD dataInExtraOffset;		// [0x108] offset from DMAAddrPhysical/DMAAddrVirtual.
 	QWORD dataInExtraLengthMax;		// [0x110] maximum length of extra in-data. 

@@ -664,14 +664,15 @@ VOID Util_WaitForPowerCycle(_Inout_ PPCILEECH_CONTEXT ctx)
 	Util_WaitForPowerOn(ctx);
 }
 
-VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb)
+VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset)
 {
 	DWORD i, j;
-	if(cb > 8192) {
-		printf("Large output. Only displaying first 8192 bytes.\n");
-		cb = 8192;
+	if(cb > 0x10000) {
+		printf("Large output. Only displaying first 65kB.\n");
+		cb = 0x10000 - cbInitialOffset;
 	}
-	for(i = 0; i < cb + ((cb % 16) ? (16 - cb % 16) : 0); i++)
+	cb += cbInitialOffset;
+	for(i = cbInitialOffset; i < cb + ((cb % 16) ? (16 - cb % 16) : 0); i++)
 	{
 		// address
 		if(0 == i % 16) {

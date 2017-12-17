@@ -47,6 +47,7 @@ VOID Help_ShowGeneral()
 		"   kmdload                DMA       [ pt, cr3 ]                                \n" \
 		"   kmdexit                    KMD                                              \n" \
 		"   mount                      KMD   [ s ]          (Windows only feature)      \n" \
+		"   display                DMA,KMD   [ min, max ]                               \n" \
 		"   pagedisplay            DMA,KMD   [ min ]                                    \n" \
 		"   pt_phys2virt           DMA,KMD   [ cr3, 0 ]                                 \n" \
 		"   testmemread            DMA       [ min ]                                    \n" \
@@ -94,6 +95,9 @@ VOID Help_ShowGeneral()
 		"          Valid options: USB3380, SP605_FT601, SP605_TCP                       \n" \
 		"   -device-addr: Remote address for -device SP605_TCP.                         \n" \
 		"   -device-port: Remote TCP port for -device SP605_TCP. Default value: 28472.  \n" \
+		"   -device-opt[0-3]: Optional additional device configuration for some devices.\n" \
+		"          SP605_FT605 device: NB! 0 = default!. -device-opt0 = delay read uS   \n" \
+		"                -device-opt1 = delay write uS, -device-opt2 = delay probe uS   \n" \
 		"   -help: show help about the selected command or implant and then exit        \n" \
 		"          without running the command. Affects all modes and commands.         \n" \
 		"          Option has no value. Example: -help                                  \n" \
@@ -140,7 +144,7 @@ VOID Help_ShowInfo()
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
 		" PCILeech (c) 2016, 2017 Ulf Frisk                                             \n" \
-		" Version: 2.5                                                                  \n" \
+		" Version: 2.5.1                                                                \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \

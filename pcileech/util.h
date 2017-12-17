@@ -221,7 +221,8 @@ VOID Util_WaitForPowerOn(_Inout_ PPCILEECH_CONTEXT ctx);
 * Print a maximum of 8192 bytes of binary data as hexascii on the screen.
 * -- pb
 * -- cb
+* -- cbInitialOffset = offset, must be max 0x1000 and multiple of 0x10.
 */
-VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb);
+VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset);
 
 #endif /* __UTIL_H__ */

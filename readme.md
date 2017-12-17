@@ -220,3 +220,7 @@ v2.4
 v2.5
 * SP605/FT601: re-designed and improved. NB! FPGA device have to be re-flashed with new bitstream!
 * SP605/TCP: bug fixes.
+
+Latest
+* Display command added.
+* Various bug fixes.

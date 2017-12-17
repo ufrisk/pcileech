@@ -107,7 +107,7 @@ VOID TLP_Print(_In_ PBYTE pbTlp, _In_ DWORD cbTlp, _In_ BOOL isTx)
 		);
 	}
 	printf("\n");
-	Util_PrintHexAscii(pbTlp, cbTlp);
+	Util_PrintHexAscii(pbTlp, cbTlp, 0);
 }
 
 BOOL TLP_CallbackMRd(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMRd, _In_ PBYTE pb, _In_ DWORD cb, _In_opt_ HANDLE hEventCompleted)

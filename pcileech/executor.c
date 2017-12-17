@@ -342,7 +342,7 @@ VOID ActionExecShellcode(_Inout_ PPCILEECH_CONTEXT ctx)
 			goto fail;
 		}
 		// print to screen
-		Util_PrintHexAscii(pbBuffer, cbLength);
+		Util_PrintHexAscii(pbBuffer, cbLength, 0);
 		// write to out file
 		if(ctx->cfg->szFileOut[0]) {
 			// open output file

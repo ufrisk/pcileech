@@ -33,6 +33,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
 		{.tp = MOUNT,.sz = "mount" },
 		{.tp = USB3380_START8051,.sz = "8051start" },
 		{.tp = USB3380_STOP8051,.sz = "8051stop" },
+		{.tp = DISPLAY,.sz = "display" },
 		{.tp = PAGEDISPLAY,.sz = "pagedisplay" },
 		{.tp = TESTMEMREAD,.sz = "testmemread" },
 		{.tp = TESTMEMREADWRITE,.sz = "testmemreadwrite" },
@@ -151,7 +152,9 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
 			}
 		} else if(2 == strlen(argv[i]) && '0' <= argv[i][1] && '9' >= argv[i][1]) { // -0..9 param
 			ctx->cfg->qwDataIn[argv[i][1] - '0'] = Util_GetNumeric(argv[i + 1]);
-		} 
+		} else if(!memcmp(argv[i], "-device-opt", 11) && (argv[i][11] >= '0') && (argv[i][11] <= '3')) { // -devopt[0-3] (device options)
+			ctx->cfg->qwDeviceOpt[argv[i][11] - '0'] = Util_GetNumeric(argv[i + 1]);
+		}
 		i += 2;
 	}
 	if(!ctx->cfg->pbIn) {
@@ -208,6 +211,14 @@ int main(_In_ int argc, _In_ char* argv[])
 		printf("PCILEECH: Out of memory.\n");
 		return 1;
 	}
+	//LPSTR szTMP[] = { "", "-device", "SP605_TCP", "-device-addr", "192.168.1.2", "dump", "-out", "none", "-min", "0x100000000", "-max", "0x110010000" };
+	//LPSTR szTMP[] = { "", "kmdload", "-kmd", "win10x64_ntfs_20170919_14240.kmd", "-min", "0x100000000" };
+	//LPSTR szTMP[] = { "", "mount", "-kmd", "win10_x64"};
+	//LPSTR szTMP[] = { "", "write", "-min", "0xc6010000", "-in", "c:\\temp\\16M_zero.raw"};
+	//LPSTR szTMP[] = { "", "pagedisplay", "-min", "0x1000", "-vv"};
+	///LPSTR szTMP[] = { "", "dump", "-out", "none", "-min", "0x100000000", "-max", "0x120000000"};
+	//LPSTR szTMP[] = { "", "tlp", "-in", "00000000c30000ffc1000000", "-vv"};
+	//result = PCILeechConfigIntialize(sizeof(szTMP) / sizeof(LPSTR), szTMP, ctx);
 	result = PCILeechConfigIntialize((DWORD)argc, argv, ctx);
 	if(!result) {
 		Help_ShowGeneral();
@@ -257,6 +268,8 @@ int main(_In_ int argc, _In_ char* argv[])
 		ActionMemoryDump(ctx);
 	} else if(ctx->cfg->tpAction == WRITE) {
 		ActionMemoryWrite(ctx);
+	} else if(ctx->cfg->tpAction == DISPLAY) {
+		ActionMemoryDisplay(ctx);
 	} else if(ctx->cfg->tpAction == PAGEDISPLAY) {
 		ActionMemoryPageDisplay(ctx);
 	} else if(ctx->cfg->tpAction == PATCH) {

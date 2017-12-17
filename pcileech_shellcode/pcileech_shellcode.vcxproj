@@ -66,6 +66,8 @@
     <ClCompile Include="uefi_common.c" />
     <ClCompile Include="uefi_kmd_c.c" />
     <ClCompile Include="uefi_textout.c" />
+    <ClCompile Include="uefi_winload_ntos_kmd_c.c" />
+    <ClCompile Include="uefi_winload_ntos_patch.c" />
     <ClCompile Include="wx64_common.c" />
     <ClCompile Include="wx64_driverinfo.c" />
     <ClCompile Include="wx64_driverload_svc.c" />
@@ -95,6 +97,7 @@
     <None Include="macos_stage3.asm" />
     <None Include="uefi_common_a.asm" />
     <None Include="uefi_kmd.asm" />
+    <None Include="uefi_winload_ntos_kmd.asm" />
     <None Include="wx64_common_a.asm" />
     <None Include="wx64_exec_user.asm" />
     <None Include="wx64_pageinfo.asm" />
