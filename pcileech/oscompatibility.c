@@ -10,6 +10,7 @@
 VOID usleep(_In_ DWORD us)
 {
 	QWORD tmFreq, tmStart, tmNow, tmThreshold;
+	if(us == 0) { return; }
 	QueryPerformanceFrequency((PLARGE_INTEGER)&tmFreq);
 	tmThreshold = tmFreq * us / (1000 * 1000);	// dw_uS uS
 	QueryPerformanceCounter((PLARGE_INTEGER)&tmStart);

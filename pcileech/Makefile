@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-I. -D LINUX -pthread `pkg-config libusb-1.0 --libs --cflags`
 DEPS = pcileech.h
-OBJ = pcileech oscompatibility.o pcileech.o device.o device3380.o device605_601.o device605_tcp.o executor.o extra.o help.o kmd.o memdump.o mempatch.o statistics.o tlp.o util.o vfs.o
+OBJ = pcileech oscompatibility.o pcileech.o device.o device3380.o devicefpga.o device605_tcp.o executor.o extra.o help.o kmd.o memdump.o mempatch.o statistics.o tlp.o util.o vfs.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)

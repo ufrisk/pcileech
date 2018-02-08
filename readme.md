@@ -6,7 +6,7 @@ PCILeech supports multiple hardware. USB3380 based hardware is only able to read
 
 PCILeech is capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. PCIleech runs on Windows/Linux/Android. Supported target systems are currently the x64 versions of: UEFI, Linux, FreeBSD, macOS and Windows.
 
-<img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_mbp.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_m2.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_shadow.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_dump.gif" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_mount.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/314e527e13e78edd44cc6db2b7c05cfa4a1ce322/_gh_android.jpg" height="150"/>
+<img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_mbp.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_m2.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_shadow.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/314e527e13e78edd44cc6db2b7c05cfa4a1ce322/_gh_android.jpg" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/2df37be67047e19ea2c3f73be67a0ba06fea203d/_gh_dump.gif" height="150"/><img src="https://gist.githubusercontent.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/ab5032dac2600acf1480d81ac265b66fecaaa9b2/_gh_ac701_pcileech_main.jpg" height="150"/><img src="https://gist.github.com/ufrisk/c5ba7b360335a13bbac2515e5e7bb9d7/raw/ab5032dac2600acf1480d81ac265b66fecaaa9b2/_gh_pciescreamer_pcileech_main.jpg" height="150"/>
 
 Capabilities:
 =============
@@ -30,6 +30,31 @@ Capabilities:
 
 \*) macOS High Sierra is not supported.
 
+Hardware:
+=================
+PCILeech supports multiple hardware devices. Please check out the [PCILeech FPGA project](https://github.com/ufrisk/pcileech-fpga/) for information about supported FPGA based hardware. Please check out [PCILeech USB3380](usb3380.md) for information about USB3380 based hardware. 
+
+Please find a device comparision table below.
+
+| Device                                    | Type | Interface | Speed | 64-bit memory access | PCIe TLP access |
+| -------------------------------------------------------- | ------- | ---- | ------- | ----------------- | --- |
+| [AC701/FT601](https://github.com/ufrisk/pcileech-fpga/)  | FPGA    | USB3 | 150MB/s | Yes               | Yes |
+| [PCIeScreamer](https://github.com/ufrisk/pcileech-fpga/) | FPGA    | USB3 | 100MB/s | Yes               | Yes |
+| [SP605/FT601](https://github.com/ufrisk/pcileech-fpga/)  | FPGA    | USB3 |  75MB/s | Yes               | Yes |
+| [SP605/TCP](https://github.com/ufrisk/pcileech-fpga/)    | FPGA  | TCP/IP | 100kB/s | Yes               | Yes |
+| [USB3380-EVB](usb3380.md)                                | USB3380 | USB3 | 150MB/s | No (via KMD only) | No  |
+| [PP3380](usb3380.md)                                     | USB3380 | USB3 | 150MB/s | No (via KMD only) | No  |
+
+Recommended adapters:
+* PE3B - ExpressCard to mini-PCIe.
+* PE3A - ExpressCard to PCIe.
+* ADP - PCIe to mini-PCIe.
+* P15S-P15F - M.2 Key A+E to mini-PCIe.
+* Sonnet Echo ExpressCard Pro - Thunderbolt to ExpressCard.
+* Apple Thunderbolt3 (USB-C) - Thunderbolt2 dongle.
+
+Please note that other adapters may also work.
+
 Installing PCILeech:
 ====================
 Please ensure you do have the most recent version of PCILeech by visiting the PCILeech github repository at: https://github.com/ufrisk/pcileech
@@ -48,51 +73,6 @@ PCILeech on Linux must be run as root. PCILeech also requires libusb. Libusb is 
 
 #### Android:
 Separate instructions for [Android](Android.md).
-
-Hardware:
-=================
-PCILeech supports multiple hardware devices. Please check out the [PCILeech FPGA project](https://github.com/ufrisk/pcileech-fpga/) for information about supported FPGA based hardware. Please find a device comparision table below. More information about USB3380 devices are also found below.
-
-| Device      | Type    | Interface | Speed   | 64-bit memory access | PCIe TLP access |
-| ----------- | ------- | --------- | ------- | -------------------- | --------------- |
-| USB3380-EVB | USB3380 | USB3      | 150MB/s | No (via KMD only)    | No              |
-| PP3380      | USB3380 | USB3      | 150MB/s | No (via KMD only)    | No              |
-| SP605/FT601 | FPGA    | USB3      |  75MB/s | Yes                  | Yes             |
-| SP605/TCP   | FPGA    | TCP/IP    | 100kB/s | Yes                  | Yes             |
-
-Hardware (USB3380):
-=================
-PCILeech use the PLX Technologies USB3380 chip. The actual chip can be purchased for around $15, but it's more convenient to purchase a development board on which the chip is already mounted. Development boards can be purchased from BPlus Technology, or on eBay / Ali Express. Please note that adapters may be required too depending on your requirements. In addition to the USB3380 PCILeech also supports not yet released FPGA based hardware.
-
-http://www.bplus.com.tw/PLX.html
-
-The hardware confirmed working is:
-* USB3380-EVB mini-PCIe card.
-* PP3380-AB PCIe card.
-
-Please note that the ExpressCard EC3380-AB is not working!
-
-Please note that the USB3380-AB EVK-RC kit is not working!
-
-Recommended adapters:
-* PE3B - ExpressCard to mini-PCIe.
-* PE3A - ExpressCard to PCIe.
-* ADP - PCIe to mini-PCIe.
-* P15S-P15F - M.2 Key A+E to mini-PCIe.
-* Sonnet Echo ExpressCard Pro - Thunderbolt to ExpressCard.
-* Apple Thunderbolt3 (USB-C) - Thunderbolt2 dongle.
-
-Please note that other adapters may also work.
-
-Flashing Hardware (USB3380):
-==================
-In order to turn the USB3380 development board into a PCILeech device it must be flashed. Flashing may be done in Windows 10 (as administrator) or in Linux (as root). The board must be connected to the system via PCIe when performing the initial flash.
-
-To flash in Windows 10 unzip all contents of the ` flash.zip ` archive found in ` pcileech_files `. Run ` PCILeechFlash_Installer.exe `and follow the instructions.
-
-Flashing in 32-bit Windows or in Windows 7 is not supported.
-
-If flashing fails or if Linux is preferred please see [pcileech_flash/linux](pcileech_flash/linux) for instructions.
 
 Examples:
 =========
@@ -158,17 +138,18 @@ Force the usage of a specific device (instead of default auto detecting it). The
 
 Generating Signatures:
 ======================
-PCILeech comes with built in signatures for Windows, Linux, FreeBSD and macOS. For Windows 8.1 or later it is also possible to use the pcileech_gensig.exe program to generate alternative signatures.
+PCILeech comes with built in signatures for Windows, Linux, FreeBSD and macOS. For Windows 10 it is also possible to use the pcileech_gensig.exe program to generate alternative signatures.
 
 Limitations/Known Issues:
 =========================
 * Read and write errors on some hardware with the USB3380. Try `pcileech.exe testmemreadwrite -min 0x1000` to test memory reads and writes against the physical address 0x1000 (or any other address) in order to confirm. If issues exists downgrading to USB2 may help.
+* The PCIeScreamer device may currently experience instability depending on target configuration and any adapters used. 
 * Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10 with Virtualization based security features enabled does not work fully - this is however not the default setting in Windows 10 or Linux.
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * Linux based on the 4.8 kernel and later might not work with the USB3380 hardware. As an alternative, if target root access exists, compile and insert .ko (pcileech_kmd/linux). If the system is EFI booted an alternative signature exists.
 * Windows 7: signatures are not published.
 * The Linux/Android versions of PCILeech dumps memory slightly slower than the Windows version. Mount target file system and live RAM are also not availabe in the Linux/Android versions.
-* FPGA support for the SP605/FT601 device only exists for Windows. Linux and Android support is planned for the future.
+* FPGA support only exists for Windows. Linux and Android support is planned for the future.
 
 Building:
 =========
@@ -221,6 +202,7 @@ v2.5
 * SP605/FT601: re-designed and improved. NB! FPGA device have to be re-flashed with new bitstream!
 * SP605/TCP: bug fixes.
 
-Latest
+v2.6
+* FPGA: Support for PCIeScreamer and AC701/FT601 devices added.
 * Display command added.
 * Various bug fixes.

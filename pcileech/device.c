@@ -1,13 +1,13 @@
 // device.c : implementation related to hardware devices.
 //
-// (c) Ulf Frisk, 2016, 2017
+// (c) Ulf Frisk, 2016-2018
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "device.h"
 #include "kmd.h"
 #include "statistics.h"
 #include "device3380.h"
-#include "device605_601.h"
+#include "devicefpga.h"
 #include "device605_tcp.h"
 
 typedef struct tdREAD_DMA_EX_MEMORY_MAP {
@@ -58,6 +58,7 @@ DWORD DeviceReadDMAEx_DoWork(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _
 			DeviceReadDMAEx_IsMemoryMapOK(pMemoryMap, qwAddr + cbRdOff, cbRd) &&
 			DeviceReadDMA(ctx, qwAddr + cbRdOff, pb + cbRdOff, cbRd, 0);
 		if(!result && !pMemoryMap->fProbeExecuted && ctx->cfg->dev.pfnProbeDMA) { // probe memory on 1st fail (if supported)
+            memset(pMemoryMap->pb, 0, pMemoryMap->cPages);
 			DeviceProbeDMA(ctx, pMemoryMap->qwAddrBase, pMemoryMap->cPages, pMemoryMap->pb);
 			pMemoryMap->fProbeExecuted = TRUE;
 		}
@@ -121,7 +122,7 @@ BOOL DeviceWriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE
 	return result;
 }
 
-BOOL DeviceProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap)
+BOOL DeviceProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Inout_ __bcount(cPages) PBYTE pbResultMap)
 {
 	if(!ctx->cfg->dev.pfnProbeDMA) { return FALSE; }
 	ctx->cfg->dev.pfnProbeDMA(ctx, qwAddr, cPages, pbResultMap);
@@ -153,8 +154,8 @@ BOOL DeviceOpen(_Inout_ PPCILEECH_CONTEXT ctx)
 	if(PCILEECH_DEVICE_USB3380 == ctx->cfg->dev.tp || PCILEECH_DEVICE_NA == ctx->cfg->dev.tp) {
 		result = Device3380_Open(ctx);
 	}
-	if(PCILEECH_DEVICE_SP605_FT601 == ctx->cfg->dev.tp || PCILEECH_DEVICE_NA == ctx->cfg->dev.tp) {
-		result = Device605_601_Open(ctx);
+	if(PCILEECH_DEVICE_FPGA == ctx->cfg->dev.tp || PCILEECH_DEVICE_NA == ctx->cfg->dev.tp) {
+		result = DeviceFPGA_Open(ctx);
 	}
 	if(PCILEECH_DEVICE_SP605_TCP == ctx->cfg->dev.tp) {
 		result = Device605_TCP_Open(ctx);

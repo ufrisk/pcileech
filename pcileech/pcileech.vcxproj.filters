@@ -66,10 +66,10 @@
     <ClInclude Include="oscompatibility.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="device605_601.h">
+    <ClInclude Include="device605_tcp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="device605_tcp.h">
+    <ClInclude Include="devicefpga.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -116,10 +116,10 @@
     <ClCompile Include="oscompatibility.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="device605_601.c">
+    <ClCompile Include="device605_tcp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="device605_tcp.c">
+    <ClCompile Include="devicefpga.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

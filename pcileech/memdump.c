@@ -140,6 +140,7 @@ VOID ActionMemoryProbe(_Inout_ PPCILEECH_CONTEXT ctx)
 	PageStatInitialize(&ps, ctx->cfg->qwAddrMin, ctx->cfg->qwAddrMax, "Probing Memory", FALSE, TRUE);
 	while(qwA < ctx->cfg->qwAddrMax) {
 		cPages = min(MEMORY_PROBE_PAGES_PER_SWEEP, (ctx->cfg->qwAddrMax - qwA) / 0x1000);
+        memset(pbResultMap, 0, cPages);
 		if(!DeviceProbeDMA(ctx, qwA, (DWORD)cPages, pbResultMap)) {
 			PageStatClose(&ps);
 			printf("Memory Probe: Failed. Unsupported hardware (USB3380) or other failure.\n");

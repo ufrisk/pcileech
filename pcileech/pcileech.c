@@ -91,6 +91,10 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
 			ctx->cfg->fForceUsb2 = TRUE;
 			i++;
 			continue;
+		} else if((0 == _stricmp(argv[i], "-pcie_gen1")) || (0 == _stricmp(argv[i], "-pcie-gen1"))) {
+			ctx->cfg->fForcePCIeGen1 = TRUE;
+			i++;
+			continue;
 		} else if(0 == _stricmp(argv[i], "-v")) {
 			ctx->cfg->fVerbose = TRUE;
 			i++;
@@ -119,8 +123,8 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
 			ctx->cfg->dev.tp = PCILEECH_DEVICE_NA;
 			if(0 == _stricmp(argv[i + 1], "usb3380")) { 
 				ctx->cfg->dev.tp = PCILEECH_DEVICE_USB3380;
-			} else if(0 == _stricmp(argv[i + 1], "sp605_ft601")) {
-				ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_FT601;
+			} else if(0 == _stricmp(argv[i + 1], "fpga")) {
+				ctx->cfg->dev.tp = PCILEECH_DEVICE_FPGA;
 			} else if(0 == _stricmp(argv[i + 1], "sp605_tcp")) {
 				ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_TCP;
 			}
@@ -153,7 +157,8 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
 		} else if(2 == strlen(argv[i]) && '0' <= argv[i][1] && '9' >= argv[i][1]) { // -0..9 param
 			ctx->cfg->qwDataIn[argv[i][1] - '0'] = Util_GetNumeric(argv[i + 1]);
 		} else if(!memcmp(argv[i], "-device-opt", 11) && (argv[i][11] >= '0') && (argv[i][11] <= '3')) { // -devopt[0-3] (device options)
-			ctx->cfg->qwDeviceOpt[argv[i][11] - '0'] = Util_GetNumeric(argv[i + 1]);
+			ctx->cfg->DeviceOpt[argv[i][11] - '0'].qwValue = Util_GetNumeric(argv[i + 1]);
+			ctx->cfg->DeviceOpt[argv[i][11] - '0'].isValid = TRUE;
 		}
 		i += 2;
 	}
@@ -211,15 +216,7 @@ int main(_In_ int argc, _In_ char* argv[])
 		printf("PCILEECH: Out of memory.\n");
 		return 1;
 	}
-	//LPSTR szTMP[] = { "", "-device", "SP605_TCP", "-device-addr", "192.168.1.2", "dump", "-out", "none", "-min", "0x100000000", "-max", "0x110010000" };
-	//LPSTR szTMP[] = { "", "kmdload", "-kmd", "win10x64_ntfs_20170919_14240.kmd", "-min", "0x100000000" };
-	//LPSTR szTMP[] = { "", "mount", "-kmd", "win10_x64"};
-	//LPSTR szTMP[] = { "", "write", "-min", "0xc6010000", "-in", "c:\\temp\\16M_zero.raw"};
-	//LPSTR szTMP[] = { "", "pagedisplay", "-min", "0x1000", "-vv"};
-	///LPSTR szTMP[] = { "", "dump", "-out", "none", "-min", "0x100000000", "-max", "0x120000000"};
-	//LPSTR szTMP[] = { "", "tlp", "-in", "00000000c30000ffc1000000", "-vv"};
-	//result = PCILeechConfigIntialize(sizeof(szTMP) / sizeof(LPSTR), szTMP, ctx);
-	result = PCILeechConfigIntialize((DWORD)argc, argv, ctx);
+    result = PCILeechConfigIntialize((DWORD)argc, argv, ctx);
 	if(!result) {
 		Help_ShowGeneral();
 		PCILeechFreeContext(ctx);

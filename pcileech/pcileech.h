@@ -48,7 +48,7 @@ typedef enum tdActionType {
 typedef enum tdPCILEECH_DEVICE_TYPE {
 	PCILEECH_DEVICE_NA,
 	PCILEECH_DEVICE_USB3380,
-	PCILEECH_DEVICE_SP605_FT601,
+	PCILEECH_DEVICE_FPGA,
 	PCILEECH_DEVICE_SP605_TCP
 } PCILEECH_DEVICE_TYPE;
 
@@ -59,11 +59,16 @@ typedef struct tdDeviceConfig {
 	BOOL fPartialPageReadSupported;
 	BOOL(*pfnReadDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb);
 	BOOL(*pfnWriteDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb);
-	VOID(*pfnProbeDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap);
+	VOID(*pfnProbeDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Inout_ __bcount(cPages) PBYTE pbResultMap);
 	BOOL(*pfnWriteTlp)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PBYTE pb, _In_ DWORD cb);
 	BOOL(*pfnListenTlp)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ DWORD dwTime);
 	VOID(*pfnClose)(_Inout_ PPCILEECH_CONTEXT ctx);
 } DEVICE_CONFIG;
+
+typedef struct tdCONFIG_OPTION {
+	QWORD isValid;
+	QWORD qwValue;
+} CONFIG_OPTION;
 
 typedef struct tdConfig {
 	QWORD qwAddrMin;
@@ -76,7 +81,7 @@ typedef struct tdConfig {
 	QWORD cbIn;
 	CHAR szInS[MAX_PATH];
 	QWORD qwDataIn[10];
-	QWORD qwDeviceOpt[4];
+	CONFIG_OPTION DeviceOpt[4];
 	ACTION_TYPE tpAction;
 	CHAR szSignatureName[MAX_PATH];
 	CHAR szKMDName[MAX_PATH];
@@ -91,7 +96,8 @@ typedef struct tdConfig {
 	BOOL fForceRW;
 	BOOL fShowHelp;
 	BOOL fOutFile;
-	BOOL fForceUsb2;	// USB3380
+	BOOL fForceUsb2;		// USB3380
+	BOOL fForcePCIeGen1;	// FPGA
 	BOOL fVerbose;
 	BOOL fVerboseExtra;
 	BOOL fDebug;

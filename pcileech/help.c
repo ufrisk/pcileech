@@ -34,7 +34,8 @@ VOID Help_ShowGeneral()
 		" loaded on program exit ( except for the kmdload command ).                    \n" \
 		" KMD mode may access all memory (available to the kernel of the target system).\n" \
 		" DMA mode may only access lower 4GB of memory if USB3380 hardware is used.     \n" \
-		" DMA mode may access all memory if FPGA based hardware such as SP605 is used.  \n" \
+		" DMA mode may access all memory if FPGA based hardware is used such as the:    \n" \
+		" SP605, AC701 and PCIeScreamer.                                                \n" \
 		" For detailed help about a specific command type:  pcileech.exe <command> -help\n" \
 		" General syntax: pcileech.exe <command> [-<optionname1> <optionvalue1>] ...    \n" \
 		" Valid commands and valid MODEs     [ and options ]                            \n" \
@@ -63,11 +64,10 @@ VOID Help_ShowGeneral()
 		"   mac_fvrecover2         DMA                                                  \n" \
 		"   mac_disablevtd         DMA                                                  \n" \
 		" Valid options:                                                                \n" \
-		"   -min : memory min address, valid range: 0x0..0xffffffffffffffff             \n" \
+		"   -min : memory min address, valid range: 0x0 .. 0xffffffffffffffff           \n" \
 		"          default: 0x0                                                         \n" \
-		"   -max : memory max address, valid range: 0x0..0xffffffffffffffff             \n" \
-		"          default: <max supported by device> (0xffffffff/4GB for USB3380)      \n" \
-		"          default: actual memory size in KMD mode.                             \n" \
+		"   -max : memory max address, valid range: 0x0 .. 0xffffffffffffffff           \n" \
+		"          default: <max supported by device> (FPGA = no limit, USB3380 = 4GB)  \n" \
 		"   -out : name of output file.                                                 \n" \
 		"          default: pcileech-<minaddr>-<maxaddr>-<date>-<time>.raw              \n" \
 		"          No output file will be created if parameter is set to none or null.  \n" \
@@ -76,27 +76,25 @@ VOID Help_ShowGeneral()
 		"   -vv  : extra verbose option. Same as -v but even more detailed output.      \n" \
 		"          Option shows raw PCIe TLPs received/sent if FPGA is used.            \n" \
 		"   -v   : verbose option. Additional information is displayed in the output.   \n" \
-		"          The memory map is shown when searching/dumping memory as an example. \n" \
-		"          Affects all modes and commands.                                      \n" \
-		"          Option has no value. Example: -v                                     \n" \
+		"          Affects all modes and commands. Option has no value. Example: -v     \n" \
 		"   -force: force reads and writes even though target memory is marked as not   \n" \
 		"          accessible. Dangerous! Affects all modes and commands.               \n" \
 		"          Option has no value. Example: -force                                 \n" \
 		"   -usb2: force USB2 mode (only for USB3380 device). USB2 will reduce transfer \n" \
-		"          speed but may increase stability.                                    \n" \
-		"          Affects all modes and commands.                                      \n" \
-		"          Option has no value. Example: -usb2                                  \n" \
+		"          speed but increase stability. Option has no value. Example: -usb2    \n" \
+		"   -pcie_gen1: force PCIe Gen1 mode. For FPGA devices capable of PCIe Gen2.    \n" \
+		"          May increase stability. Option has no value. Example: -pcie_gen1     \n" \
 		"   -iosize: max DMA i/o size. Hardware DMA requests larger than iosize will    \n" \
 		"          be discarded. Affects all modes and commands.                        \n" \
 		"   -tlpwait: Wait in seconds while listening for PCIe TLPs.                    \n" \
 		"          Wait occurs after any other actions have been completed.             \n" \
 		"   -device: force the use of a specific hardware device instead of auto-detect.\n" \
 		"          Affects all modes and commands.                                      \n" \
-		"          Valid options: USB3380, SP605_FT601, SP605_TCP                       \n" \
+		"          Valid options: USB3380, FPGA, SP605_TCP                              \n" \
 		"   -device-addr: Remote address for -device SP605_TCP.                         \n" \
 		"   -device-port: Remote TCP port for -device SP605_TCP. Default value: 28472.  \n" \
 		"   -device-opt[0-3]: Optional additional device configuration for some devices.\n" \
-		"          SP605_FT605 device: NB! 0 = default!. -device-opt0 = delay read uS   \n" \
+		"          FPGA device (NB! 0 = default!): -device-opt0 = delay read uS         \n" \
 		"                -device-opt1 = delay write uS, -device-opt2 = delay probe uS   \n" \
 		"   -help: show help about the selected command or implant and then exit        \n" \
 		"          without running the command. Affects all modes and commands.         \n" \
@@ -109,12 +107,10 @@ VOID Help_ShowGeneral()
 		"          default: 0                                                           \n" \
 		"   -pt  : trigger KMD insertion by automatic page table hijack.                \n" \
 		"          Option has no value. Example: -pt                                    \n" \
-		"          Only used in conjunction with -kmd option to trigger KMD insertion   \n" \
-		"          by page table hijack. Only recommended to use with care on computers \n" \
-		"          with 4GB+ RAM when kernel is located in high-memory (Windows 10).    \n" \
-		"          Insertion may trigger system crash unless signature exactly matches. \n" \
+		"          Used in conjunction with -kmd option to trigger KMD insertion by page\n" \
+		"          table hijack. Only recommended to use with care on computers with    \n" \
+		"          4GB+ RAM when kernel is located in high-memory (Windows 10).         \n" \
 		"   -cr3 : base address of system page table / CR3 CPU register.                \n" \
-		"          Insertion may trigger system crash unless signature exactly matches. \n" \
 		"   -efibase : base address of EFI_SYSTEM_TABLE (IBI SYST) used when inserting  \n" \
 		"          UEFI 'kernel' modules.                                               \n" \
 		"   -kmd : address of already loaded kernel module helper (KMD).                \n" \
@@ -143,21 +139,20 @@ VOID Help_ShowInfo()
 {
 	printf(
 		" PCILEECH INFORMATION                                                          \n" \
-		" PCILeech (c) 2016, 2017 Ulf Frisk                                             \n" \
-		" Version: 2.5.1                                                                \n" \
+		" PCILeech (c) 2016-2018 Ulf Frisk                                              \n" \
+		" Version: 2.6                                                                  \n" \
 		" License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
 		" Contact information: pcileech@frizk.net                                       \n" \
 		" System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \
 		" Other project references:                                                     \n" \
 		"   PCILeech          - https://github.com/ufrisk/pcileech                      \n" \
-		"   Slotscreamer      - https://github.com/NSAPlayset/SLOTSCREAMER              \n" \
-		"   Inception         - https://github.com/carmaa/inception                     \n" \
-		"   Google USB driver - https://developer.android.com/sdk/win-usb.html#download \n" \
-		"   FTDI FT601:       - http://www.ftdichip.com/Drivers/D3XX.htm                \n" \
+		"   PCILeech-FPGA     - https://github.com/ufrisk/pcileech-fpga                 \n" \
+		"   Google USB Driver - https://developer.android.com/sdk/win-usb.html          \n" \
+		"   FTDI FT601 Driver - http://www.ftdichip.com/Drivers/D3XX.htm                \n" \
 		"   Dokany            - https://github.com/dokan-dev/dokany/releases/latest     \n" \
 		" ----------------                                                              \n" \
 		" Use with USB3380 hardware programmed as a PCILeech device.                    \n" \
-		" Use with SP605/FT601 harware programmed as a PCILeech FPGA device.            \n" \
+		" Use with FPGA harware programmed as a PCILeech FPGA device.                   \n" \
 		" Use with SP605 hardware / 'PCI Express DIY hacking toolkit' by cr4sh/@d_olex. \n\n" \
 		" ----------------                                                              \n" \
 		" Driver information (USB3380/Windows):                                         \n" \
@@ -165,12 +160,11 @@ VOID Help_ShowInfo()
 		"   device masks as a Google Glass. Please download and install the Google USB  \n" \
 		"   driver before proceeding by using the USB3380 device. USB3 is recommended   \n" \
 		"   to performance reasons (USB2 will work but impact performance).             \n" \
-		" Driver information (SP605/FT601/Windows):                                     \n" \
-		"   The PCILeech programmed SP605 FPGA development board with the FT601 USB3    \n" \
-		"   addon board requires drivers for Windows. The drivers are on Windows update \n" \
-		"   and is installed automatically at first use. PCILeech also requires the FTDI\n" \
-		"   application library (DLL). Download this library from the FTDI web site and \n" \
-		"   place the 64-bit FTD3XX.dll alongside pcileech.exe.                         \n" \
+		" Driver information (FPGA/FT601/Windows):                                      \n" \
+		"   The PCILeech programmed FPGA board with FT601 USB3 requires drivers for USB.\n" \
+		"   The drivers are on Windows update and is installed at first use.            \n" \
+		"   PCILeech also requires the FTDI application library (DLL). Download DLL from\n" \
+		"   FTDI web site and place the 64-bit FTD3XX.dll alongside pcileech.exe.       \n" \
 		" Driver information (Dokany/Windows):                                          \n" \
 		"   To be able to use the 'mount' functionality for filesystem browsing and live\n" \
 		"   memory file access PCILeech requires Dokany to be installed for virtual file\n" \
@@ -336,11 +330,26 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
 			" 2) mount file system and live RAM of target as X: drive letter.               \n" \
 			"    pcileech mount -kmd 0x7fffe000 -s X                                        \n");
 		break;
+	case DISPLAY:
+		printf(
+			" DISPLAY MEMORY ON SCREEN.                                                     \n" \
+			" MODES   : DMA, KMD                                                            \n" \
+			" OPTIONS : -min, -max (optional)                                               \n" \
+			" The memory contents between min and max is shown on screen.                   \n" \
+			" Use the -min option to specify the memory location.                           \n" \
+			" EXAMPLES:      (example kernel module is loaded at address 0x7fffe000)        \n" \
+			" 1) display memory starting at physical address 0x1000.                        \n" \
+			"    pcileech display -min 0x1000                                               \n" \
+			" 2) display memory between 0x1000 and 0x2fff.                                  \n" \
+			"    pcileech display -min 0x1000 -max 0x2fff                                   \n" \
+			" 3) display memory starting at physical address 0x140000000 (5GB).             \n" \
+			"    pcileech display -min 0x140000000 -kmd 0x7fffe000                          \n");
+		break;
 	case PAGEDISPLAY:
 		printf(
 			" DISPLAY A MEMORY PAGE ON SCREEN.                                              \n" \
 			" MODES   : DMA, KMD                                                            \n" \
-			" OPTIONS : -min, -force                                                        \n" \
+			" OPTIONS : -min                                                                \n" \
 			" The memory contents of a single page (4096 bytes) is shown on screen. Use the \n" \
 			" -min option to specify the memory location. If the -min option is not aligned \n" \
 			" the specified memory address will be truncated. It is also possible to force  \n" \

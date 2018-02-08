@@ -71,9 +71,11 @@ BOOL DeviceWriteDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE
 * -- qwAddr = address to start probe from.
 * -- cPages = number of 4kB pages to probe.
 * -- pbResultMap = result map, 1 byte represents 1 page, 0 = fail, 1 = success.
+*       (individual page elements in pbResultMap must be set to 0 [fail] on call
+*       for probe to take place on individual page).
 * -- return = FALSE if not supported by underlying hardware, TRUE if supported.
 */
-BOOL DeviceProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Out_ __bcount(cPages) PBYTE pbResultMap);
+BOOL DeviceProbeDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Inout_ __bcount(cPages) PBYTE pbResultMap);
 
 /*
 * Write target physical memory. If an KMD is inserted in the target kernel the
