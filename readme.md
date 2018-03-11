@@ -76,14 +76,9 @@ Separate instructions for [Android](Android.md).
 
 Examples:
 =========
-Load macOS kernel module:
-* ` pcileech.exe kmdload -kmd macos `
 
 Mount target system live RAM and file system, requires that a KMD is loaded. In this example 0x11abc000 is used.
 * ` pcileech.exe mount -kmd 0x11abc000 `
-
-Remove macOS password requirement, requires a KMD is loaded. In this example 0x11abc000 is used.
-* ` pcileech.exe macos_unlock -kmd 0x11abc000 -0 1 `
 
 Mount Linux target system live RAM and file system without pre-loading a KMD.
 * ` pcileech.exe mount -kmd LINUX_X64_46 `
