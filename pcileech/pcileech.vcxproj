@@ -86,6 +86,7 @@
     <ClInclude Include="device.h" />
     <ClInclude Include="device3380.h" />
     <ClInclude Include="device605_tcp.h" />
+    <ClInclude Include="devicefile.h" />
     <ClInclude Include="devicefpga.h" />
     <ClInclude Include="dokan.h" />
     <ClInclude Include="executor.h" />
@@ -101,11 +102,15 @@
     <ClInclude Include="tlp.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="vfs.h" />
+    <ClInclude Include="vmm.h" />
+    <ClInclude Include="vmmproc.h" />
+    <ClInclude Include="vmmvfs.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.c" />
     <ClCompile Include="device3380.c" />
     <ClCompile Include="device605_tcp.c" />
+    <ClCompile Include="devicefile.c" />
     <ClCompile Include="devicefpga.c" />
     <ClCompile Include="executor.c" />
     <ClCompile Include="extra.c" />
@@ -119,6 +124,9 @@
     <ClCompile Include="tlp.c" />
     <ClCompile Include="util.c" />
     <ClCompile Include="vfs.c" />
+    <ClCompile Include="vmm.c" />
+    <ClCompile Include="vmmproc.c" />
+    <ClCompile Include="vmmvfs.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Android.mk" />

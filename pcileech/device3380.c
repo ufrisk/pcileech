@@ -406,9 +406,9 @@ BOOL Device3380_Open(_Inout_ PPCILEECH_CONTEXT ctx)
 		Device3380_ReadCsr((PDEVICE_DATA)ctx->hDevice, REG_USBSTAT, &dwReg, CSR_CONFIGSPACE_MEMM | CSR_BYTEALL);
 	}
 	if(dwReg & 0xc0 /* Full-Speed(USB1)|High-Speed(USB2) */) {
-		printf("Device Info: USB330 running at USB2 speed.\n");
+		printf("Device Info: USB3380 running at USB2 speed.\n");
 	} else if(ctx->cfg->fVerbose) {
-		printf("Device Info: USB330 running at USB3 speed.\n");
+		printf("Device Info: USB3380 running at USB3 speed.\n");
 	}
 	if(ctx->cfg->fVerbose) { printf("Device Info: USB3380.\n"); }
 	// set callback functions and fix up config

@@ -233,7 +233,7 @@ BOOL Exec_ExecSilent(_Inout_ PPCILEECH_CONTEXT ctx, _In_ LPSTR szShellcodeName, 
 	//------------------------------------------------
 	// 5: Display/Write additional output.
 	//------------------------------------------------
-	if(pcbOut) {
+	if(ppbOut && pcbOut) {
 		*pcbOut = pk->dataOutExtraLength;
 		*ppbOut = (PBYTE)LocalAlloc(0, SIZE_PAGE_ALIGN_4K(*pcbOut));
 		if(!*ppbOut) { result = FALSE; goto fail; }

@@ -1,6 +1,6 @@
 // oscompatibility.h : pcileech windows/linux/android compatibility layer.
 //
-// (c) Ulf Frisk, 2017
+// (c) Ulf Frisk, 2017-2018
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __OSCOMPATIBILITY_H__
@@ -87,6 +87,7 @@ typedef uint64_t							SIZE_T, *PSIZE_T;
 #define WINUSB_INTERFACE_HANDLE				libusb_device_handle*
 #define PIPE_TRANSFER_TIMEOUT				0x03
 #define CONSOLE_SCREEN_BUFFER_INFO			PVOID	// TODO: remove this dummy
+#define CRITICAL_SECTION					HANDLE
 
 #define _In_
 #define _Out_
@@ -95,7 +96,10 @@ typedef uint64_t							SIZE_T, *PSIZE_T;
 #define _In_opt_
 #define _Out_opt_
 #define __bcount(x)
+#define _Inout_bytecount_(x)
 #define _Inout_updates_bytes_(x)
+#define _Success_(return)
+
 
 #define max(a, b)							(((a) > (b)) ? (a) : (b))
 #define min(a, b)		 					(((a) < (b)) ? (a) : (b))
@@ -116,7 +120,13 @@ typedef uint64_t							SIZE_T, *PSIZE_T;
 #define ZeroMemory(pb, cb)					(memset(pb, 0, cb))
 #define WinUsb_SetPipePolicy(h, p, t, cb, pb)	// TODO: implement this for better USB2 performance.
 #define CloseHandle(h)							// TODO: remove this dummy implementation & replace with WARN.
-#define SetEvent(h)								// TODO: remove this dummy implementation!
+#define _ftelli64(f)						(ftello(f))
+#define _fseeki64(f, o, w)					(fseeko(f, o, w))
+
+#define InitializeCriticalSection(x)		// no dma transfer critical section in linux yet
+#define DeleteCriticalSection(x)			// no dma transfer critical section in linux yet
+#define EnterCriticalSection(x)				// no dma transfer critical section in linux yet
+#define LeaveCriticalSection(x)				// no dma transfer critical section in linux yet
 
 typedef struct _SYSTEMTIME {
 	WORD wYear;

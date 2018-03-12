@@ -1,6 +1,6 @@
 // device605_tcp.c : implementation related to the Xilinx SP605 dev board flashed with @d_olex bitstream.
 //
-// (c) Ulf Frisk & @d_olex, 2017
+// (c) Ulf Frisk & @d_olex, 2017-2018
 //
 #ifdef WIN32
 
@@ -84,7 +84,7 @@ typedef struct tdDEVICE_CONTEXT_SP605_TCP {
 		DWORD cb;
 		DWORD cbMax;
 	} txbuf;	
-	BOOL(*hRxTlpCallbackFn)(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMrd, _In_ PBYTE pb, _In_ DWORD cb, _In_opt_ HANDLE hEventCompleted);
+	VOID(*hRxTlpCallbackFn)(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMrd, _In_ PBYTE pb, _In_ DWORD cb);
 } DEVICE_CONTEXT_SP605_TCP, *PDEVICE_CONTEXT_SP605_TCP;
 
 //-------------------------------------------------------------------------------
@@ -215,7 +215,7 @@ VOID Device605_TCP_RxTlpSynchronous(_In_ PDEVICE_CONTEXT_SP605_TCP ctx)
 					TLP_Print(pbTlp, cdwTlp << 2, FALSE);
 				}
 				if (ctx->hRxTlpCallbackFn) {
-					ctx->hRxTlpCallbackFn(ctx->pMRdBuffer, pbTlp, cdwTlp << 2, NULL);
+					ctx->hRxTlpCallbackFn(ctx->pMRdBuffer, pbTlp, cdwTlp << 2);
 				}
 			} else {
 				fprintf(stderr, "WARNING: BAD PCIe TLP RECEIVED! THIS SHOULD NOT HAPPEN!\n");
@@ -456,7 +456,7 @@ BOOL Device605_TCP_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
 	ctx->txbuf.cbMax = SP605_TCP_MAX_SIZE_TX + 0x10000;
 	ctx->txbuf.pb = LocalAlloc(0, ctx->txbuf.cbMax);
 	if (!ctx->txbuf.pb) { goto fail; }
-	ctx->isPrintTlp = ctxPcileech->cfg->fVerboseExtra;
+	ctx->isPrintTlp = ctxPcileech->cfg->fVerboseExtraTlp;
 	// set callback functions and fix up config
 	ctxPcileech->cfg->dev.tp = PCILEECH_DEVICE_SP605_TCP;
 	ctxPcileech->cfg->dev.qwMaxSizeDmaIo = 0x1e000;

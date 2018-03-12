@@ -7,6 +7,26 @@
 #define __VFS_H__
 #include "pcileech.h"
 
+#define VFS_FLAGS_FILE_NORMAL           0x01
+#define VFS_FLAGS_FILE_DIRECTORY        0x02
+#define VFS_FLAGS_FILE_SYMLINK          0x04
+#define VFS_FLAGS_FILE_OTHER            0x08
+#define VFS_FLAGS_UNICODE               0x10
+#define VFS_FLAGS_EXIST_FILE            0x20
+#define VFS_FLAGS_TRUNCATE_ON_WRITE     0x40
+#define VFS_FLAGS_APPEND_ON_WRITE       0x80
+
+typedef struct tdVFS_RESULT_FILEINFO {
+    QWORD flags;
+    QWORD tAccessOpt;
+    QWORD tModifyOpt;
+    QWORD tCreateOpt;
+    QWORD dbg1;
+    QWORD dbg2;
+    QWORD cb;
+    WCHAR wszFileName[MAX_PATH];
+} VFS_RESULT_FILEINFO, *PVFS_RESULT_FILEINFO;
+
 /*
 * Mount a drive backed by PCILeech virtual file system. The mounted file system
 * will contain both a memory mapped ram files and the file system as seen from

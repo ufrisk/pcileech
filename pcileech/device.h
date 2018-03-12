@@ -1,6 +1,6 @@
 // device.h : definitions related to the hardware devices.
 //
-// (c) Ulf Frisk, 2016, 2017
+// (c) Ulf Frisk, 2016-2018
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __DEVICE_H__
@@ -52,6 +52,20 @@ BOOL DeviceReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE
 *
 */
 DWORD DeviceReadDMAEx(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _Inout_opt_ PPAGE_STATISTICS pPageStat, _In_ QWORD flags);
+
+/*
+* Read memory in various non-contigious locations specified by the items in the
+* phDMAs array. Result for each unit of work will be given individually. No upper
+* limit of number of items to read, but no performance boost will be given if
+* above hardware limit. Max size of each unit of work is one 4k page (4096 bytes).
+* -- ctx
+* -- ppDMAs = array of scatter read headers.
+* -- cpDMAs = count of ppDMAs.
+* -- pcpDMAsRead = optional count of number of successfully read ppDMAs.
+* -- return = TRUE if function is available, FALSE if not supported by hardware.
+*
+*/
+BOOL DeviceReadScatterDMA(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PPDMA_IO_SCATTER_HEADER ppDMAs, _In_ DWORD cpDMAs, _Out_opt_ PDWORD pcpDMAsRead);
 
 /*
 * Write data to the target system using DMA.

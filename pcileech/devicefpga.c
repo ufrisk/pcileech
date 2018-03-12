@@ -17,8 +17,9 @@
 // FPGA defines below.
 //-------------------------------------------------------------------------------
 
-#define FPGA_CMD_VERSION        0x01
-#define FPGA_CMD_ID             0x03
+#define FPGA_CMD_VERSION_MAJOR  0x01
+#define FPGA_CMD_DEVICE_ID      0x03
+#define FPGA_CMD_VERSION_MINOR  0x05
 
 #define ENDIAN_SWAP_WORD(x)     (x = (x << 8) | (x >> 8))
 #define ENDIAN_SWAP_DWORD(x)    (x = (x << 24) | ((x >> 8) & 0xff00) | ((x << 8) & 0xff0000) | (x >> 24))
@@ -107,25 +108,25 @@ const DEVICE_PERFORMANCE PERFORMANCE_PROFILES[PERFORMANCE_PROFILE_MAX + 1] = {
         .SZ_DEVICE_NAME = "AC701 / FT601",
         .PROBE_MAXPAGES = 0x400,
         .RX_FLUSH_LIMIT = 0xfffff000,
-        .MAX_SIZE_RX = 0x24000,
+        .MAX_SIZE_RX = 0x20000,
         .MAX_SIZE_TX = 0x8000,
         .DELAY_PROBE_READ = 500,
         .DELAY_PROBE_WRITE = 0,
         .DELAY_WRITE = 0,
-        .DELAY_READ = 200,
+        .DELAY_READ = 300,
         .RETRY_ON_ERROR = FALSE
     }
 };
 
 typedef struct tdDEVICE_CONTEXT_FPGA {
     WORD wDeviceId;
-    WORD wFpgaVersion;
+    WORD wFpgaVersionMajor;
+    WORD wFpgaVersionMinor;
     WORD wFpgaID;
     BOOL phySupported;
     DEV_CFG_PHY phy;
     DEVICE_PERFORMANCE perf;
     BOOL isPrintTlp;
-    PTLP_CALLBACK_BUF_MRd pMRdBuffer;
     struct {
         PBYTE pb;
         DWORD cb;
@@ -168,7 +169,9 @@ typedef struct tdDEVICE_CONTEXT_FPGA {
             UCHAR ucPipeID
         );
     } dev;
-    BOOL(*hRxTlpCallbackFn)(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMrd, _In_ PBYTE pb, _In_ DWORD cb, _In_opt_ HANDLE hEventCompleted);
+    PVOID pMRdBufferX; // NULL || PTLP_CALLBACK_BUF_MRd || PTLP_CALLBACK_BUF_MRd_2
+    VOID(*hRxTlpCallbackFn)(_Inout_ PVOID pBufferMrd, _In_ PBYTE pb, _In_ DWORD cb);
+    BYTE RxEccBit;
 } DEVICE_CONTEXT_FPGA, *PDEVICE_CONTEXT_FPGA;
 
 // STRUCT FROM FTD3XX.h
@@ -315,13 +318,13 @@ BOOL DeviceFPGA_GetSetPHY(_In_ PDEVICE_CONTEXT_FPGA ctx, _In_ BOOL isUpdate)
         ctx->phy.tp_cfg = 1;
         ctx->phy.tp = 4;
         *(PQWORD)pbTx = _byteswap_uint64(*(PQWORD)&ctx->phy);
-        status = ctx->dev.pfnFT_WritePipe(ctx->dev.hFTDI, 0x02, pbTx, 16, &cbRxTx, NULL);
+        status = ctx->dev.pfnFT_WritePipe(ctx->dev.hFTDI, 0x02, pbTx, sizeof(pbTx), &cbRxTx, NULL);
         if(status) { return FALSE; }
         Sleep(10);
     }
     *(PQWORD)&ctx->phy = 0;
     *(PQWORD)pbTx = 0x7731000000000000; // phy read (3) + cfg (1) + magic (77)
-    status = ctx->dev.pfnFT_WritePipe(ctx->dev.hFTDI, 0x02, pbTx, 16, &cbRxTx, NULL);
+    status = ctx->dev.pfnFT_WritePipe(ctx->dev.hFTDI, 0x02, pbTx, sizeof(pbTx), &cbRxTx, NULL);
     if(status) { return FALSE; }
     Sleep(10);
     status = ctx->dev.pfnFT_ReadPipe(ctx->dev.hFTDI, 0x82, pbRx, 0x1000, &cbRxTx, NULL);
@@ -329,7 +332,7 @@ BOOL DeviceFPGA_GetSetPHY(_In_ PDEVICE_CONTEXT_FPGA ctx, _In_ BOOL isUpdate)
     for(i = 0; i < cbRxTx; i += 32) {
         while(*(PDWORD)(pbRx + i) == 0x55556666) { // skip over ftdi workaround dummy fillers
             i += 4;
-            if(i > cbRxTx - 32) { return FALSE; }
+            if(i + 32 > cbRxTx) { return FALSE; }
         }
         dwStatus = *(PDWORD)(pbRx + i);
         pdwData = (PDWORD)(pbRx + i + 4);
@@ -371,18 +374,21 @@ VOID DeviceFPGA_GetDeviceID_FpgaVersion(_In_ PDEVICE_CONTEXT_FPGA ctx)
 {
     DWORD status;
     DWORD cbTX, cbRX, i, j;
-    PBYTE pbRX = LocalAlloc(0, 0x01000000);
+    PBYTE pbRX;
     DWORD dwStatus, dwData, cdwCfg = 0;
     PDWORD pdwData;
-    BYTE pbTX[24] = {
+    BYTE pbTX[32] = {
         // cfg status: (pcie bus,dev,fn id)
         0x00, 0x00, 0x00, 0x00,  0x00, 0x00, 0x01, 0x77,
-        // cmd msg: FPGA bitstream version
+        // cmd msg: FPGA bitstream version (major)
         0x00, 0x00, 0x00, 0x00,  0x01, 0x00, 0x03, 0x77,
+        // cmd msg: FPGA bitstream version (minor)
+        0x00, 0x00, 0x00, 0x00,  0x05, 0x00, 0x03, 0x77,
         // cmd msg: FPGA bitstream device id
         0x00, 0x00, 0x00, 0x00,  0x03, 0x00, 0x03, 0x77
     };
-    status = ctx->dev.pfnFT_WritePipe(ctx->dev.hFTDI, 0x02, pbTX, 24, &cbTX, NULL);
+    if(!(pbRX = LocalAlloc(0, 0x01000000))) { return; }
+    status = ctx->dev.pfnFT_WritePipe(ctx->dev.hFTDI, 0x02, pbTX, sizeof(pbTX), &cbTX, NULL);
     if(status) { goto fail; }
     Sleep(10);
     status = ctx->dev.pfnFT_ReadPipe(ctx->dev.hFTDI, 0x82, pbRX, 0x01000000, &cbRX, NULL);
@@ -390,7 +396,7 @@ VOID DeviceFPGA_GetDeviceID_FpgaVersion(_In_ PDEVICE_CONTEXT_FPGA ctx)
     for(i = 0; i < cbRX; i += 32) {
         while(*(PDWORD)(pbRX + i) == 0x55556666) { // skip over ftdi workaround dummy fillers
             i += 4;
-            if(i > cbRX - 32) { goto fail; }
+            if(i + 32 > cbRX) { goto fail; }
         }
         dwStatus = *(PDWORD)(pbRX + i);
         pdwData = (PDWORD)(pbRX + i + 4);
@@ -398,11 +404,16 @@ VOID DeviceFPGA_GetDeviceID_FpgaVersion(_In_ PDEVICE_CONTEXT_FPGA ctx)
         for(j = 0; j < 7; j++) {
             dwData = *pdwData;
             if((dwStatus & 0x03) == 0x03) { // CMD REPLY (or filler)
-                if((dwData >> 24) == FPGA_CMD_VERSION) { // FPGA bitstream version
-                    ctx->wFpgaVersion = (WORD)dwData;
-                }
-                if((dwData >> 24) == FPGA_CMD_ID) { // FPGA bitstream device id
-                    ctx->wFpgaID = (WORD)dwData;
+                switch(dwData >> 24) {
+                    case FPGA_CMD_VERSION_MAJOR:
+                        ctx->wFpgaVersionMajor = (WORD)dwData;
+                        break;
+                    case FPGA_CMD_VERSION_MINOR:
+                        ctx->wFpgaVersionMinor = (WORD)dwData;
+                        break;
+                    case FPGA_CMD_DEVICE_ID:
+                        ctx->wFpgaID = (WORD)dwData;
+                        break;
                 }
             }
             if((dwStatus & 0x03) == 0x01) { // PCIe CFG REPLY
@@ -414,7 +425,7 @@ VOID DeviceFPGA_GetDeviceID_FpgaVersion(_In_ PDEVICE_CONTEXT_FPGA ctx)
             dwStatus >>= 4;
         }
     }
-    ctx->phySupported = (ctx->wFpgaVersion >= 3) ? DeviceFPGA_GetSetPHY(ctx, FALSE) : FALSE;
+    ctx->phySupported = (ctx->wFpgaVersionMajor >= 3) ? DeviceFPGA_GetSetPHY(ctx, FALSE) : FALSE;
 fail:
     LocalFree(pbRX);
 }
@@ -502,7 +513,7 @@ VOID DeviceFPGA_RxTlpSynchronous(_In_ PDEVICE_CONTEXT_FPGA ctx)
     for(i = 0; i < ctx->rxbuf.cb; i += 32) { // index in 64-bit (QWORD)
         while(*(PDWORD)(ctx->rxbuf.pb + i) == 0x55556666) { // skip over ftdi workaround dummy fillers
             i += 4;
-            if(i > ctx->rxbuf.cb - 32) { return; }
+            if(i + 32 > ctx->rxbuf.cb) { return; }
         }
         dwStatus = *(PDWORD)(ctx->rxbuf.pb + i);
         pdwData = (PDWORD)(ctx->rxbuf.pb + i + 4);
@@ -521,10 +532,10 @@ VOID DeviceFPGA_RxTlpSynchronous(_In_ PDEVICE_CONTEXT_FPGA ctx)
                         TLP_Print(pbTlp, cdwTlp << 2, FALSE);
                     }
                     if(ctx->hRxTlpCallbackFn) {
-                        ctx->hRxTlpCallbackFn(ctx->pMRdBuffer, pbTlp, cdwTlp << 2, NULL);
+                        ctx->hRxTlpCallbackFn(ctx->pMRdBufferX, pbTlp, cdwTlp << 2);
                     }
                 } else {
-                    printf("Device Info: SP605 / FT601: Bad PCIe TLP received! Should not happen!\n");
+                    printf("Device Info: FPGA: Bad PCIe TLP received! Should not happen!\n");
                 }
                 cdwTlp = 0;
             }
@@ -534,74 +545,107 @@ VOID DeviceFPGA_RxTlpSynchronous(_In_ PDEVICE_CONTEXT_FPGA ctx)
     }
 }
 
-BOOL DeviceFPGA_ReadDMA_Impl(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
+VOID DeviceFPGA_ReadScatterDMA_Impl(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _Inout_ PPDMA_IO_SCATTER_HEADER ppDMAs, _In_ DWORD cpDMAs)
 {
     PDEVICE_CONTEXT_FPGA ctx = (PDEVICE_CONTEXT_FPGA)ctxPcileech->hDevice;
-    TLP_CALLBACK_BUF_MRd rxbuf;
-    DWORD tx[4], o, i;
-    BOOL is32, isFlush;
+    TLP_CALLBACK_BUF_MRd_SCATTER rxbuf;
+    DWORD tx[4] = { 0 };
+    DWORD o, i, j, cb, cbFlush, cbTotalInCycle = 0;
+    BOOL isAlgorithmReadTiny;
+    BOOL is32;
     PTLP_HDR_MRdWr64 hdrRd64 = (PTLP_HDR_MRdWr64)tx;
     PTLP_HDR_MRdWr32 hdrRd32 = (PTLP_HDR_MRdWr32)tx;
-    if(cb > ctx->perf.MAX_SIZE_RX) { return FALSE; }
-    if(qwAddr % 0x1000) { return FALSE; }
-    if((cb >= 0x1000) && (cb % 0x1000)) { return FALSE; }
-    if((cb < 0x1000) && (cb % 0x8)) { return FALSE; }
-    // prepare
-    rxbuf.cb = 0;
-    rxbuf.pb = pb;
-    rxbuf.cbMax = cb;
-    ctx->pMRdBuffer = &rxbuf;
-    ctx->hRxTlpCallbackFn = TLP_CallbackMRd;
-    // transmit TLPs
-    for(o = 0; o < cb; o += 0x1000) {
-        memset(tx, 0, 16);
-        is32 = qwAddr + o < 0x100000000;
-        if(is32) {
-            hdrRd32->h.TypeFmt = TLP_MRd32;
-            hdrRd32->h.Length = (WORD)((cb < 0x1000) ? cb >> 2 : 0);
-            hdrRd32->RequesterID = ctx->wDeviceId;
-            hdrRd32->Tag = (BYTE)(o >> 12);
-            hdrRd32->FirstBE = 0xf;
-            hdrRd32->LastBE = 0xf;
-            hdrRd32->Address = (DWORD)(qwAddr + o);
-        } else {
-            hdrRd64->h.TypeFmt = TLP_MRd64;
-            hdrRd64->h.Length = (WORD)((cb < 0x1000) ? cb >> 2 : 0);
-            hdrRd64->RequesterID = ctx->wDeviceId;
-            hdrRd64->Tag = (BYTE)(o >> 12);
-            hdrRd64->FirstBE = 0xf;
-            hdrRd64->LastBE = 0xf;
-            hdrRd64->AddressHigh = (DWORD)((qwAddr + o) >> 32);
-            hdrRd64->AddressLow = (DWORD)(qwAddr + o);
+    PDMA_IO_SCATTER_HEADER pDMA;
+    BYTE bTag;
+    isAlgorithmReadTiny = (1 == ctxPcileech->cfg->DeviceOpt[3].qwValue);
+    i = 0;
+    ctx->pMRdBufferX = &rxbuf;
+    while(i < cpDMAs) {
+        // Prepare callback buffer
+        ctx->RxEccBit = ctx->RxEccBit ? 0 : 1;
+        rxbuf.bEccBit = ctx->RxEccBit;
+        rxbuf.cbReadTotal = 0;
+        rxbuf.cph = cpDMAs - i;
+        rxbuf.pph = ppDMAs + i;
+        ctx->hRxTlpCallbackFn = TLP_CallbackMRd_Scatter;
+        // Transmit TLPs
+        cbFlush = 0;
+        cbTotalInCycle = 0;
+        bTag = (ctx->RxEccBit ? 0x80 : 0) + (isAlgorithmReadTiny ? 0x40 : 0);
+        for(; i < cpDMAs; i++) {
+            pDMA = *(ppDMAs + i);
+            if((pDMA->cbMax <= pDMA->cb) || (pDMA->cbMax % 8) || (pDMA->cbMax > 0x1000)) { // already completed or unsupported size -> skip over
+                bTag += isAlgorithmReadTiny ? 0x20 : 1;
+                if(!(bTag & 0x3f)) { break; }
+                continue;
+            }
+            cbTotalInCycle += pDMA->cbMax;
+            if(cbTotalInCycle > ctx->perf.MAX_SIZE_RX) { break; } // over max size -> break loop and read result
+            o = 0;
+            while(o < pDMA->cbMax) {
+                cb = isAlgorithmReadTiny ? 0x80 : pDMA->cbMax;
+                is32 = pDMA->qwA + o < 0x100000000;
+                if(is32) {
+                    hdrRd32->h.TypeFmt = TLP_MRd32;
+                    hdrRd32->h.Length = (WORD)((cb < 0x1000) ? cb >> 2 : 0);
+                    hdrRd32->RequesterID = ctx->wDeviceId;
+                    hdrRd32->Tag = bTag;
+                    hdrRd32->FirstBE = 0xf;
+                    hdrRd32->LastBE = 0xf;
+                    hdrRd32->Address = (DWORD)(pDMA->qwA + o);
+                } else {
+                    hdrRd64->h.TypeFmt = TLP_MRd64;
+                    hdrRd64->h.Length = (WORD)((cb < 0x1000) ? cb >> 2 : 0);
+                    hdrRd64->RequesterID = ctx->wDeviceId;
+                    hdrRd64->Tag = bTag;
+                    hdrRd64->FirstBE = 0xf;
+                    hdrRd64->LastBE = 0xf;
+                    hdrRd64->AddressHigh = (DWORD)((pDMA->qwA + o) >> 32);
+                    hdrRd64->AddressLow = (DWORD)(pDMA->qwA + o);
+                }
+                for(j = 0; j < 4; j++) {
+                    ENDIAN_SWAP_DWORD(tx[j]);
+                }
+                cbFlush += cb;
+                if((cbFlush >= ctx->perf.RX_FLUSH_LIMIT) || (isAlgorithmReadTiny && (cbFlush >= 0x1000))) {
+                    DeviceFPGA_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE, TRUE);
+                    usleep(ctx->perf.DELAY_WRITE);
+                    cbFlush = 0;
+                } else {
+                    DeviceFPGA_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE, FALSE);
+                }
+                o += cb;
+                bTag++;
+            }
+            if(isAlgorithmReadTiny && ((bTag & 0x3f) < 0x20)) { bTag = 0x20; }
+            if(!(bTag & 0x3f)) { break; }
         }
-        for(i = 0; i < 4; i++) {
-            ENDIAN_SWAP_DWORD(tx[i]);
-        }
-        isFlush = ((o % ctx->perf.RX_FLUSH_LIMIT) == (ctx->perf.RX_FLUSH_LIMIT - 0x1000));
-        if(isFlush) {
-            DeviceFPGA_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE, TRUE);
-            usleep(ctx->perf.DELAY_WRITE);
-        } else {
-            DeviceFPGA_TxTlp(ctx, (PBYTE)tx, is32 ? 12 : 16, FALSE, FALSE);
-        }
+        // Receive TLPs
+        DeviceFPGA_TxTlp(ctx, NULL, 0, TRUE, TRUE);
+        usleep(ctx->perf.DELAY_READ);
+        DeviceFPGA_RxTlpSynchronous(ctx);
     }
-    DeviceFPGA_TxTlp(ctx, NULL, 0, TRUE, TRUE);
-    usleep(ctx->perf.DELAY_READ);
-    DeviceFPGA_RxTlpSynchronous(ctx);
-    ctx->pMRdBuffer = NULL;
-    return rxbuf.cb >= rxbuf.cbMax;
+    ctx->pMRdBufferX = NULL;
 }
 
-BOOL DeviceFPGA_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
+VOID DeviceFPGA_ReadScatterDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _Inout_ PPDMA_IO_SCATTER_HEADER ppDMAs, _In_ DWORD cpDMAs, _Out_opt_ PDWORD pchDMAsRead)
 {
     PDEVICE_CONTEXT_FPGA ctx = (PDEVICE_CONTEXT_FPGA)ctxPcileech->hDevice;
-    BOOL result;
-    result = DeviceFPGA_ReadDMA_Impl(ctxPcileech, qwAddr, pb, cb);
-    if(!result && (cb <= 0x1000) && ctx->perf.RETRY_ON_ERROR) {
-        Sleep(100);
-        result = DeviceFPGA_ReadDMA_Impl(ctxPcileech, qwAddr, pb, cb);
+    DWORD i = 0, c = 0;
+    DeviceFPGA_ReadScatterDMA_Impl(ctxPcileech, ppDMAs, cpDMAs);
+    if(pchDMAsRead || ctx->perf.RETRY_ON_ERROR) {
+        while(i < cpDMAs) {
+            if((ppDMAs[i]->cb < ppDMAs[i]->cbMax) && ctx->perf.RETRY_ON_ERROR) {
+                Sleep(100);
+                DeviceFPGA_ReadScatterDMA_Impl(ctxPcileech, ppDMAs, cpDMAs);
+            }
+            c += (ppDMAs[i]->cb >= ppDMAs[i]->cbMax) ? 1 : 0;
+            i++;
+        }
     }
-    return result;
+    if(pchDMAsRead) {
+        *pchDMAsRead = c;
+    }
 }
 
 VOID DeviceFPGA_ProbeDMA_Impl(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwAddr, _In_ DWORD cPages, _Inout_ __bcount(cPages) PBYTE pbResultMap)
@@ -624,7 +668,7 @@ VOID DeviceFPGA_ProbeDMA_Impl(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD 
     bufMRd.cb = 0;
     bufMRd.pb = pbResultMap;
     bufMRd.cbMax = cPages;
-    ctx->pMRdBuffer = &bufMRd;
+    ctx->pMRdBufferX = &bufMRd;
     ctx->hRxTlpCallbackFn = TLP_CallbackMRdProbe;
     // transmit TLPs
     for(i = 0; i < cPages; i++) {
@@ -664,7 +708,7 @@ VOID DeviceFPGA_ProbeDMA_Impl(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD 
     usleep(ctx->perf.DELAY_PROBE_READ);
     DeviceFPGA_RxTlpSynchronous(ctx);
     ctx->hRxTlpCallbackFn = NULL;
-    ctx->pMRdBuffer = NULL;
+    ctx->pMRdBufferX = NULL;
 }
 
 VOID DeviceFPGA_ProbeDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwAddr, _In_ DWORD cPages, _Inout_ __bcount(cPages) PBYTE pbResultMap)
@@ -794,7 +838,7 @@ BOOL DeviceFPGA_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
     ctx->txbuf.cbMax = ctx->perf.MAX_SIZE_TX + 0x10000;
     ctx->txbuf.pb = LocalAlloc(0, ctx->txbuf.cbMax);
     if(!ctx->txbuf.pb) { goto fail; }
-    ctx->isPrintTlp = ctxPcileech->cfg->fVerboseExtra;
+    ctx->isPrintTlp = ctxPcileech->cfg->fVerboseExtraTlp;
     // set callback functions and fix up config
     ctxPcileech->cfg->dev.tp = PCILEECH_DEVICE_FPGA;
     ctxPcileech->cfg->dev.qwMaxSizeDmaIo = ctx->perf.MAX_SIZE_RX;
@@ -802,13 +846,22 @@ BOOL DeviceFPGA_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
     ctxPcileech->cfg->dev.fPartialPageReadSupported = TRUE;
     ctxPcileech->cfg->dev.pfnClose = DeviceFPGA_Close;
     ctxPcileech->cfg->dev.pfnProbeDMA = ctx->perf.PROBE_MAXPAGES ? DeviceFPGA_ProbeDMA : NULL;
-    ctxPcileech->cfg->dev.pfnReadDMA = DeviceFPGA_ReadDMA;
+    ctxPcileech->cfg->dev.pfnReadScatterDMA = DeviceFPGA_ReadScatterDMA;
     ctxPcileech->cfg->dev.pfnWriteDMA = DeviceFPGA_WriteDMA;
     ctxPcileech->cfg->dev.pfnWriteTlp = DeviceFPGA_WriteTlp;
     ctxPcileech->cfg->dev.pfnListenTlp = DeviceFPGA_ListenTlp;
     // return
     if(ctxPcileech->cfg->fVerbose) { 
-        printf("FPGA: Device Info: %s PCIe gen%i x%i [%i,%i,%i]\n", ctx->perf.SZ_DEVICE_NAME, DeviceFPGA_PHY_GetPCIeGen(ctx), DeviceFPGA_PHY_GetLinkWidth(ctx), ctx->perf.DELAY_READ, ctx->perf.DELAY_WRITE, ctx->perf.DELAY_PROBE_READ);
+        printf(
+            "FPGA: Device Info: %s PCIe gen%i x%i [%i,%i,%i] [v%i.%i]\n", 
+            ctx->perf.SZ_DEVICE_NAME, 
+            DeviceFPGA_PHY_GetPCIeGen(ctx), 
+            DeviceFPGA_PHY_GetLinkWidth(ctx), 
+            ctx->perf.DELAY_READ, 
+            ctx->perf.DELAY_WRITE, 
+            ctx->perf.DELAY_PROBE_READ,
+            ctx->wFpgaVersionMajor,
+            ctx->wFpgaVersionMinor);
     }
     return TRUE;
 fail:

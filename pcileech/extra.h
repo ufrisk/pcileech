@@ -1,6 +1,6 @@
 // extra.h : definitions related to various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016, 2017
+// (c) Ulf Frisk, 2016-2018
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __EXTRA_H__
@@ -32,6 +32,12 @@ VOID Action_MacDisableVtd(_Inout_ PPCILEECH_CONTEXT ctx);
 * -- ctx
 */
 VOID Action_PT_Phys2Virt(_Inout_ PPCILEECH_CONTEXT ctx);
+
+/*
+* Search for the physical address that is mapped by a virtual address given a page table base.
+* -- ctx
+*/
+VOID Action_PT_Virt2Phys(_Inout_ PPCILEECH_CONTEXT ctx);
 
 /*
 * Transmit the TLP data specified in the -in parameter.

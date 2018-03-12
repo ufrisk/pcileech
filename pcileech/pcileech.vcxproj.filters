@@ -72,6 +72,18 @@
     <ClInclude Include="devicefpga.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="vmm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vmmproc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vmmvfs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="devicefile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.c">
@@ -120,6 +132,18 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="devicefpga.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devicefile.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vmm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vmmproc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vmmvfs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

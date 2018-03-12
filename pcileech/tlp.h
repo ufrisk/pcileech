@@ -96,16 +96,30 @@ typedef struct tdTLP_CALLBACK_BUF_MRd {
 	PBYTE pb;
 } TLP_CALLBACK_BUF_MRd, *PTLP_CALLBACK_BUF_MRd;
 
+typedef struct tdTLP_CALLBACK_BUF_MRd_SCATTER {
+    PPDMA_IO_SCATTER_HEADER pph;  // pointer to pointer-table to DMA_READ_SCATTER_HEADERs.
+    DWORD cph;                      // entry count of pph array.
+    DWORD cbReadTotal;              // total bytes read.
+    BYTE bEccBit;                   // alternating bit (Tlp.Tag[7]) for ECC.
+} TLP_CALLBACK_BUF_MRd_SCATTER, *PTLP_CALLBACK_BUF_MRd_SCATTER;
+
 /*
 * Generic callback function that may be used by TLP capable devices to aid the
 * collection of memory read completions. Receives single TLP packet.
 * -- pBufferMrd
 * -- pb
 * -- cb
-* -- hEventCompleted = optional Event that will be signaled once all MRd's are completed.
-* -- return = TRUE if all required TLPs required to fill up buffer have been processed, otherwise FALSE.
 */
-BOOL TLP_CallbackMRd(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMrd, _In_ PBYTE pb, _In_ DWORD cb, _In_opt_ HANDLE hEventCompleted);
+VOID TLP_CallbackMRd(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMrd, _In_ PBYTE pb, _In_ DWORD cb);
+
+/*
+* Generic callback function that may be used by TLP capable devices to aid the
+* collection of memory read completions. Receives single TLP packet.
+* -- pBufferMrd_2
+* -- pb
+* -- cb
+*/
+VOID TLP_CallbackMRd_Scatter(_Inout_ PTLP_CALLBACK_BUF_MRd_SCATTER pBufferMrd_Scatter, _In_ PBYTE pb, _In_ DWORD cb);
 
 /*
 * Generic callback function that may be used by TLP capable devices to aid the
@@ -113,9 +127,7 @@ BOOL TLP_CallbackMRd(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMrd, _In_ PBYTE pb, _I
 * -- pBufferMrd
 * -- pb
 * -- cb
-* -- hEventCompleted = optional Event that will be signaled once all MRd's are completed.
-* -- return = TRUE if all required TLPs required TLPs have been processed, otherwise FALSE.
 */
-BOOL TLP_CallbackMRdProbe(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMRd, _In_ PBYTE pb, _In_ DWORD cb, _In_opt_ HANDLE hEventCompleted);
+VOID TLP_CallbackMRdProbe(_Inout_ PTLP_CALLBACK_BUF_MRd pBufferMRd, _In_ PBYTE pb, _In_ DWORD cb);
 
 #endif /* __TLP_H__ */

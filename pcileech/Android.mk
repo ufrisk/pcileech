@@ -14,7 +14,7 @@ LOCAL_CFLAGS := -D ANDROID
 LOCAL_LDLIBS := -L$(LOCAL_PATH)/lib -llog -g
 
 LOCAL_C_INCLUDES := bionic
-LOCAL_SRC_FILES:= pcileech.c oscompatibility.c device.c device3380.c devicefpga.c device605_tcp.c executor.c extra.c help.c kmd.c memdump.c mempatch.c statistics.c tlp.c util.c vfs.c
+LOCAL_SRC_FILES:= pcileech.c oscompatibility.c device.c device3380.c devicefile.c devicefpga.c device605_tcp.c executor.c extra.c help.c kmd.c memdump.c mempatch.c statistics.c tlp.c util.c vfs.c vmm.c vmmproc.c
 
 LOCAL_MODULE := pcileech
 LOCAL_SHARED_LIBRARIES += libusb1.0
