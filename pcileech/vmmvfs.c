@@ -106,6 +106,7 @@ NTSTATUS VmmVfsReadFile(_Inout_ PPCILEECH_CONTEXT ctx, _In_opt_ DWORD dwPID, _In
 {
     NTSTATUS nt;
     PVMM_CONTEXT ctxVmm = (PVMM_CONTEXT)ctx->hVMM;
+    if(!ctxVmm || !ctxVmm->ptPROC) { return STATUS_FILE_INVALID; }
     EnterCriticalSection(&ctxVmm->MasterLock);
     nt = VmmVfsReadFileDo(ctx, dwPID, wszPath1, qwPath2, pb, cb, pcbRead, cbOffset);
     LeaveCriticalSection(&ctxVmm->MasterLock);
@@ -192,6 +193,7 @@ NTSTATUS VmmVfsWriteFile(_Inout_ PPCILEECH_CONTEXT ctx, _In_opt_ DWORD dwPID, _I
 {
     NTSTATUS nt;
     PVMM_CONTEXT ctxVmm = (PVMM_CONTEXT)ctx->hVMM;
+    if(!ctxVmm || !ctxVmm->ptPROC) { return STATUS_FILE_INVALID; }
     EnterCriticalSection(&ctxVmm->MasterLock);
     nt = VmmVfsWriteFileDo(ctx, dwPID, wszPath1, qwPath2, pb, cb, pcbWrite, cbOffset);
     LeaveCriticalSection(&ctxVmm->MasterLock);
@@ -242,7 +244,7 @@ BOOL VmmVfsListFilesDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BOOL fRoot, _In_ BOOL
     PVMM_PROCESS pProcess;
     WORD iProcess;
     DWORD i, cMax;
-    if(!ctxVmm) { return FALSE; }
+    if(!ctxVmm || !ctxVmm->ptPROC) { return FALSE; }
     // populate root node - list processes as directories
     if(fRoot) {
         *ppfi = LocalAlloc(LMEM_ZEROINIT, ctxVmm->ptPROC->c * sizeof(VFS_RESULT_FILEINFO));
@@ -327,6 +329,7 @@ BOOL VmmVfsListFiles(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BOOL fRoot, _In_ BOOL f
 {
     BOOL result;
     PVMM_CONTEXT ctxVmm = (PVMM_CONTEXT)ctx->hVMM;
+    if(!ctxVmm || !ctxVmm->ptPROC) { return FALSE; }
     EnterCriticalSection(&ctxVmm->MasterLock);
     result = VmmVfsListFilesDo(ctx, fRoot, fNamesPid, dwPID, wszPath1, qwPath2, ppfi, pcfi);
     LeaveCriticalSection(&ctxVmm->MasterLock);

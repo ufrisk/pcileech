@@ -6,7 +6,6 @@
 // (c) Ulf Frisk, 2017-2018
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-#ifdef WIN32
 
 #include "devicefpga.h"
 #include "device.h"
@@ -567,7 +566,7 @@ VOID DeviceFPGA_ReadScatterDMA_Impl(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _Inou
         rxbuf.cbReadTotal = 0;
         rxbuf.cph = cpDMAs - i;
         rxbuf.pph = ppDMAs + i;
-        ctx->hRxTlpCallbackFn = TLP_CallbackMRd_Scatter;
+        ctx->hRxTlpCallbackFn = (VOID(*)(PVOID, PBYTE, DWORD))TLP_CallbackMRd_Scatter;
         // Transmit TLPs
         cbFlush = 0;
         cbTotalInCycle = 0;
@@ -632,12 +631,14 @@ VOID DeviceFPGA_ReadScatterDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _Inout_ PP
 {
     PDEVICE_CONTEXT_FPGA ctx = (PDEVICE_CONTEXT_FPGA)ctxPcileech->hDevice;
     DWORD i = 0, c = 0;
+    BOOL fRetry = FALSE;
     DeviceFPGA_ReadScatterDMA_Impl(ctxPcileech, ppDMAs, cpDMAs);
     if(pchDMAsRead || ctx->perf.RETRY_ON_ERROR) {
         while(i < cpDMAs) {
-            if((ppDMAs[i]->cb < ppDMAs[i]->cbMax) && ctx->perf.RETRY_ON_ERROR) {
+            if((ppDMAs[i]->cb < ppDMAs[i]->cbMax) && ctx->perf.RETRY_ON_ERROR && !fRetry) {
                 Sleep(100);
                 DeviceFPGA_ReadScatterDMA_Impl(ctxPcileech, ppDMAs, cpDMAs);
+                fRetry = TRUE;
             }
             c += (ppDMAs[i]->cb >= ppDMAs[i]->cbMax) ? 1 : 0;
             i++;
@@ -669,7 +670,7 @@ VOID DeviceFPGA_ProbeDMA_Impl(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD 
     bufMRd.pb = pbResultMap;
     bufMRd.cbMax = cPages;
     ctx->pMRdBufferX = &bufMRd;
-    ctx->hRxTlpCallbackFn = TLP_CallbackMRdProbe;
+    ctx->hRxTlpCallbackFn = (VOID(*)(PVOID, PBYTE, DWORD))TLP_CallbackMRdProbe;
     // transmit TLPs
     for(i = 0; i < cPages; i++) {
         if(pbResultMap[i]) { continue; } // skip over if page already marked as ok
@@ -853,7 +854,7 @@ BOOL DeviceFPGA_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
     // return
     if(ctxPcileech->cfg->fVerbose) { 
         printf(
-            "FPGA: Device Info: %s PCIe gen%i x%i [%i,%i,%i] [v%i.%i]\n", 
+            "FPGA: Device Info: %s PCIe gen%i x%i [%i,%i,%i] [v%i.%i,%04x]\n", 
             ctx->perf.SZ_DEVICE_NAME, 
             DeviceFPGA_PHY_GetPCIeGen(ctx), 
             DeviceFPGA_PHY_GetLinkWidth(ctx), 
@@ -861,28 +862,20 @@ BOOL DeviceFPGA_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
             ctx->perf.DELAY_WRITE, 
             ctx->perf.DELAY_PROBE_READ,
             ctx->wFpgaVersionMajor,
-            ctx->wFpgaVersionMinor);
+            ctx->wFpgaVersionMinor,
+            ctx->wDeviceId);
     }
     return TRUE;
 fail:
     if(szDeviceError && (ctxPcileech->cfg->fVerbose || (ctxPcileech->cfg->dev.tp == PCILEECH_DEVICE_FPGA))) {
-        printf("FPGA: ERROR: %s.\n", szDeviceError);
+        printf(
+            "FPGA: ERROR: %s [%i,v%i.%i,%04x]\n", 
+            szDeviceError,
+            ctx->wFpgaID,
+            ctx->wFpgaVersionMajor,
+            ctx->wFpgaVersionMinor,
+            ctx->wDeviceId);
     }
     DeviceFPGA_Close(ctxPcileech);
     return FALSE;
 }
-
-#endif /* WIN32 */
-#if defined(LINUX) || defined(ANDROID)
-
-#include "devicefpga.h"
-
-BOOL DeviceFPGA_Open(_Inout_ PPCILEECH_CONTEXT ctx)
-{
-    if(ctx->cfg->dev.tp == PCILEECH_DEVICE_FPGA) {
-        printf("FPGA: Failed. FPGA device currently only supported in PCILeech for Windows.");
-    }
-    return FALSE;
-}
-
-#endif /* LINUX || ANDROID */

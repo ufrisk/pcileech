@@ -223,7 +223,7 @@ VOID Action_TlpTx(_Inout_ PPCILEECH_CONTEXT ctx)
         printf("Action_TlpTx: Invalid TLP (length not multiple of 4).\n");
         return;
     }
-    printf("TLP: Transmitting PCIe TLP.%s\n", ctx->cfg->fVerboseExtra ? "" : " (use -vv option for detailed info).");
+    printf("TLP: Transmitting PCIe TLP.%s\n", ctx->cfg->fVerboseExtra ? "" : " (use -vvv option for detailed info).");
     DeviceWriteTlp(ctx, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn);
     DeviceListenTlp(ctx, 100);
 }

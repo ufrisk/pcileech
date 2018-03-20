@@ -1090,7 +1090,7 @@ fail:
 
 VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx)
 {
-    printf("MOUNT: Failed. Operation only supported in PCILeech for Windows.");
+    printf("MOUNT: Failed. Operation only supported in PCILeech for Windows.\n");
 }
 
 #endif /* LINUX || ANDROID */

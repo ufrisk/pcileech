@@ -658,7 +658,7 @@ VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProce
     }
     // 2: translate virt2phys and retrieve data loop
     cpDMAsPhys = 0;
-    cPagesPerScatterRead = min(0x48, ((ctxVmm->ctxPcileech->cfg->dev.qwMaxSizeDmaIo & ~0xfff) >> 12));
+    cPagesPerScatterRead = min(0x48, ((ctxVmm->ctxPcileech->cfg->qwMaxSizeDmaIo & ~0xfff) >> 12));
     for(i = 0; i < cpDMAsVirt; i++) {
         // retrieve from cache (if found)
         pDMA_Virt = ppDMAsVirt[i];

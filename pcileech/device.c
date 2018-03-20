@@ -96,7 +96,7 @@ DWORD DeviceReadDMAEx_DoWork(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _
         cbRd = ((i == cChunkTotal - 1) && (cb % cbChunk)) ? (cb % cbChunk) : cbChunk; // (last chunk may be smaller)
         if(ctx->cfg->dev.fScatterReadSupported) {
             // scatter read, if available
-            cbSuccess = DeviceReadDMAEx_DoWork_Scatter(ctx, qwAddr + cbRdOff, pb + cbRdOff, cbRd, pPageStat);
+            cbSuccess += DeviceReadDMAEx_DoWork_Scatter(ctx, qwAddr + cbRdOff, pb + cbRdOff, cbRd, pPageStat);
         } else {
             // traditional read
             result = DeviceReadDMA(ctx, qwAddr + cbRdOff, pb + cbRdOff, cbRd, 0);

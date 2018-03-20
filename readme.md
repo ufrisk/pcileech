@@ -28,7 +28,6 @@ Capabilities:
 * Execute kernel code on the target system.
 * Spawn system shell [Windows].
 * Spawn any executable [Windows].
-* Load unsigned drivers [Windows].
 * Pull files [Linux, FreeBSD, Windows, macOS*].
 * Push files [Linux, Windows, macOS*].
 * Patch / Unlock (remove password requirement) [Windows, macOS*].
@@ -69,17 +68,15 @@ Please ensure you do have the most recent version of PCILeech by visiting the PC
 Clone the PCILeech Github repository. The binaries are found in pcileech_files and should work on 64-bit Windows and Linux. Please copy all files from pcileech_files since some files contains additional modules and signatures.
 
 #### Windows:
-The Google Android USB driver also have to be installed if USB3380 hardware is used. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver. Open Device Manager. Right click on the computer, choose add legacy hardware. Select install the hardware manually. Click Have Disk. Navigate to the Android Driver, select android_winusb.inf and install.
 
-FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card. FTDI drivers will installed automatically on Windows from Windows Update at first connection. PCILeech also requires 64-bit [`FTD3XX.dll`](http://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.2.0.6.zip) which must be downloaded from FTDI and placed alongside `pcileech.exe`.
+Please see the [PCILeech-on-Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows) guide for information about running PCILeech on Windows.
 
+The Google Android USB driver have to be installed if USB3380 hardware is used. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver.<br>
+FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card. Download the 64-bit [`FTD3XX.dll`](http://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.2.0.6.zip) from FTDI and place it alongside `pcileech.exe`.<br>
 To mount live ram and target file system as drive in Windows the Dokany file system library must be installed. Please download and install the latest version of Dokany at: https://github.com/dokan-dev/dokany/releases/latest
 
-#### Linux:
-PCILeech on Linux must be run as root. PCILeech also requires libusb. Libusb is probably installed by default - if not install it by running: `apt-get install libusb-1.0-0`.
-
-#### Android:
-Separate instructions for [Android](Android.md).
+#### Linux and Android:
+Please see the [PCILeech-on-Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) guide for information about running PCILeech on Linux or [PCILeech-on-Android](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Android) for Android information.
 
 Examples:
 =========
@@ -128,16 +125,11 @@ Limitations/Known Issues:
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * Linux based on the 4.8 kernel and later might not work with the USB3380 hardware. As an alternative, if target root access exists, compile and insert .ko (pcileech_kmd/linux). If the system is EFI booted an alternative signature exists.
 * Windows 7: signatures are not published.
-* The Linux/Android versions of PCILeech dumps memory slightly slower than the Windows version (USB3380 hardware). Mount target file system, process file system and live RAM are also not availabe in the Linux/Android versions.
-* FPGA and file system mount support only exists for Windows. Linux and Android support is planned for the future.
+* File system mount, including the Memory Process File System, support only exists for Windows.
 
 Building:
 =========
-The binaries are found in the pcileech_files folder. If one wish to build an own version it is possible to do so. Compile the pcileech and pcileech_gensig projects from within Visual Studio. Tested with Visual Studio 2015. 
-
-To compile kernel- and shellcode, located in the pcileech_shellcode project, please look into the individual files for instructions. These files are usually compiled command line. To compile for Linux make sure the dependencies are met my running: `apt-get install libusb-1.0-0-dev pkg-config` then move into the pcileech/pcileech directory and build by running: `make`. Download the shellcode module and configuration files separately from the binary download link and put them alongside the pcileech executable.
-
-Separate instructions for [Android](Android.md).
+The binaries are found in the pcileech_files folder. If one wish to build an own version it is possible to do so. Please see the [PCILeech-on-Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows), [PCILeech-on-Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) or [PCILeech-on-Android](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Android) for more information about building PCILeech.
 
 Links:
 ======
@@ -150,17 +142,14 @@ Changelog:
 v1.0
 * Initial release.
 
-v1.1-v1.5
+v1.1-v2.6
 * Various updates. please see individual relases for more information.
-
-v2.0-2.6
-* Mount as a drive functionality.
-* Linux and Android support.
-* UEFI target support.
-* FPGA hardware support.
-* Various other updates. please see individual relases for more information.
 
 v3.0
 * PCILeech Memory Process File System.
 * Internal refactorings.
+* Various bug fixes.
+
+v3.1
+* Linux FPGA support.
 * Various bug fixes.

@@ -33,9 +33,9 @@ VOID Help_ShowGeneral()
         " contains a kernel mode signature the kernel module will be loaded and then un-\n" \
         " loaded on program exit ( except for the kmdload command ).                    \n" \
         " KMD mode may access all memory (available to the kernel of the target system).\n" \
-        " DMA mode may only access lower 4GB of memory if USB3380 hardware is used.     \n" \
+        " DMA mode may access 4GB memory if USB3380 hardware is used.                   \n" \
         " DMA mode may access all memory if FPGA based hardware is used such as the:    \n" \
-        " SP605, AC701 and PCIeScreamer.                                                \n" \
+        "   SP605/FT601, AC701/FT601 and PCIeScreamer.                                  \n" \
         " For detailed help about a specific command type:  pcileech <command> -help    \n" \
         " General syntax: pcileech <command> [-<optionname1> <optionvalue1>] ...        \n" \
         " Valid commands and valid MODEs     [ and options ]                            \n" \
@@ -47,7 +47,7 @@ VOID Help_ShowGeneral()
         "   [implant]                  KMD   [ in, out, s, 0..9 ]                       \n" \
         "   kmdload                DMA       [ pt, cr3 ]                                \n" \
         "   kmdexit                    KMD                                              \n" \
-        "   mount                      KMD   [ s, cr3 ]     (Windows only feature)      \n" \
+        "   mount                  DMA,KMD   [ s, cr3 ]     (Windows only feature)      \n" \
         "   display                DMA,KMD   [ min, max ]                               \n" \
         "   pagedisplay            DMA,KMD   [ min ]                                    \n" \
         "   pt_phys2virt           DMA,KMD   [ cr3, 0 ]                                 \n" \
@@ -62,9 +62,9 @@ VOID Help_ShowGeneral()
         "   tlp                    DMA       [ in ]         (FPGA)                      \n" \
         "   probe                  DMA       [ in ]         (FPGA)                      \n" \
         " System specific commands and valid MODEs [ and options ]:                     \n" \
-        "   mac_fvrecover          DMA                                                  \n" \
-        "   mac_fvrecover2         DMA                                                  \n" \
-        "   mac_disablevtd         DMA                                                  \n" \
+        "   mac_fvrecover          DMA                      (USB3380)                   \n" \
+        "   mac_fvrecover2         DMA                      (USB3380)                   \n" \
+        "   mac_disablevtd         DMA                      (USB3380)                   \n" \
         " Valid options:                                                                \n" \
         "   -min : memory min address, valid range: 0x0 .. 0xffffffffffffffff           \n" \
         "          default: 0x0                                                         \n" \
@@ -110,12 +110,10 @@ VOID Help_ShowGeneral()
         "   -0..9: QWORD input value. Example: -0 0xff , -3 0x7fffffff00001000 or -2 13 \n" \
         "          default: 0                                                           \n" \
         "   -pt  : trigger KMD insertion by automatic page table hijack.                \n" \
-        "          Option has no value. Example: -pt                                    \n" \
-        "          Used in conjunction with -kmd option to trigger KMD insertion by page\n" \
-        "          table hijack. Only recommended to use with care on computers with    \n" \
-        "          4GB+ RAM when kernel is located in high-memory (Windows 10).         \n" \
-        "   -cr3 : base address of system page table / CR3 CPU register.                \n" \
-        "   -efibase : base address of EFI_SYSTEM_TABLE (IBI SYST) used when inserting  \n" \
+        "          Option has no value. Example: -pt. Used in conjunction with          \n" \
+        "          -kmd option to trigger KMD insertion by page table hijack.           \n" \
+        "   -cr3 : base address of page table (PML4) / CR3 CPU register.                \n" \
+        "   -efibase : base address of EFI_SYSTEM_TABLE (IBI SYST). Used when inserting \n" \
         "          UEFI 'kernel' modules.                                               \n" \
         "   -kmd : address of already loaded kernel module helper (KMD).                \n" \
         "          ALTERNATIVELY                                                        \n" \
@@ -144,7 +142,7 @@ VOID Help_ShowInfo()
     printf(
         " PCILEECH INFORMATION                                                          \n" \
         " PCILeech (c) 2016-2018 Ulf Frisk                                              \n" \
-        " Version: 3.0                                                                  \n" \
+        " Version: 3.1                                                                  \n" \
         " License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
         " Contact information: pcileech@frizk.net                                       \n" \
         " System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \
@@ -153,12 +151,12 @@ VOID Help_ShowInfo()
         "   PCILeech-FPGA     - https://github.com/ufrisk/pcileech-fpga                 \n" \
         "   Google USB Driver - https://developer.android.com/sdk/win-usb.html          \n" \
         "   FTDI FT601 Driver - http://www.ftdichip.com/Drivers/D3XX.htm                \n" \
+        "   PCIe Injector     - https://github.com/enjoy-digital/pcie_injector          \n" \
         "   Dokany            - https://github.com/dokan-dev/dokany/releases/latest     \n" \
         " ----------------                                                              \n" \
         " Use with memory dump files in read-only mode.                                 \n" \
         " Use with USB3380 hardware programmed as a PCILeech device.                    \n" \
-        " Use with FPGA harware programmed as a PCILeech FPGA device.                   \n" \
-        " Use with SP605 hardware / 'PCI Express DIY hacking toolkit' by cr4sh/@d_olex. \n\n" \
+        " Use with FPGA harware programmed as a PCILeech FPGA device.                   \n\n" \
         " ----------------                                                              \n" \
         " Driver information (USB3380/Windows):                                         \n" \
         "   The USB3380 HW requires a dummy driver to function properly. The PCILeech   \n" \
@@ -175,9 +173,15 @@ VOID Help_ShowInfo()
         "   memory file access PCILeech requires Dokany to be installed for virtual file\n" \
         "   system support. Please download and install Dokany on your computer before  \n" \
         "   using the mount functionality.                                              \n" \
-        " Driver information (Libusb/Linux):                                            \n" \
+        " Driver information (USB3380/Linux):                                           \n" \
         "   PCILeech on Linux requires that libusb is installed. Libusb is most probably\n" \
         "   installed by default, if not install by running:apt-get install libusb-1.0-0\n" \
+        " Driver information (FPGA/FT601/Linux):                                        \n" \
+        "   The PCILeech programmed FPGA board with FT601 USB3 requires drivers for USB.\n" \
+        "   The driver is a small kernel driver found in the drivers/ft60x folder in the\n" \
+        "   PCIe Injector Github repository. Once loaded the driver will expose a device\n" \
+        "   named /dev/ft60x[0-3] Please note that this device file must be read/write  \n" \
+        "   for the current user for PCILeech to find and use it automatically.         \n" \
         " ----------------                                                              \n" \
         " Notes about the PCILeech USB3380 device:                                      \n" \
         " Usage: connect USB3380 device to target computer and USB cable to the computer\n" \

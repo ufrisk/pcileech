@@ -741,6 +741,13 @@ DWORD VmmProcCacheUpdaterThread(_Inout_ PVMM_CONTEXT ctxVmm)
                     // spider TLB and set up initial system process and enumerate EPROCESS
                     VmmTlbSpider(ctxVmm, paSystemPML4, FALSE);
                     pSystemProcess = VmmProcessCreateEntry(ctxVmm, 4, 0, paSystemPML4, "System", FALSE, TRUE);
+                    if(!pSystemProcess) {
+                        printf("VmmProc: Failed to refresh memory process file system - aborting.\n");
+                        VmmProcessCreateFinish(ctxVmm);
+                        ctxVmm->ThreadProcCache.fEnabled = FALSE;
+                        LeaveCriticalSection(&ctxVmm->MasterLock);
+                        goto fail;
+                    }
                     VmmProcessCreateFinish(ctxVmm);
                     pSystemProcess->os.win.vaEPROCESS = vaSystemEPROCESS;
                     VmmProcWindows_EnumerateEPROCESS(ctxVmm, pSystemProcess);
@@ -757,6 +764,7 @@ DWORD VmmProcCacheUpdaterThread(_Inout_ PVMM_CONTEXT ctxVmm)
         }
         LeaveCriticalSection(&ctxVmm->MasterLock);
     }
+    fail:
     if(ctxVmm->ctxPcileech->cfg->fVerbose) {
         printf("VmmProc: Exit periodic cache flushing.\n");
     }
