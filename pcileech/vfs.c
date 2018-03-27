@@ -359,51 +359,6 @@ VOID Vfs_UtilSplitPathFile(_Out_ WCHAR wszPath[MAX_PATH], _Out_ LPWSTR *pwcsFile
     *pwcsFile = wszPath + iSplitFilePath + 1;
 }
 
-BOOL Vfs_UtilVmmGetPidDirFile(_In_ WCHAR wszFilePathBuffer[MAX_PATH], _Out_ PBOOL pfRoot, _Out_ PBOOL pfName, _Out_ PDWORD pdwPID, _Out_ LPWSTR *pwszPath1, _Out_ PQWORD pqwPath2)
-{
-    DWORD i = 0, iPID, iPath1 = 0, iPath2 = 0;
-    CHAR szBuffer[MAX_PATH];
-    *pdwPID = 0;
-    *pwszPath1 = NULL;
-    *pqwPath2 = (QWORD)-1;
-    // 1: Check for root only item
-    *pfName = !_wcsicmp(wszFilePathBuffer, L"\\proc\\name");
-    *pfRoot = *pfName || !_wcsicmp(wszFilePathBuffer, L"\\proc\\pid");
-    if(*pfRoot) { return TRUE; }
-    // 2: Check if starting with PID or NAME and move start index
-    if(!_wcsnicmp(wszFilePathBuffer, L"\\proc\\pid\\", 10)) { i = 10; }
-    if(!_wcsnicmp(wszFilePathBuffer, L"\\proc\\name\\", 11)) { i = 11; }
-    if(i == 0) { return FALSE; }
-    // 3: Locate start of PID number and 1st Path item (if any)
-    while((i < MAX_PATH) && wszFilePathBuffer[i] && (wszFilePathBuffer[i] != L'\\')) { i++; }
-    if(wszFilePathBuffer[i]) { iPath1 = i + 1; }
-    wszFilePathBuffer[i] = 0;
-    i--;
-    while((i > 0) && (wszFilePathBuffer[i] >= L'0') && (wszFilePathBuffer[i] <= L'9')) { i--; }
-    iPID = i + 1;
-    UnicodeToAscii(szBuffer, MAX_PATH, &wszFilePathBuffer[iPID]);
-    *pdwPID = (DWORD)Util_GetNumeric(szBuffer);
-    if(!iPath1) { return TRUE; }
-    // 4: Locate 2nd Path item (if any)
-    i = iPath1;
-    while((i < MAX_PATH) && wszFilePathBuffer[i] && (wszFilePathBuffer[i] != L'\\')) { i++; }
-    if(wszFilePathBuffer[i]) { 
-        iPath2 = i + 1;
-        wszFilePathBuffer[i] = 0;
-        // 5: Fixups
-        i++;
-        while((i < MAX_PATH) && wszFilePathBuffer[i] && (wszFilePathBuffer[i] != L'\\')) { i++; }
-        if(i < MAX_PATH) { wszFilePathBuffer[i] = 0; }
-    }
-    // 6: Finish
-    *pwszPath1 = &wszFilePathBuffer[iPath1];
-    if(iPath2) {
-        UnicodeToAscii(szBuffer, MAX_PATH, &wszFilePathBuffer[iPath2]);
-        *pqwPath2 = Util_GetNumeric(szBuffer);
-    }
-    return TRUE;
-}
-
 BOOL Vfs_ConvertFilenameToUnix(LPSTR szFileNameUnix, LPCWSTR wcsFileNameVfs) {
     DWORD i;
     CHAR sz[MAX_PATH];
@@ -444,11 +399,6 @@ BOOL Vfs_ListDirectory(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo, _Out
     BOOL result;
     VFS_OPERATION op;
     QWORD cbfi;
-    WCHAR wszProcBuffer[MAX_PATH];
-    BOOL fProcRoot, fProcName;
-    DWORD dwProcPID;
-    QWORD qwProcPath2;
-    LPWSTR wszProcPath1;
     result = VfsCache_DirectoryGetDirectory(ppfi, pcfi, wcsFileName, pds);
     if(result) { return TRUE; }
     // matches: \files*
@@ -473,10 +423,7 @@ BOOL Vfs_ListDirectory(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo, _Out
     }
     // matches: \proc\*
     if(!_wcsnicmp(wcsFileName, L"\\proc\\", 6) && pds->fVMM) {
-        wcsncpy_s(wszProcBuffer, MAX_PATH, wcsFileName, _TRUNCATE);
-        result = 
-            Vfs_UtilVmmGetPidDirFile(wszProcBuffer, &fProcRoot, &fProcName, &dwProcPID, &wszProcPath1, &qwProcPath2) &&
-            VmmVfsListFiles(pds->ctx, fProcRoot, fProcName, dwProcPID, wszProcPath1, qwProcPath2, ppfi, pcfi);
+        result =  VmmVfsListFiles(pds->ctx, wcsFileName, ppfi, pcfi);
         if(result) { 
             VfsCache_DirectoryPut(wcsFileName, *ppfi, *pcfi, pds);
         }
@@ -878,11 +825,6 @@ NTSTATUS DOKAN_CALLBACK
 VfsCallback_ReadFile(LPCWSTR wcsFileName, LPVOID Buffer, DWORD BufferLength, LPDWORD ReadLength, LONGLONG Offset, PDOKAN_FILE_INFO DokanFileInfo)
 {
     PVFS_GLOBAL_STATE pds = (PVFS_GLOBAL_STATE)DokanFileInfo->DokanOptions->GlobalContext;
-    WCHAR wszProcBuffer[MAX_PATH];
-    BOOL result, fProcRoot, fProcName;
-    DWORD dwProcPID;
-    QWORD qwProcPath2;
-    LPWSTR wszProcPath1;
     if(!_wcsicmp(wcsFileName, L"\\liveram-kmd.raw") && pds->cbRAM[VFS_RAM_TP_KMD]) { // kernel module backed RAM file
         return _VfsReadFile_RAM(VFS_RAM_TP_KMD, Buffer, BufferLength, ReadLength, Offset, pds);
     }
@@ -893,10 +835,7 @@ VfsCallback_ReadFile(LPCWSTR wcsFileName, LPVOID Buffer, DWORD BufferLength, LPD
         return _VfsReadFile_File(wcsFileName, Buffer, BufferLength, ReadLength, Offset, DokanFileInfo);
     }
     if(pds->fVMM && (!_wcsnicmp(wcsFileName, L"\\proc\\name\\", 1) || !_wcsnicmp(wcsFileName, L"\\proc\\pid\\", 10))) {
-        wcsncpy_s(wszProcBuffer, MAX_PATH, wcsFileName, _TRUNCATE);
-        result = Vfs_UtilVmmGetPidDirFile(wszProcBuffer, &fProcRoot, &fProcName, &dwProcPID, &wszProcPath1, &qwProcPath2);
-        if(!result || fProcRoot) { return STATUS_FILE_INVALID; }
-        return VmmVfsReadFile(pds->ctx, dwProcPID, wszProcPath1, qwProcPath2, Buffer, BufferLength, ReadLength, Offset);
+        return VmmVfsReadFile(pds->ctx, wcsFileName, Buffer, BufferLength, ReadLength, Offset);
     }
     return STATUS_FILE_INVALID;
 }
@@ -905,11 +844,7 @@ NTSTATUS DOKAN_CALLBACK
 VfsCallback_WriteFile(LPCWSTR wcsFileName, LPCVOID Buffer, DWORD NumberOfBytesToWrite, LPDWORD NumberOfBytesWritten, LONGLONG Offset, PDOKAN_FILE_INFO DokanFileInfo)
 {
     PVFS_GLOBAL_STATE pds = (PVFS_GLOBAL_STATE)DokanFileInfo->DokanOptions->GlobalContext;
-    WCHAR wszProcBuffer[MAX_PATH];
-    BOOL result, fProcRoot, fProcName;
-    DWORD dwProcPID;
-    QWORD qwProcPath2;
-    LPWSTR wszProcPath1;
+    BOOL result;
     if(!_wcsicmp(wcsFileName, L"\\liveram-kmd.raw") && pds->cbRAM[VFS_RAM_TP_KMD]) { // kernel module backed RAM file
         EnterCriticalSection(&pds->LockDma);
         result = DeviceWriteMEM(pds->ctx, Offset, (PBYTE)Buffer, NumberOfBytesToWrite, PCILEECH_MEM_FLAG_RETRYONFAIL);
@@ -929,15 +864,9 @@ VfsCallback_WriteFile(LPCWSTR wcsFileName, LPCVOID Buffer, DWORD NumberOfBytesTo
     if(!_wcsnicmp(wcsFileName, L"\\files\\", 7) && pds->fKMD) {
         return _VfsWriteFile_File(wcsFileName, Buffer, NumberOfBytesToWrite, NumberOfBytesWritten, Offset, DokanFileInfo);
     }
-
     if(pds->fVMM && (!_wcsnicmp(wcsFileName, L"\\proc\\name\\", 1) || !_wcsnicmp(wcsFileName, L"\\proc\\pid\\", 10))) {
-        wcsncpy_s(wszProcBuffer, MAX_PATH, wcsFileName, _TRUNCATE);
-        result = Vfs_UtilVmmGetPidDirFile(wszProcBuffer, &fProcRoot, &fProcName, &dwProcPID, &wszProcPath1, &qwProcPath2);
-        if(!result || fProcRoot) { return STATUS_FILE_INVALID; }
-        return VmmVfsWriteFile(pds->ctx, dwProcPID, wszProcPath1, qwProcPath2, (PBYTE)Buffer, NumberOfBytesToWrite, NumberOfBytesWritten, Offset);
+        return VmmVfsWriteFile(pds->ctx, wcsFileName, (PBYTE)Buffer, NumberOfBytesToWrite, NumberOfBytesWritten, Offset);
     }
-
-
     return STATUS_FILE_INVALID;
 }
 

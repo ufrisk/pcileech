@@ -58,6 +58,20 @@ PDMA_IO_SCATTER_HEADER VmmCacheGet(_In_ PVMM_CACHE_TABLE t, _In_ QWORD qwA)
     e = t->M[h];
     while(e) {
         if(e->h.qwA == qwA) {
+            if(e->AgeBLink) {
+                // disconnect from age list
+                if(e->AgeFLink) {
+                    e->AgeFLink->AgeBLink = e->AgeBLink;
+                } else {
+                    t->AgeBLink = e->AgeBLink;
+                }
+                e->AgeBLink->AgeFLink = e->AgeFLink;
+                // put entry at front in age list
+                e->AgeFLink = t->AgeFLink;
+                e->AgeFLink->AgeBLink = e;
+                e->AgeBLink = NULL;
+                t->AgeFLink = e;
+            }
             return &e->h;
         }
         e = e->FLink;
@@ -125,11 +139,11 @@ PVMM_CACHE_ENTRY VmmCacheReserve(_Inout_ PVMM_CACHE_TABLE t)
 /*
 * Invalidate a cache entry (if exists)
 */
-VOID VmmCacheInvalidate(_Inout_ PVMM_CACHE_TABLE t, _In_ QWORD qwA)
+VOID VmmCacheInvalidate_2(_Inout_ PVMM_CACHE_TABLE t, _In_ QWORD pa)
 {
     WORD h;
     PVMM_CACHE_ENTRY e;
-    h = (qwA >> 12) % VMM_CACHE_TABLESIZE;
+    h = (pa >> 12) % VMM_CACHE_TABLESIZE;
     // invalidate all items in h bucket while letting them remain in age list
     e = t->M[h];
     t->M[h] = NULL;
@@ -142,7 +156,14 @@ VOID VmmCacheInvalidate(_Inout_ PVMM_CACHE_TABLE t, _In_ QWORD qwA)
     }
 }
 
-VOID VmmCacheClear(_Inout_ _In_ PVMM_CONTEXT ctxVmm, _In_ BOOL fTLB, _In_ BOOL fPHYS)
+VOID VmmCacheInvalidate(_Inout_ PVMM_CONTEXT ctxVmm, _In_ QWORD pa)
+{
+    VmmCacheInvalidate_2(ctxVmm->ptTLB, pa);
+    VmmCacheInvalidate_2(ctxVmm->ptPHYS, pa);
+}
+
+
+VOID VmmCacheClear(_Inout_ PVMM_CONTEXT ctxVmm, _In_ BOOL fTLB, _In_ BOOL fPHYS)
 {
     if(fTLB && ctxVmm->ptTLB) {
         VmmCacheClose(ctxVmm->ptTLB);
@@ -173,7 +194,7 @@ PDMA_IO_SCATTER_HEADER VmmCacheGet_FromDeviceOnMiss(_In_ PVMM_CONTEXT ctxVmm, _I
 * it bytes supplied in pb will be altered to look better.
 *
 */
-BOOL VmmTlbPageTableVerify(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PBYTE pb, _In_ QWORD pa, _In_ BOOL fSelfRefReq)
+BOOL VmmTlbPageTableVerify(_Inout_opt_ PVMM_CONTEXT ctxVmm, _Inout_ PBYTE pb, _In_ QWORD pa, _In_ BOOL fSelfRefReq)
 {
     DWORD i;
     QWORD *ptes, c = 0, pte;
@@ -195,7 +216,7 @@ BOOL VmmTlbPageTableVerify(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PBYTE pb, _In_ Q
             // clear this faulty entry. If too may bad PTEs are found this
             // is most probably not a page table - zero it out but let it
             // remain in cache to prevent performande degrading reloads...
-            if(ctxVmm->ctxPcileech->cfg->fVerboseExtra) {
+            if(ctxVmm && ctxVmm->ctxPcileech->cfg->fVerboseExtra) {
                 printf("VMM: vmm.c!VmmTlbPageTableVerify: BAD PTE %016llx at PA: %016llx i: %i\n", *(ptes + i), pa, i);
             }
             *(ptes + i) = (QWORD)0;
@@ -207,7 +228,7 @@ BOOL VmmTlbPageTableVerify(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PBYTE pb, _In_ Q
         }
     }
     if(fBad || (c > 16) || (fSelfRefReq && !fSelfRef)) {
-        if(ctxVmm->ctxPcileech->cfg->fVerboseExtra) {
+        if(ctxVmm && ctxVmm->ctxPcileech->cfg->fVerboseExtra) {
             printf("VMM: vmm.c!VmmTlbPageTableVerify: BAD PT PAGE at PA: %016llx\n", pa);
         }
         ZeroMemory(pb, 4096);
@@ -235,7 +256,8 @@ PVMM_PROCESS VmmProcessGetEx(_In_ PVMM_PROCESS_TABLE pt, _In_ DWORD dwPID)
     DWORD i, iStart;
     i = iStart = dwPID % VMM_PROCESSTABLE_ENTRIES_MAX;
     while(TRUE) {
-        if(pt->M[i] && (pt->M[i]->dwPID == dwPID)) {
+        if(!pt->M[i]) { return NULL; }
+        if(pt->M[i]->dwPID == dwPID) {
             return pt->M[i];
         }
         if(++i == VMM_PROCESSTABLE_ENTRIES_MAX) { i = 0; }
@@ -584,26 +606,26 @@ PVMM_MEMMAP_ENTRY VmmMapGetEntry(_In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA)
 }
 
 _Success_(return)
-BOOL VmmVirt2Phys_DoWork(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _In_ QWORD qwPML, _In_ QWORD PTEs[512], _Out_ PQWORD pqwPA)
+BOOL VmmVirt2PhysEx(_Inout_ PVMM_CONTEXT ctxVmm, _In_ BOOL fUserOnly, _In_ QWORD va, _In_ QWORD iPML, _In_ QWORD PTEs[512], _Out_ PQWORD ppa)
 {
     QWORD pte, i, qwMask;
     PBYTE pbNextPageTable;
-    i = 0x1ff & (qwVA >> VMM_PAGETABLEMAP_PML_REGION_SIZE[qwPML]);
+    i = 0x1ff & (va >> VMM_PAGETABLEMAP_PML_REGION_SIZE[iPML]);
     pte = PTEs[i];
     if(!(pte & 0x01)) { return FALSE; }                 // NOT VALID
-    if(pProcess->fUserOnly && !(pte & 0x04)) { return FALSE; }    // SUPERVISOR PAGE & USER MODE REQ
+    if(fUserOnly && !(pte & 0x04)) { return FALSE; }    // SUPERVISOR PAGE & USER MODE REQ
     if(pte & 0x000f000000000000) { return FALSE; }      // RESERVED
-    if((qwPML == 1) || (pte & 0x80) /* PS */) {
-        if(qwPML == 4) { return FALSE; }                // NO SUPPORT IN PML4
-        qwMask = 0xffffffffffffffff << VMM_PAGETABLEMAP_PML_REGION_SIZE[qwPML];
-        *pqwPA = pte & 0x0000fffffffff000 & qwMask;   // MASK AWAY BITS FOR 4kB/2MB/1GB PAGES
+    if((iPML == 1) || (pte & 0x80) /* PS */) {
+        if(iPML == 4) { return FALSE; }                // NO SUPPORT IN PML4
+        qwMask = 0xffffffffffffffff << VMM_PAGETABLEMAP_PML_REGION_SIZE[iPML];
+        *ppa = pte & 0x0000fffffffff000 & qwMask;   // MASK AWAY BITS FOR 4kB/2MB/1GB PAGES
         qwMask = qwMask ^ 0xffffffffffffffff;
-        *pqwPA = *pqwPA | (qwMask & qwVA);            // FILL LOWER ADDRESS BITS
+        *ppa = *ppa | (qwMask & va);            // FILL LOWER ADDRESS BITS
         return TRUE;
     }
     pbNextPageTable = VmmTlbGetPageTable(ctxVmm, pte & 0x0000fffffffff000, FALSE);
     if(!pbNextPageTable) { return FALSE; }
-    return VmmVirt2Phys_DoWork(ctxVmm, pProcess, qwVA, qwPML - 1, (PQWORD)pbNextPageTable, pqwPA);
+    return VmmVirt2PhysEx(ctxVmm, fUserOnly, va, iPML - 1, (PQWORD)pbNextPageTable, ppa);
 }
 
 _Success_(return)
@@ -612,7 +634,43 @@ BOOL VmmVirt2Phys(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ 
     PBYTE pbPML4 = VmmTlbGetPageTable(ctxVmm, pProcess->paPML4, FALSE);
     if(!pbPML4) { return FALSE; }
     *pqwPA = 0;
-    return VmmVirt2Phys_DoWork(ctxVmm, pProcess, qwVA, 4, (PQWORD)pbPML4, pqwPA);
+    return VmmVirt2PhysEx(ctxVmm, pProcess->fUserOnly, qwVA, 4, (PQWORD)pbPML4, pqwPA);
+}
+
+VOID VmmVirt2PhysUpdateProcess_DoWork(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PVMM_PROCESS pProcess, _In_ QWORD qwPML, _In_ QWORD PTEs[512])
+{
+    QWORD pte, i, qwMask;
+    PBYTE pbNextPageTable;
+    i = 0x1ff & (pProcess->virt2phys.va >> VMM_PAGETABLEMAP_PML_REGION_SIZE[qwPML]);
+    pte = PTEs[i];
+    pProcess->virt2phys.iPTEs[qwPML] = (WORD)i;
+    pProcess->virt2phys.PTEs[qwPML] = pte;
+    if(!(pte & 0x01)) { return; }                           // NOT VALID
+    if(pProcess->fUserOnly && !(pte & 0x04)) { return; }    // SUPERVISOR PAGE & USER MODE REQ
+    if(pte & 0x000f000000000000) { return; }                // RESERVED
+    if((qwPML == 1) || (pte & 0x80) /* PS */) {
+        if(qwPML == 4) { return; }                          // NO SUPPORT IN PML4
+        qwMask = 0xffffffffffffffff << VMM_PAGETABLEMAP_PML_REGION_SIZE[qwPML];
+        pProcess->virt2phys.pas[0] = pte & 0x0000fffffffff000 & qwMask;     // MASK AWAY BITS FOR 4kB/2MB/1GB PAGES
+        qwMask = qwMask ^ 0xffffffffffffffff;
+        pProcess->virt2phys.pas[0] = pProcess->virt2phys.pas[0] | (qwMask & pProcess->virt2phys.va);    // FILL LOWER ADDRESS BITS
+        return;
+    }
+    if(!(pbNextPageTable = VmmTlbGetPageTable(ctxVmm, pte & 0x0000fffffffff000, FALSE))) { return; }
+    pProcess->virt2phys.pas[qwPML - 1] = pte & 0x0000fffffffff000;
+    VmmVirt2PhysUpdateProcess_DoWork(ctxVmm, pProcess, qwPML - 1, (PQWORD)pbNextPageTable);
+}
+
+VOID VmmVirt2PhysUpdateProcess(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PVMM_PROCESS pProcess)
+{
+    QWORD va;
+    PBYTE pbPML4;
+    va = pProcess->virt2phys.va;
+    ZeroMemory(&pProcess->virt2phys, sizeof(pProcess->virt2phys));
+    pProcess->virt2phys.va = va;
+    pProcess->virt2phys.pas[4] = pProcess->paPML4;
+    if(!(pbPML4 = VmmTlbGetPageTable(ctxVmm, pProcess->paPML4, FALSE))) { return; }
+    VmmVirt2PhysUpdateProcess_DoWork(ctxVmm, pProcess, 4, (PQWORD)pbPML4);
 }
 
 // ----------------------------------------------------------------------------
@@ -636,10 +694,46 @@ VOID VmmWriteScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProc
         result = DeviceWriteDMA(ctxVmm->ctxPcileech, qwPA, pDMA_Virt->pb, pDMA_Virt->cbMax, 0);
         if(result) {
             pDMA_Virt->cb = pDMA_Virt->cbMax;
-            VmmCacheInvalidate(ctxVmm->ptTLB, qwPA & ~0xfff);
-            VmmCacheInvalidate(ctxVmm->ptPHYS, qwPA & ~0xfff);
+            VmmCacheInvalidate(ctxVmm, qwPA & ~0xfff);
         }
     }
+}
+
+BOOL VmmWritePhysical(_Inout_ PVMM_CONTEXT ctxVmm, _In_ QWORD pa, _Out_ PBYTE pb, _In_ DWORD cb)
+{
+    QWORD paPage;
+    // 1: invalidate any physical pages from cache
+    paPage = pa & ~0xfff;
+    do {
+        VmmCacheInvalidate(ctxVmm, paPage);
+        paPage += 0x1000;
+    } while(paPage < pa + cb);
+    // 2: perform write
+    return DeviceWriteDMA(ctxVmm->ctxPcileech, pa, pb, cb, 0);
+}
+
+BOOL VmmReadPhysicalPage(_Inout_ PVMM_CONTEXT ctxVmm, _In_ QWORD qwPA, _Inout_bytecount_(4096) PBYTE pbPage)
+{
+    PDMA_IO_SCATTER_HEADER pDMA_Phys;
+    PVMM_CACHE_ENTRY pDMAPhysCacheEntry;
+    DWORD cReadDMAs = 0;
+    pDMA_Phys = VmmCacheGet(ctxVmm->ptPHYS, qwPA);
+    if(pDMA_Phys) {
+        memcpy(pbPage, pDMA_Phys->pb, 0x1000);
+        return TRUE;
+    }
+    pDMAPhysCacheEntry = VmmCacheReserve(ctxVmm->ptPHYS);
+    pDMA_Phys = &pDMAPhysCacheEntry->h;
+    pDMA_Phys->cb = 0;
+    pDMA_Phys->qwA = qwPA;
+    DeviceReadScatterDMA(ctxVmm->ctxPcileech, &pDMA_Phys, 1, &cReadDMAs);
+    VmmCachePut(ctxVmm->ptPHYS, pDMAPhysCacheEntry);
+    if(cReadDMAs) {
+        memcpy(pbPage, pDMA_Phys->pb, 0x1000);
+        return TRUE;
+    }
+    ZeroMemory(pbPage, 0x1000);
+    return FALSE;
 }
 
 VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Inout_ PPDMA_IO_SCATTER_HEADER ppDMAsVirt, _In_ DWORD cpDMAsVirt)
@@ -662,22 +756,23 @@ VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProce
     for(i = 0; i < cpDMAsVirt; i++) {
         // retrieve from cache (if found)
         pDMA_Virt = ppDMAsVirt[i];
-        if((QWORD)pDMA_Virt->pvReserved1) { continue; }     // no virt2phys translation - skip
-        pDMA_Phys = VmmCacheGet(ctxVmm->ptPHYS, (QWORD)pDMA_Virt->pvReserved2);
-        if(pDMA_Phys) {
-            // in cache - copy data into requester and set as completed!
-            pDMA_Virt->cb = 0x1000;
-            memcpy(pDMA_Virt->pb, pDMA_Phys->pb, 0x1000);
-            (QWORD)pDMA_Virt->pvReserved1 = 1;
-        } else {
-            // not in cache - add to requesting queue
-            ppDMAsPhysCacheEntry[cpDMAsPhys] = VmmCacheReserve(ctxVmm->ptPHYS);
-            ppDMAsPhys[cpDMAsPhys] = &ppDMAsPhysCacheEntry[cpDMAsPhys]->h;
-            ppDMAsPhys[cpDMAsPhys]->cb = 0;
-            ppDMAsPhys[cpDMAsPhys]->qwA = (QWORD)pDMA_Virt->pvReserved2;
-            (QWORD)ppDMAsPhys[cpDMAsPhys]->pvReserved1 = i;
-            (QWORD)ppDMAsPhys[cpDMAsPhys]->pvReserved2 = pDMA_Virt->qwA;
-            cpDMAsPhys++;
+        if(!(QWORD)pDMA_Virt->pvReserved1) {    // phys2virt translation exists
+            pDMA_Phys = VmmCacheGet(ctxVmm->ptPHYS, (QWORD)pDMA_Virt->pvReserved2);
+            if(pDMA_Phys) {
+                // in cache - copy data into requester and set as completed!
+                pDMA_Virt->cb = 0x1000;
+                memcpy(pDMA_Virt->pb, pDMA_Phys->pb, 0x1000);
+                (QWORD)pDMA_Virt->pvReserved1 = 1;
+            } else {
+                // not in cache - add to requesting queue
+                ppDMAsPhysCacheEntry[cpDMAsPhys] = VmmCacheReserve(ctxVmm->ptPHYS);
+                ppDMAsPhys[cpDMAsPhys] = &ppDMAsPhysCacheEntry[cpDMAsPhys]->h;
+                ppDMAsPhys[cpDMAsPhys]->cb = 0;
+                ppDMAsPhys[cpDMAsPhys]->qwA = (QWORD)pDMA_Virt->pvReserved2;
+                (QWORD)ppDMAsPhys[cpDMAsPhys]->pvReserved1 = i;
+                (QWORD)ppDMAsPhys[cpDMAsPhys]->pvReserved2 = pDMA_Virt->qwA;
+                cpDMAsPhys++;
+            }
         }
         // physical read if requesting queue is full of if this is last
         if(cpDMAsPhys && ((cpDMAsPhys == cPagesPerScatterRead) || (i == cpDMAsVirt - 1))) {

@@ -47,8 +47,12 @@ typedef struct tdVMM_PROCESS {
     PVMM_MEMMAP_ENTRY pMemMap;
     PBYTE pbMemMapDisplayCache;
     QWORD cbMemMapDisplayCache;
-    QWORD Virt2Phys_VA;
-    QWORD Virt2Phys_PA;
+    struct {
+        QWORD va;
+        QWORD pas[5];   // physical addresses of pagetable[PML]/page[0]
+        QWORD PTEs[5];  // PTEs[PML]
+        WORD  iPTEs[5]; // Index of PTE in page table
+    } virt2phys;
     union {
         struct{
             PVOID pvReserved[VMM_PROCESS_OS_ALLOC_PTR_MAX]; // os-specific buffer to be allocated if needed (free'd by VmmClose)
@@ -60,6 +64,7 @@ typedef struct tdVMM_PROCESS {
             QWORD vaEPROCESS;
             QWORD vaPEB;
             QWORD vaENTRY;
+            BOOL fWow64;
         } win;
     } os;
 } VMM_PROCESS, *PVMM_PROCESS;
@@ -125,6 +130,16 @@ typedef struct tdVMM_CONTEXT {
 BOOL VmmWrite(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _Out_ PBYTE pb, _In_ DWORD cb);
 
 /*
+* Write physical memory and clear any VMM caches that may contain data.
+* -- ctxVmm
+* -- pa
+* -- pb
+* -- cb
+* -- return
+*/
+BOOL VmmWritePhysical(_Inout_ PVMM_CONTEXT ctxVmm, _In_ QWORD pa, _Out_ PBYTE pb, _In_ DWORD cb);
+
+/*
 * Read a virtually contigious arbitrary amount of memory.
 * -- ctxVmm
 * -- pProcess
@@ -167,6 +182,15 @@ BOOL VmmReadPage(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ Q
 VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Inout_ PPDMA_IO_SCATTER_HEADER ppDMAsVirt, _In_ DWORD cpDMAsVirt);
 
 /*
+* Read a single 4096-byte page of physical memory.
+* -- ctxVmm
+* -- qwPA
+* -- pbPage
+* -- return
+*/
+BOOL VmmReadPhysicalPage(_Inout_ PVMM_CONTEXT ctxVmm, _In_ QWORD qwPA, _Inout_bytecount_(4096) PBYTE pbPage);
+
+/*
 * Translate a virtual address to a physical address by walking the page tables.
 * -- ctxVmm
 * -- pProcess
@@ -176,6 +200,20 @@ VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProce
 */
 _Success_(return)
 BOOL VmmVirt2Phys(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _Out_ PQWORD pqwPA);
+
+/*
+* Translate a virtual address to a physical address given some extra parameters as
+* as compared to the standard recommended function VmmVirt2Phys.
+* -- ctxVmm
+* -- fUserOnly
+* -- va
+* -- iPML
+* -- PTEs
+* -- ppa
+* -- return
+*/
+_Success_(return)
+BOOL VmmVirt2PhysEx(_Inout_ PVMM_CONTEXT ctxVmm, _In_ BOOL fUserOnly, _In_ QWORD va, _In_ QWORD iPML, _In_ QWORD PTEs[512], _Out_ PQWORD ppa);
 
 /*
 * Spider the TLB (page table cache) to load all page table pages into the cache.
@@ -194,7 +232,7 @@ VOID VmmTlbSpider(_Inout_ PVMM_CONTEXT ctxVmm, _In_ QWORD qwPML4, _In_ BOOL fUse
 * -- pa = physical address if the page table page.
 * -- fSelfRefReq = is a self referential entry required to be in the map? (PML4 for Windows).
 */
-BOOL VmmTlbPageTableVerify(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PBYTE pb, _In_ QWORD pa, _In_ BOOL fSelfRefReq);
+BOOL VmmTlbPageTableVerify(_Inout_opt_ PVMM_CONTEXT ctxVmm, _Inout_ PBYTE pb, _In_ QWORD pa, _In_ BOOL fSelfRefReq);
 
 /*
 * Retrieve a page table (0x1000 bytes) via the TLB cache.
@@ -204,6 +242,13 @@ BOOL VmmTlbPageTableVerify(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PBYTE pb, _In_ Q
 * -- return
 */
 PBYTE VmmTlbGetPageTable(_In_ PVMM_CONTEXT ctxVmm, _In_ QWORD qwPA, _In_ BOOL fCacheOnly);
+
+/*
+* Update the virt2phys struct in the supplied process given the virtual address stored in it.
+* -- ctxVmm
+* -- pProcess
+*/
+VOID VmmVirt2PhysUpdateProcess(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PVMM_PROCESS pProcess);
 
 /*
 * Initialize the memory map for a specific process. This may take some time
@@ -279,6 +324,13 @@ VOID VmmProcessCreateFinish(_In_ PVMM_CONTEXT ctxVmm);
 * -- fPHYS
 */
 VOID VmmCacheClear(_Inout_ _In_ PVMM_CONTEXT ctxVmm, _In_ BOOL fTLB, _In_ BOOL fPHYS);
+
+/*
+* Invalidate cache entries belonging to a specific physical address.
+* -- ctxVmm
+* -- pa
+*/
+VOID VmmCacheInvalidate(_Inout_ PVMM_CONTEXT ctxVmm, _In_ QWORD pa);
 
 /*
 * Initialize a new VMM context. This must always be done before calling any

@@ -106,6 +106,9 @@ VOID VmmProcWindows_InitializeLdrModules(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_
             pModule->BaseAddress + pModule->SizeOfImage - 1,
             pModule->wszName
         );
+        if(!pProcess->os.win.fWow64 && !memcmp(pModule->wszName, L"wow64.dll", 20)) {
+            pProcess->os.win.fWow64 = TRUE;
+        }
     }
     // update memory map with names
     for(i = 0; i < cModules; i++) {
@@ -255,6 +258,45 @@ fail:
 }
 
 /*
+* Retrieve PE module name given a PE32 header. This is used to resolve
+* module names in wow64 processes (32-bit processes in 64-bit windows).
+* NB! very messy code due to lots of sanity checks on untrusted data.
+*/
+_Success_(return)
+BOOL VmmProcWindows_GetModuleName_PE32(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD vaModule, _Out_ CHAR pbModuleName[MAX_PATH], _Out_ PDWORD pdwSize, _In_opt_ PBYTE pbPageMZHeaderPreCacheOpt, _In_ BOOL fDummyPENameOnExportDirectoryFail)
+{
+    DWORD vaExportDirectory, cbExportDirectory;
+    BYTE pbModuleHeader[0x1000], pbExportDirectory[sizeof(IMAGE_EXPORT_DIRECTORY)];
+    if(vaModule > 0xffffffff) { return FALSE; }
+    if(pbPageMZHeaderPreCacheOpt) {
+        memcpy(pbModuleHeader, pbPageMZHeaderPreCacheOpt, 0x1000);
+    } else {
+        if(!VmmReadPage(ctxVmm, pProcess, vaModule, pbModuleHeader)) { return FALSE; }
+    }
+    PIMAGE_DOS_HEADER dosHeader = (PIMAGE_DOS_HEADER)pbModuleHeader; // dos header.
+    if(!dosHeader || dosHeader->e_magic != IMAGE_DOS_SIGNATURE) { return FALSE; }
+    if(dosHeader->e_lfanew > 0x800) { return FALSE; }
+    PIMAGE_NT_HEADERS32 ntHeader = (PIMAGE_NT_HEADERS32)(pbModuleHeader + dosHeader->e_lfanew); // nt header
+    if(!ntHeader || ntHeader->Signature != IMAGE_NT_SIGNATURE) { return FALSE; }
+    *pdwSize = ntHeader->OptionalHeader.SizeOfImage;
+    vaExportDirectory = (DWORD)vaModule + ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    cbExportDirectory = ntHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+    if((cbExportDirectory < sizeof(IMAGE_EXPORT_DIRECTORY)) || (vaExportDirectory == vaModule)) { goto fail; }
+    if(!VmmRead(ctxVmm, pProcess, vaExportDirectory, pbExportDirectory, sizeof(IMAGE_EXPORT_DIRECTORY))) { goto fail; }
+    PIMAGE_EXPORT_DIRECTORY exp = (PIMAGE_EXPORT_DIRECTORY)pbExportDirectory;
+    if(!exp || !exp->Name || exp->Name > ntHeader->OptionalHeader.SizeOfImage) { goto fail; }
+    pbModuleName[MAX_PATH - 1] = 0;
+    if(!VmmRead(ctxVmm, pProcess, vaModule + exp->Name, pbModuleName, MAX_PATH - 1)) { goto fail; }
+    return TRUE;
+fail:
+    if(fDummyPENameOnExportDirectoryFail) {
+        memcpy(pbModuleName, "UNKNOWN", 8);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+/*
 * Load module proc names into memory map list if possible.
 * NB! this function parallelize reads of MZ header candidates to speed things up.
 */
@@ -301,7 +343,9 @@ VOID VmmProcWindows_ScanHeaderPE(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS 
     for(i = 0; i < cDMAs; i++) {
         if(pMaps[i].dma.cb == 0x1000) {
             pMap = pMaps + i;
-            result = VmmProcWindows_GetModuleName(ctxVmm, pProcess, pMap->mme->AddrBase, szBuffer, &cbImageSize, pMap->pb, TRUE);
+            result = pProcess->os.win.fWow64 ? 
+                VmmProcWindows_GetModuleName_PE32(ctxVmm, pProcess, pMap->mme->AddrBase, szBuffer, &cbImageSize, pMap->pb, TRUE) :
+                VmmProcWindows_GetModuleName(ctxVmm, pProcess, pMap->mme->AddrBase, szBuffer, &cbImageSize, pMap->pb, TRUE);
             if(result && (cbImageSize < 0x01000000)) {
                 VmmMapTag(ctxVmm, pProcess, pMap->mme->AddrBase, pMap->mme->AddrBase + cbImageSize, szBuffer, NULL);
             }
@@ -321,8 +365,8 @@ BOOL VmmProcWindows_OffsetLocatorEPROCESS(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM
 {
     BOOL f;
     DWORD i;
-    QWORD va1;
-    BYTE pb0[VMMPROC_EPROCESS_MAX_SIZE], pb1[VMMPROC_EPROCESS_MAX_SIZE];
+    QWORD va1, vaPEB, paPEB;
+    BYTE pb0[VMMPROC_EPROCESS_MAX_SIZE], pb1[VMMPROC_EPROCESS_MAX_SIZE], pbPage[0x1000];
     if(!VmmRead(ctxVmm, pSystemProcess, pSystemProcess->os.win.vaEPROCESS, pb0, 0x500)) { return FALSE; }
     if(ctxVmm->ctxPcileech->cfg->fVerboseExtra) {
         printf("vmmproc.c!VmmProcWindows_OffsetLocatorEPROCESS: %016llx %016llx\n", pSystemProcess->paPML4, pSystemProcess->os.win.vaEPROCESS);
@@ -353,6 +397,7 @@ BOOL VmmProcWindows_OffsetLocatorEPROCESS(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM
             if(!f) { continue; }
             f = FALSE;
             if( (*(PQWORD)(pb1 + *pdwoName) != 0x6578652e73736d73) && // smss.exe
+                (*(PQWORD)(pb1 + *pdwoName) != 0x7972747369676552) && // Registry
                 (*(PQWORD)(pb1 + *pdwoName) != 0x5320657275636553))   // Secure System
             {
                 continue;
@@ -367,17 +412,28 @@ BOOL VmmProcWindows_OffsetLocatorEPROCESS(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM
         }
     }
     if(!f) { return FALSE; }
-    // find offset for PEB (in EPROCESS)
-    if(*(PQWORD)(pb1 + *pdwoName) == 0x5320657275636553) { 
-        // Secure System have no PEB -> move forward in EPROCESS list to resolve!
+    // skip over "processes" without PEB
+    while(  (*(PQWORD)(pb1 + *pdwoName) == 0x5320657275636553) ||       // Secure System
+            (*(PQWORD)(pb1 + *pdwoName) == 0x7972747369676552))         // Registry
+    {       
         va1 = *(PQWORD)(pb1 + *pdwoFLink) - *pdwoFLink;
         f = VmmRead(ctxVmm, pSystemProcess, va1, pb1, VMMPROC_EPROCESS_MAX_SIZE);
         if(!f) { return FALSE; }
     }
+    if(ctxVmm->ctxPcileech->cfg->fVerboseExtra) {
+        printf("---------------------------------------------------------------------------\n");
+        Util_PrintHexAscii(pb1, VMMPROC_EPROCESS_MAX_SIZE, 0);
+    }
+    // find offset for PEB (in EPROCESS)
     for(i = 0x300, f = FALSE; i < 0x480; i += 8) {
         if(*(PQWORD)(pb0 + i)) { continue; }
-        if(!*(PQWORD)(pb1 + i)) { continue; }
-        if(*(PQWORD)(pb1 + i) & 0xffffff0000000fff) { continue; }
+        vaPEB = *(PQWORD)(pb1 + i);
+        if(!vaPEB || (*(PQWORD)(pb1 + i) & 0xffff800000000fff)) { continue; }
+        // Verify potential PEB
+        if(!VmmReadPhysicalPage(ctxVmm, *(PQWORD)(pb1 + *pdwoPML4), pbPage)) { continue; }
+        if(!VmmVirt2PhysEx(ctxVmm, TRUE, vaPEB, 4, (PQWORD)pbPage, &paPEB)) { continue; }
+        if(!VmmReadPhysicalPage(ctxVmm, paPEB, pbPage)) { continue; }
+        if(*(PWORD)pbPage == 0x5a4d) { continue; }  // MZ header -> likely entry point or something not PEB ...
         *pdwoPEB = i;
         f = TRUE;
         break;
@@ -400,7 +456,7 @@ BOOL VmmProcWindows_EnumerateEPROCESS(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PRO
     PDWORD pdwState, pdwPID;
     LPSTR szName;
     BYTE pb[VMMPROC_EPROCESS_MAX_SIZE];
-    BOOL result, fSystem;
+    BOOL result, fSystem, fKernel;
     PVMM_PROCESS pVmmProcess;
     QWORD vaSystemEPROCESS, vaEPROCESS, cPID = 0;
     // retrieve offsets
@@ -426,17 +482,22 @@ BOOL VmmProcWindows_EnumerateEPROCESS(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PRO
     while(TRUE) {
         cPID++;
         fSystem = (*pdwPID == 4);
+        fKernel = fSystem | !strcmp("Registry", szName);
         // NB! Windows/Dokany does not support full 64-bit sizes on files, hence
         // the max value 0x0001000000000000 for kernel space. Top 16-bits (ffff)
         // are sign extended anyway so this should be fine if user skips them.
-        pVmmProcess = VmmProcessCreateEntry(
-            ctxVmm,
-            *pdwPID,
-            *pdwState,
-            ~0xfff & *pqwPML4,
-            szName,
-            !fSystem,
-            fSystem);
+        if(*pqwPML4 && *(PQWORD)szName) {
+            pVmmProcess = VmmProcessCreateEntry(
+                ctxVmm,
+                *pdwPID,
+                *pdwState,
+                ~0xfff & *pqwPML4,
+                szName,
+                !fKernel,
+                fSystem);
+        } else {
+            pVmmProcess = NULL;
+        }
         if(pVmmProcess) {
             pVmmProcess->os.win.vaEPROCESS = vaEPROCESS;
             pVmmProcess->os.win.vaPEB = *pqwPEB;
@@ -736,8 +797,6 @@ DWORD VmmProcCacheUpdaterThread(_Inout_ PVMM_CONTEXT ctxVmm)
                 if(pSystemProcess) {
                     paSystemPML4 = pSystemProcess->paPML4;
                     vaSystemEPROCESS = pSystemProcess->os.win.vaEPROCESS;
-                    // purge existing process entries
-                    VmmProcessCreateTable(ctxVmm);
                     // spider TLB and set up initial system process and enumerate EPROCESS
                     VmmTlbSpider(ctxVmm, paSystemPML4, FALSE);
                     pSystemProcess = VmmProcessCreateEntry(ctxVmm, 4, 0, paSystemPML4, "System", FALSE, TRUE);
@@ -748,7 +807,6 @@ DWORD VmmProcCacheUpdaterThread(_Inout_ PVMM_CONTEXT ctxVmm)
                         LeaveCriticalSection(&ctxVmm->MasterLock);
                         goto fail;
                     }
-                    VmmProcessCreateFinish(ctxVmm);
                     pSystemProcess->os.win.vaEPROCESS = vaSystemEPROCESS;
                     VmmProcWindows_EnumerateEPROCESS(ctxVmm, pSystemProcess);
                     if(ctxVmm->ctxPcileech->cfg->fVerboseExtra) {

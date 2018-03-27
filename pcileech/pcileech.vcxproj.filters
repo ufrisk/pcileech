@@ -84,6 +84,9 @@
     <ClInclude Include="devicefile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="devicetmd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.c">
@@ -144,6 +147,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="vmmvfs.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="devicetmd.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

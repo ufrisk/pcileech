@@ -2,7 +2,7 @@ PCILeech Summary:
 =================
 PCILeech uses PCIe hardware devices to read and write from the target system memory. This is achieved by using DMA over PCIe. No drivers are needed on the target system. 
 
-PCILeech supports multiple hardware. USB3380 based hardware is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel. FPGA based hardware is able to read all memory.
+PCILeech supports multiple memory acquisition devices. Primarily hardware based, but also dump files and software based techniques based on select security issues are supported. USB3380 based hardware is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel. FPGA based hardware is able to read all memory.
 
 PCILeech is capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. PCIleech runs on Windows/Linux/Android. Supported target systems are currently the x64 versions of: UEFI, Linux, FreeBSD, macOS and Windows.
 
@@ -152,4 +152,10 @@ v3.0
 
 v3.1
 * Linux FPGA support.
+* Various bug fixes.
+
+v3.2
+* Support for the [Windows 7 x64 page table vulnerability memory acquisition device](https://blog.frizk.net/2018/03/total-meltdown.html).
+* Support for Wow64 (32-bit processes) for the Memory Process File System.
+* Extended virt2phys support for the Memory Process File System.
 * Various bug fixes.

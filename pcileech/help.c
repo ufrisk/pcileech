@@ -54,7 +54,7 @@ VOID Help_ShowGeneral()
         "   pt_virt2phys           DMA,KMD   [ cr3, 0 ]                                 \n" \
         "   testmemread            DMA       [ min ]                                    \n" \
         "   testmemreadwrite       DMA       [ min ]                                    \n" \
-        "   vmm_identify           DMA                                                  \n" \
+        "   identify               DMA                                                  \n" \
         " Device specific commands and valid MODEs [ and options ] (and device):        \n" \
         "   usb3380_flash          DMA,KMD   [ in ]         (USB3380)                   \n" \
         "   usb3380_8051start      DMA,KMD   [ in ]         (USB3380)                   \n" \
@@ -94,7 +94,8 @@ VOID Help_ShowGeneral()
         "          Wait occurs after any other actions have been completed.             \n" \
         "   -device: force the use of a specific hardware device instead of auto-detect.\n" \
         "          Affects all modes and commands.                                      \n" \
-        "          Valid options: USB3380, FPGA, SP605_TCP, <memory-dump-file-name>     \n" \
+        "          Valid options: USB3380, FPGA, SP605_TCP, <memory-dump-file-name> or  \n" \
+        "          TOTALMELTDOWN                                                        \n" \
         "   -device-addr: Remote address for -device SP605_TCP.                         \n" \
         "   -device-port: Remote TCP port for -device SP605_TCP. Default value: 28472.  \n" \
         "   -device-opt[0-3]: Optional additional device configuration for some devices.\n" \
@@ -142,7 +143,7 @@ VOID Help_ShowInfo()
     printf(
         " PCILEECH INFORMATION                                                          \n" \
         " PCILeech (c) 2016-2018 Ulf Frisk                                              \n" \
-        " Version: 3.1                                                                  \n" \
+        " Version: 3.2                                                                  \n" \
         " License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
         " Contact information: pcileech@frizk.net                                       \n" \
         " System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \

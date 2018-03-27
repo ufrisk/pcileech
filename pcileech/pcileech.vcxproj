@@ -88,6 +88,7 @@
     <ClInclude Include="device605_tcp.h" />
     <ClInclude Include="devicefile.h" />
     <ClInclude Include="devicefpga.h" />
+    <ClInclude Include="devicetmd.h" />
     <ClInclude Include="dokan.h" />
     <ClInclude Include="executor.h" />
     <ClInclude Include="extra.h" />
@@ -112,6 +113,7 @@
     <ClCompile Include="device605_tcp.c" />
     <ClCompile Include="devicefile.c" />
     <ClCompile Include="devicefpga.c" />
+    <ClCompile Include="devicetmd.c" />
     <ClCompile Include="executor.c" />
     <ClCompile Include="extra.c" />
     <ClCompile Include="help.c" />

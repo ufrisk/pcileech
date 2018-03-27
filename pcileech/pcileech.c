@@ -134,6 +134,8 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
                 ctx->cfg->dev.tp = PCILEECH_DEVICE_FPGA;
             } else if(0 == _stricmp(argv[i + 1], "sp605_tcp")) {
                 ctx->cfg->dev.tp = PCILEECH_DEVICE_SP605_TCP;
+            } else if(0 == _stricmp(argv[i + 1], "totalmeltdown")) {
+                ctx->cfg->dev.tp = PCILEECH_DEVICE_TOTALMELTDOWN;
             } else if((Util_GetFileSize(argv[i + 1]) >= 0x1000)) {
                 strcpy_s(ctx->cfg->dev.szFileNameOptTpFile, MAX_PATH, argv[i + 1]);
                 ctx->cfg->dev.tp = PCILEECH_DEVICE_FILE;
