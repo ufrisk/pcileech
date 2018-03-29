@@ -2,7 +2,7 @@ PCILeech Summary:
 =================
 PCILeech uses PCIe hardware devices to read and write from the target system memory. This is achieved by using DMA over PCIe. No drivers are needed on the target system. 
 
-<b>PCILeech works without hardware together with memory dump files and the reported [Windows 7/2008R2 x64 PML4 page table permission vulnerability](https://blog.frizk.net/2018/03/total-meltdown.html). Please note that the test for the page table PML4 page table permission vulnerability may currently make your system unstable - blue screens may occur.</b>
+<b>PCILeech works without hardware together with memory dump files and the reported [Windows 7/2008R2 x64 PML4 page table permission vulnerability](https://blog.frizk.net/2018/03/total-meltdown.html). Please note that the test for the PML4 page table permission vulnerability may currently make your system unstable - blue screens may occur.</b>
 
 PCILeech supports multiple memory acquisition devices. Primarily hardware based, but also dump files and software based techniques based on select security issues are supported. USB3380 based hardware is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel. FPGA based hardware is able to read all memory.
 
