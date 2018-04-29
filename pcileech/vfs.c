@@ -42,18 +42,19 @@ typedef struct tdVFS_OPERATION {
 // Defines and Typedefs (not shared with shellcode) below:
 //-------------------------------------------------------------------------------
 
-#define VFS_RAM_TP_KMD                  0
-#define VFS_RAM_TP_NATIVE               1
-#define VFS_RAM_TP_MAX                  1
+#define VFS_RAM_TP_KMD                      0
+#define VFS_RAM_TP_NATIVE                   1
+#define VFS_RAM_TP_MAX                      1
 
-#define CACHE_MEM_ENTRIES               32
-#define CACHE_MEM_SIZE                  0x00400000
-#define CACHE_MEM_LIFETIME_MS           2000
-#define CACHE_FILE_ENTRIES              32
-#define CACHE_FILE_SIZE                 0x00200000
-#define CACHE_FILE_LIFETIME_MS          10000
-#define CACHE_DIRECTORY_ENTRIES         32
-#define CACHE_DIRECTORY_LIFETIME_MS     5000
+#define CACHE_MEM_ENTRIES                   32
+#define CACHE_MEM_SIZE                      0x00400000
+#define CACHE_MEM_LIFETIME_MS               2000
+#define CACHE_FILE_ENTRIES                  32
+#define CACHE_FILE_SIZE                     0x00200000
+#define CACHE_FILE_LIFETIME_MS              10000
+#define CACHE_DIRECTORY_ENTRIES             32
+#define CACHE_DIRECTORY_LIFETIME_FILE_MS    5000
+#define CACHE_DIRECTORY_LIFETIME_PROC_MS    10
 
 typedef struct tdVfsCacheMem {
     QWORD qwTickCount64;
@@ -70,7 +71,7 @@ typedef struct tdVfsCacheFile {
 } VFS_CACHE_FILE, *PVFS_CACHE_FILE;
 
 typedef struct tdVfsCacheDirectory {
-    QWORD qwTickCount64;
+    QWORD qwExpireTickCount64;
     WCHAR wszDirectoryName[MAX_PATH];
     QWORD cfi;
     PVFS_RESULT_FILEINFO pfi;
@@ -131,7 +132,7 @@ BOOL VfsCache_DirectoryGetSingle(_Out_ PVFS_RESULT_FILEINFO pfi, _Out_ PBOOL isE
         if(wcscmp(wcsPath, pds->CacheDirectory[i].wszDirectoryName)) {
             continue;
         }
-        if(qwCurrentTickCount - pds->CacheDirectory[i].qwTickCount64 > CACHE_DIRECTORY_LIFETIME_MS) {
+        if(qwCurrentTickCount > pds->CacheDirectory[i].qwExpireTickCount64) {
             continue;
         }
         for(j = 0; j < pds->CacheDirectory[i].cfi; j++) {
@@ -162,7 +163,7 @@ BOOL VfsCache_DirectoryGetDirectory(_Out_ PVFS_RESULT_FILEINFO *ppfi, _Out_ PQWO
         if(wcscmp(wcsPathFileName, pds->CacheDirectory[i].wszDirectoryName)) {
             continue;
         }
-        if(qwCurrentTickCount - pds->CacheDirectory[i].qwTickCount64 > CACHE_DIRECTORY_LIFETIME_MS) {
+        if(qwCurrentTickCount > pds->CacheDirectory[i].qwExpireTickCount64) {
             continue;
         }
         *pcfi = pds->CacheDirectory[i].cfi;
@@ -179,17 +180,17 @@ BOOL VfsCache_DirectoryGetDirectory(_Out_ PVFS_RESULT_FILEINFO *ppfi, _Out_ PQWO
     return FALSE;
 }
 
-VOID VfsCache_DirectoryPut(_In_ LPCWSTR wcsDirectoryName, _In_ PVFS_RESULT_FILEINFO pfi, _In_ QWORD cfi, _In_ PVFS_GLOBAL_STATE pds)
+VOID VfsCache_DirectoryPut(_In_ LPCWSTR wcsDirectoryName, _In_ PVFS_RESULT_FILEINFO pfi, _In_ QWORD cfi, _In_ PVFS_GLOBAL_STATE pds, _In_ QWORD qwCacheValidMs)
 {
     PVFS_CACHE_DIRECTORY cd;
     EnterCriticalSection(&pds->LockCache);
     cd = &pds->CacheDirectory[pds->CacheDirectoryIndex];
-    cd->qwTickCount64 = 0;
+    cd->qwExpireTickCount64 = 0;
     LocalFree(cd->pfi);
     cd->pfi = NULL;
     cd->pfi = (PVFS_RESULT_FILEINFO)LocalAlloc(0, cfi * sizeof(VFS_RESULT_FILEINFO));
     if(!cd->pfi) { return; }
-    cd->qwTickCount64 = GetTickCount64();
+    cd->qwExpireTickCount64 = GetTickCount64() + qwCacheValidMs;
     memcpy(cd->pfi, pfi, cfi * sizeof(VFS_RESULT_FILEINFO));
     cd->cfi = cfi;
     wcscpy_s(cd->wszDirectoryName, MAX_PATH, wcsDirectoryName);
@@ -207,7 +208,7 @@ VOID VfsCache_DirectoryDel(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo, 
     EnterCriticalSection(&pds->LockCache);
     for(i = 0; i < CACHE_DIRECTORY_ENTRIES; i++) {
         if(isDeleteAll || !wcscmp(wszPath, pds->CacheDirectory[i].wszDirectoryName)) {
-            pds->CacheDirectory[i].qwTickCount64 = 0;
+            pds->CacheDirectory[i].qwExpireTickCount64 = 0;
             LocalFree(pds->CacheDirectory[i].pfi);
             pds->CacheDirectory[i].pfi = NULL;
         }
@@ -417,7 +418,7 @@ BOOL Vfs_ListDirectory(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo, _Out
             return FALSE;
         }
         *pcfi = cbfi / sizeof(VFS_RESULT_FILEINFO);
-        VfsCache_DirectoryPut(wcsFileName, *ppfi, *pcfi, pds);
+        VfsCache_DirectoryPut(wcsFileName, *ppfi, *pcfi, pds, CACHE_DIRECTORY_LIFETIME_FILE_MS);
         LeaveCriticalSection(&pds->LockDma);
         return TRUE;
     }
@@ -425,7 +426,7 @@ BOOL Vfs_ListDirectory(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo, _Out
     if(!_wcsnicmp(wcsFileName, L"\\proc\\", 6) && pds->fVMM) {
         result =  VmmVfsListFiles(pds->ctx, wcsFileName, ppfi, pcfi);
         if(result) { 
-            VfsCache_DirectoryPut(wcsFileName, *ppfi, *pcfi, pds);
+            VfsCache_DirectoryPut(wcsFileName, *ppfi, *pcfi, pds, CACHE_DIRECTORY_LIFETIME_PROC_MS);
         }
         return result;
     }
@@ -942,7 +943,7 @@ VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx)
         goto fail;
     }
     // initialize virtual memory manager (VMM) if possible
-    pDokanState->fVMM = VmmProcInitialize(ctx);
+    pDokanState->fVMM = !ctx->cfg->fNoProcFS && VmmProcInitialize(ctx);
     if(!pDokanState->fVMM) { printf("MOUNT: INFO: PROC file system not mounted.\n"); }
     // set options
     pDokanOptions->Version = DOKAN_VERSION;

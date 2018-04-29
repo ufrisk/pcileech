@@ -111,6 +111,14 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
             ctx->cfg->fVerboseExtraTlp = TRUE;
             i++;
             continue;
+        } else if(0 == _stricmp(argv[i], "-loop")) {
+            ctx->cfg->fLoop = TRUE;
+            i++;
+            continue;
+        } else if(0 == _stricmp(argv[i], "-noprocfs")) {
+            ctx->cfg->fNoProcFS = TRUE;
+            i++;
+            continue;
         } else if(i + 1 >= argc) {
             return FALSE;
         } else if(0 == strcmp(argv[i], "-min")) {

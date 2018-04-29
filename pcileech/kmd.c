@@ -889,6 +889,10 @@ BOOL KMD_SetupStage3(_Inout_ PPCILEECH_CONTEXT ctx, _In_ DWORD dwPhysicalAddress
         return FALSE;
     }
     ctx->cfg->qwKMD = ctx->phKMD->dwPageAddr32;
+    if(ctx->pk->MAGIC != KMDDATA_MAGIC) {
+        ctx->pk->MAGIC = KMDDATA_MAGIC;
+        DeviceWriteDMA(ctx, ctx->phKMD->dwPageAddr32, ctx->phKMD->pbPageData, sizeof(QWORD), 0);
+    }
     return TRUE;
 }
 

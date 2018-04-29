@@ -121,6 +121,8 @@ typedef struct tdConfig {
     BOOL fDebug;
     BOOL fPartialPageReadSupported;
     BOOL fAddrKMDSetByArgument;
+    BOOL fLoop;
+    BOOL fNoProcFS;
     // device information below
     DEVICE_CONFIG dev;
 } CONFIG, *PCONFIG;

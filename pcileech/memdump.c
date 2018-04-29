@@ -240,10 +240,15 @@ VOID ActionMemoryWrite(_Inout_ PPCILEECH_CONTEXT ctx)
 		printf("Memory Write: Failed. Data too large: >16MB.\n");
 		return;
 	}
-	result = DeviceWriteMEM(ctx, ctx->cfg->qwAddrMin, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn, 0);
-	if(!result) {
-		printf("Memory Write: Failed. Write failed (partial memory may be written).\n");
-		return;
-	}
+    if(ctx->cfg->fLoop) {
+        printf("Memory Write: Starting loop write. Press CTRL+C to abort.\n");
+    }
+    do {
+        result = DeviceWriteMEM(ctx, ctx->cfg->qwAddrMin, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn, 0);
+        if(!result) {
+            printf("Memory Write: Failed. Write failed (partial memory may be written).\n");
+            return;
+        }
+    } while(ctx->cfg->fLoop);
 	printf("Memory Write: Successful.\n");
 }
