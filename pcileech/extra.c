@@ -224,6 +224,14 @@ VOID Action_TlpTx(_Inout_ PPCILEECH_CONTEXT ctx)
         return;
     }
     printf("TLP: Transmitting PCIe TLP.%s\n", ctx->cfg->fVerboseExtra ? "" : " (use -vvv option for detailed info).");
+    if(ctx->cfg->fLoop) {
+        printf("TLP: Starting loop TLP transmit. Press CTRL+C to abort.\n");
+        while(TRUE) {
+            DeviceWriteTlp(ctx, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn);
+            DeviceListenTlp(ctx, 100);
+        }
+        return;
+    }
     DeviceWriteTlp(ctx, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn);
     DeviceListenTlp(ctx, 100);
 }

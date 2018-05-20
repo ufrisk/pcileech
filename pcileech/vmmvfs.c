@@ -21,11 +21,12 @@ typedef struct tdVMMVFS_PATH {
     QWORD qwPath2;
     LPSTR szPath1;
     LPSTR szPath2;
+    LPSTR szPath3;
 } VMMVFS_PATH, *PVMMVFS_PATH;
 
 BOOL VmmVfs_UtilVmmGetPidDirFile(_In_ LPCWSTR wcsFileName, _Inout_ PVMMVFS_PATH pPath)
 {
-    DWORD i = 0, iPID, iPath1 = 0, iPath2 = 0;
+    DWORD i = 0, iPID, iPath1 = 0, iPath2 = 0, iPath3 = 0;
     // 1: convert to ascii string
     ZeroMemory(pPath, sizeof(VMMVFS_PATH));
     while(TRUE) {
@@ -58,16 +59,28 @@ BOOL VmmVfs_UtilVmmGetPidDirFile(_In_ LPCWSTR wcsFileName, _Inout_ PVMMVFS_PATH 
     if(pPath->_sz[i]) {
         iPath2 = i + 1;
         pPath->_sz[i] = 0;
-        // 5: Fixups
-        i++;
-        while((i < MAX_PATH) && pPath->_sz[i] && (pPath->_sz[i] != '\\')) { i++; }
-        if(i < MAX_PATH) { pPath->_sz[i] = 0; }
     }
-    // 6: Finish
+    // 5: Locate 3rd Path item (if any)
+    if(iPath2) {
+        i = iPath2;
+        while((i < MAX_PATH) && pPath->_sz[i] && (pPath->_sz[i] != '\\')) { i++; }
+        if(pPath->_sz[i]) {
+            iPath3 = i + 1;
+            pPath->_sz[i] = 0;
+            // 6: Fixups
+            i++;
+            while((i < MAX_PATH) && pPath->_sz[i] && (pPath->_sz[i] != '\\')) { i++; }
+            if(i < MAX_PATH) { pPath->_sz[i] = 0; }
+        }
+    }
+    // 7: Finish
     pPath->szPath1 = &pPath->_sz[iPath1];
     if(iPath2) {
         pPath->szPath2 = &pPath->_sz[iPath2];
         pPath->qwPath2 = Util_GetNumeric(pPath->szPath2);
+    }
+    if(iPath3) {
+        pPath->szPath3 = &pPath->_sz[iPath3];
     }
     return TRUE;
 }
@@ -89,6 +102,14 @@ NTSTATUS VmmVfsReadFile_FromQWORD(_In_ QWORD qwValue, _Out_ LPVOID pb, _In_ DWOR
     BYTE pbBuffer[32];
     DWORD cbBuffer;
     cbBuffer = snprintf(pbBuffer, 32, (fPrefix ? "0x%016llx" : "%016llx"), qwValue);
+    return VmmVfsReadFile_FromBuffer(pbBuffer, cbBuffer, pb, cb, pcbRead, cbOffset);
+}
+
+NTSTATUS VmmVfsReadFile_FromDWORD(_In_ DWORD dwValue, _Out_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbRead, _In_ QWORD cbOffset, _In_ BOOL fPrefix)
+{
+    BYTE pbBuffer[32];
+    DWORD cbBuffer;
+    cbBuffer = snprintf(pbBuffer, 32, (fPrefix ? "0x%08x" : "%08x"), dwValue);
     return VmmVfsReadFile_FromBuffer(pbBuffer, cbBuffer, pb, cb, pcbRead, cbOffset);
 }
 
@@ -145,9 +166,9 @@ NTSTATUS VmmVfsReadFileDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath
     PVMM_CONTEXT ctxVmm = (PVMM_CONTEXT)ctx->hVMM;
     PVMM_MEMMAP_ENTRY pMapEntry;
     PVMM_PROCESS pProcess;
-    BYTE pbBuffer[48];
+    BYTE pbBuffer[0x800];
     DWORD cbBuffer;
-    QWORD cbMax;
+    QWORD cbMax, i;
     ZeroMemory(pbBuffer, 48);
     if(!ctxVmm) { return STATUS_FILE_INVALID; }
     pProcess = VmmProcessGet(ctxVmm, pPath->dwPID);
@@ -179,9 +200,19 @@ NTSTATUS VmmVfsReadFileDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath
         }
         return VmmVfsReadFile_FromBuffer(pProcess->pbMemMapDisplayCache, pProcess->cbMemMapDisplayCache, pb, cb, pcbRead, cbOffset);
     }
+    // read from modules
+    if(!_stricmp(pPath->szPath1, "modules") && pPath->szPath2) {
+        // locate module
+        for(i = 0; i < pProcess->cModuleMap; i++) {
+            //TODO: COMPARE HERE !!!
+        }
+    }
     // read genereal numeric values from files, pml4, pid, name, virt, virt2phys
     if(!_stricmp(pPath->szPath1, "pml4")) {
-        return VmmVfsReadFile_FromQWORD(pProcess->paPML4, pb, cb, pcbRead, cbOffset, TRUE);
+        return VmmVfsReadFile_FromQWORD(pProcess->paPML4, pb, cb, pcbRead, cbOffset, FALSE);
+    }
+    if(!_stricmp(pPath->szPath1, "pml4-user")) {
+        return VmmVfsReadFile_FromQWORD(pProcess->paPML4_UserOpt, pb, cb, pcbRead, cbOffset, FALSE);
     }
     if(!_stricmp(pPath->szPath1, "pid")) {
         cbBuffer = snprintf(pbBuffer, 32, "%i", pProcess->dwPID);
@@ -197,17 +228,58 @@ NTSTATUS VmmVfsReadFileDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath
     // windows specific reads below:
     if(ctxVmm->fWin) {
         if(!_stricmp(pPath->szPath1, "win-eprocess")) {
-            return VmmVfsReadFile_FromQWORD(pProcess->os.win.vaEPROCESS, pb, cb, pcbRead, cbOffset, TRUE);
-        }
-        if(!_stricmp(pPath->szPath1, "win-peb")) {
-            return VmmVfsReadFile_FromQWORD(pProcess->os.win.vaPEB, pb, cb, pcbRead, cbOffset, TRUE);
+            return VmmVfsReadFile_FromQWORD(pProcess->os.win.vaEPROCESS, pb, cb, pcbRead, cbOffset, FALSE);
         }
         if(!_stricmp(pPath->szPath1, "win-entry")) {
-            return VmmVfsReadFile_FromQWORD(pProcess->os.win.vaENTRY, pb, cb, pcbRead, cbOffset, TRUE);
+            return VmmVfsReadFile_FromQWORD(pProcess->os.win.vaENTRY, pb, cb, pcbRead, cbOffset, FALSE);
+        }
+        if(!_stricmp(pPath->szPath1, "win-peb")) {
+            return VmmVfsReadFile_FromQWORD(pProcess->os.win.vaPEB, pb, cb, pcbRead, cbOffset, FALSE);
         }
         if(!_stricmp(pPath->szPath1, "win-modules") && pProcess->os.win.pbLdrModulesDisplayCache) {
             return VmmVfsReadFile_FromBuffer(pProcess->os.win.pbLdrModulesDisplayCache, pProcess->os.win.cbLdrModulesDisplayCache, pb, cb, pcbRead, cbOffset);
         }
+        if(!_stricmp(pPath->szPath1, "win-peb32")) {
+            return VmmVfsReadFile_FromDWORD(pProcess->os.win.vaPEB32, pb, cb, pcbRead, cbOffset, FALSE);
+        }
+    }
+    // file in modules directory
+    if(!_stricmp(pPath->szPath1, "modules") && pPath->szPath2[0] && pPath->szPath3[0]) {
+        for(i = 0; i < pProcess->cModuleMap; i++) {
+            if(0 == strncmp(pPath->szPath2, pProcess->pModuleMap[i].szName, MAX_PATH)) {
+                if(!_stricmp(pPath->szPath3, "base")) {
+                    return VmmVfsReadFile_FromQWORD(pProcess->pModuleMap[i].BaseAddress, pb, cb, pcbRead, cbOffset, FALSE);
+                }
+                if(!_stricmp(pPath->szPath3, "entry")) {
+                    return VmmVfsReadFile_FromQWORD(pProcess->pModuleMap[i].EntryPoint, pb, cb, pcbRead, cbOffset, FALSE);
+                }
+                if(!_stricmp(pPath->szPath3, "size")) {
+                    return VmmVfsReadFile_FromDWORD(pProcess->pModuleMap[i].SizeOfImage, pb, cb, pcbRead, cbOffset, FALSE);
+                }
+                if(!_stricmp(pPath->szPath3, "directories")) {
+                    VmmProcWindows_PE_DIRECTORY_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i, pbBuffer, 0x400, &cbBuffer);
+                    return VmmVfsReadFile_FromBuffer(pbBuffer, cbBuffer, pb, cb, pcbRead, cbOffset);
+                }
+                if(!_stricmp(pPath->szPath3, "export")) {
+                    VmmProcWindows_PE_LoadEAT_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i);
+                    if(!memcmp(pProcess->os.win.szDisplayCacheEAT, pProcess->pModuleMap[i].szName, 32)) {
+                        return VmmVfsReadFile_FromBuffer(pProcess->os.win.pbDisplayCacheEAT, pProcess->pModuleMap[i].cbDisplayBufferEAT, pb, cb, pcbRead, cbOffset);
+                    }
+                }
+                if(!_stricmp(pPath->szPath3, "import")) {
+                    VmmProcWindows_PE_LoadIAT_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i);
+                    if(!memcmp(pProcess->os.win.szDisplayCacheIAT, pProcess->pModuleMap[i].szName, 32)) {
+                        return VmmVfsReadFile_FromBuffer(pProcess->os.win.pbDisplayCacheIAT, pProcess->pModuleMap[i].cbDisplayBufferIAT, pb, cb, pcbRead, cbOffset);
+                    }
+                }
+                if(!_stricmp(pPath->szPath3, "sections")) {
+                    VmmProcWindows_PE_SECTION_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i, pbBuffer, 0x800, &cbBuffer);
+                    return VmmVfsReadFile_FromBuffer(pbBuffer, cbBuffer, pb, cb, pcbRead, cbOffset);
+                }
+                return STATUS_FILE_INVALID;
+            }
+        }
+        return STATUS_FILE_INVALID;
     }
     return STATUS_FILE_INVALID;
 }
@@ -359,19 +431,26 @@ VOID VmmVfsListFiles_OsSpecific(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS p
     // WINDOWS
     if(ctxVmm->fWin) {
         if(*pcfi >= cfiMax) { return; }
-        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + *pcfi, "win-eprocess", 18, VFS_FLAGS_FILE_NORMAL);
-        *pcfi = *pcfi + 1;
-        if(*pcfi >= cfiMax) { return; }
-        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + *pcfi, "win-peb", 18, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + *pcfi, "win-eprocess", 16, VFS_FLAGS_FILE_NORMAL);
         *pcfi = *pcfi + 1;
         if(*pcfi >= cfiMax) { return; }
         if(pProcess->os.win.vaENTRY) {
-            VmmVfsListFiles_PopulateResultFileInfo(*ppfi + *pcfi, "win-entry", 18, VFS_FLAGS_FILE_NORMAL);
+            VmmVfsListFiles_PopulateResultFileInfo(*ppfi + *pcfi, "win-entry", 16, VFS_FLAGS_FILE_NORMAL);
             *pcfi = *pcfi + 1;
             if(*pcfi >= cfiMax) { return; }
         }
+        // 64-bit PEB and modules
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + *pcfi, "win-peb", 16, VFS_FLAGS_FILE_NORMAL);
+        *pcfi = *pcfi + 1;
+        if(*pcfi >= cfiMax) { return; }
         if(pProcess->os.win.cbLdrModulesDisplayCache) {
             VmmVfsListFiles_PopulateResultFileInfo(*ppfi + *pcfi, "win-modules", pProcess->os.win.cbLdrModulesDisplayCache, VFS_FLAGS_FILE_NORMAL);
+            *pcfi = *pcfi + 1;
+            if(*pcfi >= cfiMax) { return; }
+        }
+        // 32-bit PEB and modules
+        if(pProcess->os.win.vaPEB32) {
+            VmmVfsListFiles_PopulateResultFileInfo(*ppfi + *pcfi, "win-peb32", 8, VFS_FLAGS_FILE_NORMAL);
             *pcfi = *pcfi + 1;
             if(*pcfi >= cfiMax) { return; }
         }
@@ -427,19 +506,22 @@ BOOL VmmVfsListFilesDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath, _
         VmmProc_InitializeModuleNames(ctxVmm, pProcess);
         VmmMapDisplayBufferGenerate(pProcess);
     }
-    // populate process directory - list standard files and memd subdirectory
+    // populate process directory - list standard files and subdirectories
     if(!pPath->szPath1) {
-        cMax = 12;
-        *pcfi = 7;
-        *ppfi = LocalAlloc(LMEM_ZEROINIT, cMax * sizeof(VFS_RESULT_FILEINFO));
-        if(!*ppfi) { return FALSE; }
-        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 0, "map", pProcess->cbMemMapDisplayCache, VFS_FLAGS_FILE_NORMAL);
-        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 1, "vmem", 0x0001000000000000, VFS_FLAGS_FILE_NORMAL);
-        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 2, "vmemd", 0, VFS_FLAGS_FILE_DIRECTORY);
-        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 3, "name", 16, VFS_FLAGS_FILE_NORMAL);
-        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 4, "pid", 10, VFS_FLAGS_FILE_NORMAL);
-        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 5, "pml4", 18, VFS_FLAGS_FILE_NORMAL);
-        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 6, "virt2phys", 0, VFS_FLAGS_FILE_DIRECTORY);
+        i = 0, cMax = 14;
+        if(!(*ppfi = LocalAlloc(LMEM_ZEROINIT, cMax * sizeof(VFS_RESULT_FILEINFO)))) { return FALSE; }
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "map", pProcess->cbMemMapDisplayCache, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "name", 16, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "pid", 10, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "pml4", 16, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "vmem", 0x0001000000000000, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "modules", 0, VFS_FLAGS_FILE_DIRECTORY);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "virt2phys", 0, VFS_FLAGS_FILE_DIRECTORY);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "vmemd", 0, VFS_FLAGS_FILE_DIRECTORY);
+        if(pProcess->paPML4_UserOpt) {
+            VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "pml4-user", 16, VFS_FLAGS_FILE_NORMAL);
+        }
+        *pcfi = i;
         VmmVfsListFiles_OsSpecific(ctxVmm, pProcess, ppfi, pcfi, cMax);
         return TRUE;
     }
@@ -479,7 +561,41 @@ BOOL VmmVfsListFilesDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath, _
         VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 7, "pt_pt", 0x1000, VFS_FLAGS_FILE_NORMAL);
         return TRUE;
     }
-
+    // populate modules directory
+    if(!_stricmp(pPath->szPath1, "modules") && pProcess->cModuleMap) {
+        // modules directory -> list all modules
+        if(!pPath->szPath2) {
+            *pcfi = pProcess->cModuleMap;
+            *ppfi = LocalAlloc(LMEM_ZEROINIT, pProcess->cModuleMap * sizeof(VFS_RESULT_FILEINFO));
+            if(!*ppfi) { return FALSE; }
+            for(i = 0; i < pProcess->cModuleMap; i++) {
+                VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i, pProcess->pModuleMap[i].szName, 0, VFS_FLAGS_FILE_DIRECTORY);
+            }
+            return TRUE;
+        }
+        // individual module directory -> list files
+        if(!pPath->szPath3) {
+            for(i = 0; i < pProcess->cModuleMap; i++) {
+                if(0 == strncmp(pPath->szPath2, pProcess->pModuleMap[i].szName, MAX_PATH)) {
+                    *pcfi = 7;
+                    *ppfi = LocalAlloc(LMEM_ZEROINIT, *pcfi * sizeof(VFS_RESULT_FILEINFO));
+                    if(!*ppfi) { return FALSE; }
+                    VmmProcWindows_PE_SetSizeSectionIATEAT_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i);
+                    VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 0, "base", 16, VFS_FLAGS_FILE_NORMAL);
+                    VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 1, "entry", 16, VFS_FLAGS_FILE_NORMAL);
+                    VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 2, "size", 8, VFS_FLAGS_FILE_NORMAL);
+                    VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 3, "directories", 864, VFS_FLAGS_FILE_NORMAL);
+                    VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 4, "export", pProcess->pModuleMap[i].cbDisplayBufferEAT, VFS_FLAGS_FILE_NORMAL);
+                    VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 5, "import", pProcess->pModuleMap[i].cbDisplayBufferIAT, VFS_FLAGS_FILE_NORMAL);
+                    VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 6, "sections", pProcess->pModuleMap[i].cbDisplayBufferSections, VFS_FLAGS_FILE_NORMAL);
+                    return TRUE;
+                }
+            }
+            return FALSE;
+        }
+        printf("DEBUG PATH: %s :: %s \n", pPath->szPath2, pPath->szPath3);
+    }
+    // no hit - return false
     return FALSE;
 }
 

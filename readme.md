@@ -165,6 +165,7 @@ v3.2
 * Extended virt2phys support for the Memory Process File System.
 * Various bug fixes.
 
-Latest
+v3.3
+* Memory Process File System - 32-bit process support, parsing of imports, exports, directories and sections.
 * Total Meltdown stability fixes (removed risk of bluescreen) and increased memory support (up to 512GB).
 * Various bug fixes.

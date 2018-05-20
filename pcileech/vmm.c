@@ -270,7 +270,7 @@ PVMM_PROCESS VmmProcessGet(_In_ PVMM_CONTEXT ctxVmm, _In_ DWORD dwPID)
     return VmmProcessGetEx(ctxVmm->ptPROC, dwPID);
 }
 
-PVMM_PROCESS VmmProcessCreateEntry(_In_ PVMM_CONTEXT ctxVmm, _In_ DWORD dwPID, _In_ DWORD dwState, _In_ QWORD paPML4, _In_ CHAR szName[16], _In_ BOOL fUserOnly, _In_ BOOL fSpiderPageTableDone)
+PVMM_PROCESS VmmProcessCreateEntry(_In_ PVMM_CONTEXT ctxVmm, _In_ DWORD dwPID, _In_ DWORD dwState, _In_ QWORD paPML4, _In_ QWORD paPML4_UserOpt, _In_ CHAR szName[16], _In_ BOOL fUserOnly, _In_ BOOL fSpiderPageTableDone)
 {
     QWORD i, iStart, cEmpty = 0, cValid = 0;
     PVMM_PROCESS pNewProcess;
@@ -292,6 +292,7 @@ PVMM_PROCESS VmmProcessCreateEntry(_In_ PVMM_CONTEXT ctxVmm, _In_ DWORD dwPID, _
     pNewProcess->dwPID = dwPID;
     pNewProcess->dwState = dwState;
     pNewProcess->paPML4 = paPML4;
+    pNewProcess->paPML4_UserOpt = paPML4_UserOpt;
     pNewProcess->fUserOnly = fUserOnly;
     pNewProcess->fSpiderPageTableDone = pNewProcess->fSpiderPageTableDone || fSpiderPageTableDone;
     pNewProcess->_i_fMigrated = TRUE;
@@ -321,6 +322,7 @@ VOID VmmProcessCloseTable(_In_ PVMM_PROCESS_TABLE pt, _In_ BOOL fForceFreeAll)
     while(pProcess) {
         if(fForceFreeAll || !pProcess->_i_fMigrated) {
             LocalFree(pProcess->pMemMap);
+            LocalFree(pProcess->pModuleMap);
             LocalFree(pProcess->pbMemMapDisplayCache);
             for(i = 0; i < VMM_PROCESS_OS_ALLOC_PTR_MAX; i++) {
                 LocalFree(pProcess->os.unk.pvReserved[i]);
@@ -517,7 +519,7 @@ VOID VmmMapInitialize(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess)
 * -- szTag
 * -- wszTag
 */
-VOID VmmMapTag(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD vaBase, _In_ QWORD vaLimit, _In_opt_ LPSTR szTag, _In_opt_ LPWSTR wszTag)
+VOID VmmMapTag(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD vaBase, _In_ QWORD vaLimit, _In_opt_ LPSTR szTag, _In_opt_ LPWSTR wszTag, _In_opt_ BOOL fWoW64)
 {
     PVMM_MEMMAP_ENTRY pMap;
     QWORD i, lvl, cMap;
@@ -545,6 +547,7 @@ VOID VmmMapTag(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWO
     // 3: fill in tag
     while((i < cMap) && (pMap[i].AddrBase + (pMap[i].cPages << 12) <= vaLimit)) {
         if(pMap[i].AddrBase >= vaBase) {
+            pMap[i].fWoW64 = fWoW64;
             if(wszTag) {
                 snprintf(pMap[i].szName, 31, "%S", wszTag);
             }
@@ -564,12 +567,12 @@ VOID VmmMapDisplayBufferGenerate(_In_ PVMM_PROCESS pProcess)
     pProcess->cbMemMapDisplayCache = 0;
     LocalFree(pProcess->pbMemMapDisplayCache);
     pProcess->pbMemMapDisplayCache = NULL;
-    pbBuffer = LocalAlloc(LMEM_ZEROINIT, 86 * pProcess->cMemMap);
+    pbBuffer = LocalAlloc(LMEM_ZEROINIT, 89 * pProcess->cMemMap);
     if(!pbBuffer) { return; }
     for(i = 0; i < pProcess->cMemMap; i++) {
         o += snprintf(
             pbBuffer + o,
-            86,
+            89,
             "%04x %8x %016llx-%016llx %sr%s%s%s%s\n",
             i,
             (DWORD)pProcess->pMemMap[i].cPages,
@@ -578,7 +581,7 @@ VOID VmmMapDisplayBufferGenerate(_In_ PVMM_PROCESS pProcess)
             pProcess->pMemMap[i].fPage & VMM_MEMMAP_FLAG_PAGE_NS ? "-" : "s",
             pProcess->pMemMap[i].fPage & VMM_MEMMAP_FLAG_PAGE_W ? "w" : "-",
             pProcess->pMemMap[i].fPage & VMM_MEMMAP_FLAG_PAGE_NX ? "-" : "x",
-            pProcess->pMemMap[i].szName[0] ? " " : "",
+            pProcess->pMemMap[i].szName[0] ? (pProcess->pMemMap[i].fWoW64 ? " 32 " : "    ") : "",
             pProcess->pMemMap[i].szName
         );
     }
@@ -928,6 +931,21 @@ VOID VmmReadEx(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWO
     }
     if(pcbReadOpt) { *pcbReadOpt = cbRead; }
     LocalFree(pbBuffer);
+}
+
+BOOL VmmReadString_Unicode2Ansi(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _Out_ LPSTR sz, _In_ DWORD cch)
+{
+    DWORD i = 0;
+    BOOL result;
+    WCHAR wsz[0x1000];
+    if(cch > 0x1000) { return FALSE; }
+    result = VmmRead(ctxVmm, pProcess, qwVA, (PBYTE)wsz, cch << 1);
+    if(!result) { return FALSE; }
+    for(i = 0; i < cch; i++) {
+        sz[i] = ((WORD)wsz[i] <= 0xff) ? (CHAR)wsz[i] : '?';
+        if(sz[i] == 0) { return TRUE; }
+    }
+    return TRUE;
 }
 
 BOOL VmmRead(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _Out_ PBYTE pb, _In_ DWORD cb)

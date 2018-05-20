@@ -15,7 +15,7 @@
 // ----------------------------------------------------------------------------
 
 #define VMM_PROCESSTABLE_ENTRIES_MAX    0x4000
-#define VMM_PROCESS_OS_ALLOC_PTR_MAX    0x2    // max number of operating system specific pointers that must be free'd
+#define VMM_PROCESS_OS_ALLOC_PTR_MAX    0x4    // max number of operating system specific pointers that must be free'd
 #define VMM_MEMMAP_ENTRIES_MAX          0x4000
 
 #define VMM_MEMMAP_FLAG_PAGE_W          0x0000000000000002
@@ -31,13 +31,31 @@ typedef struct tdVMM_MEMMAP_ENTRY {
     QWORD AddrBase;
     QWORD cPages;
     QWORD fPage;
+    BOOL  fWoW64;
     CHAR  szName[32];
 } VMM_MEMMAP_ENTRY, *PVMM_MEMMAP_ENTRY;
+
+typedef struct tdVMM_MODULEMAP_ENTRY {
+    QWORD BaseAddress;
+    QWORD EntryPoint;
+    DWORD SizeOfImage;
+    BOOL  fWoW64;
+    CHAR  szName[32];
+    // # of entries in EAT / IAT (lazy loaded due to performance reasons)
+    BOOL  fLoadedEAT;
+    BOOL  fLoadedEAT_Prel;
+    DWORD cbDisplayBufferEAT;
+    BOOL  fLoadedIAT;
+    BOOL  fLoadedIAT_Prel;
+    DWORD cbDisplayBufferIAT;
+    DWORD cbDisplayBufferSections;
+} VMM_MODULEMAP_ENTRY, *PVMM_MODULEMAP_ENTRY;
 
 typedef struct tdVMM_PROCESS {
     DWORD dwPID;
     DWORD dwState;          // state of process, 0 = running
     QWORD paPML4;
+    QWORD paPML4_UserOpt;
     CHAR szName[16];
     BOOL _i_fMigrated;
     BOOL fUserOnly;
@@ -47,6 +65,9 @@ typedef struct tdVMM_PROCESS {
     PVMM_MEMMAP_ENTRY pMemMap;
     PBYTE pbMemMapDisplayCache;
     QWORD cbMemMapDisplayCache;
+    // module map (free must be called separately)
+    QWORD cModuleMap;
+    PVMM_MODULEMAP_ENTRY pModuleMap;
     struct {
         QWORD va;
         QWORD pas[5];   // physical addresses of pagetable[PML]/page[0]
@@ -59,10 +80,15 @@ typedef struct tdVMM_PROCESS {
         } unk;
         struct {
             PBYTE pbLdrModulesDisplayCache;
-            PVOID pbReserved[VMM_PROCESS_OS_ALLOC_PTR_MAX - 1];
+            PBYTE pbDisplayCacheEAT;
+            PBYTE pbDisplayCacheIAT;
+            PVOID pbReserved[VMM_PROCESS_OS_ALLOC_PTR_MAX - 3];
+            CHAR  szDisplayCacheEAT[32];
+            CHAR  szDisplayCacheIAT[32];
             DWORD cbLdrModulesDisplayCache;
             QWORD vaEPROCESS;
             QWORD vaPEB;
+            DWORD vaPEB32;                          // WoW64 only
             QWORD vaENTRY;
             BOOL fWow64;
         } win;
@@ -138,6 +164,19 @@ BOOL VmmWrite(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWOR
 * -- return
 */
 BOOL VmmWritePhysical(_Inout_ PVMM_CONTEXT ctxVmm, _In_ QWORD pa, _Out_ PBYTE pb, _In_ DWORD cb);
+
+/*
+* Read a virtually contigious arbitrary amount of memory containing cch number of
+* unicode characters and convert them into ansi characters. Characters > 0xff are
+* converted into '?'.
+* -- ctxVmm
+* -- pProcess
+* -- qwVA
+* -- sz
+* -- cch
+* -- return
+*/
+BOOL VmmReadString_Unicode2Ansi(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _Out_ LPSTR sz, _In_ DWORD cch);
 
 /*
 * Read a virtually contigious arbitrary amount of memory.
@@ -267,8 +306,9 @@ VOID VmmMapInitialize(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess);
 * -- vaLimit = limit == vaBase + size (== top address in range +1)
 * -- szTag
 * -- wszTag
+* -- fWoW64
 */
-VOID VmmMapTag(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD vaBase, _In_ QWORD vaLimit, _In_opt_ LPSTR szTag, _In_opt_ LPWSTR wszTag);
+VOID VmmMapTag(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD vaBase, _In_ QWORD vaLimit, _In_opt_ LPSTR szTag, _In_opt_ LPWSTR wszTag, _In_opt_ BOOL fWoW64);
 
 /*
 * Retrieve a memory map entry info given a specific address.
@@ -308,7 +348,7 @@ PVMM_PROCESS VmmProcessGet(_In_ PVMM_CONTEXT ctxVmm, _In_ DWORD dwPID);
 * structure and won't become visible to the "Process" functions until after the
 * VmmProcessCreateFinish have been called.
 */
-PVMM_PROCESS VmmProcessCreateEntry(_In_ PVMM_CONTEXT ctxVmm, _In_ DWORD dwPID, _In_ DWORD dwState, _In_ QWORD paPML4, _In_ CHAR szName[16], _In_ BOOL fUserOnly, _In_ BOOL fSpiderPageTableDone);
+PVMM_PROCESS VmmProcessCreateEntry(_In_ PVMM_CONTEXT ctxVmm, _In_ DWORD dwPID, _In_ DWORD dwState, _In_ QWORD paPML4, _In_ QWORD paPML4_UserOpt, _In_ CHAR szName[16], _In_ BOOL fUserOnly, _In_ BOOL fSpiderPageTableDone);
 
 /*
 * Activate the pending, not yet active, processes added by VmmProcessCreateEntry.
