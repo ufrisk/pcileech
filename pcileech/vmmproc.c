@@ -196,7 +196,7 @@ VOID VmmProcWindows_PE_LoadIAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _Inout
     if(pModule->SizeOfImage > 0x01000000) { return; }
     cbModule = pModule->SizeOfImage;
     if(!(pbModule = LocalAlloc(LMEM_ZEROINIT, cbModule))) { return; }
-    VmmReadEx(ctxVmm, pProcess, pModule->BaseAddress, pbModule, cbModule, &cbRead);
+    VmmReadEx(ctxVmm, pProcess, pModule->BaseAddress, pbModule, cbModule, &cbRead, 0);
     if(cbRead <= 0x2000) { goto cleanup; }
     // load both 32/64 bit ntHeader (only one will be valid)
     if(!(ntHeader64 = VmmProcWindows_GetVerifyHeaderPE(ctxVmm, pProcess, pModule->BaseAddress, pbModuleHeader, &fHdr32))) { goto cleanup; }
@@ -533,7 +533,7 @@ QWORD VmmProcWindows_FindNtoskrnl(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS
     if(!pb) { goto cleanup; }
     // Scan back in 2MB chunks a time, (ntoskrnl.exe is loaded in 2MB pages).
     for(vaBase = vaKernelEntry & ~0x1fffff; vaBase + 0x02000000 > vaKernelEntry; vaBase -= 0x200000) {
-        VmmReadEx(ctxVmm, pSystemProcess, vaBase, pb, 0x200000, &cbRead);
+        VmmReadEx(ctxVmm, pSystemProcess, vaBase, pb, 0x200000, &cbRead, 0);
         // only fail here if all virtual memory in read fails. reason is that kernel is
         // properly mapped in memory (with NX MZ header in separate page) with empty
         // space before next valid kernel pages when running Virtualization Based Security.
@@ -713,7 +713,7 @@ VOID VmmProcWindows_ScanHeaderPE(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS 
         }
     }
     // 3: read all MZ header candicates previously selected and try load name from them (after read is successful)
-    VmmReadScatterVirtual(ctxVmm, pProcess, ppDMAs, cDMAs);
+    VmmReadScatterVirtual(ctxVmm, pProcess, ppDMAs, cDMAs, 0);
     for(i = 0; i < cDMAs; i++) {
         if(pMaps[i].dma.cb == 0x1000) {
             pMap = pMaps + i;
@@ -1041,7 +1041,7 @@ QWORD VmmProcPHYS_ScanWindowsKernel_LargePages(_Inout_ PVMM_CONTEXT ctxVmm, _In_
         // try locate ntoskrnl.exe base inside suggested area
         pbBuffer = (PBYTE)LocalAlloc(0, cbSize);
         if(!pbBuffer) { return 0; }
-        VmmReadEx(ctxVmm, pSystemProcess, vaBase, pbBuffer, (DWORD)cbSize, NULL);
+        VmmReadEx(ctxVmm, pSystemProcess, vaBase, pbBuffer, (DWORD)cbSize, NULL, 0);
         for(p = 0; p < cbSize; p += 0x1000) {
             if(*(PWORD)(pbBuffer + p) != 0x5a4d) { continue; }
             // check if module header contains INITKDBG and POOLCODE
@@ -1149,8 +1149,8 @@ BOOL VmmProcUserCR3TryInitialize(_Inout_ PVMM_CONTEXT ctxVmm)
 
 #define VMMPROC_UPDATERTHREAD_PERIOD                50
 #define VMMPROC_UPDATERTHREAD_PHYSCACHE             (500 / VMMPROC_UPDATERTHREAD_PERIOD)            // 0.5s
+#define VMMPROC_UPDATERTHREAD_TLB                   (5 * 1000 / VMMPROC_UPDATERTHREAD_PERIOD)       // 5s
 #define VMMPROC_UPDATERTHREAD_PROC_REFRESHLIST      (5 * 1000 / VMMPROC_UPDATERTHREAD_PERIOD)       // 5s
-#define VMMPROC_UPDATERTHREAD_TLB                   (15 * 1000 / VMMPROC_UPDATERTHREAD_PERIOD)      // 15s
 #define VMMPROC_UPDATERTHREAD_PROC_REFRESHTOTAL     (15 * 1000 / VMMPROC_UPDATERTHREAD_PERIOD)      // 15s
 
 DWORD VmmProcCacheUpdaterThread(_Inout_ PVMM_CONTEXT ctxVmm)
@@ -1162,13 +1162,18 @@ DWORD VmmProcCacheUpdaterThread(_Inout_ PVMM_CONTEXT ctxVmm)
     if(ctxVmm->ctxPcileech->cfg->fVerbose) { 
         printf("VmmProc: Start periodic cache flushing.\n"); 
     }
+    ctxVmm->ThreadProcCache.cMs_TickPeriod = VMMPROC_UPDATERTHREAD_PERIOD;
+    ctxVmm->ThreadProcCache.cTick_Phys = VMMPROC_UPDATERTHREAD_PHYSCACHE;
+    ctxVmm->ThreadProcCache.cTick_TLB = VMMPROC_UPDATERTHREAD_TLB;
+    ctxVmm->ThreadProcCache.cTick_ProcPartial = VMMPROC_UPDATERTHREAD_PROC_REFRESHLIST;
+    ctxVmm->ThreadProcCache.cTick_ProcTotal = VMMPROC_UPDATERTHREAD_PROC_REFRESHTOTAL;
     while(ctxVmm->ThreadProcCache.fEnabled) {
-        Sleep(VMMPROC_UPDATERTHREAD_PERIOD);
+        Sleep(ctxVmm->ThreadProcCache.cMs_TickPeriod);
         i++;
-        fTLB = !(i % VMMPROC_UPDATERTHREAD_PHYSCACHE);
-        fPHYS = !(i % VMMPROC_UPDATERTHREAD_PHYSCACHE);
-        fProcTotal = !(i % VMMPROC_UPDATERTHREAD_PROC_REFRESHTOTAL);
-        fProcList = !(i % VMMPROC_UPDATERTHREAD_PROC_REFRESHLIST) && !fProcTotal;
+        fTLB = !(i % ctxVmm->ThreadProcCache.cTick_TLB);
+        fPHYS = !(i % ctxVmm->ThreadProcCache.cTick_Phys);
+        fProcTotal = !(i % ctxVmm->ThreadProcCache.cTick_ProcTotal);
+        fProcList = !(i % ctxVmm->ThreadProcCache.cTick_ProcPartial) && !fProcTotal;
         EnterCriticalSection(&ctxVmm->MasterLock);
         // PHYS / TLB cache clear
         if(fPHYS || fTLB) {

@@ -113,6 +113,13 @@ NTSTATUS VmmVfsReadFile_FromDWORD(_In_ DWORD dwValue, _Out_ LPVOID pb, _In_ DWOR
     return VmmVfsReadFile_FromBuffer(pbBuffer, cbBuffer, pb, cb, pcbRead, cbOffset);
 }
 
+NTSTATUS VmmVfsReadFile_FromBOOL(_In_ BOOL fValue, _Out_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbRead, _In_ QWORD cbOffset)
+{
+    BYTE pbBuffer[1];
+    pbBuffer[0] = fValue ? '1' : '0';
+    return VmmVfsReadFile_FromBuffer(pbBuffer, 1, pb, cb, pcbRead, cbOffset);
+}
+
 NTSTATUS VmmVfsReadFile_Virt2Phys(PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ LPSTR szFile, _Out_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbRead, _In_ QWORD cbOffset)
 {
     BYTE iPML = 0;
@@ -175,7 +182,7 @@ NTSTATUS VmmVfsReadFileDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath
     if(!pProcess) { return STATUS_FILE_INVALID; }
     // read memory from "vmem" file
     if(!_stricmp(pPath->szPath1, "vmem")) {
-        VmmReadEx(ctxVmm, pProcess, cbOffset, pb, cb, NULL);
+        VmmReadEx(ctxVmm, pProcess, cbOffset, pb, cb, NULL, 0);
         *pcbRead = cb;
         return STATUS_SUCCESS;
     }
@@ -187,7 +194,12 @@ NTSTATUS VmmVfsReadFileDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath
         *pcbRead = 0;
         if(pMapEntry->AddrBase + (pMapEntry->cPages << 12) <= pPath->qwPath2 + cbOffset) { return STATUS_END_OF_FILE; }
         cbMax = min((pMapEntry->AddrBase + (pMapEntry->cPages << 12)), (pPath->qwPath2 + cb + cbOffset)) - (pPath->qwPath2 - cbOffset);   // min(entry_top_addr, request_top_addr) - request_start_addr
-        VmmReadEx(ctxVmm, pProcess, pPath->qwPath2 + cbOffset, pb, (DWORD)min(cb, cbMax), pcbRead);
+        //QWORD tmFreq, tmStart, tmNow;
+        //QueryPerformanceFrequency((PLARGE_INTEGER)&tmFreq);
+        //QueryPerformanceCounter((PLARGE_INTEGER)&tmStart);
+        VmmReadEx(ctxVmm, pProcess, pPath->qwPath2 + cbOffset, pb, (DWORD)min(cb, cbMax), pcbRead, (pProcess->fFileCacheDisabled ? VMM_FLAG_NOCACHE : 0));
+        //QueryPerformanceCounter((PLARGE_INTEGER)&tmNow);
+        //printf("Time uS VmmReadEx: %i\n", (((tmNow - tmStart) * 1000 * 1000) / tmFreq));
         return (*pcbRead) ? STATUS_SUCCESS : STATUS_END_OF_FILE;
     }
     // read the memory map
@@ -281,6 +293,34 @@ NTSTATUS VmmVfsReadFileDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath
         }
         return STATUS_FILE_INVALID;
     }
+    // read file in .config directory
+    if(!_stricmp(pPath->szPath1, ".config")) {
+        *pcbRead = 0;
+        // file: cache_file_enable
+        if(!_stricmp(pPath->szPath2, "cache_file_enable")) {
+            return VmmVfsReadFile_FromBOOL(!pProcess->fFileCacheDisabled, pb, cb, pcbRead, cbOffset);
+        }
+        // files: global_refresh*
+        if(!_stricmp(pPath->szPath2, "global_refresh_enable")) {
+            return VmmVfsReadFile_FromBOOL(ctxVmm->ThreadProcCache.fEnabled, pb, cb, pcbRead, cbOffset);
+        }
+        if(!_stricmp(pPath->szPath2, "global_refresh_tick_period_ms")) {
+            return VmmVfsReadFile_FromDWORD(ctxVmm->ThreadProcCache.cMs_TickPeriod, pb, cb, pcbRead, cbOffset, FALSE);
+        }
+        if(!_stricmp(pPath->szPath2, "global_refresh_read")) {
+            return VmmVfsReadFile_FromDWORD(ctxVmm->ThreadProcCache.cTick_Phys, pb, cb, pcbRead, cbOffset, FALSE);
+        }
+        if(!_stricmp(pPath->szPath2, "global_refresh_tlb")) {
+            return VmmVfsReadFile_FromDWORD(ctxVmm->ThreadProcCache.cTick_TLB, pb, cb, pcbRead, cbOffset, FALSE);
+        }
+        if(!_stricmp(pPath->szPath2, "global_refresh_proc_partial")) {
+            return VmmVfsReadFile_FromDWORD(ctxVmm->ThreadProcCache.cTick_ProcPartial, pb, cb, pcbRead, cbOffset, FALSE);
+        }
+        if(!_stricmp(pPath->szPath2, "global_refresh_proc_total")) {
+            return VmmVfsReadFile_FromDWORD(ctxVmm->ThreadProcCache.cTick_ProcTotal, pb, cb, pcbRead, cbOffset, FALSE);
+        }
+        return STATUS_FILE_INVALID;
+    }
     return STATUS_FILE_INVALID;
 }
 
@@ -301,7 +341,26 @@ NTSTATUS VmmVfsReadFile(_Inout_ PPCILEECH_CONTEXT ctx, LPCWSTR wcsFileName, _Out
 // FUNCTIONALITY RELATED TO: WRITE
 // ----------------------------------------------------------------------------
 
-NTSTATUS VmmVfsWriteFile_Virt2PhysVA(PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Out_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset)
+NTSTATUS VmmVfsWriteFile_DWORD(_Inout_ PDWORD pdwTarget, _In_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset, _In_ DWORD dwMinAllow)
+{
+    BYTE pbBuffer[9];
+    DWORD dw;
+    if(cbOffset < 8) {
+        *pcbWrite = cb;
+        snprintf(pbBuffer, 9, "%08x", *pdwTarget);
+        cb = (DWORD)min(8 - cbOffset, cb);
+        memcpy(pbBuffer + cbOffset, pb, cb);
+        pbBuffer[8] = 0;
+        dw = strtoul(pbBuffer, NULL, 16);
+        dw = max(dw, dwMinAllow);
+        *pdwTarget = dw;
+    } else {
+        *pcbWrite = 0;
+    }
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS VmmVfsWriteFile_Virt2PhysVA(PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset)
 {
     BYTE pbBuffer[17];
     if(cbOffset < 16) {
@@ -318,7 +377,7 @@ NTSTATUS VmmVfsWriteFile_Virt2PhysVA(PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pPro
     return STATUS_SUCCESS;
 }
 
-NTSTATUS VmmVfsWriteFile_Virt2Phys(PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ LPSTR szFile, _Out_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset)
+NTSTATUS VmmVfsWriteFile_Virt2Phys(PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ LPSTR szFile, _In_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset)
 {
     DWORD i;
     if(!_stricmp(szFile, "virt")) {
@@ -339,7 +398,7 @@ NTSTATUS VmmVfsWriteFile_Virt2Phys(PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProce
 
 }
 
-NTSTATUS VmmVfsWriteFileDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath, _Out_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset)
+NTSTATUS VmmVfsWriteFileDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath, _In_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset)
 {
     PVMM_CONTEXT ctxVmm = (PVMM_CONTEXT)ctx->hVMM;
     PVMM_MEMMAP_ENTRY pMapEntry;
@@ -394,10 +453,39 @@ NTSTATUS VmmVfsWriteFileDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPat
         *pcbWrite = cb;
         return STATUS_SUCCESS;
     }
+    // write file in .config directory
+    if(!_stricmp(pPath->szPath1, ".config")) {
+        // file: cache_file_enable
+        if(!_stricmp(pPath->szPath2, "cache_file_enable")) {
+            if((cbOffset == 0) && (cb > 0)) {
+                if(((PCHAR)pb)[0] == '1') { pProcess->fFileCacheDisabled = FALSE; }
+                if(((PCHAR)pb)[0] == '0') { pProcess->fFileCacheDisabled = TRUE; }
+            }
+            *pcbWrite = cb;
+            return STATUS_SUCCESS;
+        }
+        // files: global_refresh*
+        if(!_stricmp(pPath->szPath2, "global_refresh_tick_period_ms")) {
+            return VmmVfsWriteFile_DWORD(&ctxVmm->ThreadProcCache.cMs_TickPeriod, pb, cb, pcbWrite, cbOffset, 50);
+        }
+        if(!_stricmp(pPath->szPath2, "global_refresh_read")) {
+            return VmmVfsWriteFile_DWORD(&ctxVmm->ThreadProcCache.cTick_Phys, pb, cb, pcbWrite, cbOffset, 1);
+        }
+        if(!_stricmp(pPath->szPath2, "global_refresh_tlb")) {
+            return VmmVfsWriteFile_DWORD(&ctxVmm->ThreadProcCache.cTick_TLB, pb, cb, pcbWrite, cbOffset, 1);
+        }
+        if(!_stricmp(pPath->szPath2, "global_refresh_proc_partial")) {
+            return VmmVfsWriteFile_DWORD(&ctxVmm->ThreadProcCache.cTick_ProcPartial, pb, cb, pcbWrite, cbOffset, 1);
+        }
+        if(!_stricmp(pPath->szPath2, "global_refresh_proc_total")) {
+            return VmmVfsWriteFile_DWORD(&ctxVmm->ThreadProcCache.cTick_ProcTotal, pb, cb, pcbWrite, cbOffset, 1);
+        }
+        return STATUS_FILE_INVALID;
+    }
     return STATUS_FILE_INVALID;
 }
 
-NTSTATUS VmmVfsWriteFile(_Inout_ PPCILEECH_CONTEXT ctx, LPCWSTR wcsFileName, _Out_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset)
+NTSTATUS VmmVfsWriteFile(_Inout_ PPCILEECH_CONTEXT ctx, LPCWSTR wcsFileName, _In_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset)
 {
     NTSTATUS nt;
     VMMVFS_PATH path;
@@ -508,7 +596,7 @@ BOOL VmmVfsListFilesDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath, _
     }
     // populate process directory - list standard files and subdirectories
     if(!pPath->szPath1) {
-        i = 0, cMax = 14;
+        i = 0, cMax = 15;
         if(!(*ppfi = LocalAlloc(LMEM_ZEROINIT, cMax * sizeof(VFS_RESULT_FILEINFO)))) { return FALSE; }
         VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "map", pProcess->cbMemMapDisplayCache, VFS_FLAGS_FILE_NORMAL);
         VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "name", 16, VFS_FLAGS_FILE_NORMAL);
@@ -518,6 +606,7 @@ BOOL VmmVfsListFilesDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath, _
         VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "modules", 0, VFS_FLAGS_FILE_DIRECTORY);
         VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "virt2phys", 0, VFS_FLAGS_FILE_DIRECTORY);
         VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "vmemd", 0, VFS_FLAGS_FILE_DIRECTORY);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, ".config", 0, VFS_FLAGS_FILE_DIRECTORY);
         if(pProcess->paPML4_UserOpt) {
             VmmVfsListFiles_PopulateResultFileInfo(*ppfi + i++, "pml4-user", 16, VFS_FLAGS_FILE_NORMAL);
         }
@@ -594,6 +683,20 @@ BOOL VmmVfsListFilesDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath, _
             return FALSE;
         }
         printf("DEBUG PATH: %s :: %s \n", pPath->szPath2, pPath->szPath3);
+    }
+    // populate .config directory
+    if(!_stricmp(pPath->szPath1, ".config")) {
+        *pcfi = 7;
+        *ppfi = LocalAlloc(LMEM_ZEROINIT, *pcfi * sizeof(VFS_RESULT_FILEINFO));
+        if(!*ppfi) { return FALSE; }
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 0, "cache_file_enable", 1, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 1, "global_refresh_enable", 1, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 2, "global_refresh_tick_period_ms", 8, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 3, "global_refresh_read", 8, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 4, "global_refresh_tlb", 8, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 5, "global_refresh_proc_partial", 8, VFS_FLAGS_FILE_NORMAL);
+        VmmVfsListFiles_PopulateResultFileInfo(*ppfi + 6, "global_refresh_proc_total", 8, VFS_FLAGS_FILE_NORMAL);
+        return TRUE;
     }
     // no hit - return false
     return FALSE;

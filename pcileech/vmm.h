@@ -27,6 +27,8 @@
 #define VMM_CACHE_TLB_ENTRIES           0x4000  // -> 64MB of cached data
 #define VMM_CACHE_PHYS_ENTRIES          0x4000  // -> 64MB of cached data
 
+#define VMM_FLAG_NOCACHE                0x0001  // do not use the data cache (force reading from DMA device)
+
 typedef struct tdVMM_MEMMAP_ENTRY {
     QWORD AddrBase;
     QWORD cPages;
@@ -60,6 +62,7 @@ typedef struct tdVMM_PROCESS {
     BOOL _i_fMigrated;
     BOOL fUserOnly;
     BOOL fSpiderPageTableDone;
+    BOOL fFileCacheDisabled;
     // memmap related pointers (free must be called separately)
     QWORD cMemMap;
     PVMM_MEMMAP_ENTRY pMemMap;
@@ -137,6 +140,11 @@ typedef struct tdVMM_CONTEXT {
     struct {
         BOOL fEnabled;
         HANDLE hThread;
+        DWORD cMs_TickPeriod;
+        DWORD cTick_Phys;
+        DWORD cTick_TLB;
+        DWORD cTick_ProcPartial;
+        DWORD cTick_ProcTotal;
     } ThreadProcCache;
 } VMM_CONTEXT, *PVMM_CONTEXT;
 
@@ -198,8 +206,9 @@ BOOL VmmRead(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD
 * -- pb
 * -- cb
 * -- pcbRead
+* -- flags = flags as in VMM_FLAG_*
 */
-VOID VmmReadEx(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _Inout_ PBYTE pb, _In_ DWORD cb, _Out_opt_ PDWORD pcbReadOpt);
+VOID VmmReadEx(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _Inout_ PBYTE pb, _In_ DWORD cb, _Out_opt_ PDWORD pcbReadOpt, _In_ QWORD flags);
 
 /*
 * Read a single 4096-byte page of virtual memory.
@@ -217,8 +226,9 @@ BOOL VmmReadPage(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ Q
 * -- pProcess
 * -- ppDMAsVirt
 * -- cpDMAsVirt
+* -- flags = flags as in VMM_FLAG_*, [VMM_FLAG_NOCACHE for supression of data (not tlb) caching]
 */
-VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Inout_ PPDMA_IO_SCATTER_HEADER ppDMAsVirt, _In_ DWORD cpDMAsVirt);
+VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Inout_ PPDMA_IO_SCATTER_HEADER ppDMAsVirt, _In_ DWORD cpDMAsVirt, _In_ QWORD flags);
 
 /*
 * Read a single 4096-byte page of physical memory.

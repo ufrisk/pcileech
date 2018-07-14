@@ -835,7 +835,7 @@ VfsCallback_ReadFile(LPCWSTR wcsFileName, LPVOID Buffer, DWORD BufferLength, LPD
     if(!_wcsnicmp(wcsFileName, L"\\files\\", 7) && pds->fKMD) {
         return _VfsReadFile_File(wcsFileName, Buffer, BufferLength, ReadLength, Offset, DokanFileInfo);
     }
-    if(pds->fVMM && (!_wcsnicmp(wcsFileName, L"\\proc\\name\\", 1) || !_wcsnicmp(wcsFileName, L"\\proc\\pid\\", 10))) {
+    if(pds->fVMM && (!_wcsnicmp(wcsFileName, L"\\proc\\name\\", 11) || !_wcsnicmp(wcsFileName, L"\\proc\\pid\\", 10))) {
         return VmmVfsReadFile(pds->ctx, wcsFileName, Buffer, BufferLength, ReadLength, Offset);
     }
     return STATUS_FILE_INVALID;
@@ -865,7 +865,7 @@ VfsCallback_WriteFile(LPCWSTR wcsFileName, LPCVOID Buffer, DWORD NumberOfBytesTo
     if(!_wcsnicmp(wcsFileName, L"\\files\\", 7) && pds->fKMD) {
         return _VfsWriteFile_File(wcsFileName, Buffer, NumberOfBytesToWrite, NumberOfBytesWritten, Offset, DokanFileInfo);
     }
-    if(pds->fVMM && (!_wcsnicmp(wcsFileName, L"\\proc\\name\\", 1) || !_wcsnicmp(wcsFileName, L"\\proc\\pid\\", 10))) {
+    if(pds->fVMM && (!_wcsnicmp(wcsFileName, L"\\proc\\name\\", 11) || !_wcsnicmp(wcsFileName, L"\\proc\\pid\\", 10))) {
         return VmmVfsWriteFile(pds->ctx, wcsFileName, (PBYTE)Buffer, NumberOfBytesToWrite, NumberOfBytesWritten, Offset);
     }
     return STATUS_FILE_INVALID;

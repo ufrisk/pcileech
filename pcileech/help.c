@@ -114,8 +114,8 @@ VOID Help_ShowGeneral()
         "          Option has no value. Example: -pt. Used in conjunction with          \n" \
         "          -kmd option to trigger KMD insertion by page table hijack.           \n" \
         "   -cr3 : base address of page table (PML4) / CR3 CPU register.                \n" \
-        "   -efibase : base address of EFI_SYSTEM_TABLE (IBI SYST). Used when inserting \n" \
-        "          UEFI 'kernel' modules.                                               \n" \
+        "   -efibase : base address of EFI table when inserting select kernel modules.  \n" \
+        "          EFI_SYSTEM_TABLE(IBI SYST) == UEFI ; RUNTSERV == LINUX RUNTSERV EFI. \n" \
         "   -kmd : address of already loaded kernel module helper (KMD).                \n" \
         "          ALTERNATIVELY                                                        \n" \
         "          kernel module to use, see list below for choices:                    \n" \
@@ -143,7 +143,7 @@ VOID Help_ShowInfo()
     printf(
         " PCILEECH INFORMATION                                                          \n" \
         " PCILeech (c) 2016-2018 Ulf Frisk                                              \n" \
-        " Version: 3.3                                                                  \n" \
+        " Version: 3.4                                                                  \n" \
         " License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
         " Contact information: pcileech@frizk.net                                       \n" \
         " System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \

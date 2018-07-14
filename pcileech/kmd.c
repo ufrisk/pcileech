@@ -124,6 +124,18 @@ BOOL KMD_FindSignature_EfiRuntimeServices(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ P
     if(!(pbBuffer16M = LocalAlloc(0, 0x01000000))) {
         return FALSE;
     }
+    // Option 1: User-supplied efibase option (= base of EFI RUNTIME SERVICES table (RUNTSERV)).
+    if(ctx->cfg->qwEFI_IBI_SYST) { // technically not EFI_IBI_SYST table but we use this user-supplied option anyway here.
+        result =
+            ((ctx->cfg->qwEFI_IBI_SYST & 0xfff) > 0x18) &&
+            ((ctx->cfg->qwEFI_IBI_SYST & 0xfff) < (0x1000 - 0x88)) &&
+            DeviceReadMEM(ctx, ctx->cfg->qwEFI_IBI_SYST & ~0xfff, pbBuffer16M, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL) &&
+            IS_SIGNATURE_EFI_RUNTIME_SERVICES(pbBuffer16M + (ctx->cfg->qwEFI_IBI_SYST & 0xfff));
+        LocalFree(pbBuffer16M);
+        *pqwAddrPhys = ctx->cfg->qwEFI_IBI_SYST;
+        return result;
+    }
+    // Option 2: Scan for EFI RUNTIME SERVICES table (RUNTSERV).
     ctx->cfg->qwAddrMin &= ~0xfff;
     ctx->cfg->qwAddrMax = (ctx->cfg->qwAddrMax + 1) & ~0xfff;
     if(ctx->cfg->qwAddrMax == 0) {

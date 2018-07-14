@@ -43,7 +43,7 @@ NTSTATUS VmmVfsReadFile(_Inout_ PPCILEECH_CONTEXT ctx, _In_ LPCWSTR wcsFileName,
 * -- pcbWrite    = bytes actually read
 * -- cbOffset    = offset where to start read compared to file start
 */
-NTSTATUS VmmVfsWriteFile(_Inout_ PPCILEECH_CONTEXT ctx, _In_ LPCWSTR wcsFileName, _Out_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset);
+NTSTATUS VmmVfsWriteFile(_Inout_ PPCILEECH_CONTEXT ctx, _In_ LPCWSTR wcsFileName, _In_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ QWORD cbOffset);
 
 #endif /* WIN32 */
 #endif /* __VMMVFS_H__ */

@@ -739,13 +739,15 @@ BOOL VmmReadPhysicalPage(_Inout_ PVMM_CONTEXT ctxVmm, _In_ QWORD qwPA, _Inout_by
     return FALSE;
 }
 
-VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Inout_ PPDMA_IO_SCATTER_HEADER ppDMAsVirt, _In_ DWORD cpDMAsVirt)
+VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Inout_ PPDMA_IO_SCATTER_HEADER ppDMAsVirt, _In_ DWORD cpDMAsVirt, _In_ QWORD flags)
 {
     BOOL result;
     QWORD i, j, cPagesPerScatterRead, qwVA, qwPA, cpDMAsPhys = 0;
     PDMA_IO_SCATTER_HEADER pDMA_Virt, pDMA_Phys;
     PVMM_CACHE_ENTRY ppDMAsPhysCacheEntry[0x48];
     PDMA_IO_SCATTER_HEADER ppDMAsPhys[0x48];
+    DMA_IO_SCATTER_HEADER pDMAsPhys_NoCache[0x48];
+    BOOL fCacheDisable = flags & VMM_FLAG_NOCACHE;
     // 1: translate virt2phys
     for(i = 0; i < cpDMAsVirt; i++) {
         pDMA_Virt = ppDMAsVirt[i];
@@ -753,9 +755,37 @@ VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProce
         (QWORD)pDMA_Virt->pvReserved1 = (result && (pDMA_Virt->cbMax == 0x1000)) ? 0 : 1;
         (QWORD)pDMA_Virt->pvReserved2 = qwPA;
     }
-    // 2: translate virt2phys and retrieve data loop
+    // 2: retrieve data loop below
     cpDMAsPhys = 0;
     cPagesPerScatterRead = min(0x48, ((ctxVmm->ctxPcileech->cfg->qwMaxSizeDmaIo & ~0xfff) >> 12));
+    // 2.1: retrieve data loop - read strategy: non-cached read
+    if(fCacheDisable) {
+        for(i = 0; i < cpDMAsVirt; i++) {
+            pDMA_Virt = ppDMAsVirt[i];
+            if(!(QWORD)pDMA_Virt->pvReserved1) {    // phys2virt translation exists
+                pDMA_Phys = &pDMAsPhys_NoCache[cpDMAsPhys];
+                pDMA_Phys->pb = pDMA_Virt->pb;
+                pDMA_Phys->cbMax = pDMA_Virt->cbMax;
+                pDMA_Phys->cb = 0;
+                pDMA_Phys->qwA = (QWORD)pDMA_Virt->pvReserved2;
+                (QWORD)pDMA_Phys->pvReserved1 = i;
+                ppDMAsPhys[cpDMAsPhys] = pDMA_Phys;
+                cpDMAsPhys++;
+            }
+            // physical read if requesting queue is full or if this is last
+            if(cpDMAsPhys && ((cpDMAsPhys == cPagesPerScatterRead) || (i == cpDMAsVirt - 1))) {
+                // physical memory access
+                DeviceReadScatterDMA(ctxVmm->ctxPcileech, ppDMAsPhys, (DWORD)cpDMAsPhys, NULL);
+                for(j = 0; j < cpDMAsPhys; j++) {
+                    pDMA_Phys = ppDMAsPhys[j];
+                    ppDMAsVirt[(QWORD)pDMA_Phys->pvReserved1]->cb = pDMA_Phys->cb;
+                }
+                cpDMAsPhys = 0;
+            }
+        }
+        return;
+    }
+    // 2.2: retrieve data loop - read strategy: cached read (standard/preferred)
     for(i = 0; i < cpDMAsVirt; i++) {
         // retrieve from cache (if found)
         pDMA_Virt = ppDMAsVirt[i];
@@ -777,7 +807,7 @@ VOID VmmReadScatterVirtual(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProce
                 cpDMAsPhys++;
             }
         }
-        // physical read if requesting queue is full of if this is last
+        // physical read if requesting queue is full or if this is last
         if(cpDMAsPhys && ((cpDMAsPhys == cPagesPerScatterRead) || (i == cpDMAsVirt - 1))) {
             // SPECULATIVE FUTURE READ IF NEGLIGIBLE PERFORMANCE LOSS
             while(cpDMAsPhys < min(0x18, cPagesPerScatterRead)) {
@@ -875,7 +905,7 @@ BOOL VmmWrite(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWOR
     return (cbWrite == cb);
 }
 
-VOID VmmReadEx(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _Inout_ PBYTE pb, _In_ DWORD cb, _Out_opt_ PDWORD pcbReadOpt)
+VOID VmmReadEx(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _Inout_ PBYTE pb, _In_ DWORD cb, _Out_opt_ PDWORD pcbReadOpt, _In_ QWORD flags)
 {
     DWORD cbP, cDMAs, cbRead = 0;
     PBYTE pbBuffer;
@@ -901,7 +931,7 @@ VOID VmmReadEx(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWO
         pDMAs[cDMAs - 1].pb = pbBuffer + 0x1000;
     }
     // Read VMM and handle result
-    VmmReadScatterVirtual(ctxVmm, pProcess, ppDMAs, cDMAs);
+    VmmReadScatterVirtual(ctxVmm, pProcess, ppDMAs, cDMAs, flags);
     for(i = 0; i < cDMAs; i++) {
         if(pDMAs[i].cb == 0x1000) {
             cbRead += 0x1000;
@@ -951,7 +981,7 @@ BOOL VmmReadString_Unicode2Ansi(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS p
 BOOL VmmRead(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWORD qwVA, _Out_ PBYTE pb, _In_ DWORD cb)
 {
     DWORD cbRead;
-    VmmReadEx(ctxVmm, pProcess, qwVA, pb, cb, &cbRead);
+    VmmReadEx(ctxVmm, pProcess, qwVA, pb, cb, &cbRead, 0);
     return (cbRead == cb);
 }
 
@@ -963,7 +993,7 @@ BOOL VmmReadPage(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ Q
     pDMA->pb = pbPage;
     pDMA->cb = 0;
     pDMA->cbMax = 0x1000;
-    VmmReadScatterVirtual(ctxVmm, pProcess, &pDMA, 1);
+    VmmReadScatterVirtual(ctxVmm, pProcess, &pDMA, 1, 0);
     return (pDMA->cb == 0x1000);
 }
 

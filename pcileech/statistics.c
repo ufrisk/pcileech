@@ -1,6 +1,6 @@
 // statistics.c : implementation of statistics related functionality.
 //
-// (c) Ulf Frisk, 2016, 2017
+// (c) Ulf Frisk, 2016-2018
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "statistics.h"
@@ -10,14 +10,14 @@ VOID _PageStatPrintMemMap(_Inout_ PPAGE_STATISTICS ps)
 	BOOL fIsLinePrinted = FALSE;
 	QWORD i, qwAddrBase, qwAddrEnd;
 	if(!ps->i.fIsFirstPrintCompleted) {
-		printf(" Memory Map:                                  \n START              END               #PAGES\n");
+		printf(" Memory Map:                                     \n START              END               #PAGES   \n");
 	}
 	if(!ps->i.MemMapIdx && !ps->i.MemMap[0]) {
-		printf("                                              \n                                              \n");
+		printf("                                                 \n                                                 \n");
 		return;
 	}
 	if(ps->i.MemMapPrintCommitIdx >= PAGE_STATISTICS_MEM_MAP_MAX_ENTRY - 4) {
-		printf(" Maximum number of memory map entries reached.\n                                              \n");
+		printf(" Maximum number of memory map entries reached.   \n                                                 \n");
 		return;
 	}
 	qwAddrBase = ps->i.qwAddrBase + ps->i.MemMapPrintCommitPages * 0x1000;
@@ -32,7 +32,7 @@ VOID _PageStatPrintMemMap(_Inout_ PPAGE_STATISTICS ps)
 		if((i % 2) == 0) {
 			fIsLinePrinted = TRUE;
 			printf(
-				" %016llx - %016llx  %08x\n",
+				" %016llx - %016llx  %08x   \n",
 				qwAddrBase,
 				qwAddrEnd - 1,
 				ps->i.MemMap[i]);
@@ -45,9 +45,9 @@ VOID _PageStatPrintMemMap(_Inout_ PPAGE_STATISTICS ps)
 		qwAddrBase = qwAddrEnd;
 	}
 	if(!fIsLinePrinted) { // print extra line for formatting reasons.
-		printf(" (No memory successfully read yet)            \n");
+		printf(" (No memory successfully read yet)               \n");
 	}
-	printf("                                              \n");
+	printf("                                                 \n");
 }
 
 VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
