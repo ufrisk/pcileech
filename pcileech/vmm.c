@@ -720,6 +720,7 @@ BOOL VmmReadPhysicalPage(_Inout_ PVMM_CONTEXT ctxVmm, _In_ QWORD qwPA, _Inout_by
     PDMA_IO_SCATTER_HEADER pDMA_Phys;
     PVMM_CACHE_ENTRY pDMAPhysCacheEntry;
     DWORD cReadDMAs = 0;
+    qwPA &= ~0xfff;
     pDMA_Phys = VmmCacheGet(ctxVmm->ptPHYS, qwPA);
     if(pDMA_Phys) {
         memcpy(pbPage, pDMA_Phys->pb, 0x1000);

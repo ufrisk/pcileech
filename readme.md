@@ -173,3 +173,6 @@ v3.3
 v3.4
 * Memory Process File System - runtime tunables in .config directory - allows for disabling of caching and adjusting refresh periods.
 * Various bug fixes
+
+Latest
+* Bug fixes (faster FPGA initialization time).

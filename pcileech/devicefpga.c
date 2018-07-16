@@ -387,11 +387,21 @@ VOID DeviceFPGA_GetDeviceID_FpgaVersion(_In_ PDEVICE_CONTEXT_FPGA ctx)
         0x00, 0x00, 0x00, 0x00,  0x03, 0x00, 0x03, 0x77
     };
     if(!(pbRX = LocalAlloc(0, 0x01000000))) { return; }
-    status = ctx->dev.pfnFT_WritePipe(ctx->dev.hFTDI, 0x02, pbTX, sizeof(pbTX), &cbTX, NULL);
-    if(status) { goto fail; }
-    Sleep(10);
-    status = ctx->dev.pfnFT_ReadPipe(ctx->dev.hFTDI, 0x82, pbRX, 0x01000000, &cbRX, NULL);
-    if(status) { goto fail; }
+    // Write and read data from device. Initially 0x1000 bytes of data is read
+    // - this is enough in most situations, but if there is previous crap data
+    // 16MB may be read to clear queued device data (= slow, 3-4 extra seconds)
+    while(TRUE) {
+        status = ctx->dev.pfnFT_WritePipe(ctx->dev.hFTDI, 0x02, pbTX, sizeof(pbTX), &cbTX, NULL);
+        if(status) { goto fail; }
+        Sleep(10);
+        status = ctx->dev.pfnFT_ReadPipe(ctx->dev.hFTDI, 0x82, pbRX, 0x1000, &cbRX, NULL);
+        if(status) { goto fail; }
+        if(cbRX < 0x1000) { break; }
+        Sleep(10);
+        status = ctx->dev.pfnFT_ReadPipe(ctx->dev.hFTDI, 0x82, pbRX, 0x01000000, &cbRX, NULL);
+        if(status) { goto fail; }
+    }
+    // Interpret read data
     for(i = 0; i < cbRX; i += 32) {
         while(*(PDWORD)(pbRX + i) == 0x55556666) { // skip over ftdi workaround dummy fillers
             i += 4;
