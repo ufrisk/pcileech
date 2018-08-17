@@ -75,7 +75,7 @@ Please see the [PCILeech-on-Windows](https://github.com/ufrisk/pcileech/wiki/PCI
 
 The Google Android USB driver have to be installed if USB3380 hardware is used. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver.<br>
 FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card. Download the 64-bit [`FTD3XX.dll`](http://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.2.0.6.zip) from FTDI and place it alongside `pcileech.exe`.<br>
-To mount live ram and target file system as drive in Windows the Dokany file system library must be installed. Please download and install the latest version of Dokany at: https://github.com/dokan-dev/dokany/releases/latest
+To mount live ram and target file system as drive in Windows the Dokany file system library must be installed. Please download and install Dokany at: https://github.com/dokan-dev/dokany/releases/tag/v1.1.0.2000
 
 #### Linux and Android:
 Please see the [PCILeech-on-Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) guide for information about running PCILeech on Linux or [PCILeech-on-Android](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Android) for Android information.
