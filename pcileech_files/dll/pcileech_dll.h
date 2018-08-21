@@ -7,7 +7,14 @@
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 
+#ifndef __PCILEECH_DLL_H__
+#define __PCILEECH_DLL_H__
+
 #include <windows.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /*
 * Retrieve the current version of PCILeech.
@@ -345,3 +352,9 @@ BOOL PCIleech_VmmProcess_GetDirectories(_In_ DWORD dwPID, _In_ LPSTR szModule, _
 BOOL PCIleech_VmmProcess_GetSections(_In_ DWORD dwPID, _In_ LPSTR szModule, _Out_ PIMAGE_SECTION_HEADER pData, _In_ DWORD cData, _Out_ PDWORD pcData);
 BOOL PCIleech_VmmProcess_GetEAT(_In_ DWORD dwPID, _In_ LPSTR szModule, _Out_ PPCILEECH_VMM_EAT_ENTRY pData, _In_ DWORD cData, _Out_ PDWORD pcData);
 BOOL PCIleech_VmmProcess_GetIAT(_In_ DWORD dwPID, _In_ LPSTR szModule, _Out_ PPCILEECH_VMM_IAT_ENTRY pData, _In_ DWORD cData, _Out_ PDWORD pcData);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+#endif /* __PCILEECH_DLL_H__ */

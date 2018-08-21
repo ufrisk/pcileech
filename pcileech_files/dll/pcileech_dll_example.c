@@ -3,6 +3,9 @@
 // Note that this is not a complete list of the PCILeech API. For the complete
 // list please consult the pcileech_dll.h header file.
 //
+// Please also note that the pre-compiled version of pcileech.dll is compiled
+// for 64-bit (x64). 32-bit (x86) is not officially supported.
+//
 // (c) Ulf Frisk, 2017-2018
 // Author: Ulf Frisk, pcileech@frizk.net
 //
@@ -107,6 +110,9 @@ int main(_In_ int argc, _In_ char* argv[])
 
 #ifdef _INITIALIZE_FROM_FPGA
     // Initialize PCILeech DLL with a FPGA hardware device
+    // !!!IMPORTANT PCILeech_InitializeFPGA is dependent on the 64-bit version
+    // of FTD3XX.dll to be placed alongside pcileech.dll. Please consult the
+    // PCILeech documentation on github on where to find FTD3XX.dll.
     ShowKeyPress();
     printf("CALL:    PCILeech_InitializeFPGA\n");
     result = PCILeech_InitializeFPGA(NULL, NULL);
