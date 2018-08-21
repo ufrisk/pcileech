@@ -40,23 +40,47 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
+		DebugDLL|x64 = DebugDLL|x64
 		Release|x64 = Release|x64
+		ReleaseDLL|x64 = ReleaseDLL|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.Debug|x64.ActiveCfg = Release|x64
 		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.Debug|x64.Build.0 = Release|x64
+		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.DebugDLL|x64.ActiveCfg = DebugDLL|x64
+		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.DebugDLL|x64.Build.0 = DebugDLL|x64
 		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.Release|x64.ActiveCfg = Release|x64
 		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.Release|x64.Build.0 = Release|x64
+		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.ReleaseDLL|x64.ActiveCfg = ReleaseDLL|x64
+		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.ReleaseDLL|x64.Build.0 = ReleaseDLL|x64
 		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Debug|x64.ActiveCfg = Release|x64
 		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Debug|x64.Build.0 = Release|x64
+		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.DebugDLL|x64.ActiveCfg = Debug|x64
+		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.DebugDLL|x64.Build.0 = Debug|x64
 		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Release|x64.ActiveCfg = Release|x64
 		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Release|x64.Build.0 = Release|x64
+		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.ReleaseDLL|x64.ActiveCfg = Release|x64
+		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.ReleaseDLL|x64.Build.0 = Release|x64
 		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.Debug|x64.ActiveCfg = Release|x64
+		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.DebugDLL|x64.ActiveCfg = Release|x64
+		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.DebugDLL|x64.Build.0 = Release|x64
 		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.Release|x64.ActiveCfg = Release|x64
+		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.ReleaseDLL|x64.ActiveCfg = Release|x64
+		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.ReleaseDLL|x64.Build.0 = Release|x64
 		{E11BECC1-685F-41B9-A352-A6127FAB3758}.Debug|x64.ActiveCfg = Release|x64
+		{E11BECC1-685F-41B9-A352-A6127FAB3758}.DebugDLL|x64.ActiveCfg = Debug|x64
+		{E11BECC1-685F-41B9-A352-A6127FAB3758}.DebugDLL|x64.Build.0 = Debug|x64
+		{E11BECC1-685F-41B9-A352-A6127FAB3758}.DebugDLL|x64.Deploy.0 = Debug|x64
 		{E11BECC1-685F-41B9-A352-A6127FAB3758}.Release|x64.ActiveCfg = Release|x64
+		{E11BECC1-685F-41B9-A352-A6127FAB3758}.ReleaseDLL|x64.ActiveCfg = Release|x64
+		{E11BECC1-685F-41B9-A352-A6127FAB3758}.ReleaseDLL|x64.Build.0 = Release|x64
+		{E11BECC1-685F-41B9-A352-A6127FAB3758}.ReleaseDLL|x64.Deploy.0 = Release|x64
 		{F2F4AA4A-BEFE-4738-9412-820007919334}.Debug|x64.ActiveCfg = Release|x64
+		{F2F4AA4A-BEFE-4738-9412-820007919334}.DebugDLL|x64.ActiveCfg = Debug|x64
+		{F2F4AA4A-BEFE-4738-9412-820007919334}.DebugDLL|x64.Build.0 = Debug|x64
 		{F2F4AA4A-BEFE-4738-9412-820007919334}.Release|x64.ActiveCfg = Release|x64
+		{F2F4AA4A-BEFE-4738-9412-820007919334}.ReleaseDLL|x64.ActiveCfg = Release|x64
+		{F2F4AA4A-BEFE-4738-9412-820007919334}.ReleaseDLL|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

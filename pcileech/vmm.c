@@ -367,6 +367,33 @@ VOID VmmProcessCreateFinish(_In_ PVMM_CONTEXT ctxVmm)
     }
 }
 
+VOID VmmProcessListPIDs(_In_ PVMM_CONTEXT ctxVmm, _Out_ PDWORD pPIDs, _Inout_ PSIZE_T pcPIDs)
+{
+    DWORD i = 0;
+    WORD iProcess;
+    PVMM_PROCESS pProcess;
+    PVMM_PROCESS_TABLE pt = ctxVmm->ptPROC;
+    if(!pPIDs) {
+        *pcPIDs = pt->c;
+        return;
+    }
+    if(*pcPIDs < pt->c) {
+        *pcPIDs = 0;
+        return;
+    }
+    // copy all PIDs
+    iProcess = pt->iFLink;
+    pProcess = pt->M[iProcess];
+    while(pProcess) {
+        *(pPIDs + i) = pProcess->dwPID;
+        i++;
+        iProcess = pt->iFLinkM[iProcess];
+        pProcess = pt->M[iProcess];
+        if(!pProcess || (iProcess == pt->iFLink)) { break; }
+    }
+    *pcPIDs = i;
+}
+
 #define VMM_TLB_SIZE_STAGEBUF   0x200
 
 typedef struct tdVMM_TLB_SPIDER_STAGE_INTERNAL {

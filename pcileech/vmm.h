@@ -368,6 +368,14 @@ PVMM_PROCESS VmmProcessCreateEntry(_In_ PVMM_CONTEXT ctxVmm, _In_ DWORD dwPID, _
 VOID VmmProcessCreateFinish(_In_ PVMM_CONTEXT ctxVmm);
 
 /*
+* List the PIDs and put them into the supplied table.
+* -- ctxVmm
+* -- pPIDs = user allocated DWORD array to receive result, or NULL.
+* -- pcPIDs = ptr to number of DWORDs in pPIDs on entry - number of PIDs in system on exit.
+*/
+VOID VmmProcessListPIDs(_In_ PVMM_CONTEXT ctxVmm, _Out_ PDWORD pPIDs, _Inout_ PSIZE_T pcPIDs);
+
+/*
 * Clear the specified cache from all entries.
 * -- ctxVmm
 * -- fTLB

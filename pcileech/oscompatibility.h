@@ -19,6 +19,10 @@
 #pragma comment (lib, "setupapi.lib")
 #pragma comment (lib, "bcrypt.lib")
 
+#ifdef _WINDLL
+#define printf(format, ...) {}      // No printf output in DLL mode
+#endif /* _WINDLL */
+
 typedef unsigned __int64                    QWORD, *PQWORD;
 
 #pragma warning( disable : 4477)

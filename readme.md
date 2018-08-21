@@ -75,7 +75,11 @@ Please see the [PCILeech-on-Windows](https://github.com/ufrisk/pcileech/wiki/PCI
 
 The Google Android USB driver have to be installed if USB3380 hardware is used. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver.<br>
 FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card. Download the 64-bit [`FTD3XX.dll`](http://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.2.0.6.zip) from FTDI and place it alongside `pcileech.exe`.<br>
-To mount live ram and target file system as drive in Windows the Dokany file system library must be installed. Please download and install Dokany at: https://github.com/dokan-dev/dokany/releases/tag/v1.1.0.2000
+To mount live ram and target file system as drive in Windows the Dokany file system library must be installed. Please download and install the latest version of Dokany at: https://github.com/dokan-dev/dokany/releases/latest
+
+#### Windows/DLL:
+
+PCILeech is also available as a dynamic link library .DLL for easy including in other projects. The DLL, headers and sample code is found in the pcileech_files/dll folder.
 
 #### Linux and Android:
 Please see the [PCILeech-on-Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) guide for information about running PCILeech on Linux or [PCILeech-on-Android](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Android) for Android information.
@@ -174,5 +178,8 @@ v3.4
 * Memory Process File System - runtime tunables in .config directory - allows for disabling of caching and adjusting refresh periods.
 * Various bug fixes
 
-Latest
-* Bug fixes (faster FPGA initialization time).
+v3.5
+* PCILeech DLL released.
+* Update of Dokany header files.
+* Faster FPGA initialization time.
+* Various bug fixes

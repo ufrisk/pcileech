@@ -135,4 +135,24 @@ BOOL DeviceWriteTlp(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PBYTE pb, _In_ DWORD cb)
 */
 BOOL DeviceListenTlp(_Inout_ PPCILEECH_CONTEXT ctx, _In_ DWORD dwTime);
 
+/*
+* Set a device specific option value. Please see individual device header files
+* for a list of the possible device specific options.
+* -- ctx
+* -- fOption
+* -- pqwValue = pointer to QWORD to receive option value.
+* -- return
+*/
+BOOL DeviceGetOption(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD fOption, _Out_ PQWORD pqwValue);
+
+/*
+* Set a device specific option value. Please see individual device header files
+* for a list of the possible device specific options.
+* -- ctx
+* -- fOption
+* -- qwValue
+* -- return
+*/
+BOOL DeviceSetOption(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD fOption, _In_ QWORD qwValue);
+
 #endif /* __DEVICE_H__ */

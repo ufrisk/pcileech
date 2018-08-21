@@ -17,4 +17,23 @@
 */
 BOOL DeviceFPGA_Open(_Inout_ PPCILEECH_CONTEXT ctx);
 
+/*
+* Device specific options - to be used together with the device GetOption and
+* SetOption functions. For more detailed information please check sources for
+* devicefpga.c
+*/
+#define DEVICE_OPT_FPGA_PROBE_MAXPAGES          1   // RW
+#define DEVICE_OPT_FPGA_RX_FLUSH_LIMIT          2   // RW
+#define DEVICE_OPT_FPGA_MAX_SIZE_RX             3   // RW
+#define DEVICE_OPT_FPGA_MAX_SIZE_TX             4   // RW
+#define DEVICE_OPT_FPGA_DELAY_PROBE_READ        5   // RW uS
+#define DEVICE_OPT_FPGA_DELAY_PROBE_WRITE       6   // RW uS
+#define DEVICE_OPT_FPGA_DELAY_WRITE             7   // RW uS
+#define DEVICE_OPT_FPGA_DELAY_READ              8   // RW uS
+#define DEVICE_OPT_FPGA_RETRY_ON_ERROR          9   // RW
+#define DEVICE_OPT_FPGA_DEVICE_ID              80   // R
+#define DEVICE_OPT_FPGA_FPGA_ID                81   // R
+#define DEVICE_OPT_FPGA_VERSION_MAJOR          82   // R
+#define DEVICE_OPT_FPGA_VERSION_MINOR          83   // R
+
 #endif /* __DEVICEFPGA_H__ */

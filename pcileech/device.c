@@ -237,3 +237,13 @@ BOOL DeviceReadMEM(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE
         return cb == DeviceReadDMAEx(ctx, qwAddr, pb, cb, NULL, 0);
     }
 }
+
+BOOL DeviceGetOption(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD fOption, _Out_ PQWORD pqwValue)
+{
+    return ctx->hDevice && ctx->cfg->dev.pfnGetOption && ctx->cfg->dev.pfnGetOption(ctx, fOption, pqwValue);
+}
+
+BOOL DeviceSetOption(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD fOption, _In_ QWORD qwValue)
+{
+    return ctx->hDevice && ctx->cfg->dev.pfnSetOption && ctx->cfg->dev.pfnSetOption(ctx, fOption, qwValue);
+}

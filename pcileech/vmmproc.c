@@ -38,73 +38,77 @@ PIMAGE_NT_HEADERS VmmProcWindows_GetVerifyHeaderPE(_Inout_ PVMM_CONTEXT ctxVmm, 
 //    IMPORT/EXPORT DIRECTORY PARSING
 // ----------------------------------------------------------------------------
 
-VOID VmmProcWindows_PE_SECTION_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ PVMM_MODULEMAP_ENTRY pModule, _Out_ PBYTE pbDisplayBuffer, _In_ DWORD cbDisplayBufferMax, _Out_ PDWORD pcbDisplayBuffer)
+VOID VmmProcWindows_PE_SECTION_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ PVMM_MODULEMAP_ENTRY pModule, _Out_opt_ PBYTE pbDisplayBufferOpt, _In_ DWORD cbDisplayBufferMax, _Out_ PDWORD pcbDisplayBuffer, _Out_opt_ PIMAGE_SECTION_HEADER pSectionsOpt)
 {
     BYTE pbModuleHeader[0x1000];
     PIMAGE_NT_HEADERS64 ntHeader64;
     PIMAGE_NT_HEADERS32 ntHeader32;
     BOOL fHdr32;
     DWORD i;
-    PIMAGE_SECTION_HEADER pSectionHeader;
-    *pcbDisplayBuffer = 0;
+    PIMAGE_SECTION_HEADER pSectionBase;
+    if(pcbDisplayBuffer) { *pcbDisplayBuffer = 0; }
     if(!(ntHeader64 = VmmProcWindows_GetVerifyHeaderPE(ctxVmm, pProcess, pModule->BaseAddress, pbModuleHeader, &fHdr32))) { return; }
-    for(i = 0; i < (DWORD)min(32, ntHeader64->FileHeader.NumberOfSections); i++) {
-        if(fHdr32) { // 32-bit PE
-            ntHeader32 = (PIMAGE_NT_HEADERS32)ntHeader64;
-            pSectionHeader = (PIMAGE_SECTION_HEADER)((QWORD)ntHeader32 + sizeof(IMAGE_NT_HEADERS32) + i * sizeof(IMAGE_SECTION_HEADER));
-        } else { // 64-bit PE
-            pSectionHeader = (PIMAGE_SECTION_HEADER)((QWORD)ntHeader64 + sizeof(IMAGE_NT_HEADERS64) + i * sizeof(IMAGE_SECTION_HEADER));
+    ntHeader32 = (PIMAGE_NT_HEADERS32)ntHeader64;
+    pSectionBase = fHdr32 ?
+        (PIMAGE_SECTION_HEADER)((QWORD)ntHeader32 + sizeof(IMAGE_NT_HEADERS32)) :
+        (PIMAGE_SECTION_HEADER)((QWORD)ntHeader64 + sizeof(IMAGE_NT_HEADERS64));
+    if(pbDisplayBufferOpt) {
+        for(i = 0; i < (DWORD)min(32, ntHeader64->FileHeader.NumberOfSections); i++) {
+            // 52 byte per line (indluding newline)
+            *pcbDisplayBuffer += snprintf(
+                pbDisplayBufferOpt + *pcbDisplayBuffer,
+                cbDisplayBufferMax - *pcbDisplayBuffer,
+                "%02x %-8.8s  %016llx %08x %08x %c%c%c\n",
+                i,
+                pSectionBase[i].Name,
+                pModule->BaseAddress + pSectionBase[i].VirtualAddress,
+                pSectionBase[i].VirtualAddress,
+                pSectionBase[i].Misc.VirtualSize,
+                (pSectionBase[i].Characteristics & IMAGE_SCN_MEM_READ) ? 'r' : '-',
+                (pSectionBase[i].Characteristics & IMAGE_SCN_MEM_WRITE) ? 'w' : '-',
+                (pSectionBase[i].Characteristics & IMAGE_SCN_MEM_EXECUTE) ? 'x' : '-'
+                );
         }
-        // 52 byte per line (indluding newline)
-        *pcbDisplayBuffer += snprintf(
-            pbDisplayBuffer + *pcbDisplayBuffer,
-            cbDisplayBufferMax - *pcbDisplayBuffer,
-            "%02x %-8.8s  %016llx %08x %08x %c%c%c\n",
-            i,
-            pSectionHeader->Name,
-            pModule->BaseAddress + pSectionHeader->VirtualAddress,
-            pSectionHeader->VirtualAddress,
-            pSectionHeader->Misc.VirtualSize,
-            (pSectionHeader->Characteristics & IMAGE_SCN_MEM_READ) ? 'r' : '-',
-            (pSectionHeader->Characteristics & IMAGE_SCN_MEM_WRITE) ? 'w' : '-',
-            (pSectionHeader->Characteristics & IMAGE_SCN_MEM_EXECUTE) ? 'x' : '-'
-        );
+    }
+    if(pSectionsOpt) {
+        memcpy(pSectionsOpt, pSectionBase, ntHeader64->FileHeader.NumberOfSections * sizeof(IMAGE_SECTION_HEADER));
     }
 }
 
-VOID VmmProcWindows_PE_DIRECTORY_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ PVMM_MODULEMAP_ENTRY pModule, _Out_ PBYTE pbDisplayBuffer, _In_ DWORD cbDisplayBufferMax, _Out_ PDWORD pcbDisplayBuffer)
+VOID VmmProcWindows_PE_DIRECTORY_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ PVMM_MODULEMAP_ENTRY pModule, _Out_opt_ PBYTE pbDisplayBufferOpt, _In_ DWORD cbDisplayBufferMax, _Out_ PDWORD pcbDisplayBuffer, _Out_opt_ PIMAGE_DATA_DIRECTORY pDataDirectoryOpt)
 {
     LPCSTR DIRECTORIES[16] = { "EXPORT", "IMPORT", "RESOURCE", "EXCEPTION", "SECURITY", "BASERELOC", "DEBUG", "ARCHITECTURE", "GLOBALPTR", "TLS", "LOAD_CONFIG", "BOUND_IMPORT", "IAT", "DELAY_IMPORT", "COM_DESCRIPTOR", "RESERVED" };
-    BYTE pbModuleHeader[0x1000];
+    BYTE i, pbModuleHeader[0x1000];
     PIMAGE_NT_HEADERS64 ntHeader64;
     PIMAGE_NT_HEADERS32 ntHeader32;
+    PIMAGE_DATA_DIRECTORY pDataDirectoryBase;
     BOOL fHdr32;
-    DWORD i, VirtualAddress, Size;
-    *pcbDisplayBuffer = 0;
+    if(pcbDisplayBuffer) { *pcbDisplayBuffer = 0; }
     if(!(ntHeader64 = VmmProcWindows_GetVerifyHeaderPE(ctxVmm, pProcess, pModule->BaseAddress, pbModuleHeader, &fHdr32))) { return; }
-    for(i = 0; i < 16; i++) {
-        if(fHdr32) { // 32-bit PE
-            ntHeader32 = (PIMAGE_NT_HEADERS32)ntHeader64;
-            VirtualAddress = ntHeader32->OptionalHeader.DataDirectory[i].VirtualAddress;
-            Size = ntHeader32->OptionalHeader.DataDirectory[i].Size;
-        } else { // 64-bit PE
-            VirtualAddress = ntHeader64->OptionalHeader.DataDirectory[i].VirtualAddress;
-            Size = ntHeader64->OptionalHeader.DataDirectory[i].Size;
+    ntHeader32 = (PIMAGE_NT_HEADERS32)ntHeader64;
+    pDataDirectoryBase = fHdr32 ? ntHeader32->OptionalHeader.DataDirectory : ntHeader64->OptionalHeader.DataDirectory;
+    if(pbDisplayBufferOpt) {
+        for(i = 0; i < 16; i++) {
+            if(pbDisplayBufferOpt) {
+                *pcbDisplayBuffer += snprintf(
+                    pbDisplayBufferOpt + *pcbDisplayBuffer,
+                    cbDisplayBufferMax - *pcbDisplayBuffer,
+                    "%x %-16.16s %016llx %08x %08x\n",
+                    i,
+                    DIRECTORIES[i],
+                    pModule->BaseAddress + pDataDirectoryBase[i].VirtualAddress,
+                    pDataDirectoryBase[i].VirtualAddress,
+                    pDataDirectoryBase[i].Size
+                );
+            }
         }
-        *pcbDisplayBuffer += snprintf(
-            pbDisplayBuffer + *pcbDisplayBuffer,
-            cbDisplayBufferMax - *pcbDisplayBuffer,
-            "%x %-16.16s %016llx %08x %08x\n",
-            i,
-            DIRECTORIES[i],
-            pModule->BaseAddress + VirtualAddress,
-            VirtualAddress,
-            Size
-        );
+    }
+    if(pDataDirectoryOpt) {
+        memcpy(pDataDirectoryOpt, pDataDirectoryBase, 16 * sizeof(IMAGE_DATA_DIRECTORY));
     }
 }
 
-VOID VmmProcWindows_PE_LoadEAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PVMM_PROCESS pProcess, _Inout_ PVMM_MODULEMAP_ENTRY pModule)
+VOID VmmProcWindows_PE_LoadEAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PVMM_PROCESS pProcess, _Inout_ PVMM_MODULEMAP_ENTRY pModule, _In_ BOOL fLoadDisplayBuffer, _Out_opt_ PVMMPROC_WINDOWS_EAT_ENTRY pEATs, _In_opt_ DWORD cEATs)
 {
     BYTE pbModuleHeader[0x1000];
     PIMAGE_NT_HEADERS64 ntHeader64;
@@ -114,7 +118,7 @@ VOID VmmProcWindows_PE_LoadEAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _Inout
     PIMAGE_EXPORT_DIRECTORY pExportDirectory;
     QWORD oNameOrdinal, ooName, oName, oFunction;
     WORD wOrdinalFnIdx;
-    QWORD vaFunction;
+    DWORD vaFunctionOffset;
     LPSTR szBuffer = NULL;
     DWORD cbBuffer, cbBufferData;
     BOOL fHdr32;
@@ -152,30 +156,37 @@ VOID VmmProcWindows_PE_LoadEAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _Inout
         //
         oFunction = pExportDirectory->AddressOfFunctions + (wOrdinalFnIdx << 2);
         if((oFunction - sizeof(DWORD) - oExportDirectory) > cbExportDirectory) { continue; }
-        vaFunction = pModule->BaseAddress + *(PDWORD)(pbExportDirectory - oExportDirectory + oFunction);
+        vaFunctionOffset = *(PDWORD)(pbExportDirectory - oExportDirectory + oFunction);
+        // optionally store into caller supplied info struct
+        if(pEATs && (i < cEATs)) {
+            pEATs[i].vaFunctionOffset = vaFunctionOffset;
+            strncpy_s(pEATs[i].szFunction, 40, (LPSTR)(pbExportDirectory - oExportDirectory + oName), _TRUNCATE);
+        }
         // store to buffer
         cbBufferData += snprintf(
             szBuffer + cbBufferData,
             min(100, cbBuffer - cbBufferData),
             "%04x %016llx %-40.40s \n",     // 64 bytes (chars) / line (function)
             i,
-            vaFunction,
+            pModule->BaseAddress + vaFunctionOffset,
             (LPSTR)(pbExportDirectory - oExportDirectory + oName)
         );
         if(cbBufferData > 0x00100000 - 64) { break; }
     }
     // store as EAT display buffer in process struct.
-    LocalFree(pProcess->os.win.pbDisplayCacheEAT);
-    if(!(pProcess->os.win.pbDisplayCacheEAT = LocalAlloc(0, cbBufferData))) { goto cleanup; }
-    memcpy(pProcess->os.win.pbDisplayCacheEAT, szBuffer, cbBufferData);
-    memcpy(pProcess->os.win.szDisplayCacheEAT, pModule->szName, 32);
-    pModule->cbDisplayBufferEAT = cbBufferData;
+    if(fLoadDisplayBuffer) {
+        LocalFree(pProcess->os.win.pbDisplayCacheEAT);
+        if(!(pProcess->os.win.pbDisplayCacheEAT = LocalAlloc(0, cbBufferData))) { goto cleanup; }
+        memcpy(pProcess->os.win.pbDisplayCacheEAT, szBuffer, cbBufferData);
+        memcpy(pProcess->os.win.szDisplayCacheEAT, pModule->szName, 32);
+        pModule->cbDisplayBufferEAT = cbBufferData;
+    }
 cleanup:
     LocalFree(pbExportDirectory);
     LocalFree(szBuffer);
 }
 
-VOID VmmProcWindows_PE_LoadIAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PVMM_PROCESS pProcess, _Inout_ PVMM_MODULEMAP_ENTRY pModule)
+VOID VmmProcWindows_PE_LoadIAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _Inout_ PVMM_PROCESS pProcess, _Inout_ PVMM_MODULEMAP_ENTRY pModule, _In_ BOOL fLoadDisplayBuffer, _Out_opt_ PVMMPROC_WINDOWS_IAT_ENTRY pIATs, _In_opt_ DWORD cIATs)
 {
     BYTE pbModuleHeader[0x1000];
     PIMAGE_NT_HEADERS64 ntHeader64;
@@ -225,6 +236,12 @@ VOID VmmProcWindows_PE_LoadIAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _Inout
                 if(!pIAT32[j]) { break; }
                 if(!pHNA32[j]) { break; }
                 fFnName = (pHNA32[j] < cbModule - 40);
+                // optionally store into caller supplied info struct
+                if(pIATs && (c < cIATs)) {
+                    pIATs[c].vaFunction = pIAT32[j];
+                    strncpy_s(pIATs[c].szFunction, 40, (fFnName ? (LPSTR)(pbModule + pHNA32[j] + 2) : ""), _TRUNCATE);
+                    strncpy_s(pIATs[c].szModule, 64, (LPSTR)(pbModule + pIID[i].Name), _TRUNCATE);
+                }
                 // store to buffer
                 cbBufferData += snprintf(
                     szBuffer + cbBufferData,
@@ -250,6 +267,12 @@ VOID VmmProcWindows_PE_LoadIAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _Inout
                 if(!pIAT64[j]) { break; }
                 if(!pHNA64[j]) { break; }
                 fFnName = (pHNA64[j] < cbModule - 40);
+                // optionally store into caller supplied info struct
+                if(pIATs && (c < cIATs)) {
+                    pIATs[c].vaFunction = pIAT64[j];
+                    strncpy_s(pIATs[c].szFunction, 40, (fFnName ? (LPSTR)(pbModule + pHNA64[j] + 2) : ""), _TRUNCATE);
+                    strncpy_s(pIATs[c].szModule, 64, (LPSTR)(pbModule + pIID[i].Name), _TRUNCATE);
+                }
                 // store to buffer
                 cbBufferData += snprintf(
                     szBuffer + cbBufferData,
@@ -267,57 +290,93 @@ VOID VmmProcWindows_PE_LoadIAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _Inout
         i++;
     }
     // store as IAT display buffer in process struct.
-    LocalFree(pProcess->os.win.pbDisplayCacheIAT);
-    if(!(pProcess->os.win.pbDisplayCacheIAT = LocalAlloc(0, cbBufferData))) { goto cleanup; }
-    memcpy(pProcess->os.win.pbDisplayCacheIAT, szBuffer, cbBufferData);
-    memcpy(pProcess->os.win.szDisplayCacheIAT, pModule->szName, 32);
-    pModule->cbDisplayBufferIAT = cbBufferData;
+    if(fLoadDisplayBuffer) {
+        LocalFree(pProcess->os.win.pbDisplayCacheIAT);
+        if(!(pProcess->os.win.pbDisplayCacheIAT = LocalAlloc(0, cbBufferData))) { goto cleanup; }
+        memcpy(pProcess->os.win.pbDisplayCacheIAT, szBuffer, cbBufferData);
+        memcpy(pProcess->os.win.szDisplayCacheIAT, pModule->szName, 32);
+        pModule->cbDisplayBufferIAT = cbBufferData;
+    }
 cleanup:
     LocalFree(pbModule);
     LocalFree(szBuffer);
 }
 
+WORD VmmProcWindows_PE_GetNumberOfSection(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Inout_ PVMM_MODULEMAP_ENTRY pModule, _In_opt_ PIMAGE_NT_HEADERS pbModuleHeaderOpt, _In_opt_ BOOL fHdr32)
+{
+    BYTE pbModuleHeader[0x1000];
+    PIMAGE_NT_HEADERS64 pNtHeader64;
+    PIMAGE_NT_HEADERS32 pNtHeader32;
+    // load both 32/64 bit ntHeader unless already supplied in parameter (only one of 32/64 bit hdr will be valid)
+    if(!(pNtHeader64 = pbModuleHeaderOpt ? pbModuleHeaderOpt : VmmProcWindows_GetVerifyHeaderPE(ctxVmm, pProcess, pModule->BaseAddress, pbModuleHeader, &fHdr32))) { return 0; }
+    pNtHeader32 = (PIMAGE_NT_HEADERS32)pNtHeader64;
+    // retrieve number of sections
+    return fHdr32 ? pNtHeader32->FileHeader.NumberOfSections : pNtHeader64->FileHeader.NumberOfSections;
+}
+
+DWORD VmmProcWindows_PE_GetNumberOfIAT(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Inout_ PVMM_MODULEMAP_ENTRY pModule, _In_opt_ PIMAGE_NT_HEADERS pbModuleHeaderOpt, _In_opt_ BOOL fHdr32)
+{
+    BYTE pbModuleHeader[0x1000];
+    PIMAGE_NT_HEADERS64 pNtHeader64;
+    PIMAGE_NT_HEADERS32 pNtHeader32;
+    DWORD cbImportDirectory, cbImportAddressTable, cIatEntries, cModules;
+    // load both 32/64 bit ntHeader unless already supplied in parameter (only one of 32/64 bit hdr will be valid)
+    if(!(pNtHeader64 = pbModuleHeaderOpt ? pbModuleHeaderOpt : VmmProcWindows_GetVerifyHeaderPE(ctxVmm, pProcess, pModule->BaseAddress, pbModuleHeader, &fHdr32))) { return 0; }
+    pNtHeader32 = (PIMAGE_NT_HEADERS32)pNtHeader64;
+    // Calculate the number of functions in the import address table (IAT).
+    // Number of functions = # IAT entries - # Imported modules
+    cbImportDirectory = fHdr32 ?
+        pNtHeader32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size :
+        pNtHeader64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size;
+    cbImportAddressTable = fHdr32 ?
+        pNtHeader32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT].Size :
+        pNtHeader64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT].Size;
+    cIatEntries = cbImportAddressTable / (fHdr32 ? sizeof(DWORD) : sizeof(QWORD));
+    cModules = cbImportDirectory / sizeof(IMAGE_IMPORT_DESCRIPTOR);
+    return cIatEntries - cModules;
+}
+
+DWORD VmmProcWindows_PE_GetNumberOfEAT(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Inout_ PVMM_MODULEMAP_ENTRY pModule, _In_opt_ PIMAGE_NT_HEADERS pbModuleHeaderOpt, _In_opt_ BOOL fHdr32)
+{
+    BYTE pbModuleHeader[0x1000];
+    PIMAGE_NT_HEADERS64 pNtHeader64;
+    PIMAGE_NT_HEADERS32 pNtHeader32;
+    QWORD va, vaExportDirectory;
+    IMAGE_EXPORT_DIRECTORY hdrExportDirectory;
+    // load both 32/64 bit ntHeader unless already supplied in parameter (only one of 32/64 bit hdr will be valid)
+    if(!(pNtHeader64 = pbModuleHeaderOpt ? pbModuleHeaderOpt : VmmProcWindows_GetVerifyHeaderPE(ctxVmm, pProcess, pModule->BaseAddress, pbModuleHeader, &fHdr32))) { return 0; }
+    pNtHeader32 = (PIMAGE_NT_HEADERS32)pNtHeader64;
+    // Calculate the number of functions in the export address table (EAT).
+    va = fHdr32 ?
+        pNtHeader32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress :
+        pNtHeader64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    vaExportDirectory = va ? pModule->BaseAddress + va : 0;
+    if(vaExportDirectory && VmmRead(ctxVmm, pProcess, vaExportDirectory, (PBYTE)&hdrExportDirectory, sizeof(IMAGE_EXPORT_DIRECTORY)) && (hdrExportDirectory.NumberOfNames < 0x00010000)) {
+        return hdrExportDirectory.NumberOfNames;
+    }
+    return 0;
+}
+
 VOID VmmProcWindows_PE_SetSizeSectionIATEAT_DisplayBuffer(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _Inout_ PVMM_MODULEMAP_ENTRY pModule)
 {
     BYTE pbModuleHeader[0x1000];
-    PIMAGE_NT_HEADERS64 ntHeader64;
-    PIMAGE_NT_HEADERS32 ntHeader32;
-    QWORD va, vaExportDirectory;
-    IMAGE_EXPORT_DIRECTORY hdrEAT[sizeof(IMAGE_EXPORT_DIRECTORY)];
+    PIMAGE_NT_HEADERS64 pNtHeaders64;
     BOOL fHdr32, fCalculateEAT, fCalculateIAT;
-    DWORD cbImportDirectory, cbImportAddressTable, c;
     // check if function is required
     fCalculateEAT = !(pModule->fLoadedEAT || pModule->fLoadedEAT_Prel);
-    fCalculateIAT = !(pModule->fLoadedEAT || pModule->fLoadedEAT_Prel);
+    fCalculateIAT = !(pModule->fLoadedIAT || pModule->fLoadedIAT_Prel);
     if(!fCalculateEAT && !fCalculateIAT) { return; }
     // load both 32/64 bit ntHeader (only one will be valid)
-    if(!(ntHeader64 = VmmProcWindows_GetVerifyHeaderPE(ctxVmm, pProcess, pModule->BaseAddress, pbModuleHeader, &fHdr32))) { return; }
-    ntHeader32 = (PIMAGE_NT_HEADERS32)ntHeader64;
-    // Retrieve ¤ sections and calculate display buffer size (ntHeader64 == ntHeader32 with regards to this)
-    pModule->cbDisplayBufferSections = ntHeader64->FileHeader.NumberOfSections * 52; // each display buffer human readable line = 52 bytes.
-    // Retrieve # functions in export address table (EAT) and calculate display buffer size
+    if(!(pNtHeaders64 = VmmProcWindows_GetVerifyHeaderPE(ctxVmm, pProcess, pModule->BaseAddress, pbModuleHeader, &fHdr32))) { return; }
+    // calculate display buffer size of: SECTIONS, EAT, IAT
+    pModule->cbDisplayBufferSections = VmmProcWindows_PE_GetNumberOfSection(ctxVmm, pProcess, pModule, pNtHeaders64, fHdr32) * 52;  // each display buffer human readable line == 52 bytes.
     if(fCalculateEAT) {
+        pModule->cbDisplayBufferEAT = VmmProcWindows_PE_GetNumberOfEAT(ctxVmm, pProcess, pModule, pNtHeaders64, fHdr32) * 64;       // each display buffer human readable line == 64 bytes.
         pModule->fLoadedEAT_Prel = TRUE;
-        va = fHdr32 ?
-            ntHeader32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress :
-            ntHeader64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-        vaExportDirectory = va ? pModule->BaseAddress + va : 0;
-        if(vaExportDirectory && VmmRead(ctxVmm, pProcess, vaExportDirectory, (PBYTE)&hdrEAT, sizeof(IMAGE_EXPORT_DIRECTORY)) && (hdrEAT->NumberOfFunctions < 0x00010000)) {
-            pModule->cbDisplayBufferEAT = hdrEAT->NumberOfFunctions * 64;   // each display buffer human readable line == 64 bytes.
-        }
     }
-    // Retrieve # functions in import address table (IAT) and calculate display buffer size
-    // Number of functions = # IAT entries - # Imported modules
     if(fCalculateIAT) {
+        pModule->cbDisplayBufferIAT = VmmProcWindows_PE_GetNumberOfEAT(ctxVmm, pProcess, pModule, pNtHeaders64, fHdr32) * 128;      // each display buffer human readable line == 128 bytes.
         pModule->fLoadedIAT_Prel = TRUE;
-        cbImportDirectory = fHdr32 ?
-            ntHeader32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size :
-            ntHeader64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size;
-        cbImportAddressTable = fHdr32 ?
-            ntHeader32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT].Size :
-            ntHeader64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IAT].Size;
-        c = (cbImportAddressTable / (fHdr32 ? sizeof(DWORD) : sizeof(QWORD))) - (cbImportDirectory / sizeof(IMAGE_IMPORT_DESCRIPTOR));
-        pModule->cbDisplayBufferIAT = c * 128;   // each display buffer human readable line == 128 bytes.
     }
 }
 

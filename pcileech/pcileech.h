@@ -7,6 +7,8 @@
 #define __PCILEECH_H__
 #include "oscompatibility.h"
 
+#define PCILEECH_VERSION_CURRENT            "3.5"
+
 #define SIZE_PAGE_ALIGN_4K(x)                ((x + 0xfff) & ~0xfff)
 #define CONFIG_MAX_SIGNATURES                16
 
@@ -44,7 +46,8 @@ typedef enum tdActionType {
     PT_VIRT2PHYS,
     TLP,
     PROBE,
-    IDENTIFY
+    IDENTIFY,
+    DLL_LIBRARY_USE
 } ACTION_TYPE;
 
 typedef enum tdPCILEECH_DEVICE_TYPE {
@@ -80,6 +83,8 @@ typedef struct tdDeviceConfig {
     BOOL(*pfnWriteTlp)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PBYTE pb, _In_ DWORD cb);
     BOOL(*pfnListenTlp)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ DWORD dwTime);
     VOID(*pfnClose)(_Inout_ PPCILEECH_CONTEXT ctx);
+    BOOL(*pfnGetOption)(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD fOption, _Out_ PQWORD pqwValue);
+    BOOL(*pfnSetOption)(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD fOption, _In_ QWORD qwValue);
 } DEVICE_CONFIG;
 
 typedef struct tdCONFIG_OPTION {
@@ -246,5 +251,9 @@ struct tdPCILEECH_CONTEXT {
     PKMDHANDLE phKMD;
     PKMDDATA pk;
 };
+
+BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEECH_CONTEXT ctx);
+VOID PCILeechConfigFixup(_Inout_ PPCILEECH_CONTEXT ctx);
+VOID PCILeechFreeContext(_Inout_ PPCILEECH_CONTEXT ctx);
 
 #endif /* __PCILEECH_H__ */

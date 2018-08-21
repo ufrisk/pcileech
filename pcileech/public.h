@@ -1,7 +1,7 @@
 /*
   Dokan : user-mode file system library for Windows
 
-  Copyright (C) 2015 - 2017 Adrien J. <liryna.stark@gmail.com> and Maxime C. <maxime@islog.com>
+  Copyright (C) 2015 - 2018 Adrien J. <liryna.stark@gmail.com> and Maxime C. <maxime@islog.com>
   Copyright (C) 2007 - 2011 Hiroki Asakawa <info@dokan-dev.net>
 
   http://dokan-dev.github.io
@@ -24,6 +24,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #ifndef DOKAN_MAJOR_API_VERSION
 #define DOKAN_MAJOR_API_VERSION L"1"
+#include <minwindef.h>
 #endif
 
 #define DOKAN_DRIVER_VERSION 0x0000190
@@ -66,6 +67,9 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define IOCTL_EVENT_MOUNTPOINT_LIST                                            \
   CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80D, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
+#define IOCTL_MOUNTPOINT_CLEANUP                                            \
+  CTL_CODE(FILE_DEVICE_UNKNOWN, 0x80E, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
 #define DRIVER_FUNC_INSTALL 0x01
 #define DRIVER_FUNC_REMOVE 0x02
 
@@ -89,6 +93,7 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #define DOKAN_SYNCHRONOUS_IO 64
 #define DOKAN_WRITE_TO_END_OF_FILE 128
 #define DOKAN_NOCACHE 256
+#define DOKAN_FILE_CHANGE_LAST_WRITE 512
 
 // used in DOKAN_START->DeviceType
 #define DOKAN_DISK_FILE_SYSTEM 0
@@ -357,16 +362,45 @@ typedef struct _EVENT_START {
   ULONG IrpTimeout;
 } EVENT_START, *PEVENT_START;
 
+#pragma warning(push)
+#pragma warning(disable : 4201)
 typedef struct _DOKAN_RENAME_INFORMATION {
-  BOOLEAN ReplaceIfExists;
+#if (_WIN32_WINNT >= _WIN32_WINNT_WIN10_RS1)
+	union {
+		BOOLEAN ReplaceIfExists;  // FileRenameInformation
+		ULONG Flags;              // FileRenameInformationEx
+	} DUMMYUNIONNAME;
+#else
+	BOOLEAN ReplaceIfExists;
+#endif
   ULONG FileNameLength;
   WCHAR FileName[1];
 } DOKAN_RENAME_INFORMATION, *PDOKAN_RENAME_INFORMATION;
+#pragma warning(pop)
 
 typedef struct _DOKAN_LINK_INFORMATION {
   BOOLEAN ReplaceIfExists;
   ULONG FileNameLength;
   WCHAR FileName[1];
 } DOKAN_LINK_INFORMATION, *PDOKAN_LINK_INFORMATION;
+
+/**
+* \struct DOKAN_CONTROL
+* \brief Dokan Control
+*/
+typedef struct _DOKAN_CONTROL {
+  /** File System Type */
+  ULONG Type;
+  /** Mount point. Can be "M:\" (drive letter) or "C:\mount\dokan" (path in NTFS) */
+  WCHAR MountPoint[MAX_PATH];
+  /** UNC name used for network volume */
+  WCHAR UNCName[64];
+  /** Disk Device Name */
+  WCHAR DeviceName[64];
+  /** Volume Device Object */
+  PVOID64 DeviceObject;
+  /** Session ID of calling process */
+  ULONG SessionId;
+} DOKAN_CONTROL, *PDOKAN_CONTROL;
 
 #endif // PUBLIC_H_

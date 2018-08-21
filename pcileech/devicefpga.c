@@ -824,6 +824,43 @@ BOOL DeviceFPGA_WriteTlp(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ PBYTE pbTlp
     return DeviceFPGA_TxTlp(ctx, pbTlp, cbTlp, FALSE, TRUE);
 }
 
+BOOL DeviceFPGA_GetOption(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD fOption, _Out_ PQWORD pqwValue)
+{
+    PDEVICE_CONTEXT_FPGA ctx = (PDEVICE_CONTEXT_FPGA)ctxPcileech->hDevice;
+    PDEVICE_PERFORMANCE perf = &ctx->perf;
+    if(!pqwValue) { return FALSE; }
+    if(fOption == DEVICE_OPT_FPGA_PROBE_MAXPAGES)       { *pqwValue = perf->PROBE_MAXPAGES;     return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_RX_FLUSH_LIMIT)       { *pqwValue = perf->RX_FLUSH_LIMIT;     return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_MAX_SIZE_RX)          { *pqwValue = perf->MAX_SIZE_RX;        return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_MAX_SIZE_TX)          { *pqwValue = perf->MAX_SIZE_TX;        return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_DELAY_PROBE_READ)     { *pqwValue = perf->DELAY_PROBE_READ;   return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_DELAY_PROBE_WRITE)    { *pqwValue = perf->DELAY_PROBE_WRITE;  return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_DELAY_WRITE)          { *pqwValue = perf->DELAY_WRITE;        return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_DELAY_READ)           { *pqwValue = perf->DELAY_READ;         return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_RETRY_ON_ERROR)       { *pqwValue = perf->RETRY_ON_ERROR;     return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_DEVICE_ID)            { *pqwValue = ctx->wDeviceId;           return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_FPGA_ID)              { *pqwValue = ctx->wFpgaID;             return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_VERSION_MAJOR)        { *pqwValue = ctx->wFpgaVersionMajor;   return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_VERSION_MINOR)        { *pqwValue = ctx->wFpgaVersionMinor;   return TRUE; }
+    return FALSE;
+}
+
+BOOL DeviceFPGA_SetOption(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD fOption, _In_ QWORD qwValue)
+{
+    PDEVICE_CONTEXT_FPGA ctx = (PDEVICE_CONTEXT_FPGA)ctxPcileech->hDevice;
+    PDEVICE_PERFORMANCE perf = &ctx->perf;
+    if(fOption == DEVICE_OPT_FPGA_PROBE_MAXPAGES)       { perf->PROBE_MAXPAGES = (DWORD)qwValue;    return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_RX_FLUSH_LIMIT)       { perf->RX_FLUSH_LIMIT = (DWORD)qwValue;    return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_MAX_SIZE_RX)          { perf->MAX_SIZE_RX = (DWORD)qwValue;       return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_MAX_SIZE_TX)          { perf->MAX_SIZE_TX = (DWORD)qwValue;       return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_DELAY_PROBE_READ)     { perf->DELAY_PROBE_READ = (DWORD)qwValue;  return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_DELAY_PROBE_WRITE)    { perf->DELAY_PROBE_WRITE = (DWORD)qwValue; return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_DELAY_WRITE)          { perf->DELAY_WRITE = (DWORD)qwValue;       return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_DELAY_READ)           { perf->DELAY_READ = (DWORD)qwValue;        return TRUE; }
+    if(fOption == DEVICE_OPT_FPGA_RETRY_ON_ERROR)       { perf->RETRY_ON_ERROR = qwValue ? 1 : 0;   return TRUE; }
+    return FALSE;
+}
+
 BOOL DeviceFPGA_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
 {
     LPSTR szDeviceError;
@@ -861,6 +898,8 @@ BOOL DeviceFPGA_Open(_Inout_ PPCILEECH_CONTEXT ctxPcileech)
     ctxPcileech->cfg->dev.pfnWriteDMA = DeviceFPGA_WriteDMA;
     ctxPcileech->cfg->dev.pfnWriteTlp = DeviceFPGA_WriteTlp;
     ctxPcileech->cfg->dev.pfnListenTlp = DeviceFPGA_ListenTlp;
+    ctxPcileech->cfg->dev.pfnGetOption = DeviceFPGA_GetOption;
+    ctxPcileech->cfg->dev.pfnSetOption = DeviceFPGA_SetOption;
     // return
     if(ctxPcileech->cfg->fVerbose) { 
         printf(

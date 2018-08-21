@@ -269,23 +269,23 @@ NTSTATUS VmmVfsReadFileDo(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PVMMVFS_PATH pPath
                     return VmmVfsReadFile_FromDWORD(pProcess->pModuleMap[i].SizeOfImage, pb, cb, pcbRead, cbOffset, FALSE);
                 }
                 if(!_stricmp(pPath->szPath3, "directories")) {
-                    VmmProcWindows_PE_DIRECTORY_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i, pbBuffer, 0x400, &cbBuffer);
+                    VmmProcWindows_PE_DIRECTORY_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i, pbBuffer, 0x400, &cbBuffer, NULL);
                     return VmmVfsReadFile_FromBuffer(pbBuffer, cbBuffer, pb, cb, pcbRead, cbOffset);
                 }
                 if(!_stricmp(pPath->szPath3, "export")) {
-                    VmmProcWindows_PE_LoadEAT_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i);
+                    VmmProcWindows_PE_LoadEAT_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i, TRUE, NULL, 0);
                     if(!memcmp(pProcess->os.win.szDisplayCacheEAT, pProcess->pModuleMap[i].szName, 32)) {
                         return VmmVfsReadFile_FromBuffer(pProcess->os.win.pbDisplayCacheEAT, pProcess->pModuleMap[i].cbDisplayBufferEAT, pb, cb, pcbRead, cbOffset);
                     }
                 }
                 if(!_stricmp(pPath->szPath3, "import")) {
-                    VmmProcWindows_PE_LoadIAT_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i);
+                    VmmProcWindows_PE_LoadIAT_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i, TRUE, NULL, 0);
                     if(!memcmp(pProcess->os.win.szDisplayCacheIAT, pProcess->pModuleMap[i].szName, 32)) {
                         return VmmVfsReadFile_FromBuffer(pProcess->os.win.pbDisplayCacheIAT, pProcess->pModuleMap[i].cbDisplayBufferIAT, pb, cb, pcbRead, cbOffset);
                     }
                 }
                 if(!_stricmp(pPath->szPath3, "sections")) {
-                    VmmProcWindows_PE_SECTION_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i, pbBuffer, 0x800, &cbBuffer);
+                    VmmProcWindows_PE_SECTION_DisplayBuffer(ctxVmm, pProcess, pProcess->pModuleMap + i, pbBuffer, 0x800, &cbBuffer, NULL);
                     return VmmVfsReadFile_FromBuffer(pbBuffer, cbBuffer, pb, cb, pcbRead, cbOffset);
                 }
                 return STATUS_FILE_INVALID;

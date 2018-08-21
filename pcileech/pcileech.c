@@ -47,6 +47,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
         {.tp = TLP,.sz = "tlp" },
         {.tp = PROBE,.sz = "probe" },
         {.tp = IDENTIFY,.sz = "identify" },
+        {.tp = DLL_LIBRARY_USE,.sz = "dll_library_use" },
     };
     DWORD j, i = 1;
     if(argc < 2) { return FALSE; }
