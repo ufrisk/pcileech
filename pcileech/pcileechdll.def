@@ -35,3 +35,5 @@ EXPORTS
 
     PCILeech_VmmConfigGet                 @26
     PCILeech_VmmConfigSet                 @27
+    
+    PCILeech_VmmVirt2Phys                 @28
