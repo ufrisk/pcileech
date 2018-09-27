@@ -72,23 +72,35 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)\pcileech_files\</OutDir>
     <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
+    <LibraryPath>$(SolutionDir)x64\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\parson;$(IncludePath)</IncludePath>
+    <SourcePath>$(SolutionDir)\parson;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">
     <OutDir>$(SolutionDir)\pcileech_files\dll\</OutDir>
     <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
     <TargetExt>.dll</TargetExt>
     <LinkIncremental>false</LinkIncremental>
+    <LibraryPath>$(SolutionDir)x64\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\parson;$(IncludePath)</IncludePath>
+    <SourcePath>$(SolutionDir)\parson;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">
     <OutDir>$(SolutionDir)\pcileech_files\dll\</OutDir>
     <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
     <TargetExt>.dll</TargetExt>
     <LinkIncremental>false</LinkIncremental>
+    <LibraryPath>$(SolutionDir)x64\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\parson;$(IncludePath)</IncludePath>
+    <SourcePath>$(SolutionDir)\parson;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)\pcileech_files\</OutDir>
     <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
     <LinkIncremental>false</LinkIncremental>
+    <LibraryPath>$(SolutionDir)x64\$(Configuration);$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)\parson;$(IncludePath)</IncludePath>
+    <SourcePath>$(SolutionDir)\parson;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -97,6 +109,7 @@
       <SDLCheck>true</SDLCheck>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalOptions>/D WIN32 %(AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>HAVE_STRUCT_TIMESPEC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <FullProgramDatabaseFile>
@@ -115,6 +128,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>/D WIN32 %(AdditionalOptions)</AdditionalOptions>
       <CompileAs>CompileAsC</CompileAs>
+      <PreprocessorDefinitions>HAVE_STRUCT_TIMESPEC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -212,8 +226,10 @@
     <ClInclude Include="vmm.h" />
     <ClInclude Include="vmmproc.h" />
     <ClInclude Include="vmmvfs.h" />
+    <ClInclude Include="webradar.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\parson\parson.c" />
     <ClCompile Include="device.c" />
     <ClCompile Include="device3380.c" />
     <ClCompile Include="device605_tcp.c" />
@@ -236,6 +252,7 @@
     <ClCompile Include="vmm.c" />
     <ClCompile Include="vmmproc.c" />
     <ClCompile Include="vmmvfs.c" />
+    <ClCompile Include="webradar.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Android.mk" />

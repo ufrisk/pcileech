@@ -1,0 +1,3 @@
+[submodule "parson"]
+	path = parson
+	url = https://github.com/kgabis/parson

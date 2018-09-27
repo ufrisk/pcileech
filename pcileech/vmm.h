@@ -346,6 +346,14 @@ VOID VmmMapDisplayBufferGenerate(_In_ PVMM_PROCESS pProcess);
 BOOL VmmProcessCreateTable(_In_ PVMM_CONTEXT ctxVmm);
 
 /*
+* Retrieve an existing process given a process name
+* -- ctxVmm
+* -- name
+* -- return = a process struct, or NULL if not found.
+*/
+PVMM_PROCESS VmmProcessGetByName(_In_ PVMM_CONTEXT ctxVmm, _In_ const char *name);
+
+/*
 * Retrieve an existing process given a process id (PID).
 * -- ctxVmm
 * -- dwPID

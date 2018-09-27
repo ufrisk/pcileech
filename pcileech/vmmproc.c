@@ -975,13 +975,13 @@ BOOL VmmProcWindows_EnumerateEPROCESS(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PRO
             break;
         }
         if(!VmmRead(ctxVmm, pSystemProcess, vaEPROCESS, pb, dwoMax)) {
-            break;
+			continue;
         }
         if(*pqwPML4 & 0xffffff0000000000) {
-            break;
+			continue;
         }
         if(0xffff000000000000 != (0xffff000000000003 & *pqwFLink)) {
-            break;
+			continue;
         }
     }
     VmmProcessCreateFinish(ctxVmm);

@@ -90,6 +90,9 @@
     <ClInclude Include="pcileech_dll.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="webradar.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.c">
@@ -156,6 +159,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="pcileech_dll.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="webradar.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\parson\parson.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

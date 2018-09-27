@@ -47,7 +47,8 @@ typedef enum tdActionType {
     TLP,
     PROBE,
     IDENTIFY,
-    DLL_LIBRARY_USE
+    DLL_LIBRARY_USE,
+	CSGO_WEBRADAR
 } ACTION_TYPE;
 
 typedef enum tdPCILEECH_DEVICE_TYPE {

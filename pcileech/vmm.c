@@ -251,6 +251,24 @@ PBYTE VmmTlbGetPageTable(_In_ PVMM_CONTEXT ctxVmm, _In_ QWORD qwPA, _In_ BOOL fC
     return pDMA->pb;
 }
 
+PVMM_PROCESS VmmProcessGetByName(_In_ PVMM_CONTEXT ctxVmm, _In_ const char *name)
+{
+	DWORD i, iStart;
+	i = iStart = 0;
+	while (TRUE) {
+		if (ctxVmm->ptPROC->M[i] && ctxVmm->ptPROC->M[i]->dwState == 0)
+		{
+			if (!_strnicmp(ctxVmm->ptPROC->M[i]->szName, name, sizeof(ctxVmm->ptPROC->M[i]->szName)))
+			{
+				return ctxVmm->ptPROC->M[i];
+			}
+		}
+
+		if (++i == VMM_PROCESSTABLE_ENTRIES_MAX) { i = 0; }
+		if (i == iStart) { return NULL; }
+	}
+}
+
 PVMM_PROCESS VmmProcessGetEx(_In_ PVMM_PROCESS_TABLE pt, _In_ DWORD dwPID)
 {
     DWORD i, iStart;

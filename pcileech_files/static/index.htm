@@ -1,0 +1,150 @@
+<html>
+<head>
+<title>WebRadar by Skyfail</title>
+</head>
+<body style="width:100%;height:100%;overflow:hidden;margin-left:0;margin-top:0;">
+<img src="/static/bg_idle.png" style="width:100%;height:100%;position:absolute;" id="mapimg"></img>
+<canvas id="drawCanvas" style="width:100%;height:100%;position:absolute;z-index:10000;"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="/static/vdf.js"></script>
+<script>
+
+var currentMap = '';
+var currentMapData = {};
+
+function onMapChange(newMapName) {
+	currentMap = newMapName;
+	
+	if(newMapName.length <= 1) {
+		$('#mapimg').attr('src', '/static/bg_idle.png');
+		
+		var c = document.getElementById("drawCanvas");
+		var context = c.getContext("2d");
+		context.clearRect(0, 0, c.width, c.height);
+		context.fillStyle = 'white';
+		context.font = "64px Arial";
+		context.fillText("Not connected", 70, 70);
+	}
+	else {
+		console.log('Map changed to: ' + newMapName);
+		$('#mapimg').attr('src', '/static/' + newMapName + '_radar.png');
+		
+		$.ajax('/static/' + newMapName + '.txt', {async: false}).done(function(data){
+			currentMapData = VDF.parse(data);
+		});
+	}
+}
+
+function WorldToRadar(x, y) {
+	var c = document.getElementById("drawCanvas");
+	
+	x -= parseFloat(currentMapData[currentMap]['pos_x']);
+	y -= parseFloat(currentMapData[currentMap]['pos_y']);
+	
+	var scale = parseFloat(currentMapData[currentMap]['scale']);
+	x /= scale;
+	y /= scale;
+	x /= 1024.0;
+	y /= 1024.0;
+	
+	y *= -1.0;
+
+	x *= c.width;
+	y *= c.height;
+	
+	return { x: x, y: y };
+}
+
+$(document).ready(function(){
+
+	var canvas = document.getElementById('drawCanvas');
+	canvas.width = 2560;
+	canvas.height = 1440;
+	
+	onMapChange('');
+
+	setInterval(function(){
+		/*if(!document.hasFocus()) {
+			return;
+		}*/
+		
+		$.ajax('/info', {async: false}).done(function(data){
+			try {
+				if(currentMap != data.map) {
+					onMapChange(data.map);
+				}
+				
+				if(data.map.length > 1 && typeof(data.players) !== 'undefined' && data.players !== null && data.players.length > 0) {
+					var c = document.getElementById("drawCanvas");
+					var context = c.getContext("2d");
+					
+					// clear image
+					context.clearRect(0, 0, c.width, c.height);
+					
+					var localIndex = 0;
+					var localTeam = 0;
+					
+					for(var i = 0; i < data.players.length; i++) {
+						if(data.players[i].local) {
+							localIndex = i;
+							localTeam = data.players[i].team;
+							break;
+						}
+					}
+										
+					for(var i = 0; i < data.players.length; i++) {
+						
+						if(!data.players[i].alive) {
+							continue;
+						}
+						
+						var coords = WorldToRadar(parseFloat(data.players[i].origin_x), parseFloat(data.players[i].origin_y));
+						var coordsForward = WorldToRadar(parseFloat(data.players[i].forward_x), parseFloat(data.players[i].forward_y));
+						
+						var enemy = data.players[i].team != localTeam ? true : false;
+						
+						context.save();
+						
+						// Draw player dot
+						context.beginPath();
+						context.fillStyle = enemy ? 'red' : 'green';
+						context.arc(coords.x, coords.y, 16, 0, 2 * Math.PI);
+						context.fill();
+						context.stroke();
+						
+						// Draw view direction
+						context.strokeStyle = enemy ? 'red' : 'green';
+						context.beginPath();
+						context.moveTo(coords.x, coords.y);
+						context.lineWidth = 5;
+						context.lineTo(coordsForward.x, coordsForward.y);
+						context.stroke();
+						
+						// Draw health
+						var barWidth = 80;
+						
+						context.beginPath();
+						context.strokeRect(coords.x - 40, coords.y + 25, 80, 10);
+						context.fillRect(coords.x - 40, coords.y + 25, data.players[i].health * barWidth / 100.0, 10);
+						
+						// Draw name
+						context.restore();
+						context.save();
+						context.fillStyle = 'white';
+						context.font = "32px Arial";
+						var textMeasure = context.measureText(data.players[i].name);
+						context.fillText(data.players[i].name, coords.x - textMeasure.width / 2, coords.y);
+						context.restore();
+					}
+				}
+			}
+			catch(e) { 
+				console.log(e);
+			}
+		});
+	}, 100);
+});
+</script>
+</body>
+</html>

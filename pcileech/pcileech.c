@@ -16,6 +16,7 @@
 #include "vfs.h"
 #include "vmm.h"
 #include "vmmproc.h"
+#include "webradar.h"
 
 BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEECH_CONTEXT ctx)
 {
@@ -48,6 +49,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
         {.tp = PROBE,.sz = "probe" },
         {.tp = IDENTIFY,.sz = "identify" },
         {.tp = DLL_LIBRARY_USE,.sz = "dll_library_use" },
+		{.tp = CSGO_WEBRADAR , .sz = "webradar" }
     };
     DWORD j, i = 1;
     if(argc < 2) { return FALSE; }
@@ -283,7 +285,9 @@ int main(_In_ int argc, _In_ char* argv[])
             return 1;
         }
     }
-    if(ctx->cfg->tpAction == DUMP) {
+	if (ctx->cfg->tpAction == CSGO_WEBRADAR) {
+		ActionWebRadar(ctx);
+	} else if(ctx->cfg->tpAction == DUMP) {
         ActionMemoryDump(ctx);
     } else if(ctx->cfg->tpAction == WRITE) {
         ActionMemoryWrite(ctx);
