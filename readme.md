@@ -24,7 +24,15 @@ Afterwards you have to complete the following installation steps:
  - Open a webbrowser on any device in the same network and navigate to http://ip-of-attacker:8008/
  - If you can't connect, make sure to run pcileech as Administrator
 
+ 
+**Security considerations**
 
+Current known detection vectors for anti cheats and fixes are:
+
+ - Vendor-/DeviceId of the FPGA Device -> build the firmware yourself and randomize the Device ID (instructions for the SP-605 can be found [here](https://github.com/ufrisk/pcileech-fpga/blob/master/sp605_ft601/build.md))
+ - The webserver for the webradar -> setup Windows Firewall on the computer that runs pcileech to reject connections from the target PC.
+
+ 
 **Issues**
 
  - Currently the setup is not always stable, you might need to restart the game and/or pcileech several times for it to work
