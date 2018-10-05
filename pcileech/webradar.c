@@ -408,6 +408,11 @@ VOID ActionWebRadar(_Inout_ PPCILEECH_CONTEXT ctx)
 		if (pEngineDll == 0 || pClientDll == 0)
 		{
 			// Modules not loaded yet
+
+			VmmCacheClear(ctxVmm, TRUE, TRUE);
+			LeaveCriticalSection(&ctxVmm->MasterLock);
+			Sleep(5000);
+			EnterCriticalSection(&ctxVmm->MasterLock);
 			continue;
 		}
 
