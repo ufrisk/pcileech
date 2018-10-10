@@ -1,3 +1,6 @@
 [submodule "parson"]
 	path = parson
 	url = https://github.com/kgabis/parson
+[submodule "pcileech_files/hazedumper"]
+	path = pcileech_files/hazedumper
+	url = https://github.com/frk1/hazedumper
