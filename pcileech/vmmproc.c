@@ -495,7 +495,7 @@ BOOL VmmProcWindows_ScanLdrModules32(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROC
         pModule->SizeOfImage = (DWORD)pLdrModule32->SizeOfImage;
         pModule->fWoW64 = TRUE;
         if(pLdrModule32->FullDllName.Length) {
-            if(!VmmReadString_Unicode2Ansi(ctxVmm, pProcess, (QWORD)pLdrModule32->BaseDllName.Buffer, pModule->szName, min(31, pLdrModule32->BaseDllName.Length))) { break; }
+			VmmReadString_Unicode2Ansi(ctxVmm, pProcess, (QWORD)pLdrModule32->BaseDllName.Buffer, pModule->szName, min(31, pLdrModule32->BaseDllName.Length));
         }
         if(fVerboseExtra) {
             printf("vmmproc.c!VmmProcWindows_ScanLdrModules32: %08x %08x %08x %08x %s\n", vaModuleLdr32, pModule->BaseAddress, pModule->EntryPoint, pModule->SizeOfImage, pModule->szName);
