@@ -187,13 +187,13 @@ DWORD WINAPI WebServerThread(LPVOID param)
 		response.Headers.KnownHeaders[HttpHeaderServer].pRawValue = "SkyfailWebRadar";
 		response.Headers.KnownHeaders[HttpHeaderServer].RawValueLength = strlen("SkyfailWebRadar");
 
-		if (!_stricmp(req->pRawUrl, "/"))
+		if (strcmp(req->pRawUrl, "/") == 0)
 		{
 			req->pRawUrl = "/static/index.htm";
 			req->RawUrlLength = strlen("/static/index.htm");
 		}
 
-		if (strstr(req->pRawUrl, "/info") == req->pRawUrl + req->RawUrlLength - strlen("/info")) // crank logic
+		if (strcmp(req->pRawUrl, "/info") == 0)
 		{
 			// Serialize response data
 			JSON_Value *root_value = json_value_init_object();
@@ -252,10 +252,10 @@ DWORD WINAPI WebServerThread(LPVOID param)
 
 			json_value_free(root_value);
 		}
-		else if (strstr(req->pRawUrl, "/static/"))
+		else if (strncmp(req->pRawUrl, "/static/", strlen("/static/")) == 0)
 		{
-			char *file = strstr(req->pRawUrl, "/static/") + strlen("/static/");
-			if (file >= req->pRawUrl + req->RawUrlLength || strstr(file, "..") || strstr(file, "\\") || strstr(file, "/"))
+			char *file = req->pRawUrl + strlen("/static/");
+			if (file[0] == 0 || strstr(file, "..") != NULL || strpbrk(file, "/\\") != NULL)
 			{
 				response.StatusCode = 500;
 				response.pReason = "Internal server error";
@@ -289,7 +289,7 @@ DWORD WINAPI WebServerThread(LPVOID param)
 				}
 				else
 				{
-					char *extension = strstr(file, "."); //yes actually it'd be the last dot but who cares
+					char *extension = strrchr(file, '.');
 					if (extension == NULL || extension >= file + strlen(file))
 					{
 						extension = "txt";
