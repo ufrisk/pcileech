@@ -76,7 +76,7 @@ BOOL WINAPI ControlHandler(DWORD signal)
 			g_webRadarWSThread
 		};
 
-		WaitForMultipleObjects(ARRAYSIZE(events), &events, TRUE, 5000);
+		WaitForMultipleObjects(ARRAYSIZE(events), (const HANDLE *)&events, TRUE, 5000);
 
 		for (int i = 0u; i < ARRAYSIZE(events); i++)
 		{
@@ -188,12 +188,12 @@ DWORD WINAPI WebServerThread(LPVOID param)
 
 		// Add default headers
 		response.Headers.KnownHeaders[HttpHeaderServer].pRawValue = "SkyfailWebRadar";
-		response.Headers.KnownHeaders[HttpHeaderServer].RawValueLength = strlen("SkyfailWebRadar");
+		response.Headers.KnownHeaders[HttpHeaderServer].RawValueLength = (USHORT)strlen("SkyfailWebRadar");
 
 		if (strcmp(req->pRawUrl, "/") == 0)
 		{
 			req->pRawUrl = "/static/index.htm";
-			req->RawUrlLength = strlen("/static/index.htm");
+			req->RawUrlLength = (USHORT)strlen("/static/index.htm");
 		}
 
 		if (strcmp(req->pRawUrl, "/info") == 0)
@@ -239,7 +239,7 @@ DWORD WINAPI WebServerThread(LPVOID param)
 			json_object_set_value(root_object, "players", playersVal);
 
 			serializedString = json_serialize_to_string_pretty(root_value);
-			ULONG serializedLen = strlen(serializedString);
+			ULONG serializedLen = (USHORT)strlen(serializedString);
 		
 			// Add response data
 			dataChunk.DataChunkType = HttpDataChunkFromMemory;
@@ -247,7 +247,7 @@ DWORD WINAPI WebServerThread(LPVOID param)
 			dataChunk.FromMemory.BufferLength = serializedLen;
 
 			response.Headers.KnownHeaders[HttpHeaderContentType].pRawValue = contentType;
-			response.Headers.KnownHeaders[HttpHeaderContentType].RawValueLength = strlen(contentType);
+			response.Headers.KnownHeaders[HttpHeaderContentType].RawValueLength = (USHORT)strlen(contentType);
 			status = HttpSendHttpResponse(reqQueueHandle, req->RequestId, 0, &response, 0, NULL, NULL, 0, NULL, NULL);
 
 			// Make sure to free previously allocated memory
@@ -257,7 +257,7 @@ DWORD WINAPI WebServerThread(LPVOID param)
 		}
 		else if (strncmp(req->pRawUrl, "/static/", strlen("/static/")) == 0)
 		{
-			char *file = req->pRawUrl + strlen("/static/");
+			const char *file = req->pRawUrl + strlen("/static/");
 			if (file[0] == 0 || strstr(file, "..") != NULL || strpbrk(file, "/\\") != NULL)
 			{
 				response.StatusCode = 500;
@@ -265,7 +265,7 @@ DWORD WINAPI WebServerThread(LPVOID param)
 
 				dataChunk.DataChunkType = HttpDataChunkFromMemory;
 				dataChunk.FromMemory.pBuffer = "Internal server error";
-				dataChunk.FromMemory.BufferLength = strlen("Internal server error");
+				dataChunk.FromMemory.BufferLength = (USHORT)strlen("Internal server error");
 
 				status = HttpSendHttpResponse(reqQueueHandle, req->RequestId, 0, &response, 0, NULL, NULL, 0, NULL, NULL);
 			}
@@ -286,7 +286,7 @@ DWORD WINAPI WebServerThread(LPVOID param)
 
 					dataChunk.DataChunkType = HttpDataChunkFromMemory;
 					dataChunk.FromMemory.pBuffer = "404 Not Found";
-					dataChunk.FromMemory.BufferLength = strlen("404 Not Found");
+					dataChunk.FromMemory.BufferLength = (USHORT)strlen("404 Not Found");
 
 					status = HttpSendHttpResponse(reqQueueHandle, req->RequestId, 0, &response, 0, NULL, NULL, 0, NULL, NULL);
 				}
@@ -308,7 +308,7 @@ DWORD WINAPI WebServerThread(LPVOID param)
 					dataChunk.FromFileHandle.ByteRange.Length.QuadPart = (ULONGLONG)GetFileSize(dataChunk.FromFileHandle.FileHandle, NULL);
 
 					response.Headers.KnownHeaders[HttpHeaderContentType].pRawValue = contentType;
-					response.Headers.KnownHeaders[HttpHeaderContentType].RawValueLength = strlen(contentType);
+					response.Headers.KnownHeaders[HttpHeaderContentType].RawValueLength = (USHORT)strlen(contentType);
 					status = HttpSendHttpResponse(reqQueueHandle, req->RequestId, 0, &response, 0, NULL, NULL, 0, NULL, NULL);
 
 					CloseHandle(dataChunk.FromFileHandle.FileHandle);
@@ -497,7 +497,7 @@ VOID ActionWebRadar(_Inout_ PPCILEECH_CONTEXT ctx)
 		{
 			EntityInfo *ent = &entities[i];
 
-			DWORD entityBase = pClientDll + offsets.GO_EntityList + (i * 0x10);
+			DWORD entityBase = (DWORD)pClientDll + offsets.GO_EntityList + (i * 0x10);
 			VmmRead(ctxVmm, targetProcess, entityBase, (PBYTE)&entityBase, sizeof(entityBase));
 
 			if (entityBase == 0)
