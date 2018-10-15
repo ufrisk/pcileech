@@ -230,6 +230,7 @@ DWORD WINAPI WebServerThread(LPVOID param)
 				json_object_set_number(player, "viewangle_x", (double)ent->viewAngles[0]);
 				json_object_set_number(player, "viewangle_y", (double)ent->viewAngles[1]);
 				json_object_set_string(player, "name", ent->name);
+				json_object_set_number(player, "index", (double)i);
 
 				json_array_append_value(players, playerValue);
 			}
@@ -391,11 +392,15 @@ VOID ActionWebRadar(_Inout_ PPCILEECH_CONTEXT ctx)
 	QWORD pEngineDll = 0;
 	QWORD pClientDll = 0;
 
+	BOOLEAN readSuccess = TRUE;
+
 	EnterCriticalSection(&ctxVmm->MasterLock);
 
 	while (!g_webRadarExit)
 	{
 		Sleep(10);
+
+		DWORD64 now = GetTickCount64();
 
 		// Get target process
 		if (targetProcess == NULL)
@@ -454,13 +459,19 @@ VOID ActionWebRadar(_Inout_ PPCILEECH_CONTEXT ctx)
 			continue;
 		}
 
+		if (!readSuccess)
+		{
+			printf("[WebRadar by Skyfail] Read failed, flushing TLB cache\n");
+		}
+
 		// Clear memory cache
 		// Maybe use VmmReadEx with VMM_FLAG_NOCACHE, but this way it allows us to be lazy about
 		// memory reading as pages will be cached by pcileech, causing no device communication to
 		// be required when doing multiple small reads instead of one big
 		// Example: read(entity + 0x50) + read(entity + 0x100) does not have to be
 		// combined
-		VmmCacheClear(ctxVmm, FALSE, TRUE);
+		VmmCacheClear(ctxVmm, !readSuccess, TRUE);
+		readSuccess = TRUE;
 
 		// Read data
 	
@@ -488,8 +499,8 @@ VOID ActionWebRadar(_Inout_ PPCILEECH_CONTEXT ctx)
 		}
 
 		DWORD dwPlayerinfo = *(DWORD*)(&clientStateBuffer[offsets.GO_ClientState_PlayerInfo]);
-		VmmRead(ctxVmm, targetProcess, dwPlayerinfo + 0x40, (PBYTE)&dwPlayerinfo, sizeof(dwPlayerinfo));
-		VmmRead(ctxVmm, targetProcess, dwPlayerinfo + 0xC, (PBYTE)&dwPlayerinfo, sizeof(dwPlayerinfo));
+		readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, dwPlayerinfo + 0x40, (PBYTE)&dwPlayerinfo, sizeof(dwPlayerinfo));
+		readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, dwPlayerinfo + 0xC, (PBYTE)&dwPlayerinfo, sizeof(dwPlayerinfo));
 
 		unsigned int localPlayer = *(unsigned int *)(&clientStateBuffer[offsets.GO_ClientState_LocalPlayer]);
 
@@ -498,7 +509,7 @@ VOID ActionWebRadar(_Inout_ PPCILEECH_CONTEXT ctx)
 			EntityInfo *ent = &entities[i];
 
 			DWORD entityBase = (DWORD)pClientDll + offsets.GO_EntityList + (i * 0x10);
-			VmmRead(ctxVmm, targetProcess, entityBase, (PBYTE)&entityBase, sizeof(entityBase));
+			readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, entityBase, (PBYTE)&entityBase, sizeof(entityBase));
 
 			if (entityBase == 0)
 			{
@@ -516,12 +527,12 @@ VOID ActionWebRadar(_Inout_ PPCILEECH_CONTEXT ctx)
 			{
 				ent->local = 0;
 
-				VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_AngEyeAngle, (PBYTE)&ent->viewAngles, sizeof(ent->viewAngles)); // use angEyeAngle netvar
+				readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_AngEyeAngle, (PBYTE)&ent->viewAngles, sizeof(ent->viewAngles)); // use angEyeAngle netvar
 			}
 
 			unsigned char isDormant = 0;
-			VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_Lifestate, (PBYTE)&ent->lifestate, sizeof(ent->lifestate));
-			VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_Dormant, (PBYTE)&isDormant, sizeof(isDormant));
+			readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_Lifestate, (PBYTE)&ent->lifestate, sizeof(ent->lifestate));
+			readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_Dormant, (PBYTE)&isDormant, sizeof(isDormant));
 
 			if (isDormant)
 			{
@@ -532,13 +543,13 @@ VOID ActionWebRadar(_Inout_ PPCILEECH_CONTEXT ctx)
 
 			ent->valid = 1;
 
-			VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_Team, (PBYTE)&ent->team, sizeof(ent->team));
-			VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_Health, (PBYTE)&ent->health, sizeof(ent->health));
-			VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_Origin, (PBYTE)&ent->origin, sizeof(ent->origin));
+			readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_Team, (PBYTE)&ent->team, sizeof(ent->team));
+			readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_Health, (PBYTE)&ent->health, sizeof(ent->health));
+			readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, entityBase + offsets.GO_Origin, (PBYTE)&ent->origin, sizeof(ent->origin));
 
 			DWORD dwPlayerInfoEntry = 0;
-			VmmRead(ctxVmm, targetProcess, dwPlayerinfo + 0x28 + i * 0x34, (PBYTE)&dwPlayerInfoEntry, sizeof(dwPlayerInfoEntry));
-			VmmRead(ctxVmm, targetProcess, dwPlayerInfoEntry + 0x10, (PBYTE)&ent->name, sizeof(ent->name) - 1);
+			readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, dwPlayerinfo + 0x28 + i * 0x34, (PBYTE)&dwPlayerInfoEntry, sizeof(dwPlayerInfoEntry));
+			readSuccess = readSuccess && VmmRead(ctxVmm, targetProcess, dwPlayerInfoEntry + 0x10, (PBYTE)&ent->name, sizeof(ent->name) - 1);
 
 			// quick maths
 			float forward[3];
