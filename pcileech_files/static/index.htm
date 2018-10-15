@@ -63,6 +63,7 @@ $(document).ready(function(){
 	canvas.height = 1440;
 	
 	onMapChange('');
+	var lastPositions = {};
 
 	setInterval(function(){
 		/*if(!document.hasFocus()) {
@@ -92,9 +93,8 @@ $(document).ready(function(){
 							break;
 						}
 					}
-										
+					
 					for(var i = 0; i < data.players.length; i++) {
-						
 						if(!data.players[i].alive) {
 							continue;
 						}
@@ -103,6 +103,13 @@ $(document).ready(function(){
 						var coordsForward = WorldToRadar(parseFloat(data.players[i].forward_x), parseFloat(data.players[i].forward_y));
 						
 						var enemy = data.players[i].team != localTeam ? true : false;
+						
+						// Basic interpolation
+						if(typeof(lastPositions[data.players[i].index]) !== 'undefined') {
+							var oldPosition = lastPositions[data.players[i].index];
+							coords.x = oldPosition.x + (coords.x - oldPosition.x) / 2;
+							coords.y = oldPosition.y + (coords.y - oldPosition.y) / 2;
+						}
 						
 						context.save();
 						
@@ -136,6 +143,8 @@ $(document).ready(function(){
 						var textMeasure = context.measureText(data.players[i].name);
 						context.fillText(data.players[i].name, coords.x - textMeasure.width / 2, coords.y);
 						context.restore();
+						
+						lastPositions[data.players[i].index] = coords;
 					}
 				}
 			}
