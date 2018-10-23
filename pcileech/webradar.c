@@ -365,7 +365,7 @@ VOID ActionWebRadar(_Inout_ PPCILEECH_CONTEXT ctx)
 	offsets.GO_ClientState_PlayerInfo = (DWORD)json_object_get_number(signatures, "dwClientState_PlayerInfo");
 
 	offsets.GO_Lifestate = (DWORD)json_object_get_number(netvars, "m_lifeState");
-	offsets.GO_AngEyeAngle = 0xB260;
+	offsets.GO_AngEyeAngle = 0xB274;
 	offsets.GO_Dormant = 0xE9;
 	offsets.GO_Team = (DWORD)json_object_get_number(netvars, "m_iTeamNum");
 	offsets.GO_Health = (DWORD)json_object_get_number(netvars, "m_iHealth");
