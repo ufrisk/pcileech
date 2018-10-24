@@ -36,7 +36,7 @@ Current known detection vectors for anti cheats and fixes are:
 **Issues**
 
  - Currently the setup is not always stable, you might need to restart the game and/or pcileech several times for it to work
- - Memory offsets for CS:GO need to be adjusted in the source code (webradar.c) after every game update
+ - ~~Memory offsets for CS:GO need to be adjusted in the source code (webradar.c) after every game update~~ **Update: pcileech-webradar now includes offsets dumped with Hazedumper as a submodule**
  - The HTTP Server code is written very hasty and dirty because I wanted to implement websockets first but gave up
  - If you notice any other issues, please report them :)
 
