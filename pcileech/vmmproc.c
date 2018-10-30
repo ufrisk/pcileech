@@ -375,7 +375,7 @@ VOID VmmProcWindows_PE_SetSizeSectionIATEAT_DisplayBuffer(_Inout_ PVMM_CONTEXT c
         pModule->fLoadedEAT_Prel = TRUE;
     }
     if(fCalculateIAT) {
-        pModule->cbDisplayBufferIAT = VmmProcWindows_PE_GetNumberOfEAT(ctxVmm, pProcess, pModule, pNtHeaders64, fHdr32) * 128;      // each display buffer human readable line == 128 bytes.
+        pModule->cbDisplayBufferIAT = VmmProcWindows_PE_GetNumberOfIAT(ctxVmm, pProcess, pModule, pNtHeaders64, fHdr32) * 128;      // each display buffer human readable line == 128 bytes.
         pModule->fLoadedIAT_Prel = TRUE;
     }
 }
@@ -799,7 +799,7 @@ BOOL VmmProcWindows_OffsetLocatorEPROCESS(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM
     DWORD i;
     QWORD va1, vaPEB, paPEB;
     BYTE pb0[VMMPROC_EPROCESS_MAX_SIZE], pb1[VMMPROC_EPROCESS_MAX_SIZE], pbPage[0x1000], pbZero[0x800];
-    QWORD paMaxNative, paPML4_0, paPML4_1;
+    QWORD paMax, paPML4_0, paPML4_1;
     if(!VmmRead(ctxVmm, pSystemProcess, pSystemProcess->os.win.vaEPROCESS, pb0, 0x500)) { return FALSE; }
     if(ctxVmm->ctxPcileech->cfg->fVerboseExtra) {
         printf("vmmproc.c!VmmProcWindows_OffsetLocatorEPROCESS: %016llx %016llx\n", pSystemProcess->paPML4, pSystemProcess->os.win.vaEPROCESS);
@@ -873,21 +873,21 @@ BOOL VmmProcWindows_OffsetLocatorEPROCESS(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM
     }
     if(!f) { return FALSE; }
     // find "optional" offset for user cr3/pml4 (post meltdown only)
+    // System have an entry pointing to a shadow PML4 which has empty user part
+    // smss.exe do not have an entry since it's running as admin ...
     *dwoPML4_User = 0;
     ZeroMemory(pbZero, 0x800);
-    paMaxNative = ctxVmm->ctxPcileech->cfg->dev.qwAddrMaxNative;
+    paMax = ctxVmm->ctxPcileech->cfg->qwAddrMax;
     for(i = *pdwoPML4 + 8; i < VMMPROC_EPROCESS_MAX_SIZE - 8; i += 8) {
-        paPML4_0 = *(PQWORD)(pb0 + i);
-        paPML4_1 = *(PQWORD)(pb1 + i);
-        f = (paPML4_0 & 0xfff) ||
-            (paPML4_1 & 0xfff) ||
-            (paPML4_0 > paMaxNative) ||
-            (paPML4_1 > paMaxNative) ||
-            !VmmReadPhysicalPage(ctxVmm, paPML4_0, pbPage) ||
-            memcmp(pbPage, pbZero, 0x800) ||
-            !VmmTlbPageTableVerify(ctxVmm, pbPage, paPML4_0, TRUE) ||
-            !VmmReadPhysicalPage(ctxVmm, paPML4_1, pbPage) ||
-            !VmmTlbPageTableVerify(ctxVmm, pbPage, paPML4_1, TRUE);
+        paPML4_0 = *(PQWORD)(pb0 + i);  // EPROCESS entry item of System
+        paPML4_1 = *(PQWORD)(pb1 + i);  // EPROCESS entry item of smss.exe
+        f = (paPML4_1 != 0);
+        f = f || (paPML4_0 == 0);
+        f = f || (paPML4_0 & 0xfff);
+        f = f || (paPML4_0 >= paMax);
+        f = f || !VmmReadPhysicalPage(ctxVmm, paPML4_0, pbPage);
+        f = f || memcmp(pbPage, pbZero, 0x800);
+        f = f || !VmmTlbPageTableVerify(ctxVmm, pbPage, paPML4_0, TRUE);
         if(!f) {
             *dwoPML4_User = i;
             break;

@@ -176,10 +176,14 @@ v3.3
 
 v3.4
 * Memory Process File System - runtime tunables in .config directory - allows for disabling of caching and adjusting refresh periods.
-* Various bug fixes
+* Various bug fixes.
 
 v3.5
 * PCILeech DLL released.
 * Update of Dokany header files.
 * Faster FPGA initialization time.
-* Various bug fixes
+* Various bug fixes.
+
+v3.6
+* Various bug fixes (including 'missing dlls' issue).
+* Additional functionality exported from DLL.

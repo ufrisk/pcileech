@@ -9,6 +9,7 @@
 
 #ifndef __PCILEECH_DLL_H__
 #define __PCILEECH_DLL_H__
+#ifdef _WINDLL
 
 #include <windows.h>
 
@@ -50,6 +51,13 @@ BOOL PCILeech_InitializeFromFile(_In_ LPSTR szFileName, _In_opt_ LPSTR szPageTab
 BOOL PCILeech_InitializeFPGA(_In_opt_ LPSTR szMaxPhysicalAddressOpt, _In_opt_ LPSTR szPageTableBaseOpt);
 
 /*
+* Intiailize PCILeech from a the "Total Meltdown" CVE-2018-1038 vulnerability.
+* initialized in read/write mode upon success.
+* -- return = success/fail.
+*/
+BOOL PCILeech_InitializeTotalMeltdown();
+
+/*
 * Initialize PCIleech from a USB3380 device. The functionality of a USB3380
 * device is limited to DMA in the 32-bit physical address space below 4GB.
 * As such the USB3380 cannot be used together with the VMM functionality.
@@ -68,23 +76,35 @@ BOOL PCILeech_InitializeUSB3380();
 BOOL PCILeech_Close();
 
 /*
+* For internal use only - do not use!
+*/
+BOOL PCILeech_InitializeInternalReserved(_In_ DWORD argc, _In_ char* argv[]);
+
+/*
 * Device specific options used together with the PCILeech_DeviceGetOption and
 * PCILeech_DeviceSetOption functions. For more detailed information check the
 * sources for the individual device types.
 */
-#define PCILEECH_DEVICE_OPT_FPGA_PROBE_MAXPAGES          1   // RW
-#define PCILEECH_DEVICE_OPT_FPGA_RX_FLUSH_LIMIT          2   // RW
-#define PCILEECH_DEVICE_OPT_FPGA_MAX_SIZE_RX             3   // RW
-#define PCILEECH_DEVICE_OPT_FPGA_MAX_SIZE_TX             4   // RW
-#define PCILEECH_DEVICE_OPT_FPGA_DELAY_PROBE_READ        5   // RW uS
-#define PCILEECH_DEVICE_OPT_FPGA_DELAY_PROBE_WRITE       6   // RW uS
-#define PCILEECH_DEVICE_OPT_FPGA_DELAY_WRITE             7   // RW uS
-#define PCILEECH_DEVICE_OPT_FPGA_DELAY_READ              8   // RW uS
-#define PCILEECH_DEVICE_OPT_FPGA_RETRY_ON_ERROR          9   // RW
-#define PCILEECH_DEVICE_OPT_FPGA_DEVICE_ID              80   // R
-#define PCILEECH_DEVICE_OPT_FPGA_FPGA_ID                81   // R
-#define PCILEECH_DEVICE_OPT_FPGA_VERSION_MAJOR          82   // R
-#define PCILEECH_DEVICE_OPT_FPGA_VERSION_MINOR          83   // R
+#define PCILEECH_DEVICE_OPT_FPGA_PROBE_MAXPAGES           0x01   // RW
+#define PCILEECH_DEVICE_OPT_FPGA_RX_FLUSH_LIMIT           0x02   // RW
+#define PCILEECH_DEVICE_OPT_FPGA_MAX_SIZE_RX              0x03   // RW
+#define PCILEECH_DEVICE_OPT_FPGA_MAX_SIZE_TX              0x04   // RW
+#define PCILEECH_DEVICE_OPT_FPGA_DELAY_PROBE_READ         0x05   // RW uS
+#define PCILEECH_DEVICE_OPT_FPGA_DELAY_PROBE_WRITE        0x06   // RW uS
+#define PCILEECH_DEVICE_OPT_FPGA_DELAY_WRITE              0x07   // RW uS
+#define PCILEECH_DEVICE_OPT_FPGA_DELAY_READ               0x08   // RW uS
+#define PCILEECH_DEVICE_OPT_FPGA_RETRY_ON_ERROR           0x09   // RW
+#define PCILEECH_DEVICE_OPT_FPGA_DEVICE_ID                0x80   // R
+#define PCILEECH_DEVICE_OPT_FPGA_FPGA_ID                  0x81   // R
+#define PCILEECH_DEVICE_OPT_FPGA_VERSION_MAJOR            0x82   // R
+#define PCILEECH_DEVICE_OPT_FPGA_VERSION_MINOR            0x83   // R
+
+#define PCILEECH_DEVICE_CORE_PRINTF_ENABLE          0x80000001   // RW
+#define PCILEECH_DEVICE_CORE_VERBOSE                0x80000002   // RW
+#define PCILEECH_DEVICE_CORE_VERBOSE_EXTRA          0x80000003   // RW
+#define PCILEECH_DEVICE_CORE_VERBOSE_EXTRA_TLP      0x80000004   // RW
+#define PCILEECH_DEVICE_CORE_MAX_NATIVE_ADDRESS     0x80000005   // R
+#define PCILEECH_DEVICE_CORE_MAX_NATIVE_IOSIZE      0x80000006   // R
 
 /*
 * Set a device specific option value. Please see defines PCILEECH_DEVICE_OPT_*
@@ -104,8 +124,72 @@ BOOL PCIleech_DeviceConfigGet(_In_ ULONG64 fOption, _Out_ PULONG64 pqwValue);
 * -- qwValue
 * -- return = success/fail.
 */
-BOOL PCILeech_DeviceConfigSet(ULONG64 fOption, _In_ ULONG64 qwValue);
+BOOL PCILeech_DeviceConfigSet(_In_ ULONG64 fOption, _In_ ULONG64 qwValue);
 
+/*
+* Write target physical memory. Minimum granularity: byte.
+* -- qwAddr = the physical address to write to in the target system.
+* -- pb = bytes to write
+* -- cb = number of bytes to write.
+* -- return = success/fail.
+*/
+BOOL PCILeech_DeviceWriteMEM(_In_ ULONG64 qwAddr, _In_ PBYTE pb, _In_ DWORD cb);
+
+/*
+* Read target physical memory. Minimum granularity: page (4kB).
+* -- qwAddr = physical address in target system to read.
+* -- pb = pre-allocated buffer to place result in.
+* -- cb = length of data to read, must not be larger than pb.
+* -- return = success/fail.
+*/
+BOOL PCILeech_DeviceReadMEM(_In_ ULONG64 qwAddr, _Out_ PBYTE pb, _In_ DWORD cb);
+
+typedef struct tdPCILEECH_MEM_IO_SCATTER_HEADER {
+	ULONG64 qwA;            // base address (DWORD boundry).
+	DWORD cbMax;            // bytes to read (DWORD boundry, max 0x1000); pbResult must have room for this.
+	DWORD cb;               // bytes read into result buffer.
+    PBYTE pb;               // ptr to 0x1000 sized buffer to receive read bytes.
+	PVOID pvReserved1;      // reserved for use by caller.
+	PVOID pvReserved2;      // reserved for use by caller.
+    struct {
+        PVOID pvReserved1;
+        PVOID pvReserved2;
+        BYTE pbReserved[32];
+    } sReserved;            // reserved for future use.
+} PCILEECH_MEM_IO_SCATTER_HEADER, *PPCILEECH_MEM_IO_SCATTER_HEADER, **PPPCILEECH_MEM_IO_SCATTER_HEADER;
+
+/*
+* Read memory in various non-contigious locations specified by the pointers to
+* the items in the ppDMAs array. Result for each unit of work will be given
+* individually. No upper limit of number of items to read, but no performance
+* boost will be given if above hardware limit. Max size of each unit of work is
+* one 4k page (4096 bytes).
+* -- ppMEMs = array of scatter read headers.
+* -- cpMEMs = count of ppDMAs.
+* -- pcpDMAsRead = optional count of number of successfully read ppDMAs.
+* -- return = the number of successfully read items.
+*/
+DWORD PCILeech_DeviceReadScatterMEM(_Inout_ PPPCILEECH_MEM_IO_SCATTER_HEADER ppMEMs, _In_ DWORD cpMEMs);
+
+/*
+* Initialize the Virtual Memory Manager (VMM). This will try to auto-identify
+* the operating system, parse and enumerate its processes in order to make it
+* available through the PCILeech_VMM* functions.
+* If auto-identifying of a Windows sytem fails please try initialize PCILeech
+* with the address of the kernel page table in the szPageTableBaseOpt parameter
+* in a call to the PCIleech_Initialize* functions. The page table base may be
+* obtained (sometimes) from pcileech.exe by running the identify command.
+* -- return = success/fail.
+*/
+BOOL PCILeech_VmmInitialize();
+
+/*
+* Close the Virtual Memory Manager (VMM) and clean up resources. This must be
+* done before PCILeech_VmmInitialize() is called again. This is not necessary
+* if PCILeech is completely closed by a call to PCILeech_Close() - which will
+* take care of all necessary cleanup activitities.
+*/
+BOOL PCILeech_VmmClose();
 
 #define PCILEECH_VMM_CONFIG_IS_REFRESH_ENABLED          1   // read-only, 1/0
 #define PCILEECH_VMM_CONFIG_TICK_PERIOD                 2   // read-write, base tick period in ms
@@ -131,46 +215,6 @@ BOOL PCILeech_VmmConfigGet(_In_ DWORD dwConfigOption, _Out_ PDWORD pdwConfigValu
 * -- return = success/fail.
 */
 BOOL PCILeech_VmmConfigSet(_In_ DWORD dwConfigOption, _In_ DWORD dwConfigValue);
-
-/*
-* Write target physical memory. Minimum granularity: byte.
-* -- qwAddr = the physical address to write to in the target system.
-* -- pb = bytes to write
-* -- cb = number of bytes to write.
-* -- return = success/fail.
-*/
-BOOL PCILeech_DeviceWriteMEM(_In_ ULONG64 qwAddr, _In_ PBYTE pb, _In_ DWORD cb);
-
-/*
-* Read target physical memory. Minimum granularity: page (4kB).
-* -- qwAddr = physical address in target system to read.
-* -- pb = pre-allocated buffer to place result in.
-* -- cb = length of data to read, must not be larger than pb.
-* -- return = success/fail.
-*/
-BOOL PCILeech_DeviceReadMEM(_In_ ULONG64 qwAddr, _Out_ PBYTE pb, _In_ DWORD cb);
-
-
-
-/*
-* Initialize the Virtual Memory Manager (VMM). This will try to auto-identify
-* the operating system, parse and enumerate its processes in order to make it
-* available through the PCILeech_VMM* functions.
-* If auto-identifying of a Windows sytem fails please try initialize PCILeech
-* with the address of the kernel page table in the szPageTableBaseOpt parameter
-* in a call to the PCIleech_Initialize* functions. The page table base may be
-* obtained (sometimes) from pcileech.exe by running the identify command.
-* -- return = success/fail.
-*/
-BOOL PCILeech_VmmInitialize();
-
-/*
-* Close the Virtual Memory Manager (VMM) and clean up resources. This must be
-* done before PCILeech_VmmInitialize() is called again. This is not necessary
-* if PCILeech is completely closed by a call to PCILeech_Close() - which will
-* take care of all necessary cleanup activitities.
-*/
-BOOL PCILeech_VmmClose();
 
 // FLAG used to supress the default read cache in calls to PCILeech_VmmReadEx()
 // which will lead to the read being fetched from the target system always.
@@ -357,4 +401,5 @@ BOOL PCIleech_VmmProcess_GetIAT(_In_ DWORD dwPID, _In_ LPSTR szModule, _Out_ PPC
 }
 #endif /* __cplusplus */
 
+#endif /* _WINDLL */
 #endif /* __PCILEECH_DLL_H__ */
