@@ -13,6 +13,7 @@
 #include <Windows.h>
 #include <stdio.h>
 #include <conio.h>
+#define _WINDLL
 #include "pcileech_dll.h"
 
 #pragma comment(lib, "pcileech")
@@ -226,6 +227,7 @@ int main(_In_ int argc, _In_ char* argv[])
     // some processes.
     ULONG64 cMemMapEntries;
     PPCILEECH_VMM_MEMMAP_ENTRY pMemMapEntries;
+    ShowKeyPress();
     printf("CALL:    PCILeech_VmmProcessGetMemoryMap #1\n");
     result = PCILeech_VmmProcessGetMemoryMap(dwPID, NULL, &cMemMapEntries, TRUE);
     if(result) {
@@ -273,6 +275,7 @@ int main(_In_ int argc, _In_ char* argv[])
     // memory map may use alternative parsing techniques to list DLLs.
     ULONG64 cModules;
     PPCILEECH_VMM_MODULEMAP_ENTRY pModules;
+    ShowKeyPress();
     printf("CALL:    PCILeech_VmmProcessGetModuleMap #1\n");
     result = PCILeech_VmmProcessGetModuleMap(dwPID, NULL, &cModules);
     if(result) {
@@ -357,6 +360,7 @@ int main(_In_ int argc, _In_ char* argv[])
     // List the sections from the module of crypt32.dll.
     DWORD cSections;
     PIMAGE_SECTION_HEADER pSectionHeaders;
+    ShowKeyPress();
     printf("CALL:    PCIleech_VmmProcess_GetSections #1\n");
     result = PCIleech_VmmProcess_GetSections(dwPID, "crypt32.dll", NULL, 0, &cSections);
     if(result) {
@@ -401,6 +405,7 @@ int main(_In_ int argc, _In_ char* argv[])
     LPCSTR DIRECTORIES[16] = { "EXPORT", "IMPORT", "RESOURCE", "EXCEPTION", "SECURITY", "BASERELOC", "DEBUG", "ARCHITECTURE", "GLOBALPTR", "TLS", "LOAD_CONFIG", "BOUND_IMPORT", "IAT", "DELAY_IMPORT", "COM_DESCRIPTOR", "RESERVED" };
     DWORD cDirectories;
     IMAGE_DATA_DIRECTORY pDirectories[16];
+    ShowKeyPress();
     printf("CALL:    PCIleech_VmmProcess_GetDirectories\n");
     result = PCIleech_VmmProcess_GetDirectories(dwPID, "crypt32.dll", pDirectories, 16, &cDirectories);
     if(result) {
@@ -425,6 +430,7 @@ int main(_In_ int argc, _In_ char* argv[])
     // Retrieve the export address table (EAT) of crypt32.dll
     DWORD cEATs;
     PPCILEECH_VMM_EAT_ENTRY pEATs;
+    ShowKeyPress();
     printf("CALL:    PCIleech_VmmProcess_GetEAT #1\n");
     result = PCIleech_VmmProcess_GetEAT(dwPID, "crypt32.dll", NULL, 0, &cEATs);
     if(result) {
@@ -462,6 +468,7 @@ int main(_In_ int argc, _In_ char* argv[])
     // Retrieve the import address table (IAT) of crypt32.dll
     DWORD cIATs;
     PPCILEECH_VMM_IAT_ENTRY pIATs;
+    ShowKeyPress();
     printf("CALL:    PCIleech_VmmProcess_GetIAT #1\n");
     result = PCIleech_VmmProcess_GetIAT(dwPID, "crypt32.dll", NULL, 0, &cIATs);
     if(result) {
@@ -497,6 +504,9 @@ int main(_In_ int argc, _In_ char* argv[])
     }
 
 
-
+    // Exit the test program.
+    printf("!!! EXIT !!! \n");
+    ShowKeyPress();
+    PCILeech_Close();
     return 0;
 }
