@@ -933,6 +933,7 @@ VOID VmmReadEx(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWO
     PDMA_IO_SCATTER_HEADER pDMAs, *ppDMAs;
     QWORD i, oVA;
     if(pcbReadOpt) { *pcbReadOpt = 0; }
+    if(!cb) { return; }
     cDMAs = (DWORD)(((qwVA & 0xfff) + cb + 0xfff) >> 12);
     pbBuffer = (PBYTE)LocalAlloc(LMEM_ZEROINIT, 0x2000 + cDMAs * (sizeof(DMA_IO_SCATTER_HEADER) + sizeof(PDMA_IO_SCATTER_HEADER)));
     if(!pbBuffer) { return; }

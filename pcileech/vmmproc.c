@@ -424,9 +424,8 @@ VOID VmmProcWindows_ScanLdrModules64(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROC
         pModule->EntryPoint = (QWORD)pLdrModule->EntryPoint;
         pModule->SizeOfImage = (DWORD)pLdrModule->SizeOfImage;
         pModule->fWoW64 = FALSE;
-        if(pLdrModule->FullDllName.Length) {
-            if(!VmmReadString_Unicode2Ansi(ctxVmm, pProcess, (QWORD)pLdrModule->BaseDllName.Buffer, pModule->szName, min(31, pLdrModule->BaseDllName.Length))) { break; }
-        }
+        if(!pLdrModule->BaseDllName.Length) { break; }
+        if(!VmmReadString_Unicode2Ansi(ctxVmm, pProcess, (QWORD)pLdrModule->BaseDllName.Buffer, pModule->szName, min(31, pLdrModule->BaseDllName.Length))) { break; }
         *fWow64 = *fWow64 || !memcmp(pModule->szName, "wow64.dll", 10);
         if(fVerboseExtra) {
             printf("vmmproc.c!VmmProcWindows_ScanLdrModules: %016llx %016llx %016llx %08x %i %s\n", vaModuleLdr, pModule->BaseAddress, pModule->EntryPoint, pModule->SizeOfImage, (pModule->fWoW64 ? 1 : 0), pModule->szName);
@@ -494,9 +493,8 @@ BOOL VmmProcWindows_ScanLdrModules32(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROC
         pModule->EntryPoint = (QWORD)pLdrModule32->EntryPoint;
         pModule->SizeOfImage = (DWORD)pLdrModule32->SizeOfImage;
         pModule->fWoW64 = TRUE;
-        if(pLdrModule32->FullDllName.Length) {
-            if(!VmmReadString_Unicode2Ansi(ctxVmm, pProcess, (QWORD)pLdrModule32->BaseDllName.Buffer, pModule->szName, min(31, pLdrModule32->BaseDllName.Length))) { break; }
-        }
+        if(!pLdrModule32->BaseDllName.Length) { break; }
+        if(!VmmReadString_Unicode2Ansi(ctxVmm, pProcess, (QWORD)pLdrModule32->BaseDllName.Buffer, pModule->szName, min(31, pLdrModule32->BaseDllName.Length))) { break; }
         if(fVerboseExtra) {
             printf("vmmproc.c!VmmProcWindows_ScanLdrModules32: %08x %08x %08x %08x %s\n", vaModuleLdr32, pModule->BaseAddress, pModule->EntryPoint, pModule->SizeOfImage, pModule->szName);
         }
