@@ -10,6 +10,8 @@
 #include "vmm.h"
 #include "vmmproc.h"
 
+#ifdef _WINDLL
+
 // ----------------------------------------------------------------------------
 // Synchronization macro below. The VMM isn't thread safe so it's important to
 // serialize access to it over the VMM MasterLock. This master lock is shared
@@ -42,6 +44,7 @@ PPCILEECH_DLL_CONTEXT g_ctx = NULL;
 BOOL WINAPI DllMain(_In_ HINSTANCE hinstDLL, _In_ DWORD fdwReason, _In_ LPVOID lpvReserved)
 {
     if((fdwReason == DLL_PROCESS_ATTACH) && !g_ctx) {
+        g_pcileech_dll_printf_enabled = FALSE;
         g_ctx = LocalAlloc(LMEM_ZEROINIT, sizeof(PCILEECH_DLL_CONTEXT));
         if(!g_ctx) { return FALSE; }
     }
@@ -81,40 +84,38 @@ BOOL PCILeech_InitializeFromFile(_In_ LPSTR szFileName, _In_opt_ LPSTR szPageTab
     }
 }
 
-BOOL PCILeech_InitializeUSB3380()
+BOOL PCILeech_InitializeInternalReserved(_In_ DWORD argc, _In_ char* argv[])
 {
     BOOL result = FALSE;
     if(!g_ctx || g_ctx->ctxPcileech) { return FALSE; }
     g_ctx->ctxPcileech = LocalAlloc(LMEM_ZEROINIT, sizeof(PCILEECH_CONTEXT));
     if(!g_ctx->ctxPcileech) { return FALSE; }
-    result = PCILeechConfigIntialize(4, (LPSTR[]) { "", "dll_library_use", "-device", "usb3380" }, g_ctx->ctxPcileech);
+    result = PCILeechConfigIntialize(argc, argv, g_ctx->ctxPcileech);
     result = result && DeviceOpen(g_ctx->ctxPcileech);
     if(result) {
         PCILeechConfigFixup(g_ctx->ctxPcileech);
         return TRUE;
-    } else {
+    }
+    else {
         LocalFree(g_ctx->ctxPcileech);
         g_ctx->ctxPcileech = NULL;
         return FALSE;
     }
 }
 
+BOOL PCILeech_InitializeUSB3380()
+{
+    return PCILeech_InitializeInternalReserved(4, (LPSTR[]) { "", "dll_library_use", "-device", "usb3380" });
+}
+
 BOOL PCILeech_InitializeFPGA(_In_opt_ LPSTR szMaxPhysicalAddressOpt, _In_opt_ LPSTR szPageTableBaseOpt)
 {
-    BOOL result = FALSE;
-    if(!g_ctx || g_ctx->ctxPcileech) { return FALSE; }
-    g_ctx->ctxPcileech = LocalAlloc(LMEM_ZEROINIT, sizeof(PCILEECH_CONTEXT));
-    if(!g_ctx->ctxPcileech) { return FALSE; }
-    result = PCILeechConfigIntialize(8, (LPSTR[]){ "", "dll_library_use", "-device", "fpga", "-max", (szMaxPhysicalAddressOpt ? szMaxPhysicalAddressOpt : "0x0000008000000000"), "-cr3", (szPageTableBaseOpt ? szPageTableBaseOpt : "0")}, g_ctx->ctxPcileech);
-    result = result && DeviceOpen(g_ctx->ctxPcileech);
-    if(result) {
-        PCILeechConfigFixup(g_ctx->ctxPcileech);
-        return TRUE;
-    } else {
-        LocalFree(g_ctx->ctxPcileech);
-        g_ctx->ctxPcileech = NULL;
-        return FALSE;
-    }
+    return PCILeech_InitializeInternalReserved(8, (LPSTR[]) { "", "dll_library_use", "-device", "fpga", "-max", (szMaxPhysicalAddressOpt ? szMaxPhysicalAddressOpt : "0x0000008000000000"), "-cr3", (szPageTableBaseOpt ? szPageTableBaseOpt : "0") });
+}
+
+BOOL PCILeech_InitializeTotalMeltdown()
+{
+    return PCILeech_InitializeInternalReserved(4, (LPSTR[]) { "", "dll_library_use", "-device", "totalmeltdown" });
 }
 
 BOOL PCILeech_Close()
@@ -137,15 +138,65 @@ BOOL PCILeech_DeviceReadMEM(_In_ ULONG64 qwAddr, _Out_ PBYTE pb, _In_ DWORD cb)
     return DeviceReadMEM(g_ctx->ctxPcileech, qwAddr, pb, cb, 0);
 }
 
+DWORD PCILeech_DeviceReadScatterMEM(_Inout_ PPPCILEECH_MEM_IO_SCATTER_HEADER ppMEMs, _In_ DWORD cpMEMs)
+{
+	DWORD cpMEMsRead = 0;
+	if (!g_ctx || !g_ctx->ctxPcileech) { return FALSE; }
+	return DeviceReadScatterDMA(g_ctx->ctxPcileech, (PPDMA_IO_SCATTER_HEADER)ppMEMs, cpMEMs, &cpMEMsRead) ? cpMEMsRead : 0;
+}
+
 BOOL PCIleech_DeviceConfigGet(_In_ ULONG64 fOption, _Out_ PULONG64 pqwValue)
 {
-    if(!g_ctx || !g_ctx->ctxPcileech) { return FALSE; }
+    if(!g_ctx || !g_ctx->ctxPcileech || !pqwValue) { return FALSE; }
+    if(fOption & 0x80000000) {
+        switch(fOption) {
+            case PCILEECH_DEVICE_CORE_PRINTF_ENABLE:
+                *pqwValue = g_pcileech_dll_printf_enabled ? 1 : 0;
+                return TRUE;
+            case PCILEECH_DEVICE_CORE_VERBOSE:
+                *pqwValue = g_ctx->ctxPcileech->cfg->fVerbose ? 1 : 0;
+                return TRUE;
+            case PCILEECH_DEVICE_CORE_VERBOSE_EXTRA:
+                *pqwValue = g_ctx->ctxPcileech->cfg->fVerboseExtra ? 1 : 0;
+                return TRUE;
+            case PCILEECH_DEVICE_CORE_VERBOSE_EXTRA_TLP:
+                *pqwValue = g_ctx->ctxPcileech->cfg->fVerboseExtraTlp ? 1 : 0;
+                return TRUE;
+            case PCILEECH_DEVICE_CORE_MAX_NATIVE_ADDRESS:
+                *pqwValue = g_ctx->ctxPcileech->cfg->dev.qwAddrMaxNative;
+                return TRUE;
+            case PCILEECH_DEVICE_CORE_MAX_NATIVE_IOSIZE:
+                *pqwValue = g_ctx->ctxPcileech->cfg->dev.qwMaxSizeDmaIo;
+                return TRUE;
+            default:
+                return FALSE;
+        }
+    }
     return DeviceGetOption(g_ctx->ctxPcileech, fOption, pqwValue);
 }
 
-BOOL PCILeech_DeviceConfigSet(ULONG64 fOption, _In_ ULONG64 qwValue)
+BOOL PCILeech_DeviceConfigSet(_In_ ULONG64 fOption, _In_ ULONG64 qwValue)
 {
+    if(fOption == PCILEECH_DEVICE_CORE_PRINTF_ENABLE) {
+        g_pcileech_dll_printf_enabled = qwValue ? TRUE : FALSE;
+        return TRUE;
+    }
     if(!g_ctx || !g_ctx->ctxPcileech) { return FALSE; }
+    if(fOption & 0x80000000) {
+        switch(fOption) {
+            case PCILEECH_DEVICE_CORE_VERBOSE:
+                g_ctx->ctxPcileech->cfg->fVerbose = qwValue ? TRUE : FALSE;
+                return TRUE;
+            case PCILEECH_DEVICE_CORE_VERBOSE_EXTRA:
+                g_ctx->ctxPcileech->cfg->fVerboseExtra = qwValue ? TRUE : FALSE;
+                return TRUE;
+            case PCILEECH_DEVICE_CORE_VERBOSE_EXTRA_TLP:
+                g_ctx->ctxPcileech->cfg->fVerboseExtraTlp = qwValue ? TRUE : FALSE;
+                return TRUE;
+            default:
+                return FALSE;
+        }
+    }
     return DeviceSetOption(g_ctx->ctxPcileech, fOption, qwValue);
 }
 
@@ -532,3 +583,5 @@ BOOL PCIleech_VmmProcess_GetIAT(_In_ DWORD dwPID, _In_ LPSTR szModule, _Out_ PPC
 {
     CALL_SYNCHRONIZED_IMPLEMENTATION_VMM(PCILeech_VmmProcessGet_Directories_Sections_IAT_EAT_Impl(dwPID, szModule, cData, pcData, NULL, NULL, NULL, pData, FALSE, FALSE, FALSE, TRUE))
 }
+
+#endif /* _WINDLL */

@@ -35,5 +35,9 @@ EXPORTS
 
     PCILeech_VmmConfigGet                 @26
     PCILeech_VmmConfigSet                 @27
-    
+
     PCILeech_VmmVirt2Phys                 @28
+
+    PCILeech_DeviceReadScatterMEM         @29
+    PCILeech_InitializeTotalMeltdown      @30
+    PCILeech_InitializeInternalReserved   @31

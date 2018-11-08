@@ -191,31 +191,24 @@ PDMA_IO_SCATTER_HEADER VmmCacheGet_FromDeviceOnMiss(_In_ PVMM_CONTEXT ctxVmm, _I
 
 /*
 * Tries to verify that a loaded page table is correct. If just a bit strange
-* it bytes supplied in pb will be altered to look better.
-*
+* bytes/ptes supplied in pb will be altered to look better.
 */
 BOOL VmmTlbPageTableVerify(_Inout_opt_ PVMM_CONTEXT ctxVmm, _Inout_ PBYTE pb, _In_ QWORD pa, _In_ BOOL fSelfRefReq)
 {
     DWORD i;
-    QWORD *ptes, c = 0, pte;
-    BOOL fBad = FALSE, fSelfRef = FALSE;
+    QWORD *ptes, c = 0, pte, paMax;
+    BOOL fSelfRef = FALSE;
     if(!pb) { return FALSE; }
     ptes = (PQWORD)pb;
+    paMax = ctxVmm ? ctxVmm->ctxPcileech->cfg->qwAddrMax : 0x000000ffffffffff; // if ctxVmm does not exist use 1TB memory limit
     for(i = 0; i < 512; i++) {
         pte = *(ptes + i);
-        if(0xffff800000000000 == (0xffff800000000000 & pte)) {
-            // likely a kernel virtual address or similar, this is probably
-            // not a page table page - clear it completely and leave it in
-            // cache to not allow for stupid reloads.
-            fBad = TRUE;
-            break;
-        }
-        if((pte & 0x01) && (0x0000fc0000000000 & pte)) {
-            // A bad PTE, or memory allocated above 4TB (which is unlikely)
-            // this may be just trash in the page table in which case we
-            // clear this faulty entry. If too may bad PTEs are found this
+        if((pte & 0x01) && ((0x000fffffffffffff & pte) > paMax)) {
+            // A bad PTE, or memory allocated above the physical address max
+            // limit. This may be just trash in the page table in which case
+            // we clear this faulty entry. If too may bad PTEs are found this
             // is most probably not a page table - zero it out but let it
-            // remain in cache to prevent performande degrading reloads...
+            // remain in cache to prevent performance degrading reloads...
             if(ctxVmm && ctxVmm->ctxPcileech->cfg->fVerboseExtra) {
                 printf("VMM: vmm.c!VmmTlbPageTableVerify: BAD PTE %016llx at PA: %016llx i: %i\n", *(ptes + i), pa, i);
             }
@@ -227,7 +220,7 @@ BOOL VmmTlbPageTableVerify(_Inout_opt_ PVMM_CONTEXT ctxVmm, _Inout_ PBYTE pb, _I
             fSelfRef = TRUE;
         }
     }
-    if(fBad || (c > 16) || (fSelfRefReq && !fSelfRef)) {
+    if((c > 16) || (fSelfRefReq && !fSelfRef)) {
         if(ctxVmm && ctxVmm->ctxPcileech->cfg->fVerboseExtra) {
             printf("VMM: vmm.c!VmmTlbPageTableVerify: BAD PT PAGE at PA: %016llx\n", pa);
         }
@@ -958,6 +951,7 @@ VOID VmmReadEx(_Inout_ PVMM_CONTEXT ctxVmm, _In_ PVMM_PROCESS pProcess, _In_ QWO
     PDMA_IO_SCATTER_HEADER pDMAs, *ppDMAs;
     QWORD i, oVA;
     if(pcbReadOpt) { *pcbReadOpt = 0; }
+    if(!cb) { return; }
     cDMAs = (DWORD)(((qwVA & 0xfff) + cb + 0xfff) >> 12);
     pbBuffer = (PBYTE)LocalAlloc(LMEM_ZEROINIT, 0x2000 + cDMAs * (sizeof(DMA_IO_SCATTER_HEADER) + sizeof(PDMA_IO_SCATTER_HEADER)));
     if(!pbBuffer) { return; }

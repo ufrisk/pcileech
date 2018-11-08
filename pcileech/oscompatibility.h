@@ -21,7 +21,8 @@
 #pragma comment (lib, "bcrypt.lib")
 
 #ifdef _WINDLL
-#define printf(format, ...) {}      // No printf output in DLL mode
+BOOL g_pcileech_dll_printf_enabled;
+#define printf(format, ...)     { if(g_pcileech_dll_printf_enabled) { printf_s(format, ##__VA_ARGS__); } }
 #endif /* _WINDLL */
 
 typedef unsigned __int64                    QWORD, *PQWORD;

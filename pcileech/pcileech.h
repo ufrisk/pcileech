@@ -7,7 +7,7 @@
 #define __PCILEECH_H__
 #include "oscompatibility.h"
 
-#define PCILEECH_VERSION_CURRENT            "3.5"
+#define PCILEECH_VERSION_CURRENT            "3.6.2"
 
 #define SIZE_PAGE_ALIGN_4K(x)                ((x + 0xfff) & ~0xfff)
 #define CONFIG_MAX_SIGNATURES                16
@@ -61,12 +61,17 @@ typedef enum tdPCILEECH_DEVICE_TYPE {
 } PCILEECH_DEVICE_TYPE;
 
 typedef struct tdDMA_IO_SCATTER_HEADER {
-    QWORD qwA;              // base address (DWORD boundry).
+    ULONG64 qwA;            // base address (DWORD boundry).
     DWORD cbMax;            // bytes to read (DWORD boundry, max 0x1000); pbResult must have room for this.
     DWORD cb;               // bytes read into result buffer.
+    PBYTE pb;               // ptr to 0x1000 sized buffer to receive read bytes.
     PVOID pvReserved1;      // reserved for use by caller.
     PVOID pvReserved2;      // reserved for use by caller.
-    PBYTE pb;               // ptr to 0x1000 sized buffer to receive read bytes.
+    struct {
+        PVOID pvReserved1;
+        PVOID pvReserved2;
+        BYTE pbReserved[32];
+    } sReserved;            // reserved for future use.
 } DMA_IO_SCATTER_HEADER, *PDMA_IO_SCATTER_HEADER, **PPDMA_IO_SCATTER_HEADER;
 
 typedef struct tdDeviceConfig {
