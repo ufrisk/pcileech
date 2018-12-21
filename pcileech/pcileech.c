@@ -48,6 +48,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
         {.tp = PROBE,.sz = "probe" },
         {.tp = IDENTIFY,.sz = "identify" },
         {.tp = DLL_LIBRARY_USE,.sz = "dll_library_use" },
+        {.tp = GRUYERE,.sz = "gruyere" }, //MODIF
     };
     DWORD j, i = 1;
     if(argc < 2) { return FALSE; }
@@ -319,6 +320,8 @@ int main(_In_ int argc, _In_ char* argv[])
         ActionMount(ctx);
     } else if(ctx->cfg->tpAction == IDENTIFY) {
         ActionIdentify(ctx);
+    } else if(ctx->cfg->tpAction == GRUYERE) {     //MODIF
+        ActionMemoryGruyere(ctx);
     } else if(ctx->cfg->tpAction == KMDLOAD) {
         if(ctx->cfg->qwKMD) {
             printf("KMD: Successfully loaded at address: 0x%08x\n", (DWORD)ctx->cfg->qwKMD);
