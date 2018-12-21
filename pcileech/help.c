@@ -55,6 +55,7 @@ VOID Help_ShowGeneral()
         "   testmemread            DMA       [ min ]                                    \n" \
         "   testmemreadwrite       DMA       [ min ]                                    \n" \
         "   identify               DMA                                                  \n" \
+        "   gruyere                DMA       [ min, max ]                               \n" \
         " Device specific commands and valid MODEs [ and options ] (and device):        \n" \
         "   usb3380_flash          DMA,KMD   [ in ]         (USB3380)                   \n" \
         "   usb3380_8051start      DMA,KMD   [ in ]         (USB3380)                   \n" \
@@ -548,6 +549,26 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
             " EXAMPLEs:                                                                     \n" \
             " 1) Scan for process page directories                                          \n" \
             "    pcileech identify                                                          \n");
+        break;
+    // MODIF
+    case GRUYERE:
+        printf(
+            " TRY TO READ ALL THE PAGES TO CREATE A BITMAP OF THE RAM.                     \n" \
+            " MODES   : DMA, KMD                                                            \n" \
+            " OPTIONS : -min, -max (optional)                                               \n" \
+            " The memory contents a lot of pages (4096 bytes). To show where the pages not  \n" \
+            " readables are present in the RAM, you can test all the pages and create a     \n" \
+            " CSV file with all values. Then you can parse the data and create a Bitmap     \n" \
+            " where a pixel represents a page readable or a page not readable.              \n" \
+            " This is an opportunity to display the RAM and the different pages.            \n" \
+            " Use the -min option to specify the memory location. If the -min option is not \n" \
+            " aligned the specified memory address will be truncated.                       \n" \
+            " By default, the max address is 8GB.                                           \n" \
+            " EXAMPLES:                                                                     \n" \
+            " 1) Check the pages starting at physical address 0x10000.                      \n" \
+            "    pcileech gruyere -min 0x10000                                              \n" \
+            " 2) Check the pages ending at physical address 0x1000000.                      \n" \
+            "    pcileech pagedisplay -max 0x1000000                                        \n");
         break;
     case EXEC:
         _HelpShowExecCommand(pCfg);
