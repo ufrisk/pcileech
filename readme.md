@@ -126,6 +126,15 @@ Generating Signatures:
 ======================
 PCILeech comes with built in signatures for Windows, Linux, FreeBSD and macOS. For Windows 10 it is also possible to use the pcileech_gensig.exe program to generate alternative signatures.
 
+Generating Bitmap:
+======================
+PCILeech comes with a script to parse a CSV file and create a Bitmap of the RAM. Thanks to pcileech, and the function GRUYERE, you can display the readables pages of the RAM, very simplely. The memory contents a lot of pages (4096 bytes). To show where the pages not readables are present in the RAM, you can test all the pages and create a CSV file with all values. Then you can parse this CSV file and create a Bitmap where a pixel represents a page readable or a page not readable thanks to the script. This is an opportunity to display the RAM and the different pages. The script, presents in the repertory `pcileech_tools`, will be parse your data. After that, you will have the possibility to display this data, or to export them if you only want an interval. But the main functionnality of this script is the possibility to create a bitmap. You can select the size of the PNG, the color of the pixels. Just launch the script like that:
+* ` python3 parse_and_create_bitmap.py `
+
+Do not hesitate to watch the usage of the script:
+* ` python3 parse_and_create_bitmap.py -h `
+
+
 Limitations/Known Issues:
 =========================
 * Read and write errors on some hardware with the USB3380. Try `pcileech.exe testmemreadwrite -min 0x1000` to test memory reads and writes against the physical address 0x1000 (or any other address) in order to confirm. If issues exists downgrading to USB2 may help.
