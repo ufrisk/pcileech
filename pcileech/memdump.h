@@ -54,4 +54,15 @@ VOID ActionMemoryPageDisplay(_Inout_ PPCILEECH_CONTEXT ctx);
 */
 VOID ActionMemoryDisplay(_Inout_ PPCILEECH_CONTEXT ctx);
 
+
+/*
+* MODIF
+* Try to read all the pages (success or failure)
+* Create a CSV file with values to parse them later and
+* create a bit map of the RAM
+* By default, a page is 4096 bytes (0x1000).
+* -- ctx
+*/
+VOID ActionMemoryGruyere(_Inout_ PPCILEECH_CONTEXT ctx);
+
 #endif /* __MEMDUMP_H__ */

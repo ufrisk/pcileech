@@ -7,6 +7,7 @@
 #include "device.h"
 #include "statistics.h"
 #include "util.h"
+#include <time.h>
 
 typedef struct tdFILE_WRITE_ASYNC_BUFFER {
 	FILE *phFile;
@@ -140,7 +141,7 @@ VOID ActionMemoryProbe(_Inout_ PPCILEECH_CONTEXT ctx)
 	PageStatInitialize(&ps, ctx->cfg->qwAddrMin, ctx->cfg->qwAddrMax, "Probing Memory", FALSE, TRUE);
 	while(qwA < ctx->cfg->qwAddrMax) {
 		cPages = min(MEMORY_PROBE_PAGES_PER_SWEEP, (ctx->cfg->qwAddrMax - qwA) / 0x1000);
-        memset(pbResultMap, 0, cPages);
+		memset(pbResultMap, 0, cPages);
 		if(!DeviceProbeDMA(ctx, qwA, (DWORD)cPages, pbResultMap)) {
 			PageStatClose(&ps);
 			printf("Memory Probe: Failed. Unsupported hardware (USB3380) or other failure.\n");
@@ -240,15 +241,150 @@ VOID ActionMemoryWrite(_Inout_ PPCILEECH_CONTEXT ctx)
 		printf("Memory Write: Failed. Data too large: >16MB.\n");
 		return;
 	}
-    if(ctx->cfg->fLoop) {
-        printf("Memory Write: Starting loop write. Press CTRL+C to abort.\n");
-    }
-    do {
-        result = DeviceWriteMEM(ctx, ctx->cfg->qwAddrMin, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn, 0);
-        if(!result) {
-            printf("Memory Write: Failed. Write failed (partial memory may be written).\n");
-            return;
-        }
-    } while(ctx->cfg->fLoop);
+	if(ctx->cfg->fLoop) {
+		printf("Memory Write: Starting loop write. Press CTRL+C to abort.\n");
+	}
+	do {
+		result = DeviceWriteMEM(ctx, ctx->cfg->qwAddrMin, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn, 0);
+		if(!result) {
+			printf("Memory Write: Failed. Write failed (partial memory may be written).\n");
+			return;
+		}
+	} while(ctx->cfg->fLoop);
 	printf("Memory Write: Successful.\n");
+}
+
+
+//MODIF
+BOOL ActionMemoryCheckReadPages(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	QWORD qwAddrBase, qwAddrOffset, qwSize, qwSize_4kAlign;
+	PBYTE pb;
+	BOOL check = TRUE;
+
+	// allocate and calculate values
+	pb = LocalAlloc(0, 0x10000);
+	if(!pb) { 
+		return FALSE; 
+	}
+
+	//Format Address
+	qwAddrBase = ctx->cfg->qwAddrMin & 0x0fffffffffffff000;
+	qwAddrOffset = ctx->cfg->qwAddrMin & 0xff0;
+	qwSize_4kAlign = SIZE_PAGE_ALIGN_4K(ctx->cfg->qwAddrMax) - qwAddrBase;
+	qwSize = ((ctx->cfg->qwAddrMax + 0xf) & 0x0fffffffffffffff0) - (qwAddrBase + qwAddrOffset);
+	if(qwSize_4kAlign > 0x10000) {
+		qwSize = 0x100;
+		qwSize_4kAlign = (qwAddrOffset <= 0xf00) ? 0x1000 : 0x2000;
+	}
+
+	// check read memory
+	if(!DeviceReadMEM(ctx, qwAddrBase, pb, (DWORD)qwSize_4kAlign, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
+		check = FALSE;
+	}
+
+	LocalFree(pb);
+	return check;
+}
+
+VOID ActionMemoryGruyere(_Inout_ PPCILEECH_CONTEXT ctx)
+{
+	// Init
+	QWORD qw, max_page, qwAddrCheck;
+	PAGE_STATISTICS ps;
+	ps.szAction 	= "Gruyere Memory";
+	ps.fKMD 		= ctx->phKMD ? TRUE : FALSE;
+	int nb_ok 		= 0;
+	int nb_ko 		= 0;
+	char result[2];
+
+	// Check param
+	ctx->cfg->qwAddrMin = ctx->cfg->qwAddrMin & 0x0fffffffffffff000;
+	if(ctx->cfg->qwAddrMax == 0x0000ffffffffffff){
+		ctx->cfg->qwAddrMax = 0x200000000; //8Gb by default
+	}
+
+	// Fixup addresses
+	if(ctx->cfg->qwAddrMin > ctx->cfg->qwAddrMax) {
+		qw = ctx->cfg->qwAddrMin;
+		ctx->cfg->qwAddrMin = ctx->cfg->qwAddrMax;
+		ctx->cfg->qwAddrMax = qw;
+	}
+
+	// Set Filename
+	char filename[50];
+	time_t rawtime;
+	struct tm * timeinfo;
+	time ( &rawtime );
+	timeinfo = localtime ( &rawtime );
+	sprintf(filename,"Res_Pcileech_Gruyere_%d_%d_%d_%d-%d-%d.csv",
+		timeinfo->tm_year + 1900,
+		timeinfo->tm_mon + 1,
+		timeinfo->tm_mday,
+		timeinfo->tm_hour,
+		timeinfo->tm_min,
+		timeinfo->tm_sec
+	);
+	FILE * file_id = fopen(filename,"w");
+
+	// Loop
+	printf("+-------+----------------------+-------------------+-------------------+---------------+\n");
+	printf("| State |        Address       |     Pages read    |    Pages failed   |    Progress   |\n");
+	printf("+-------+----------------------+-------------------+-------------------+---------------+\n");
+	fprintf(file_id, "State, Address, Pages read, Pages failed, Progress");
+
+	qw = ctx->cfg->qwAddrMin;
+	max_page = 1 + (ctx->cfg->qwAddrMax - ctx->cfg->qwAddrMin) / 0x1000;
+	while(ctx->cfg->qwAddrMin <= ctx->cfg->qwAddrMax){
+		qwAddrCheck = ctx->cfg->qwAddrMin & 0x0fffffffffffff000;
+		if(ActionMemoryCheckReadPages(ctx)){
+			strncpy(result, "OK", sizeof(result));
+			nb_ok++;
+		}
+		else{
+			strncpy(result, "KO", sizeof(result));
+			nb_ko++;
+		}
+		printf("|   %s  |  0x%016llX  |  %015llu  |  %015llu  |      %03llu%%     |\r",
+			result, 
+			qwAddrCheck,
+			nb_ok,
+			nb_ko,
+			100*(nb_ok+nb_ko)/max_page
+		);
+		fprintf(file_id, "\n%s, 0x%016llX, %015llu, %015llu, %03llu%%",
+			result, 
+			qwAddrCheck,
+			nb_ok,
+			nb_ko,
+			100*(nb_ok+nb_ko)/max_page
+		);
+		ctx->cfg->qwAddrMin = ctx->cfg->qwAddrMin + 0x1000;
+	}
+	printf("|  %s  |  0x%016llX  |  %015llu  |  %015llu  |      %03llu%%     |\r",
+		"END", 
+		qwAddrCheck,
+		nb_ok,
+		nb_ko,
+		100*(nb_ok+nb_ko)/max_page
+	);
+	
+
+	// Display end message
+	fclose(file_id);
+	printf("\n\n" \
+		" Performed Action: %s                             \n" \
+		" Access Mode:      %s                             \n" \
+		" Pages read:       %llu  /  %llu  (%llu%%)        \n" \
+		" Pages failed:     %llu  /  %llu  (%llu%%)        \n",
+		ps.szAction,
+		ps.fKMD ? "KMD (kernel module assisted DMA)" : "DMA (hardware only)             ",
+		nb_ok,
+		max_page,
+		100 * nb_ok / max_page,
+		nb_ko,
+		max_page,
+		100 * nb_ko / max_page
+	);
+	printf("\nGruyere Memory: Completed.\n");
 }
