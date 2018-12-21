@@ -48,7 +48,7 @@ typedef enum tdActionType {
     PROBE,
     IDENTIFY,
     DLL_LIBRARY_USE,
-    GRUYERE //MODIF
+    GRUYERE
 } ACTION_TYPE;
 
 typedef enum tdPCILEECH_DEVICE_TYPE {

@@ -56,7 +56,6 @@ VOID ActionMemoryDisplay(_Inout_ PPCILEECH_CONTEXT ctx);
 
 
 /*
-* MODIF
 * Try to read all the pages (success or failure)
 * Create a CSV file with values to parse them later and
 * create a bit map of the RAM

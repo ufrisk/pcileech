@@ -550,7 +550,6 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
             " 1) Scan for process page directories                                          \n" \
             "    pcileech identify                                                          \n");
         break;
-    // MODIF
     case GRUYERE:
         printf(
             " TRY TO READ ALL THE PAGES TO CREATE A BITMAP OF THE RAM.                     \n" \

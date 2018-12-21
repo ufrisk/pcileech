@@ -255,7 +255,7 @@ VOID ActionMemoryWrite(_Inout_ PPCILEECH_CONTEXT ctx)
 }
 
 
-//MODIF
+
 BOOL ActionMemoryCheckReadPages(_Inout_ PPCILEECH_CONTEXT ctx)
 {
 	QWORD qwAddrBase, qwAddrOffset, qwSize, qwSize_4kAlign;

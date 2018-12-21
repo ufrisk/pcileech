@@ -48,7 +48,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEE
         {.tp = PROBE,.sz = "probe" },
         {.tp = IDENTIFY,.sz = "identify" },
         {.tp = DLL_LIBRARY_USE,.sz = "dll_library_use" },
-        {.tp = GRUYERE,.sz = "gruyere" }, //MODIF
+        {.tp = GRUYERE,.sz = "gruyere" },
     };
     DWORD j, i = 1;
     if(argc < 2) { return FALSE; }
@@ -320,7 +320,7 @@ int main(_In_ int argc, _In_ char* argv[])
         ActionMount(ctx);
     } else if(ctx->cfg->tpAction == IDENTIFY) {
         ActionIdentify(ctx);
-    } else if(ctx->cfg->tpAction == GRUYERE) {     //MODIF
+    } else if(ctx->cfg->tpAction == GRUYERE) {
         ActionMemoryGruyere(ctx);
     } else if(ctx->cfg->tpAction == KMDLOAD) {
         if(ctx->cfg->qwKMD) {
