@@ -11,6 +11,7 @@
 #include "devicefpga.h"
 #include "device605_tcp.h"
 #include "devicetmd.h"
+#include "devicerawtcp.h"
 
 BOOL DeviceReadDMA(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)
 {
@@ -210,6 +211,9 @@ BOOL DeviceOpen(_Inout_ PPCILEECH_CONTEXT ctx)
     }
     if(PCILEECH_DEVICE_TOTALMELTDOWN == ctx->cfg->dev.tp) {
         result = DeviceTMD_Open(ctx);
+    }
+    if(PCILEECH_DEVICE_RAW_TCP == ctx->cfg->dev.tp) {
+        result = DeviceRawTCP_Open(ctx);
     }
     if(result) {
         ctx->cfg->dev.fScatterReadSupported = (ctx->cfg->dev.pfnReadScatterDMA != NULL);
