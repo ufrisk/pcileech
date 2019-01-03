@@ -7,7 +7,7 @@
 #define __PCILEECH_H__
 #include "oscompatibility.h"
 
-#define PCILEECH_VERSION_CURRENT            "3.6.2"
+#define PCILEECH_VERSION_CURRENT            "3.7.0"
 
 #define SIZE_PAGE_ALIGN_4K(x)                ((x + 0xfff) & ~0xfff)
 #define CONFIG_MAX_SIGNATURES                16

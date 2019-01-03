@@ -2,7 +2,7 @@ PCILeech Summary:
 =================
 PCILeech uses PCIe hardware devices to read and write from the target system memory. This is achieved by using DMA over PCIe. No drivers are needed on the target system. 
 
-<b>PCILeech works without hardware together with memory dump files and the Windows 7/2008R2 x64 [Total Meltdown / CVE-2018-1038](https://blog.frizk.net/2018/03/total-meltdown.html) vulnerability.</b>
+PCILeech works without hardware together with memory dump files and the Windows 7/2008R2 x64 [Total Meltdown / CVE-2018-1038](https://blog.frizk.net/2018/03/total-meltdown.html) vulnerability. In addition to locally connected devices PCILeech also support DMA patched iLO interfaces.
 
 PCILeech supports multiple memory acquisition devices. Primarily hardware based, but also dump files and software based techniques based on select security issues are supported. USB3380 based hardware is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel. FPGA based hardware is able to read all memory.
 
@@ -52,6 +52,7 @@ Please find a device comparision table below.
 | [SP605/TCP](https://github.com/ufrisk/pcileech-fpga/)    | FPGA  | TCP/IP | 100kB/s | Yes               | Yes |
 | [USB3380-EVB](usb3380.md)                                | USB3380 | USB3 | 150MB/s | No (via KMD only) | No  |
 | [PP3380](usb3380.md)                                     | USB3380 | USB3 | 150MB/s | No (via KMD only) | No  |
+| [DMA patched HP iLO](https://www.synacktiv.com/posts/exploit/using-your-bmc-as-a-dma-device-plugging-pcileech-to-hpe-ilo-4.html) | TCP | TCP | 1MB/s | Yes | No |
 
 Recommended adapters:
 * PE3B - ExpressCard to mini-PCIe.
@@ -122,6 +123,9 @@ Mount the PCILeech Memory Process File System from a Windows 10 64-bit memory im
 Dump memory using the the reported "TotalMeltdown" [Windows 7/2008R2 x64 PML4 page table permission vulnerability](https://blog.frizk.net/2018/03/total-meltdown.html).
 * ` pcileech.exe dump -out memdump_win7.raw -device totalmeltdown -v -force `
 
+Insert a kernel module into a running Linux system remotely via a [DMA patched HP iLO](https://www.synacktiv.com/posts/exploit/using-your-bmc-as-a-dma-device-plugging-pcileech-to-hpe-ilo-4.html).
+* ` pcileech.exe kmdload -vvv -device rawtcp -device-addr 127.0.0.1 -device-port 8888 -kmd LINUX_X64_48 `
+
 Generating Signatures:
 ======================
 PCILeech comes with built in signatures for Windows, Linux, FreeBSD and macOS. For Windows 10 it is also possible to use the pcileech_gensig.exe program to generate alternative signatures.
@@ -187,3 +191,6 @@ v3.5
 v3.6
 * Various bug fixes (including 'missing dlls' issue).
 * Additional functionality exported from DLL.
+
+v3.7
+* Support for RAWTCP device - used to communicate with [DMA patched HP iLO](https://www.synacktiv.com/posts/exploit/using-your-bmc-as-a-dma-device-plugging-pcileech-to-hpe-ilo-4.html). Thanks to [Synacktiv](https://www.synacktiv.com) for the contribution and the awesome research!

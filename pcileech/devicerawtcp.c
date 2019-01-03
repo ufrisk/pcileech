@@ -160,7 +160,7 @@ BOOL DeviceRawTCP_ReadDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwAd
 
 	cbRead = 0;
 	while (cbRead < Rx.cb) {
-		len = recv(ctxrawtcp->Sock, (char *)pb + cbRead, Rx.cb - cbRead, 0);
+		len = recv(ctxrawtcp->Sock, (char *)pb + cbRead, (int)(Rx.cb - cbRead), 0);
 		if (len == SOCKET_ERROR || len == 0) {
 			fprintf(stderr, "ERROR: recv() fails\n");
 			return 0;
@@ -213,7 +213,7 @@ BOOL DeviceRawTCP_WriteDMA(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD qwA
 	}
 
 	if (Rx.cmd != MEM_WRITE) {
-		fprintf(stderr, "ERROR: Memory write fail\n", cbRead);
+		fprintf(stderr, "ERROR: Memory write fail\n");
 	}
 	
 	return cbWritten >= cb;

@@ -94,10 +94,10 @@ VOID Help_ShowGeneral()
         "          Wait occurs after any other actions have been completed.             \n" \
         "   -device: force the use of a specific hardware device instead of auto-detect.\n" \
         "          Affects all modes and commands.                                      \n" \
-        "          Valid options: USB3380, FPGA, SP605_TCP, <memory-dump-file-name> or  \n" \
-        "          TOTALMELTDOWN                                                        \n" \
-        "   -device-addr: Remote address for -device SP605_TCP.                         \n" \
-        "   -device-port: Remote TCP port for -device SP605_TCP. Default value: 28472.  \n" \
+        "          Valid options: USB3380, FPGA, SP605_TCP, RAWTCP, TOTALMELTDOWN or    \n" \
+        "          <memory-dump-file-name>.                                             \n" \
+        "   -device-addr: Remote address for -device RAWTCP and SP605_TCP.              \n" \
+        "   -device-port: Remote TCP port for -device RAWTCP and SP605_TCP. (optional). \n" \
         "   -device-opt[0-3]: Optional additional device configuration for some devices.\n" \
         "          FPGA device (NB! 0 = default!): -device-opt0 = delay read uS         \n" \
         "                -device-opt1 = delay write uS, -device-opt2 = delay probe uS   \n" \
@@ -142,7 +142,7 @@ VOID Help_ShowInfo()
 {
     printf(
         " PCILEECH INFORMATION                                                          \n" \
-        " PCILeech (c) 2016-2018 Ulf Frisk                                              \n" \
+        " PCILeech (c) 2016-2019 Ulf Frisk                                              \n" \
         " Version: " \
         PCILEECH_VERSION_CURRENT \
         "                                                                \n" \
@@ -155,6 +155,7 @@ VOID Help_ShowInfo()
         "   Google USB Driver - https://developer.android.com/sdk/win-usb.html          \n" \
         "   FTDI FT601 Driver - http://www.ftdichip.com/Drivers/D3XX.htm                \n" \
         "   PCIe Injector     - https://github.com/enjoy-digital/pcie_injector          \n" \
+        "   iLO DMA firmware  - https://www.synacktiv.com/posts/exploit/using-your-bmc-as-a-dma-device-plugging-pcileech-to-hpe-ilo-4.html \n" \
         "   Dokany            - https://github.com/dokan-dev/dokany/releases/latest     \n" \
         " ----------------                                                              \n" \
         " Use with memory dump files in read-only mode.                                 \n" \
