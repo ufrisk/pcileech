@@ -1,6 +1,7 @@
 // pcilech_kmd.c : Linux kernel module for PCILeech.
 // Use this module on systems you already have root access on and that PCILeech
-// cannot insert a kernel module directly by normal means (4.8 kernel).
+// cannot insert a kernel module directly by normal means (4.8+ kernel) when  a
+// 32-bit limited hardware memory capture device is used (USB3380).
 //
 // (c) Ulf Frisk, 2016
 // Author: Ulf Frisk, pcileech@frizk.net
@@ -23,6 +24,9 @@
 #include <linux/kallsyms.h>
 #include <linux/highmem.h>
 #include <linux/kthread.h>
+#ifndef set_memory_x
+#include <linux/set_memory.h>
+#endif /* set_memory_x */
 
 const char LINUX_X64_STAGE3_PRE_BIN[] = {
   0xeb, 0x07, 0x6d, 0x73, 0x6c, 0x65, 0x65, 0x70, 0x00, 0x48, 0x8d, 0x3d,
