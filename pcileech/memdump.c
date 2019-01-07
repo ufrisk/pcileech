@@ -361,6 +361,7 @@ VOID ActionMemoryGruyere(_Inout_ PPCILEECH_CONTEXT ctx)
 		);
 		ctx->cfg->qwAddrMin = ctx->cfg->qwAddrMin + 0x1000;
 	}
+	// End loop
 	printf("|  %s  |  0x%016llX  |  %015llu  |  %015llu  |      %03llu%%     |\r",
 		"END", 
 		qwAddrCheck,
@@ -369,7 +370,6 @@ VOID ActionMemoryGruyere(_Inout_ PPCILEECH_CONTEXT ctx)
 		100*(nb_ok+nb_ko)/max_page
 	);
 	
-
 	// Display end message
 	fclose(file_id);
 	printf("\n\n" \

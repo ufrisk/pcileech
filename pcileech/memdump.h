@@ -58,7 +58,7 @@ VOID ActionMemoryDisplay(_Inout_ PPCILEECH_CONTEXT ctx);
 /*
 * Try to read all the pages (success or failure)
 * Create a CSV file with values to parse them later and
-* create a bit map of the RAM
+* create a bitmap of the RAM
 * By default, a page is 4096 bytes (0x1000).
 * -- ctx
 */
