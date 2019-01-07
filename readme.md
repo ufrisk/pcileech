@@ -129,10 +129,13 @@ PCILeech comes with built in signatures for Windows, Linux, FreeBSD and macOS. F
 Generating Bitmap:
 ======================
 PCILeech comes with a script to parse a CSV file and create a Bitmap of the RAM. Thanks to pcileech, and the function GRUYERE, you can locate the readables pages of the RAM very simplely (pages of 4096 bytes), and show where the pages not readables are present in the RAM.
+
 This is how it works:
 * Thanks to pcileech, and the function `GRUYERE`, you can locate all the readables pages of the RAM and create a CSV file with all values. 
 * Then you can parse this CSV file and create a Bitmap where a pixel represents a page readable or a page not readable thanks to the script presents in the repertory `pcileech_tools`. 
-This is an opportunity to display the RAM and locate the different pages. The script, presents in the repertory `pcileech_tools`, will be parse your data and after that, you will have the possibility to display this data, or to export them if you only want an interval. But the main functionnality of this script is the possibility to create a bitmap. You can select the size of the PNG and the color of the pixels. Just launch the script like that:
+This is an opportunity to display the RAM and locate the different pages. The script, presents in the repertory `pcileech_tools`, will be parse your data and after that, you will have the possibility to display this data, or to export them if you only want an interval. But the main functionnality of this script is the possibility to create a bitmap. You can select the size of the PNG and the color of the pixels. 
+
+Just launch the script like that:
 * ` python3 parse_and_create_bitmap.py CSV_FILE`
 
 Do not hesitate to watch the usage of the script:
