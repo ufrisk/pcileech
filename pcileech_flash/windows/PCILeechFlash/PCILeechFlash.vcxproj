@@ -62,11 +62,13 @@
     <DebuggerFlavor>DbgengRemoteDebugger</DebuggerFlavor>
     <OutDir>$(SolutionDir)\pcileech_files\flash\</OutDir>
     <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
+    <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DebuggerFlavor>DbgengRemoteDebugger</DebuggerFlavor>
     <OutDir>$(SolutionDir)\pcileech_files\flash\</OutDir>
     <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
+    <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
