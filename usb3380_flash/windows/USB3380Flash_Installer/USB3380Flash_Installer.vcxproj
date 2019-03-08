@@ -15,9 +15,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}</ProjectGuid>
-    <RootNamespace>pcileech_gensig</RootNamespace>
+    <ProjectGuid>{F2F4AA4A-BEFE-4738-9412-820007919334}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>PCILeechFlash_Installer</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <ProjectName>USB3380Flash_installer</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -25,15 +27,13 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <WholeProgramOptimization>
-    </WholeProgramOptimization>
     <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
-    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
@@ -41,7 +41,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
-    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
@@ -60,62 +60,96 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)\files\USB3380Flash_installer\</OutDir>
+    <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)\files\</OutDir>
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)\files\USB3380Flash_installer\</OutDir>
     <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseMT|x64'">
-    <OutDir>$(SolutionDir)\files\</OutDir>
-    <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)\files\</OutDir>
-    <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
     <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)\files\USB3380Flash_installer\</OutDir>
+    <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <GenerateDebugInformation>Debug</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PostBuildEvent>
+      <Command>powershell Compress-Archive -Path '$(SolutionDir)\files\USB3380Flash\USB3380Flash\*.*', '$(SolutionDir)\files\USB3380Flash_installer\USB3380Flash_installer.exe' -DestinationPath '$(SolutionDir)\files\USB3380Flash.zip' -Force -CompressionLevel Optimal
+del "$(SolutionDir)\files\pcileech_files.zip"
+powershell Compress-Archive -Path '$(SolutionDir)\files\*.*' -DestinationPath '$(SolutionDir)\files\pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
+      <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>No</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <ProgramDatabaseFile />
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
+    <PostBuildEvent>
+      <Command>powershell Compress-Archive -Path '$(SolutionDir)\files\USB3380Flash\USB3380Flash\*.*', '$(SolutionDir)\files\USB3380Flash_installer\USB3380Flash_installer.exe' -DestinationPath '$(SolutionDir)\files\USB3380Flash.zip' -Force -CompressionLevel Optimal
+del "$(SolutionDir)\files\pcileech_files.zip"
+powershell Compress-Archive -Path '$(SolutionDir)\files\*.*' -DestinationPath '$(SolutionDir)\files\pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseMT|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
+      <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>No</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <ProgramDatabaseFile>
+      </ProgramDatabaseFile>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
+    <PostBuildEvent>
+      <Command>powershell Compress-Archive -Path '$(SolutionDir)\files\USB3380Flash\USB3380Flash\*.*', '$(SolutionDir)\files\USB3380Flash_installer\USB3380Flash_installer.exe' -DestinationPath '$(SolutionDir)\files\USB3380Flash.zip' -Force -CompressionLevel Optimal
+</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="pcileech_gensig.c" />
+    <ClCompile Include="installer.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -37,6 +37,9 @@
     <Filter Include="Source Files\test">
       <UniqueIdentifier>{5098b4fc-a903-4dfa-b480-ea87dfca3baf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\umd_exec">
+      <UniqueIdentifier>{c376b98a-8b0b-4c3a-b687-59543d20cf03}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lx64_common.c">
@@ -141,6 +144,9 @@
     <ClCompile Include="uefi_winload_ntos_patch.c">
       <Filter>Source Files\exec</Filter>
     </ClCompile>
+    <ClCompile Include="wx64_umd_exec_c.c">
+      <Filter>Source Files\umd_exec</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="lx64_common_a.asm">
@@ -211,6 +217,12 @@
     </None>
     <None Include="uefi_winload_ntos_kmd.asm">
       <Filter>Source Files\exec</Filter>
+    </None>
+    <None Include="wx64_umd_exec.asm">
+      <Filter>Source Files\umd_exec</Filter>
+    </None>
+    <None Include="wx64_stage23_vmm.asm">
+      <Filter>Source Files\kmd_core</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

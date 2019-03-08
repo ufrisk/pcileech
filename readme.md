@@ -1,16 +1,14 @@
 PCILeech Summary:
 =================
-PCILeech uses PCIe hardware devices to read and write from the target system memory. This is achieved by using DMA over PCIe. No drivers are needed on the target system. 
+PCILeech uses PCIe hardware devices to read and write target system memory. This is achieved by using DMA over PCIe. No drivers are needed on the target system. 
 
-PCILeech works without hardware together with memory dump files and the Windows 7/2008R2 x64 [Total Meltdown / CVE-2018-1038](https://blog.frizk.net/2018/03/total-meltdown.html) vulnerability. In addition to locally connected devices PCILeech also support DMA patched iLO interfaces.
+<b>PCILeech also works without hardware together with a wide range of software memory acqusition methods supported by the LeechCore library - including capture of remote live memory using DumpIt or WinPmem. PCILeech also supports local capture of memory and a number of memory dump file formats.</b>
 
-PCILeech supports multiple memory acquisition devices. Primarily hardware based, but also dump files and software based techniques based on select security issues are supported. USB3380 based hardware is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel. FPGA based hardware is able to read all memory.
+PCILeech supports multiple memory acquisition devices. Both hardware and software based. USB3380 based hardware is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel. FPGA based hardware, and software based methods, are able to read all memory.
 
-PCILeech is capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. PCIleech runs on Windows/Linux/Android. Supported target systems are currently the x64 versions of: UEFI, Linux, FreeBSD, macOS and Windows.
+PCILeech is capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. PCIleech runs on Windows and Linux. Supported target systems are currently the x64 versions of: UEFI, Linux, FreeBSD, macOS and Windows. This requires write access to memory (USB3380 hardware, FPGA hardware or CVE-2018-1038 "Total Meltdown").
 
-PCILeech also supports the Memory Process File System - which can be used with PCILeech FPGA hardware devices in read-write mode or with memory dump files in read-only mode.
-
-To get going clone the repository and find the required binaries, modules and configuration files in the pcileech_files folder.
+<b>To get going clone the sources in the repository or download the latest [binaries, modules and configuration files](https://github.com/ufrisk/pcileech/releases/latest).</b>
 
 For use cases and more detailed information check out this readme and the [project wiki pages](https://github.com/ufrisk/pcileech/wiki/).
 
@@ -19,6 +17,7 @@ For use cases and more detailed information check out this readme and the [proje
 Capabilities:
 =============
 * Retrieve memory from the target system at >150MB/s.
+* Retrieve remote memory from remote LeechService.
 * Write data to the target system memory. 
 * 4GB memory can be accessed in native DMA mode (USB3380 hardware).
 * ALL memory can be accessed in native DMA mode (FPGA hardware).
@@ -34,6 +33,7 @@ Capabilities:
 * Push files [Linux, Windows, macOS*].
 * Patch / Unlock (remove password requirement) [Windows, macOS*].
 * Easy to create own kernel shellcode and/or custom signatures.
+* Connect to a remote LeechService over the network.
 * Even more features not listed here ...
 
 \*) macOS High Sierra is not supported.
@@ -68,22 +68,18 @@ Installing PCILeech:
 ====================
 Please ensure you do have the most recent version of PCILeech by visiting the PCILeech github repository at: https://github.com/ufrisk/pcileech
 
-Clone the PCILeech Github repository. The binaries are found in pcileech_files and should work on 64-bit Windows and Linux. Please copy all files from pcileech_files since some files contains additional modules and signatures.
+<b>Get the latest [binaries, modules and configuration files](https://github.com/ufrisk/pcileech/releases/latest) from the latest release.</b> Alternatively clone the repository and build from source.
 
 #### Windows:
 
 Please see the [PCILeech-on-Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows) guide for information about running PCILeech on Windows.
 
 The Google Android USB driver have to be installed if USB3380 hardware is used. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver.<br>
-FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card. Download the 64-bit [`FTD3XX.dll`](http://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.2.0.6.zip) from FTDI and place it alongside `pcileech.exe`.<br>
+FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card or PCIeScreamer. Download the 64-bit [`FTD3XX.dll`](http://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.2.0.6.zip) from FTDI and place it alongside `pcileech.exe`.<br>
 To mount live ram and target file system as drive in Windows the Dokany file system library must be installed. Please download and install the latest version of Dokany at: https://github.com/dokan-dev/dokany/releases/latest
 
-#### Windows/DLL:
-
-PCILeech is also available as a dynamic link library .DLL for easy including in other projects. The DLL, headers and sample code is found in the pcileech_files/dll folder.
-
-#### Linux and Android:
-Please see the [PCILeech-on-Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) guide for information about running PCILeech on Linux or [PCILeech-on-Android](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Android) for Android information.
+#### Linux:
+Please see the [PCILeech-on-Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) guide for information about running PCILeech on Linux.
 
 Examples:
 =========
@@ -102,23 +98,23 @@ Show help for the dump command.
 Dump all memory from the target system given that a kernel module is loaded at address: 0x7fffe000.
 * ` pcileech.exe dump -kmd 0x7fffe000 `
 
-Force dump memory below 4GB including accessible memory mapped devices using more stable USB2 approach.
+Force dump memory below 4GB including accessible memory mapped devices using more stable USB2 approach on USB3380.
 * ` pcileech.exe dump -force -usb2 `
 
 Receive PCIe TLPs (Transaction Layer Packets) and print them on screen (correctly configured FPGA dev board required).
 * ` pcileech.exe tlp -vv -wait 1000 `
 
 Probe/Enumerate the memory of the target system for readable memory pages and maximum memory. (FPGA hardware only).
-* ` pcileech.exe probe ` 
+* ` pcileech.exe probe `
 
 Dump all memory between addresses min and max, don't stop on failed pages. Native access to 64-bit memory is only supported on FPGA hardware.
 * ` pcileech.exe dump -min 0x0 -max 0x21e5fffff -force `
 
-Force the usage of a specific device (instead of default auto detecting it). The sp605_tcp device is not auto detected.
-* ` pcileech.exe pagedisplay -min 0x1000 -device sp605_tcp -device-addr 192.168.1.2 `
+Force the usage of a specific device (instead of default auto detecting it). The pmem device is not auto detected.
+* ` pcileech.exe pagedisplay -min 0x1000 -device pmem `
 
-Mount the PCILeech Memory Process File System from a Windows 10 64-bit memory image.
-* ` pcileech.exe mount -device c:\temp\memdump_win10.raw `
+Dump remote memory from a remote LeechService using connection encrypted and mutually authenticated by kerberos.
+* ` pcileech.exe dump -device pmem -remote rpc://computer$@ad.contoso.com `
 
 Dump memory using the the reported "TotalMeltdown" [Windows 7/2008R2 x64 PML4 page table permission vulnerability](https://blog.frizk.net/2018/03/total-meltdown.html).
 * ` pcileech.exe dump -out memdump_win7.raw -device totalmeltdown -v -force `
@@ -128,21 +124,19 @@ Insert a kernel module into a running Linux system remotely via a [DMA patched H
 
 Generating Signatures:
 ======================
-PCILeech comes with built in signatures for Windows, Linux, FreeBSD and macOS. For Windows 10 it is also possible to use the pcileech_gensig.exe program to generate alternative signatures.
+PCILeech comes with built in signatures for Windows, Linux, FreeBSD and macOS. There is also an optional, now obsoleted method of generating signatures by using the pcileech_gensig.exe program.
 
 Limitations/Known Issues:
 =========================
 * Read and write errors on some hardware with the USB3380. Try `pcileech.exe testmemreadwrite -min 0x1000` to test memory reads and writes against the physical address 0x1000 (or any other address) in order to confirm. If issues exists downgrading to USB2 may help.
-* The PCIeScreamer device may currently experience instability depending on target configuration and any adapters used. 
 * Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10 with Virtualization based security features enabled does not work fully - this is however not the default setting in Windows 10 or Linux.
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * Linux based on the 4.8 kernel and later might not work with the USB3380 hardware. As an alternative, if target root access exists, compile and insert .ko (pcileech_kmd/linux). If the system is EFI booted an alternative signature exists.
-* Windows 7: signatures are not published.
-* File system mount, including the Memory Process File System, support only exists for Windows.
+* File system mount support only exists for Windows.
 
 Building:
 =========
-The binaries are found in the pcileech_files folder. If one wish to build an own version it is possible to do so. Please see the [PCILeech-on-Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows), [PCILeech-on-Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) or [PCILeech-on-Android](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Android) for more information about building PCILeech.
+The binaries are found in the [releases section](https://github.com/ufrisk/pcileech/releases/latest) of this repository. If one wish to build an own version it is possible to do so. Please see the [PCILeech-on-Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows) or [PCILeech-on-Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) for more information about building PCILeech. PCILeech is also dependant on LeechCore and optionally (for some extra functionality) on The Memory Process File System which must both be built separately.
 
 Links:
 ======
@@ -155,42 +149,18 @@ Changelog:
 v1.0
 * Initial release.
 
-v1.1-v2.6
+v1.1-v3.6
 * Various updates. please see individual relases for more information.
 
-v3.0
-* PCILeech Memory Process File System.
-* Internal refactorings.
-* Various bug fixes.
-
-v3.1
-* Linux FPGA support.
-* Various bug fixes.
-
-v3.2
-* Support for the [CVE-2018-1038 aka Total Meltdown Windows 7/2008R2 vulnerability](https://blog.frizk.net/2018/03/total-meltdown.html).
-* Support for Wow64 (32-bit processes) for the Memory Process File System.
-* Extended virt2phys support for the Memory Process File System.
-* Various bug fixes.
-
-v3.3
-* Memory Process File System - 32-bit process support, parsing of imports, exports, directories and sections.
-* Total Meltdown stability fixes (removed risk of bluescreen) and increased memory support (up to 512GB).
-* Various bug fixes.
-
-v3.4
-* Memory Process File System - runtime tunables in .config directory - allows for disabling of caching and adjusting refresh periods.
-* Various bug fixes.
-
-v3.5
-* PCILeech DLL released.
-* Update of Dokany header files.
-* Faster FPGA initialization time.
-* Various bug fixes.
-
-v3.6
-* Various bug fixes (including 'missing dlls' issue).
-* Additional functionality exported from DLL.
-
-v3.7
-* Support for RAWTCP device - used to communicate with [DMA patched HP iLO](https://www.synacktiv.com/posts/exploit/using-your-bmc-as-a-dma-device-plugging-pcileech-to-hpe-ilo-4.html). Thanks to [Synacktiv](https://www.synacktiv.com) for the contribution and the awesome research!
+[v4.0](https://github.com/ufrisk/pcileech/releases/tag/v4.0)
+* Major cleanup and internal refactorings.
+* FPGA max memory auto-detect and more stable dumping strategy.
+* New stable Windows 10 kernel injects with FPGA hardware on non-virtualization based security systems.
+* User mode injects (experimental).
+* Removal of built-in device support - the [LeechCore](https://github.com/ufrisk/LeechCore) `leechcore.dll`/`leechcore.so` library is now used instead. New devices include:
+  * Memory dump files (raw linear dump files and microsoft crash dump files).
+  * Hyper-V save files.
+  * Live memory via DumpIt / WinPmem.
+  * remote devices via -remote setting.
+* Removal of API and built-in _Memory Process File System_ - please use the more capable APIs in the [LeechCore](https://github.com/ufrisk/LeechCore) and [Memory Process File System](https://github.com/ufrisk/MemProcFS) instead.
+* Multiple other changes and syntax updates.

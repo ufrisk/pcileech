@@ -14,32 +14,36 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
     <Filter Include="Header Files\dokan">
-      <UniqueIdentifier>{e58d3af7-d6c0-4d7c-8869-49e91f315004}</UniqueIdentifier>
+      <UniqueIdentifier>{1fff3dd1-43d5-442d-a79b-d80adbcbc80c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\leechcore">
+      <UniqueIdentifier>{c97bdfb0-f88b-453e-a7c2-8c1bd7cd1b1c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\vmm">
+      <UniqueIdentifier>{00063ca4-5dc9-4d3d-b078-d39e50b9959b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Makefile">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="pcileech.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="vmmdll.h">
+      <Filter>Header Files\vmm</Filter>
+    </ClInclude>
+    <ClInclude Include="leechcore.h">
+      <Filter>Header Files\leechcore</Filter>
+    </ClInclude>
+    <ClInclude Include="dokan.h">
+      <Filter>Header Files\dokan</Filter>
+    </ClInclude>
     <ClInclude Include="device.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="kmd.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="memdump.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="pcileech.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="shellcode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mempatch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="help.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="executor.h">
@@ -48,72 +52,48 @@
     <ClInclude Include="extra.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="statistics.h">
+    <ClInclude Include="help.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vfs.h">
+    <ClInclude Include="kmd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="dokan.h">
-      <Filter>Header Files\dokan</Filter>
-    </ClInclude>
-    <ClInclude Include="device3380.h">
+    <ClInclude Include="memdump.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="tlp.h">
+    <ClInclude Include="mempatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="oscompatibility.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="device605_tcp.h">
+    <ClInclude Include="pcileech.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="devicefpga.h">
+    <ClInclude Include="shellcode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vmm.h">
+    <ClInclude Include="statistics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vmmproc.h">
+    <ClInclude Include="umd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vmmvfs.h">
+    <ClInclude Include="util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="devicefile.h">
+    <ClInclude Include="version.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="devicetmd.h">
+    <ClInclude Include="vfs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="pcileech_dll.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="devicerawtcp.h">
+    <ClInclude Include="vmmprx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="kmd.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="memdump.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="pcileech.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="util.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="mempatch.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="help.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="executor.c">
@@ -122,58 +102,38 @@
     <ClCompile Include="extra.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="statistics.c">
+    <ClCompile Include="help.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vfs.c">
+    <ClCompile Include="kmd.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="device3380.c">
+    <ClCompile Include="memdump.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="tlp.c">
+    <ClCompile Include="mempatch.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="oscompatibility.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="device605_tcp.c">
+    <ClCompile Include="pcileech.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="devicefpga.c">
+    <ClCompile Include="statistics.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="devicefile.c">
+    <ClCompile Include="umd.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vmm.c">
+    <ClCompile Include="util.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vmmproc.c">
+    <ClCompile Include="vfs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vmmvfs.c">
+    <ClCompile Include="vmmprx.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="devicetmd.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="pcileech_dll.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="devicerawtcp.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Makefile">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="Android.mk">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="pcileechdll.def">
-      <Filter>Resource Files</Filter>
-    </None>
   </ItemGroup>
 </Project>

@@ -1,10 +1,4 @@
-// oscompatibility.c : pcileech windows/linux/android compatibility layer.
-//
-// (c) Ulf Frisk, 2017-2018
-// Author: Ulf Frisk, pcileech@frizk.net
-//
-
-#ifdef WIN32
+#ifdef _WIN32
 
 #include "oscompatibility.h"
 
@@ -20,8 +14,8 @@ VOID usleep(_In_ DWORD us)
     }
 }
 
-#endif /* WIN32 */
-#if defined(LINUX) || defined(ANDROID)
+#endif /* _WIN32 */
+#ifdef LINUX
 
 #include "oscompatibility.h"
 #include <fcntl.h>
@@ -53,6 +47,20 @@ QWORD GetTickCount64()
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
     return ts.tv_sec * 1000 + ts.tv_nsec / (1000 * 1000);
+}
+
+BOOL QueryPerformanceFrequency(_Out_ LARGE_INTEGER *lpFrequency)
+{
+    *lpFrequency = 1000 * 1000;
+    return TRUE;
+}
+
+BOOL QueryPerformanceCounter(_Out_ LARGE_INTEGER *lpPerformanceCount)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
+    *lpPerformanceCount = (ts.tv_sec * 1000 * 1000) + (ts.tv_nsec / 1000);  // uS resolution
+    return TRUE;
 }
 
 HANDLE CreateThread(
@@ -200,6 +208,12 @@ ULONG FT60x_FT_SetChipConfiguration(HANDLE ftHandle, PVOID pvConfiguration)
     return ioctl((int)(QWORD)ftHandle, 1, pvConfiguration) ? 0x20 : 0;
 }
 
+ULONG FT60x_FT_SetSuspendTimeout(HANDLE ftHandle, ULONG Timeout)
+{
+    // dummy function, only here for compatibility in Linux case
+    return 0;
+}
+
 ULONG FT60x_FT_AbortPipe(HANDLE ftHandle, UCHAR ucPipeID)
 {
     // dummy function, only here for compatibility in Linux case
@@ -270,13 +284,11 @@ FARPROC GetProcAddress(HMODULE hModule, LPSTR lpProcName)
     if(0 == strcmp("FT_Create", lpProcName))                { return (FARPROC)FT60x_FT_Create; }
     if(0 == strcmp("FT_GetChipConfiguration", lpProcName))  { return (FARPROC)FT60x_FT_GetChipConfiguration; }
     if(0 == strcmp("FT_SetChipConfiguration", lpProcName))  { return (FARPROC)FT60x_FT_SetChipConfiguration; }
+    if(0 == strcmp("FT_SetSuspendTimeout", lpProcName))     { return (FARPROC)FT60x_FT_SetSuspendTimeout; }
     if(0 == strcmp("FT_ReadPipe", lpProcName))              { return (FARPROC)FT60x_FT_ReadPipe; }
     if(0 == strcmp("FT_WritePipe", lpProcName))             { return (FARPROC)FT60x_FT_WritePipe; }
     return NULL;
 }
-
-#endif /* LINUX || ANDROID */
-#ifdef LINUX
 
 BOOL GetExitCodeThread(HANDLE hThread, PDWORD lpExitCode)
 {
@@ -286,12 +298,28 @@ BOOL GetExitCodeThread(HANDLE hThread, PDWORD lpExitCode)
     return TRUE;
 }
 
-#endif /* LINUX */
-#ifdef ANDROID
+// ----------------------------------------------------------------------------
+// CRITICAL_SECTION functionality below:
+// ----------------------------------------------------------------------------
 
-BOOL GetExitCodeThread(HANDLE hThread, PDWORD lpExitCode)
-{
-    return FALSE;
+VOID InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    memset(lpCriticalSection, 0, sizeof(CRITICAL_SECTION));
+    pthread_mutexattr_init(&lpCriticalSection->mta);
+    pthread_mutexattr_settype(&lpCriticalSection->mta, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&lpCriticalSection->mutex, &lpCriticalSection->mta);
 }
 
-#endif /* ANDROID */
+VOID DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    pthread_mutex_destroy(&lpCriticalSection->mutex);
+    memset(lpCriticalSection, 0, sizeof(CRITICAL_SECTION));
+}
+
+VOID EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    pthread_mutex_lock(&lpCriticalSection->mutex);
+}
+
+VOID LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    pthread_mutex_unlock(&lpCriticalSection->mutex);
+}
+
+#endif /* LINUX */

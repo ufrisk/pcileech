@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
@@ -9,15 +9,16 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{5C698F13-6E9F-46F3-95FC-55376A65D8BF}</ProjectGuid>
     <RootNamespace>pcileech_shellcode</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -29,8 +30,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)\pcileech_files\</OutDir>
-    <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
+    <OutDir>$(SolutionDir)\files\</OutDir>
+    <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -39,7 +40,6 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -80,6 +80,7 @@
     <ClCompile Include="wx64_pskill.c" />
     <ClCompile Include="wx64_pslist.c" />
     <ClCompile Include="wx64_stage3_c.c" />
+    <ClCompile Include="wx64_umd_exec_c.c" />
     <ClCompile Include="wx64_unlock.c" />
     <ClCompile Include="wx64_vfs.c" />
   </ItemGroup>
@@ -104,9 +105,11 @@
     <None Include="wx64_psblue.asm" />
     <None Include="wx64_stage1.asm" />
     <None Include="wx64_stage2.asm" />
+    <None Include="wx64_stage23_vmm.asm" />
     <None Include="wx64_stage2_hal.asm" />
     <None Include="wx64_stage3.asm" />
     <None Include="wx64_stage3_pre.asm" />
+    <None Include="wx64_umd_exec.asm" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="fbsdx64_common.h" />

@@ -1,6 +1,6 @@
 // util.h : definitions of various utility functions.
 //
-// (c) Ulf Frisk, 2016-2018
+// (c) Ulf Frisk, 2016-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __UTIL_H__
@@ -10,42 +10,38 @@
 
 /*
 * Retrieve a page table entry (PTE). (4kB pages only).
-* -- ctx
 * -- qwCR3 = the contents of the CPU register CR3 (= physical address of PML4)
 * -- qwAddressLinear = the virtual address for which the PTE should be retrieved
 * -- pqwPTE = ptr to receive the PTE
 * -- pqwPTEAddrPhysOpt = ptr to receive the physical address of the PTE
 * -- return
 */
-BOOL Util_PageTable_ReadPTE(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_ PQWORD pqwPTEAddrPhys);
+BOOL Util_PageTable_ReadPTE( _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ PQWORD pqwPTE, _Out_ PQWORD pqwPTEAddrPhys);
 
 /*
 * Change the mode of the mapped address to executable.
-* -- ctx
 * -- qwCR3
 * -- qwAddressLinear
 * -- fSetX = TRUE if virtual address should be executable.
 * -- return
 */
-BOOL Util_PageTable_SetMode(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX);
+BOOL Util_PageTable_SetMode(_In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX);
 
 /*
 * Find a module base given a page signature. Please note that this is a best
 * effort search. Multiple modules may have the same signature or parts of the
 * paging structures may be outside the 32-bit addressing scope >4GiB.
-* -- ctx
 * -- pqwCR3 = the contents of the CPU register CR3 (= physical address of PML4) (may be zero on entry if page table base should be searched as well)
 * -- pPTEs = paging signature of the module to find
 * -- cPTEs = number of entries in pPTEs
 * -- pqwSignatureBase = ptr to receive the module base
 * -- return
 */
-BOOL Util_PageTable_FindSignatureBase(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase);
+BOOL Util_PageTable_FindSignatureBase(_Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase);
 
 /*
 * Search the page tables for a given physical address. The first occurrence for
 * this address will be returned.
-* -- ctx
 * -- qwCR3 = the physical address of PML4.
 * -- qwAddrPhys = the physical address to search for.
 * -- pqwAddrVirt = ptr to receive virtual address.
@@ -55,11 +51,10 @@ BOOL Util_PageTable_FindSignatureBase(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PQW
 * -- pqwPML4E = ptr to optionally receive value of PML4E
 * -- return
 */
-BOOL Util_PageTable_FindMappedAddress(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_opt_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPDE, _Out_opt_ PQWORD pqwPDPTE, _Out_opt_ PQWORD pqwPML4E);
+BOOL Util_PageTable_FindMappedAddress(_In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_opt_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPDE, _Out_opt_ PQWORD pqwPDPTE, _Out_opt_ PQWORD pqwPML4E);
 
 /*
 * Walk the page table to translate a virtual address into a physical.
-* -- ctx
 * -- qwCR3 = the physical address of PML4.
 * -- qwVA = the virtual address.
 * -- pqwPA = ptr to receive physical address.
@@ -67,7 +62,7 @@ BOOL Util_PageTable_FindMappedAddress(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD 
 * -- pqwPageSize = ptr to receive size of physical page in bytes.
 * -- return
 */
-BOOL Util_PageTable_Virtual2Physical(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwCR3, _In_ QWORD qwVA, _Out_ PQWORD pqwPA, _Out_ PQWORD pqwPageBase, _Out_ PQWORD pqwPageSize);
+BOOL Util_PageTable_Virtual2Physical(_In_ QWORD qwCR3, _In_ QWORD qwVA, _Out_ PQWORD pqwPA, _Out_ PQWORD pqwPageBase, _Out_ PQWORD pqwPageSize);
 
 /*
 * Load KMD and Unlock signatures.
@@ -131,7 +126,8 @@ DWORD Util_GetFileSize(_In_ LPSTR sz);
 * Parse an input line consisting of either builtin, hexascii or file name to
 * data buffer.
 */
-BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcb);
+_Success_(return)
+BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_writes_(*pcb) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcb);
 
 /*
 * Parse a string returning the QWORD representing the string. The string may
@@ -204,30 +200,28 @@ VOID Util_CreateSignatureSearchAll(_In_ PBYTE pb, _In_ DWORD cb, _Out_ PSIGNATUR
 /*
 * Read a 16MB data chunk from the target and place it in the pbBuffer16M buffer.
 * Any data that failed to read within the 16MB buffer is set to zero.
-* -- ctx
 * -- pbBuffer16M = the already allocated 16MB buffer to place the content in.
 * -- qwBaseAddress = the base address to start reading from.
 * -- pPageStat = statistics struct to update on progress (pages success/fail).
 * -- return = TRUE if at least one 4k page could be read; FALSE if all pages failed.
 */
-BOOL Util_Read16M(_Inout_ PPCILEECH_CONTEXT ctx, _Out_ PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _Inout_opt_ PPAGE_STATISTICS pPageStat);
+_Success_(return)
+BOOL Util_Read16M(_Out_writes_(0x01000000) PBYTE pbBuffer16M, _In_ QWORD qwBaseAddress, _In_opt_ PPAGE_STATISTICS pPageStat);
 
 /*
 * Wait for the connected PCILeech device to be power cycled. This function will
 * sleep until a power cycle event is detected on the connected PCILeech device.
 * The connected device needs to first be powered down and then powered up before
 * this function will exit.
-* -- ctx
 */
-VOID Util_WaitForPowerCycle(_Inout_ PPCILEECH_CONTEXT ctx);
+VOID Util_WaitForPowerCycle();
 
 /*
 * Wait for a PCILeech device to be powered on and for it to complete a dummy
 * memory read. The pDeviceData will be initialized upon success - in which
 * the function will exit.
-* -- ctx
 */
-VOID Util_WaitForPowerOn(_Inout_ PPCILEECH_CONTEXT ctx);
+VOID Util_WaitForPowerOn();
 
 /*
 * Print a maximum of 8192 bytes of binary data as hexascii on the screen.
@@ -236,5 +230,16 @@ VOID Util_WaitForPowerOn(_Inout_ PPCILEECH_CONTEXT ctx);
 * -- cbInitialOffset = offset, must be max 0x1000 and multiple of 0x10.
 */
 VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset);
+
+/*
+* Split a string into two at the first 'chSplit' character. If no 2nd string
+* is found then it's returned as null character '\0' (i.e. not as NULL).
+* -- sz = the original string to split (of maximum MAX_PATH length)
+* -- chSplit = the delimiter character to split on.
+* -- _szBuf = MAX_PATH sized buffer that will be overwritten and used throughout the lifetime of psz1/psz2 outputs.
+* -- psz1
+* -- psz2
+*/
+VOID Util_SplitString2(_In_ LPSTR sz, _In_ CHAR chSplit, _Out_writes_(MAX_PATH) PCHAR _szBuf, _Out_ LPSTR *psz1, _Out_ LPSTR *psz2);
 
 #endif /* __UTIL_H__ */

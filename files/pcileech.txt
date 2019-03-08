@@ -1,0 +1,1 @@
+Download the latest binaries from https://github.com/ufrisk/pcileech/releases/latest

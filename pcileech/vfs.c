@@ -1,6 +1,6 @@
 // vfs.c : implementation of functions related to virtual file system support.
 //
-// (c) Ulf Frisk, 2017-2018
+// (c) Ulf Frisk, 2017-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifdef WIN32
@@ -13,8 +13,6 @@
 #pragma warning( disable : 4005 )   
 #include "dokan.h"
 #pragma warning( pop )
-#include "vmmvfs.h"
-#include "vmmproc.h"
 
 //-------------------------------------------------------------------------------
 // Defines and Typedefs (shared with shellcode) below:
@@ -97,7 +95,6 @@ typedef struct tdVFS_STATISTICS {
 
 typedef struct tdVFS_GLOBAL_STATE {
     SYSTEMTIME time;
-    PPCILEECH_CONTEXT ctx;
     QWORD cbRAM[VFS_RAM_TP_MAX+1];
     VFS_STATISTICS Statistics;
     CRITICAL_SECTION LockDma;
@@ -113,7 +110,6 @@ typedef struct tdVFS_GLOBAL_STATE {
     QWORD CacheDirectoryIndex;
     VFS_CACHE_DIRECTORY CacheDirectory[CACHE_DIRECTORY_ENTRIES];
     BOOL fKMD;
-    BOOL fVMM;
 } VFS_GLOBAL_STATE, *PVFS_GLOBAL_STATE;
 
 VOID Vfs_UtilSplitPathFile(_Out_ WCHAR wszPath[MAX_PATH], _Out_ LPWSTR *pwcsFile, _In_ LPCWSTR wcsFileName);
@@ -123,6 +119,7 @@ VOID Vfs_UtilSplitPathFile(_Out_ WCHAR wszPath[MAX_PATH], _Out_ LPWSTR *pwcsFile
 // (file and memory accesses are become extremely slow without caching).
 //-------------------------------------------------------------------------------
 
+_Success_(return)
 BOOL VfsCache_DirectoryGetSingle(_Out_ PVFS_RESULT_FILEINFO pfi, _Out_ PBOOL isExisting, _In_ LPCWSTR wcsPath, _In_ LPCWSTR wcsFile, _In_ PVFS_GLOBAL_STATE pds)
 {
     QWORD i, j, qwCurrentTickCount;
@@ -189,7 +186,10 @@ VOID VfsCache_DirectoryPut(_In_ LPCWSTR wcsDirectoryName, _In_ PVFS_RESULT_FILEI
     LocalFree(cd->pfi);
     cd->pfi = NULL;
     cd->pfi = (PVFS_RESULT_FILEINFO)LocalAlloc(0, cfi * sizeof(VFS_RESULT_FILEINFO));
-    if(!cd->pfi) { return; }
+    if(!cd->pfi) {
+        LeaveCriticalSection(&pds->LockCache);
+        return;
+    }
     cd->qwExpireTickCount64 = GetTickCount64() + qwCacheValidMs;
     memcpy(cd->pfi, pfi, cfi * sizeof(VFS_RESULT_FILEINFO));
     cd->cfi = cfi;
@@ -266,6 +266,7 @@ VOID VfsCache_MemPut(_In_ BYTE tp, _In_ LPVOID pbBuffer, _In_ QWORD qwA, _In_ PV
     LeaveCriticalSection(&pds->LockCache);
 }
 
+_Success_(return)
 BOOL VfsCache_FileGet(_In_ LPCWSTR wcsFileName, _In_ QWORD cbOffset, _Out_ LPVOID pb, _In_ DWORD cb, _In_ PVFS_GLOBAL_STATE pds)
 {
     QWORD i, qwCurrentTickCount;
@@ -412,7 +413,7 @@ BOOL Vfs_ListDirectory(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo, _Out
             LeaveCriticalSection(&pds->LockDma);
             return TRUE;
         }
-        result = Exec_ExecSilent(pds->ctx, pds->szNameVfsShellcode, (PBYTE)&op, sizeof(VFS_OPERATION), (PBYTE*)ppfi, &cbfi);
+        result = Exec_ExecSilent(pds->szNameVfsShellcode, (PBYTE)&op, sizeof(VFS_OPERATION), (PBYTE*)ppfi, &cbfi);
         if(!result) {
             LeaveCriticalSection(&pds->LockDma);
             return FALSE;
@@ -421,14 +422,6 @@ BOOL Vfs_ListDirectory(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo, _Out
         VfsCache_DirectoryPut(wcsFileName, *ppfi, *pcfi, pds, CACHE_DIRECTORY_LIFETIME_FILE_MS);
         LeaveCriticalSection(&pds->LockDma);
         return TRUE;
-    }
-    // matches: \proc\*
-    if(!_wcsnicmp(wcsFileName, L"\\proc\\", 6) && pds->fVMM) {
-        result =  VmmVfsListFiles(pds->ctx, wcsFileName, ppfi, pcfi);
-        if(result) { 
-            VfsCache_DirectoryPut(wcsFileName, *ppfi, *pcfi, pds, CACHE_DIRECTORY_LIFETIME_PROC_MS);
-        }
-        return result;
     }
     return FALSE;
 }
@@ -462,7 +455,7 @@ VOID Vfs_Delete(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo)
     if(!_wcsnicmp(wcsFileName, L"\\files\\", 7)) {
         result = Vfs_InitVfsOperation(&op, VFS_OP_CMD_DELETE, wcsFileName, DokanFileInfo);
         EnterCriticalSection(&pds->LockDma);
-        Exec_ExecSilent(pds->ctx, pds->szNameVfsShellcode, (PBYTE)&op, sizeof(VFS_OPERATION), NULL, NULL);
+        Exec_ExecSilent(pds->szNameVfsShellcode, (PBYTE)&op, sizeof(VFS_OPERATION), NULL, NULL);
         LeaveCriticalSection(&pds->LockDma);
         VfsCache_DirectoryDel(wcsFileName, DokanFileInfo, FALSE);
     }
@@ -555,10 +548,7 @@ VfsCallback_CreateFile(LPCWSTR wcsFileName, PDOKAN_IO_SECURITY_CONTEXT SecurityC
     UNREFERENCED_PARAMETER(FileAttributes);
     UNREFERENCED_PARAMETER(CreateOptions);
     // root, file or proc directory
-    if( !wcscmp(wcsFileName, L"\\") || 
-        (pds->fKMD && !_wcsicmp(wcsFileName, L"\\files")) || 
-        (pds->fVMM && (!_wcsicmp(wcsFileName, L"\\proc") || !_wcsicmp(wcsFileName, L"\\proc\\pid") || !_wcsicmp(wcsFileName, L"\\proc\\name")))) 
-    {
+    if(!wcscmp(wcsFileName, L"\\") || (pds->fKMD && !_wcsicmp(wcsFileName, L"\\files"))) {
         if(CreateDisposition != CREATE_NEW && CreateDisposition != OPEN_ALWAYS && CreateDisposition != OPEN_EXISTING) {
             return pds->DokanNtStatusFromWin32(ERROR_ACCESS_DENIED);
         }
@@ -579,8 +569,8 @@ VfsCallback_CreateFile(LPCWSTR wcsFileName, PDOKAN_IO_SECURITY_CONTEXT SecurityC
         }
         return STATUS_SUCCESS;
     }
-    // matches: \files* or \proc*
-    if((!_wcsnicmp(wcsFileName, L"\\files", 6) && pds->fKMD) || (!_wcsnicmp(wcsFileName, L"\\proc\\", 6) && pds->fVMM)) {
+    // matches: \files*
+    if(!_wcsnicmp(wcsFileName, L"\\files", 6) && pds->fKMD) {
         if(CreateDisposition != CREATE_NEW && CreateDisposition != OPEN_ALWAYS && CreateDisposition != OPEN_EXISTING) {
             pds->DokanNtStatusFromWin32(ERROR_ACCESS_DENIED);
         }
@@ -618,10 +608,7 @@ VfsCallback_GetFileInformation(_In_ LPCWSTR wcsFileName, _Inout_ LPBY_HANDLE_FIL
     VFS_RESULT_FILEINFO fi;
     BYTE tp;
     // root,files and proc directories
-    if( !wcscmp(wcsFileName, L"\\") ||
-        (pds->fKMD && (!_wcsicmp(wcsFileName, L"\\files") || !_wcsicmp(wcsFileName, L"\\files\\"))) ||
-        (pds->fVMM && (!_wcsicmp(wcsFileName, L"\\proc") || !_wcsicmp(wcsFileName, L"\\proc\\pid") || !_wcsicmp(wcsFileName, L"\\proc\\name"))))
-    {
+    if(!wcscmp(wcsFileName, L"\\") || (pds->fKMD && (!_wcsicmp(wcsFileName, L"\\files") || !_wcsicmp(wcsFileName, L"\\files\\")))) {
         SystemTimeToFileTime(&pds->time, &hfi->ftCreationTime);
         SystemTimeToFileTime(&pds->time, &hfi->ftLastWriteTime);
         SystemTimeToFileTime(&pds->time, &hfi->ftLastAccessTime);
@@ -642,7 +629,7 @@ VfsCallback_GetFileInformation(_In_ LPCWSTR wcsFileName, _Inout_ LPBY_HANDLE_FIL
         return STATUS_SUCCESS;
     }
     // matches: \files* or \proc*
-    if((!_wcsnicmp(wcsFileName, L"\\files", 6) && pds->fKMD) || (!_wcsnicmp(wcsFileName, L"\\proc\\", 6) && pds->fVMM)) {
+    if((!_wcsnicmp(wcsFileName, L"\\files", 6) && pds->fKMD)) {
         result = Vfs_ListSingle(wcsFileName, DokanFileInfo, &fi);
         if(!result) { return STATUS_FILE_INVALID; }
         _VFS_SET_FILETIME_OPT(&hfi->ftCreationTime, &fi.tCreateOpt, &pds->time);
@@ -676,9 +663,6 @@ VfsCallback_FindFiles(LPCWSTR wcsFileName, PFillFindData FillFindData, PDOKAN_FI
         if(pds->fKMD) {
             Vfs_FindFilesManualEntry(L"files", 0, FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED, FillFindData, DokanFileInfo);
         }
-        if(pds->fVMM) {
-            Vfs_FindFilesManualEntry(L"proc", 0, FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED, FillFindData, DokanFileInfo);
-        }
         return STATUS_SUCCESS;
     }
     if(!_wcsicmp(wcsFileName, L"\\liveram-kmd.raw") && pds->cbRAM[VFS_RAM_TP_KMD]) {
@@ -689,13 +673,8 @@ VfsCallback_FindFiles(LPCWSTR wcsFileName, PFillFindData FillFindData, PDOKAN_FI
         Vfs_FindFilesManualEntry(L"liveram-native.raw", pds->cbRAM[VFS_RAM_TP_NATIVE], FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED, FillFindData, DokanFileInfo);
         return STATUS_SUCCESS;
     }
-    if(!_wcsicmp(wcsFileName, L"\\proc") && pds->fVMM) {
-        Vfs_FindFilesManualEntry(L"pid", 0, FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED, FillFindData, DokanFileInfo);
-        Vfs_FindFilesManualEntry(L"name", 0, FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED, FillFindData, DokanFileInfo);
-        return STATUS_SUCCESS;
-    }
-    // matches: \files* or \proc*
-    if((!_wcsnicmp(wcsFileName, L"\\files", 6) && pds->fKMD) || (!_wcsnicmp(wcsFileName, L"\\proc\\", 6) && pds->fVMM)) {
+    // matches: \files*
+    if(!_wcsnicmp(wcsFileName, L"\\files", 6) && pds->fKMD) {
         result = Vfs_ListDirectory(wcsFileName, DokanFileInfo, &pfiBase, &cfi);
         if(!result) { return STATUS_SUCCESS; }
         for(i = 0; i < cfi; i++) {
@@ -743,13 +722,13 @@ NTSTATUS _VfsReadFile_RAM(_In_ BYTE tp, _Out_ LPVOID Buffer, _In_ DWORD BufferLe
     EnterCriticalSection(&pds->LockDma);
     switch(tp) {
         case VFS_RAM_TP_KMD:
-            qwCfgAddrMaxOrig = pds->ctx->cfg->qwAddrMax;    // TODO: REMOVE UGLY HACK WITH ADDRMAX...
-            pds->ctx->cfg->qwAddrMax = min(pds->cbRAM[tp], qwBase + qwSize);
-            result = Util_Read16M(pds->ctx, pds->pbDMA16M, qwBase, NULL);
-            pds->ctx->cfg->qwAddrMax = qwCfgAddrMaxOrig;
+            qwCfgAddrMaxOrig = ctxMain->cfg.qwAddrMax;    // TODO: REMOVE UGLY HACK WITH ADDRMAX...
+            ctxMain->cfg.qwAddrMax = min(pds->cbRAM[tp], qwBase + qwSize);
+            result = Util_Read16M(pds->pbDMA16M, qwBase, NULL);
+            ctxMain->cfg.qwAddrMax = qwCfgAddrMaxOrig;
             break;
         case VFS_RAM_TP_NATIVE:
-            result = (0 != DeviceReadDMAEx(pds->ctx, qwBase, pds->pbDMA16M, 0x01000000, NULL, 0));
+            result = (0 != DeviceReadDMAEx(qwBase, pds->pbDMA16M, 0x01000000, NULL, 0));
             break;
     }
     memcpy(Buffer, pds->pbDMA16M + qwBaseOffset, *ReadLength);
@@ -781,7 +760,7 @@ NTSTATUS _VfsReadFile_File(_In_ LPCWSTR wcsFileName, _Out_ LPVOID Buffer, _In_ D
     op.cb = qwSize;
     EnterCriticalSection(&pds->LockDma);
     // TODO OP FIXES!
-    result = Exec_ExecSilent(pds->ctx, pds->szNameVfsShellcode, (PBYTE)&op, sizeof(VFS_OPERATION), &pbBufferDma, &cbBufferDma);
+    result = Exec_ExecSilent(pds->szNameVfsShellcode, (PBYTE)&op, sizeof(VFS_OPERATION), &pbBufferDma, &cbBufferDma);
     if(result && (qwBaseOffset <= cbBufferDma)) {
         VfsCache_FilePut(wcsFileName, qwBase, pbBufferDma, cbBufferDma, pds);
         *ReadLength = (DWORD)min(*ReadLength, cbBufferDma - qwBaseOffset);
@@ -812,7 +791,7 @@ NTSTATUS _VfsWriteFile_File(_In_ LPCWSTR wcsFileName, _In_ LPCVOID Buffer, _In_ 
     memcpy(pop->pb, Buffer, NumberOfBytesToWrite);
     pop->cb = NumberOfBytesToWrite;
     EnterCriticalSection(&pds->LockDma);
-    Exec_ExecSilent(pds->ctx, pds->szNameVfsShellcode, (PBYTE)pop, sizeof(VFS_OPERATION) + NumberOfBytesToWrite, NULL, NULL);
+    Exec_ExecSilent(pds->szNameVfsShellcode, (PBYTE)pop, sizeof(VFS_OPERATION) + NumberOfBytesToWrite, NULL, NULL);
     LeaveCriticalSection(&pds->LockDma);
     VfsCache_FileDel(wcsFileName, Offset, NumberOfBytesToWrite, pds);
     VfsCache_DirectoryDel(wcsFileName, DokanFileInfo, FALSE);
@@ -835,9 +814,6 @@ VfsCallback_ReadFile(LPCWSTR wcsFileName, LPVOID Buffer, DWORD BufferLength, LPD
     if(!_wcsnicmp(wcsFileName, L"\\files\\", 7) && pds->fKMD) {
         return _VfsReadFile_File(wcsFileName, Buffer, BufferLength, ReadLength, Offset, DokanFileInfo);
     }
-    if(pds->fVMM && (!_wcsnicmp(wcsFileName, L"\\proc\\name\\", 11) || !_wcsnicmp(wcsFileName, L"\\proc\\pid\\", 10))) {
-        return VmmVfsReadFile(pds->ctx, wcsFileName, Buffer, BufferLength, ReadLength, Offset);
-    }
     return STATUS_FILE_INVALID;
 }
 
@@ -848,7 +824,7 @@ VfsCallback_WriteFile(LPCWSTR wcsFileName, LPCVOID Buffer, DWORD NumberOfBytesTo
     BOOL result;
     if(!_wcsicmp(wcsFileName, L"\\liveram-kmd.raw") && pds->cbRAM[VFS_RAM_TP_KMD]) { // kernel module backed RAM file
         EnterCriticalSection(&pds->LockDma);
-        result = DeviceWriteMEM(pds->ctx, Offset, (PBYTE)Buffer, NumberOfBytesToWrite, PCILEECH_MEM_FLAG_RETRYONFAIL);
+        result = DeviceWriteMEM(Offset, (PBYTE)Buffer, NumberOfBytesToWrite, PCILEECH_MEM_FLAG_RETRYONFAIL);
         LeaveCriticalSection(&pds->LockDma);
         VfsCache_MemDel(VFS_RAM_TP_KMD, Offset, NumberOfBytesToWrite, pds);
         *NumberOfBytesWritten = NumberOfBytesToWrite;
@@ -856,7 +832,7 @@ VfsCallback_WriteFile(LPCWSTR wcsFileName, LPCVOID Buffer, DWORD NumberOfBytesTo
     }
     if(!_wcsicmp(wcsFileName, L"\\liveram-native.raw") && pds->cbRAM[VFS_RAM_TP_NATIVE]) { // native DMA backed RAM file
         EnterCriticalSection(&pds->LockDma);
-        result = DeviceWriteDMA(pds->ctx, Offset, (PBYTE)Buffer, NumberOfBytesToWrite, 0);
+        result = LeechCore_Write(Offset, (PBYTE)Buffer, NumberOfBytesToWrite);
         LeaveCriticalSection(&pds->LockDma);
         VfsCache_MemDel(VFS_RAM_TP_NATIVE, Offset, NumberOfBytesToWrite, pds);
         *NumberOfBytesWritten = NumberOfBytesToWrite;
@@ -864,9 +840,6 @@ VfsCallback_WriteFile(LPCWSTR wcsFileName, LPCVOID Buffer, DWORD NumberOfBytesTo
     }
     if(!_wcsnicmp(wcsFileName, L"\\files\\", 7) && pds->fKMD) {
         return _VfsWriteFile_File(wcsFileName, Buffer, NumberOfBytesToWrite, NumberOfBytesWritten, Offset, DokanFileInfo);
-    }
-    if(pds->fVMM && (!_wcsnicmp(wcsFileName, L"\\proc\\name\\", 11) || !_wcsnicmp(wcsFileName, L"\\proc\\pid\\", 10))) {
-        return VmmVfsWriteFile(pds->ctx, wcsFileName, (PBYTE)Buffer, NumberOfBytesToWrite, NumberOfBytesWritten, Offset);
     }
     return STATUS_FILE_INVALID;
 }
@@ -886,7 +859,7 @@ VfsCallback_Cleanup(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo) {
     }
 }
 
-VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx)
+VOID ActionMount()
 {
     int status;
     HMODULE hModuleDokan = NULL;
@@ -896,7 +869,7 @@ VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx)
     WCHAR wszMountPoint[] = { 'K', ':', '\\', 0 };
     int(*fnDokanMain)(PDOKAN_OPTIONS, PDOKAN_OPERATIONS);
     // sanity checks
-    if(!ctx->phKMD && ((ctx->cfg->dev.tp == PCILEECH_DEVICE_USB3380) || (ctx->cfg->qwAddrMax > 0x0000040000000000) || (ctx->cfg->qwAddrMax < 0x00400000))) {
+    if(!ctxMain->phKMD && ((ctxMain->dev.tpDevice == LEECHCORE_DEVICE_USB3380) || (ctxMain->cfg.qwAddrMax > 0x0000040000000000) || (ctxMain->cfg.qwAddrMax < 0x00400000))) {
         printf(
             "MOUNT: Failed. Please see below for possible reasons:               \n" \
             "   - Mounting file system requires an active kernel module (KMD).   \n" \
@@ -906,7 +879,7 @@ VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx)
         );
         goto fail;
     }
-    if(!ctx->phKMD) { printf("MOUNT: INFO: FILES folder not mounted. (No kernel module loaded).\n"); }
+    if(!ctxMain->phKMD) { printf("MOUNT: INFO: FILES folder not mounted. (No kernel module loaded).\n"); }
     // allocate
     hModuleDokan = LoadLibraryExA("dokan1.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
     fnDokanMain = (int(*)(PDOKAN_OPTIONS, PDOKAN_OPERATIONS))GetProcAddress(hModuleDokan, "DokanMain");
@@ -924,14 +897,13 @@ VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx)
     }
     // set global state
     GetSystemTime(&pDokanState->time);
-    pDokanState->ctx = ctx;
-    pDokanState->fKMD = (ctx->phKMD != NULL);
-    pDokanState->cbRAM[VFS_RAM_TP_KMD] = pDokanState->fKMD ? (ctx->phKMD->pPhysicalMap[ctx->phKMD->cPhysicalMap - 1].BaseAddress + ctx->phKMD->pPhysicalMap[ctx->phKMD->cPhysicalMap - 1].NumberOfBytes) : 0;
-    pDokanState->cbRAM[VFS_RAM_TP_NATIVE] = (ctx->cfg->dev.tp == PCILEECH_DEVICE_USB3380) ? 0 : (pDokanState->fKMD ? pDokanState->cbRAM[VFS_RAM_TP_KMD] : ctx->cfg->qwAddrMax);
+    pDokanState->fKMD = (ctxMain->phKMD != NULL);
+    pDokanState->cbRAM[VFS_RAM_TP_KMD] = pDokanState->fKMD ? (ctxMain->phKMD->pPhysicalMap[ctxMain->phKMD->cPhysicalMap - 1].BaseAddress + ctxMain->phKMD->pPhysicalMap[ctxMain->phKMD->cPhysicalMap - 1].NumberOfBytes) : 0;
+    pDokanState->cbRAM[VFS_RAM_TP_NATIVE] = (ctxMain->dev.tpDevice == LEECHCORE_DEVICE_USB3380) ? 0 : (pDokanState->fKMD ? pDokanState->cbRAM[VFS_RAM_TP_KMD] : ctxMain->cfg.qwAddrMax);
     InitializeCriticalSection(&pDokanState->LockDma);
     InitializeCriticalSection(&pDokanState->LockCache);
     pDokanState->DokanNtStatusFromWin32 = (NTSTATUS(*)(DWORD))GetProcAddress(hModuleDokan, "DokanNtStatusFromWin32");
-    pDokanState->PCILeechOperatingSystem = pDokanState->fKMD ? ctx->pk->OperatingSystem : 0;
+    pDokanState->PCILeechOperatingSystem = pDokanState->fKMD ? ctxMain->pk->OperatingSystem : 0;
     if(pDokanState->PCILeechOperatingSystem == KMDDATA_OPERATING_SYSTEM_WINDOWS) {
         strcpy_s(pDokanState->szNameVfsShellcode, 32, "DEFAULT_WINX64_VFS_KSH");
     } else if(pDokanState->PCILeechOperatingSystem == KMDDATA_OPERATING_SYSTEM_LINUX) {
@@ -942,15 +914,12 @@ VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx)
         printf("MOUNT: Operating system not supported.\n");
         goto fail;
     }
-    // initialize virtual memory manager (VMM) if possible
-    pDokanState->fVMM = !ctx->cfg->fNoProcFS && VmmProcInitialize(ctx);
-    if(!pDokanState->fVMM) { printf("MOUNT: INFO: PROC file system not mounted.\n"); }
     // set options
     pDokanOptions->Version = DOKAN_VERSION;
     pDokanOptions->Options |= DOKAN_OPTION_NETWORK;
-    pDokanOptions->UNCName = L"\\\\PCILeech\\PCILeechFileSystem";
-    if((ctx->cfg->szInS[0] >= 'a' && ctx->cfg->szInS[0] <= 'z') || (ctx->cfg->szInS[0] >= 'A' && ctx->cfg->szInS[0] <= 'Z')) {
-        wszMountPoint[0] = ctx->cfg->szInS[0];
+    pDokanOptions->UNCName = L"PCILeechFileSystem";
+    if((ctxMain->cfg.szInS[0] >= 'a' && ctxMain->cfg.szInS[0] <= 'z') || (ctxMain->cfg.szInS[0] >= 'A' && ctxMain->cfg.szInS[0] <= 'Z')) {
+        wszMountPoint[0] = ctxMain->cfg.szInS[0];
     }
     pDokanOptions->MountPoint = wszMountPoint;
     pDokanOptions->GlobalContext = (ULONG64)pDokanState;
@@ -979,19 +948,8 @@ VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx)
             " - Only the C:\\ drive is mounted on Windows target systems.                   \n" \
             "===============================================================================\n");
     }
-    if(pDokanState->fVMM) {
-        printf(
-            "PCILeech Memory Process File System is mounted in the /proc/ folder.           \n" \
-            "Memory from dump files or PCILeech hardware DMA devices is analyzed to provide \n" \
-            "a convenient process file system.                                              \n" \
-            " - File system is read-only when dump files are used.                          \n" \
-            " - File system is read-write when FPGA hardware acquisition devices are used.  \n" \
-            " - Full support exists for some x64 Windows operating systems.                 \n" \
-            " - Limited support for all other x64 operating systems.                        \n" \
-            "===============================================================================\n");
-    }
     printf("MOUNT: Mounting as drive %S\n", pDokanOptions->MountPoint);
-    if(ctx->cfg->fVerbose) {
+    if(ctxMain->cfg.fVerbose) {
         pDokanState->Statistics.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Vfs_StatisticsThread, &pDokanState->Statistics, 0, NULL);
     }
     status = fnDokanMain(pDokanOptions, pDokanOperations);
@@ -1009,8 +967,8 @@ fail:
         LocalFree(pDokanState);
     }
     if(hModuleDokan) { FreeLibrary(hModuleDokan); }
-    if(pDokanOptions) { LocalFree(pDokanOptions); }
-    if(pDokanOperations) { LocalFree(pDokanOperations); }
+    LocalFree(pDokanOptions);
+    LocalFree(pDokanOperations);
 }
 
 #endif /* WIN32 */
@@ -1018,7 +976,7 @@ fail:
 
 #include "vfs.h"
 
-VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx)
+VOID ActionMount()
 {
     printf("MOUNT: Failed. Operation only supported in PCILeech for Windows.\n");
 }

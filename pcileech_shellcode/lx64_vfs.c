@@ -1,7 +1,7 @@
 // lx64_vfs.c : kernel code to support the PCILeech file system.
 // Compatible with Linux x64.
 //
-// (c) Ulf Frisk, 2017
+// (c) Ulf Frisk, 2017-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 // compile with:
@@ -132,7 +132,6 @@ struct kstat_4_11 {
 //-----------------------------------------------------------------------------
 
 typedef struct tdFN2 {
-	QWORD str_sys_unlink;
 	QWORD memcpy;
 	QWORD memset;
 	QWORD filp_close;
@@ -144,6 +143,11 @@ typedef struct tdFN2 {
 	QWORD vfs_readdir_opt;
 	QWORD vfs_stat_opt;
 	QWORD vfs_statx_opt;
+    struct {
+        QWORD sys_unlink;
+        QWORD getname;
+        QWORD do_unlinkat;
+    } rm;
 } FN2, *PFN2;
 
 typedef struct tdDIR_CONTEXT {
@@ -161,7 +165,6 @@ typedef struct tdDIR_CONTEXT_EXTENDED {
 
 BOOL LookupFunctions2(PKMDDATA pk, PFN2 pfn2) {
 	QWORD i = 0, NAMES[sizeof(FN2) / sizeof(QWORD)];
-	NAMES[i++] = (QWORD)(CHAR[]) { 's', 'y', 's', '_', 'u', 'n', 'l', 'i', 'n', 'k', 0 };
 	NAMES[i++] = (QWORD)(CHAR[]) { 'm', 'e', 'm', 'c', 'p', 'y', 0 };
 	NAMES[i++] = (QWORD)(CHAR[]) { 'm', 'e', 'm', 's', 'e', 't', 0 };
 	NAMES[i++] = (QWORD)(CHAR[]) { 'f', 'i', 'l', 'p', '_', 'c', 'l', 'o', 's', 'e', 0 };
@@ -178,6 +181,11 @@ BOOL LookupFunctions2(PKMDDATA pk, PFN2 pfn2) {
 	pfn2->vfs_stat_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 0 }));
 	pfn2->vfs_statx_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 'x', 0 }));
 	if(!pfn2->vfs_stat_opt && !pfn2->vfs_statx_opt) { return FALSE; }
+    // optional lookup #3
+    pfn2->rm.sys_unlink = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 0 }));
+    pfn2->rm.getname = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'g', 'e', 't', 'n', 'a', 'm', 'e', 0 }));
+    pfn2->rm.do_unlinkat = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'd', 'o', '_', 'u', 'n', 'l', 'i', 'n', 'k', 'a', 't', 0 }));
+    if(!pfn2->rm.sys_unlink && !(pfn2->rm.getname && pfn2->rm.do_unlinkat)) { return FALSE; }
 	return TRUE;
 }
 
@@ -294,7 +302,9 @@ STATUS VfsDelete(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 {
 	UNREFERENCED_PARAMETER(pk);
 	QWORD result;
-	result = SysVCall(pfn2->str_sys_unlink, pop->szFileName);
+    result = pfn2->rm.sys_unlink ?
+        SysVCall(pfn2->rm.sys_unlink, pop->szFileName) :
+        SysVCall(pfn2->rm.do_unlinkat, AT_FDCWD, SysVCall(pfn2->rm.getname, pop->szFileName));
 	return result ? STATUS_FAIL_ACTION : STATUS_SUCCESS;
 }
 

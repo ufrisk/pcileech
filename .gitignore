@@ -1,0 +1,15 @@
+﻿/.vs
+/files/pcileech
+/files/lib
+/files/temp
+/files/USB3380Flash
+/files/USB3380Flash_installer
+*.bin
+*.cod
+*.dll
+*.exe
+*.idb
+*.lnk
+*.obj
+*.so
+*.zip

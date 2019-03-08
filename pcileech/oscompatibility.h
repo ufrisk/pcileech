@@ -1,12 +1,12 @@
-// oscompatibility.h : pcileech windows/linux/android compatibility layer.
+// oscompatibility.h : pcileech windows/linux compatibility layer.
 //
-// (c) Ulf Frisk, 2017-2018
+// (c) Ulf Frisk, 2017-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __OSCOMPATIBILITY_H__
 #define __OSCOMPATIBILITY_H__
 
-#ifdef WIN32
+#ifdef _WIN32
 
 #include <Windows.h>
 #include <stdio.h>
@@ -19,32 +19,17 @@
 #pragma comment (lib, "setupapi.lib")
 #pragma comment (lib, "bcrypt.lib")
 
-#ifdef _WINDLL
-BOOL g_pcileech_dll_printf_enabled;
-#define printf(format, ...)     { if(g_pcileech_dll_printf_enabled) { printf_s(format, ##__VA_ARGS__); } }
-#endif /* _WINDLL */
-
 typedef unsigned __int64                    QWORD, *PQWORD;
 
 #pragma warning( disable : 4477)
 
 VOID usleep(_In_ DWORD us);
 
-#endif /* WIN32 */
+#endif /* _WIN32 */
 #ifdef LINUX
-
-#include <libusb-1.0/libusb.h>
-
-#endif /* LINUX */
-#ifdef ANDROID
-
-#include <libusb.h>
-
-#endif /* ANDROID */
-#if defined(LINUX) || defined(ANDROID)
-
 #define _GNU_SOURCE
 
+#include <libusb-1.0/libusb.h>
 #include <byteswap.h>
 #include <ctype.h>
 #include <dirent.h>
@@ -68,9 +53,12 @@ typedef uint16_t                            WORD, *PWORD, USHORT, *PUSHORT;
 typedef wchar_t                             WCHAR, *PWCHAR, *LPWSTR;
 typedef uint32_t                            DWORD, *PDWORD;
 typedef uint32_t                            ULONG, *PULONG;
-typedef long long unsigned int              QWORD, *PQWORD;
+typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
+typedef long long unsigned int              LARGE_INTEGER, *PLARGE_INTEGER, FILETIME;
 typedef uint64_t                            SIZE_T, *PSIZE_T;
 typedef void                                *LPOVERLAPPED;
+typedef struct tdEXCEPTION_RECORD32         { CHAR sz[80]; } EXCEPTION_RECORD32;
+typedef struct tdEXCEPTION_RECORD64         { CHAR sz[152]; } EXCEPTION_RECORD64;
 #define TRUE                                1
 #define FALSE                               0
 #define MAX_PATH                            260
@@ -94,7 +82,6 @@ typedef void                                *LPOVERLAPPED;
 #define WINUSB_INTERFACE_HANDLE             libusb_device_handle*
 #define PIPE_TRANSFER_TIMEOUT               0x03
 #define CONSOLE_SCREEN_BUFFER_INFO          PVOID    // TODO: remove this dummy
-#define CRITICAL_SECTION                    HANDLE
 
 #define _In_
 #define _Out_
@@ -105,15 +92,17 @@ typedef void                                *LPOVERLAPPED;
 #define __bcount(x)
 #define _Inout_bytecount_(x)
 #define _Inout_updates_bytes_(x)
+#define _Out_writes_opt_(x)
 #define _Success_(return)
-
 
 #define max(a, b)                           (((a) > (b)) ? (a) : (b))
 #define min(a, b)                           (((a) < (b)) ? (a) : (b))
 #define _byteswap_ulong(v)                  (bswap_32(v))
 #define _byteswap_uint64(v)                 (bswap_64(v))
+#define _countof(_Array)                    (sizeof(_Array) / sizeof(_Array[0]))
 #define strnlen_s(s, maxcount)              (strnlen(s, maxcount))
 #define strcpy_s(dst, len, src)             (strncpy(dst, src, len))
+#define strncpy_s(dst, len, src, srclen)    (strncpy(dst, src, len))
 #define _stricmp(s1, s2)                    (strcasecmp(s1, s2))
 #define _strnicmp(s1, s2, maxcount)         (strncasecmp(s1, s2, maxcount))
 #define strtok_s(s, d, c)                   (strtok_r(s, d, c))
@@ -130,11 +119,19 @@ typedef void                                *LPOVERLAPPED;
 #define CloseHandle(h)                          // TODO: remove this dummy implementation & replace with WARN.
 #define _ftelli64(f)                        (ftello(f))
 #define _fseeki64(f, o, w)                  (fseeko(f, o, w))
+#define _chsize_s(fd, cb)                   (ftruncate64(fd, cb))
+#define _fileno(f)                          (fileno(f))
+#define InterlockedAdd64(p, v)              (__sync_fetch_and_add(p, v))
+#define InterlockedIncrement64(p)           (__sync_fetch_and_add(p, 1))
 
-#define InitializeCriticalSection(x)        // TODO: add linux support for CriticalSection (not required yet)
-#define DeleteCriticalSection(x)            // TODO: add linux support for CriticalSection (not required yet)
-#define EnterCriticalSection(x)             // TODO: add linux support for CriticalSection (not required yet)
-#define LeaveCriticalSection(x)             // TODO: add linux support for CriticalSection (not required yet)
+typedef struct tdCRITICAL_SECTION {
+    pthread_mutex_t mutex;
+    pthread_mutexattr_t mta;
+} CRITICAL_SECTION, *LPCRITICAL_SECTION;
+VOID InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+VOID DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+VOID EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
+VOID LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
 
 typedef struct _SYSTEMTIME {
     WORD wYear;
@@ -157,6 +154,8 @@ BOOL FindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
 HANDLE LocalAlloc(DWORD uFlags, SIZE_T uBytes);
 VOID LocalFree(HANDLE hMem);
 QWORD GetTickCount64();
+BOOL QueryPerformanceFrequency(_Out_ LARGE_INTEGER *lpFrequency);
+BOOL QueryPerformanceCounter(_Out_ LARGE_INTEGER *lpPerformanceCount);
 VOID GetLocalTime(LPSYSTEMTIME lpSystemTime);
 DWORD InterlockedAdd(DWORD *Addend, DWORD Value);
 BOOL WinUsb_Free(WINUSB_INTERFACE_HANDLE InterfaceHandle);
@@ -189,7 +188,6 @@ BOOL __WinUsb_ReadWritePipe(
 FARPROC GetProcAddress(HMODULE hModule, LPSTR lpProcName);
 HMODULE LoadLibrary(LPWSTR lpFileName);
 #define FreeLibrary(hModule)                (TRUE)
-
-#endif /* LINUX || ANDROID */
+#endif /* LINUX */
 
 #endif /* __OSCOMPATIBILITY_H__ */

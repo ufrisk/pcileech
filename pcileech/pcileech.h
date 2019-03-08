@@ -1,13 +1,12 @@
 // pcileech.h : definitions for pcileech - dump memory and unlock computers with a USB3380 device using DMA.
 //
-// (c) Ulf Frisk, 2016-2018
+// (c) Ulf Frisk, 2016-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __PCILEECH_H__
 #define __PCILEECH_H__
 #include "oscompatibility.h"
-
-#define PCILEECH_VERSION_CURRENT            "3.7.0"
+#include "leechcore.h"
 
 #define SIZE_PAGE_ALIGN_4K(x)                ((x + 0xfff) & ~0xfff)
 #define CONFIG_MAX_SIGNATURES                16
@@ -28,16 +27,14 @@ typedef enum tdActionType {
     WRITE,
     PATCH,
     SEARCH,
-    USB3380_FLASH,
-    USB3380_START8051,
-    USB3380_STOP8051,
     DISPLAY,
     PAGEDISPLAY,
     TESTMEMREAD,
     TESTMEMREADWRITE,
     KMDLOAD,
     KMDEXIT,
-    EXEC,
+    EXEC_KMD,
+    EXEC_UMD,
     MOUNT,
     MAC_FVRECOVER,
     MAC_FVRECOVER2,
@@ -46,52 +43,9 @@ typedef enum tdActionType {
     PT_VIRT2PHYS,
     TLP,
     PROBE,
-    IDENTIFY,
-    DLL_LIBRARY_USE
+    PSLIST,
+    PSVIRT2PHYS
 } ACTION_TYPE;
-
-typedef enum tdPCILEECH_DEVICE_TYPE {
-    PCILEECH_DEVICE_NA,
-    PCILEECH_DEVICE_USB3380,
-    PCILEECH_DEVICE_FPGA,
-    PCILEECH_DEVICE_SP605_TCP,
-    PCILEECH_DEVICE_FILE,
-    PCILEECH_DEVICE_TOTALMELTDOWN,
-    PCILEECH_DEVICE_RAW_TCP
-} PCILEECH_DEVICE_TYPE;
-
-typedef struct tdDMA_IO_SCATTER_HEADER {
-    QWORD qwA;              // base address (DWORD boundry).
-    DWORD cbMax;            // bytes to read (DWORD boundry, max 0x1000); pbResult must have room for this.
-    DWORD cb;               // bytes read into result buffer.
-    PBYTE pb;               // ptr to 0x1000 sized buffer to receive read bytes.
-    PVOID pvReserved1;      // reserved for use by caller.
-    PVOID pvReserved2;      // reserved for use by caller.
-    struct {
-        PVOID pvReserved1;
-        PVOID pvReserved2;
-        BYTE pbReserved[32];
-    } sReserved;            // reserved for future use.
-} DMA_IO_SCATTER_HEADER, *PDMA_IO_SCATTER_HEADER, **PPDMA_IO_SCATTER_HEADER;
-
-typedef struct tdDeviceConfig {
-    QWORD qwMaxSizeDmaIo;
-    QWORD qwAddrMaxNative;
-    PCILEECH_DEVICE_TYPE tp;
-    CHAR szFileNameOptTpFile[MAX_PATH];
-    BOOL fPartialPageReadSupported;
-    BOOL fScatterReadSupported;
-    CRITICAL_SECTION LockDMA;
-    BOOL(*pfnReadDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _Out_ PBYTE pb, _In_ DWORD cb);
-    VOID(*pfnReadScatterDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PPDMA_IO_SCATTER_HEADER ppDMAs, _In_ DWORD cpDMAs, _Out_opt_ PDWORD pcpDMAsRead);
-    BOOL(*pfnWriteDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ PBYTE pb, _In_ DWORD cb);
-    VOID(*pfnProbeDMA)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ QWORD qwAddr, _In_ DWORD cPages, _Inout_ __bcount(cPages) PBYTE pbResultMap);
-    BOOL(*pfnWriteTlp)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ PBYTE pb, _In_ DWORD cb);
-    BOOL(*pfnListenTlp)(_Inout_ PPCILEECH_CONTEXT ctx, _In_ DWORD dwTime);
-    VOID(*pfnClose)(_Inout_ PPCILEECH_CONTEXT ctx);
-    BOOL(*pfnGetOption)(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD fOption, _Out_ PQWORD pqwValue);
-    BOOL(*pfnSetOption)(_Inout_ PPCILEECH_CONTEXT ctxPcileech, _In_ QWORD fOption, _In_ QWORD qwValue);
-} DEVICE_CONFIG;
 
 typedef struct tdCONFIG_OPTION {
     QWORD isValid;
@@ -104,28 +58,26 @@ typedef struct tdConfig {
     QWORD qwCR3;
     QWORD qwEFI_IBI_SYST;
     QWORD qwKMD;
+    CHAR szDevice[MAX_PATH];
+    CHAR szRemote[MAX_PATH];
     CHAR szFileOut[MAX_PATH];
     PBYTE pbIn;
     QWORD cbIn;
     CHAR szInS[MAX_PATH];
     QWORD qwDataIn[10];
-    CONFIG_OPTION DeviceOpt[4];
     ACTION_TYPE tpAction;
     CHAR szSignatureName[MAX_PATH];
     CHAR szKMDName[MAX_PATH];
     CHAR szShellcodeName[MAX_PATH];
+    CHAR szHook[MAX_PATH];
     QWORD qwMaxSizeDmaIo;
     DWORD dwListenTlpTimeMs;
-    DWORD TcpAddr;
-    WORD TcpPort;
     // flags below
     BOOL fPageTableScan;
     BOOL fPatchAll;
     BOOL fForceRW;
     BOOL fShowHelp;
     BOOL fOutFile;
-    BOOL fForceUsb2;        // USB3380
-    BOOL fForcePCIeGen1;    // FPGA
     BOOL fVerbose;
     BOOL fVerboseExtra;
     BOOL fVerboseExtraTlp;
@@ -133,9 +85,6 @@ typedef struct tdConfig {
     BOOL fPartialPageReadSupported;
     BOOL fAddrKMDSetByArgument;
     BOOL fLoop;
-    BOOL fNoProcFS;
-    // device information below
-    DEVICE_CONFIG dev;
 } CONFIG, *PCONFIG;
 
 #define SIGNATURE_CHUNK_TP_OFFSET_FIXED     0
@@ -251,15 +200,22 @@ typedef struct tdKMDHANDLE {
 } KMDHANDLE, *PKMDHANDLE;
 
 struct tdPCILEECH_CONTEXT {
-    PCONFIG cfg;
+    CONFIG cfg;
+    LEECHCORE_CONFIG dev;
+    HANDLE hMemProcFS;
     HANDLE hDevice;
-    HANDLE hVMM;
     PKMDHANDLE phKMD;
     PKMDDATA pk;
 };
 
-BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[], _Inout_ PPCILEECH_CONTEXT ctx);
-VOID PCILeechConfigFixup(_Inout_ PPCILEECH_CONTEXT ctx);
-VOID PCILeechFreeContext(_Inout_ PPCILEECH_CONTEXT ctx);
+BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[]);
+VOID PCILeechConfigFixup();
+VOID PCILeechFreeContext();
+
+// ----------------------------------------------------------------------------
+// PCILeech global variables below:
+// ----------------------------------------------------------------------------
+
+PPCILEECH_CONTEXT ctxMain;
 
 #endif /* __PCILEECH_H__ */

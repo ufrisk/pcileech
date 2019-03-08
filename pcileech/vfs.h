@@ -1,6 +1,6 @@
 // vfs.h : definitions related to virtual file system support.
 //
-// (c) Ulf Frisk, 2017
+// (c) Ulf Frisk, 2017-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __VFS_H__
@@ -33,9 +33,8 @@ typedef struct tdVFS_RESULT_FILEINFO {
 * the target system kernel. NB! This action requires a loaded kernel module and
 * that the Dokany file system library and driver have been installed. Please
 * see: https://github.com/dokan-dev/dokany/releases
-* -- pCfg
 * -- pDeviceData
 */
-VOID ActionMount(_Inout_ PPCILEECH_CONTEXT ctx);
+VOID ActionMount();
 
 #endif /* __VFS_H__ */

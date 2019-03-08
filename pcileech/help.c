@@ -1,10 +1,11 @@
 // help.c : implementation related to displaying help texts.
 //
-// (c) Ulf Frisk, 2016-2018
+// (c) Ulf Frisk, 2016-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "help.h"
 #include "util.h"
+#include "version.h"
 
 VOID ShowListFiles(_In_ LPSTR szSearchPattern)
 {
@@ -26,46 +27,58 @@ VOID Help_ShowGeneral()
 {
     printf(
         " PCILEECH COMMAND LINE REFERENCE                                               \n" \
-        " PCILeech can run in two modes - DMA (default) and Kernel Module Assisted (KMD)\n" \
+        " PCILeech can run in two modes - NATIVE (default), Kernel Module Assisted (KMD)\n" \
         " KMD mode may be triggered by supplying the option kmd and optionally cr3 / pt.\n" \
         " If an address is supplied in the kmd option pcileech will use the already ins-\n" \
         " erted KMD. The already inserted KMD will be left intact upon exit.  If the KMD\n" \
         " contains a kernel mode signature the kernel module will be loaded and then un-\n" \
         " loaded on program exit ( except for the kmdload command ).                    \n" \
         " KMD mode may access all memory (available to the kernel of the target system).\n" \
-        " DMA mode may access 4GB memory if USB3380 hardware is used.                   \n" \
-        " DMA mode may access all memory if FPGA based hardware is used such as the:    \n" \
-        "   SP605/FT601, AC701/FT601 and PCIeScreamer.                                  \n" \
+        " NATIVE mode may access 4GB memory if USB3380 hardware is used.                \n" \
+        " NATIVE mode may access all memory if FPGA based hardware is used such as the: \n" \
+        "   SP605/FT601, AC701/FT601 and PCIeScreamer. This mode also works for software\n" \
+        "   based acquisition methods such as Files, DumpIt, WinPmem or any other method\n" \
+        "   supported by the LeechCore library. For more information check out:         \n" \
+        "   https://github.com/ufrisk/PCILeech and  https://github.com/ufrisk/LeechCore \n" \
         " For detailed help about a specific command type:  pcileech <command> -help    \n" \
         " General syntax: pcileech <command> [-<optionname1> <optionvalue1>] ...        \n" \
-        " Valid commands and valid MODEs     [ and options ]                            \n" \
-        "   info                   DMA,KMD                                              \n" \
-        "   dump                   DMA,KMD   [ min, max, out ]                          \n" \
-        "   patch                  DMA,KMD   [ min, max, sig, all ]                     \n" \
-        "   write                  DMA,KMD   [ min, in ]                                \n" \
-        "   search                 DMA,KMD   [ min, max, sig, in, all ]                 \n" \
-        "   [implant]                  KMD   [ in, out, s, 0..9 ]                       \n" \
-        "   kmdload                DMA       [ pt, cr3 ]                                \n" \
-        "   kmdexit                    KMD                                              \n" \
-        "   mount                  DMA,KMD   [ s, cr3 ]     (Windows only feature)      \n" \
-        "   display                DMA,KMD   [ min, max ]                               \n" \
-        "   pagedisplay            DMA,KMD   [ min ]                                    \n" \
-        "   pt_phys2virt           DMA,KMD   [ cr3, 0 ]                                 \n" \
-        "   pt_virt2phys           DMA,KMD   [ cr3, 0 ]                                 \n" \
-        "   testmemread            DMA       [ min ]                                    \n" \
-        "   testmemreadwrite       DMA       [ min ]                                    \n" \
-        "   identify               DMA                                                  \n" \
+        " VALID COMMANDS           MODEs        [ OPTIONS ]    (REQUIREMENTS)           \n" \
+        "   info                   NATIVE,KMD                                           \n" \
+        "   dump                   NATIVE,KMD   [ min, max, out ]                       \n" \
+        "   patch                  NATIVE,KMD   [ min, max, sig, all ]                  \n" \
+        "   write                  NATIVE,KMD   [ min, in ]                             \n" \
+        "   search                 NATIVE,KMD   [ min, max, sig, in, all ]              \n" \
+        "   [implant]                     KMD   [ in, out, s, 0..9 ]                    \n" \
+        "   kmdload                NATIVE       [ pt, cr3 ]                             \n" \
+        "   kmdexit                       KMD                                           \n" \
+        "   mount                  NATIVE,KMD   [ s, cr3 ]     (Windows)                \n" \
+        "   display                NATIVE,KMD   [ min, max ]                            \n" \
+        "   pagedisplay            NATIVE,KMD   [ min ]                                 \n" \
+        "   pt_phys2virt           NATIVE,KMD   [ cr3, 0 ]                              \n" \
+        "   pt_virt2phys           NATIVE,KMD   [ cr3, 0 ]                              \n" \
+        "   testmemread            NATIVE       [ min ]                                 \n" \
+        "   testmemreadwrite       NATIVE       [ min ]                                 \n" \
         " Device specific commands and valid MODEs [ and options ] (and device):        \n" \
-        "   usb3380_flash          DMA,KMD   [ in ]         (USB3380)                   \n" \
-        "   usb3380_8051start      DMA,KMD   [ in ]         (USB3380)                   \n" \
-        "   usb3380_8051stop       DMA,KMD                  (USB3380)                   \n" \
-        "   tlp                    DMA       [ in ]         (FPGA)                      \n" \
-        "   probe                  DMA       [ in ]         (FPGA)                      \n" \
+        "   tlp                    NATIVE       [ in ]         (FPGA)                   \n" \
+        "   probe                  NATIVE       [ min, max ]   (FPGA)                   \n" \
+        "   pslist                 NATIVE                      (MemProcFS/Windows)      \n" \
+        "   psvirt2phys            NATIVE       [ 0, 1 ]       (MemProcFS/Windows)      \n" \
         " System specific commands and valid MODEs [ and options ]:                     \n" \
-        "   mac_fvrecover          DMA                      (USB3380)                   \n" \
-        "   mac_fvrecover2         DMA                      (USB3380)                   \n" \
-        "   mac_disablevtd         DMA                      (USB3380)                   \n" \
+        "   mac_fvrecover          NATIVE                      (USB3380)                \n" \
+        "   mac_fvrecover2         NATIVE                      (USB3380)                \n" \
+        "   mac_disablevtd         NATIVE                      (USB3380)                \n" \
         " Valid options:                                                                \n" \
+        "   -device: The memory acquisition device to including config options in the   \n" \
+        "          device connection string. If option is not given the USB3380 and FPGA\n" \
+        "          will be auto-detected. For a complete list of supported devices and  \n" \
+        "          their individual config options check out the documentation for the  \n" \
+        "          LeechCore library at: https://github.com/ufrisk/LeechCore            \n" \
+        "          Affects all modes and commands.                                      \n" \
+        "          Common valid options: USB3380, FPGA, DumpIt, <memory-dump-file-name> \n" \
+        "   -remote: Connect to a remote system LeechSvc to acquire remote memory. This \n" \
+        "          is a Windows-only feature. Specify remote host and remote user to    \n" \
+        "          authenticate (or insecure if no authenciation). Kerberos-secure conn.\n" \
+        "          Example: rpc://<remote-user-spn_or_insecure>:<remote_host>           \n" \
         "   -min : memory min address, valid range: 0x0 .. 0xffffffffffffffff           \n" \
         "          default: 0x0                                                         \n" \
         "   -max : memory max address, valid range: 0x0 .. 0xffffffffffffffff           \n" \
@@ -84,26 +97,15 @@ VOID Help_ShowGeneral()
         "   -force: force reads and writes even though target memory is marked as not   \n" \
         "          accessible. Dangerous! Affects all modes and commands.               \n" \
         "          Option has no value. Example: -force                                 \n" \
-        "   -usb2: force USB2 mode (only for USB3380 device). USB2 will reduce transfer \n" \
-        "          speed but increase stability. Option has no value. Example: -usb2    \n" \
-        "   -pcie_gen1: force PCIe Gen1 mode. For FPGA devices capable of PCIe Gen2.    \n" \
-        "          May increase stability. Option has no value. Example: -pcie_gen1     \n" \
-        "   -iosize: max DMA i/o size. Hardware DMA requests larger than iosize will    \n" \
-        "          be discarded. Affects all modes and commands.                        \n" \
+        "   -iosize: max i/o size. Hardware DMA requests larger than iosize will be     \n" \
+        "          discarded. Affects all modes and commands.                           \n" \
         "   -tlpwait: Wait in seconds while listening for PCIe TLPs.                    \n" \
         "          Wait occurs after any other actions have been completed.             \n" \
-        "   -device: force the use of a specific hardware device instead of auto-detect.\n" \
-        "          Affects all modes and commands.                                      \n" \
-        "          Valid options: USB3380, FPGA, SP605_TCP, RAWTCP, TOTALMELTDOWN or    \n" \
-        "          <memory-dump-file-name>.                                             \n" \
-        "   -device-addr: Remote address for -device RAWTCP and SP605_TCP.              \n" \
-        "   -device-port: Remote TCP port for -device RAWTCP and SP605_TCP. (optional). \n" \
-        "   -device-opt[0-3]: Optional additional device configuration for some devices.\n" \
-        "          FPGA device (NB! 0 = default!): -device-opt0 = delay read uS         \n" \
-        "                -device-opt1 = delay write uS, -device-opt2 = delay probe uS   \n" \
         "   -help: show help about the selected command or implant and then exit        \n" \
         "          without running the command. Affects all modes and commands.         \n" \
         "          Option has no value. Example: -help                                  \n" \
+        "   -hook: Where to place a hook. In case of IAT hooking (UMD*IAT*) specify as: \n" \
+        "          <imported-module>!<function-to-hook> Example: msvcrt.dll!memcpy      \n" \
         "   -in  : file name or hexstring to load as input.                             \n" \
         "          Examples: -in 0102030405060708090a0b0c0d0e0f or -in firmware.bin     \n" \
         "   -s   : string input value.                                                  \n" \
@@ -120,20 +122,22 @@ VOID Help_ShowGeneral()
         "          ALTERNATIVELY                                                        \n" \
         "          kernel module to use, see list below for choices:                    \n" \
         "             WIN10_X64                                                         \n" \
-        "             LINUX_X64_46            (NB! Kernels 2.6.33 - 4.6)                \n" \
-        "             LINUX_X64_48            (NB! Kernels 4.8+, 64-bit DMA recommended)\n" \
-        "             LINUX_X64_EFI           (NB! UEFI booted systems only)            \n" \
+        "             WIN10_X64_2         (Requires: FPGA & Windows MemProcFS 'vmm.dll')\n" \
+        "             LINUX_X64_46        (NB! Kernels 2.6.33 - 4.6)                    \n" \
+        "             LINUX_X64_48        (NB! Kernels 4.8+, FPGA only)                 \n" \
+        "             LINUX_X64_EFI       (NB! UEFI booted systems only)                \n" \
         "             FREEBSD_X64                                                       \n" \
         "             MACOS                                                             \n" \
         "             UEFI_EXIT_BOOT_SERVICES                                           \n" \
-        "             UEFI_SIGNAL_EVENT                                                 \n" \
-    );
+        "             UEFI_SIGNAL_EVENT                                                 \n");
     ShowListFiles("*.kmd");
     printf(
         "   -sig : available patches - including operating system unlock patches:       \n");
     ShowListFiles("*.sig");
     printf(
-        " Available implants:                                                           \n");
+        " User-Mode implants: EXPERIMENTAL! (Requires: MemProcFS/Windows 'vmm.dll')     \n" \
+        "             UMD_WINX64_IAT_PSEXEC                                             \n" \
+        " Kernel-mode implants:                                                         \n");
     ShowListFiles("*.ksh");
     printf("\n");
 }
@@ -144,7 +148,7 @@ VOID Help_ShowInfo()
         " PCILEECH INFORMATION                                                          \n" \
         " PCILeech (c) 2016-2019 Ulf Frisk                                              \n" \
         " Version: " \
-        PCILEECH_VERSION_CURRENT \
+        VER_FILE_VERSION_STR "\n" \
         "                                                                \n" \
         " License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
         " Contact information: pcileech@frizk.net                                       \n" \
@@ -152,13 +156,14 @@ VOID Help_ShowInfo()
         " Other project references:                                                     \n" \
         "   PCILeech          - https://github.com/ufrisk/pcileech                      \n" \
         "   PCILeech-FPGA     - https://github.com/ufrisk/pcileech-fpga                 \n" \
+        "   LeechCore         - https://github.com/ufrisk/LeechCore                     \n" \
+        "   MemProcFS         - https://github.com/ufrisk/MemProcFS                     \n" \
         "   Google USB Driver - https://developer.android.com/sdk/win-usb.html          \n" \
         "   FTDI FT601 Driver - http://www.ftdichip.com/Drivers/D3XX.htm                \n" \
         "   PCIe Injector     - https://github.com/enjoy-digital/pcie_injector          \n" \
-        "   iLO DMA firmware  - https://www.synacktiv.com/posts/exploit/using-your-bmc-as-a-dma-device-plugging-pcileech-to-hpe-ilo-4.html \n" \
         "   Dokany            - https://github.com/dokan-dev/dokany/releases/latest     \n" \
         " ----------------                                                              \n" \
-        " Use with memory dump files in read-only mode.                                 \n" \
+        " Use with memory dump files, DumpIt, WinPmem in read-only mode.                \n" \
         " Use with USB3380 hardware programmed as a PCILeech device.                    \n" \
         " Use with FPGA harware programmed as a PCILeech FPGA device.                   \n\n" \
         " ----------------                                                              \n" \
@@ -173,10 +178,9 @@ VOID Help_ShowInfo()
         "   PCILeech also requires the FTDI application library (DLL). Download DLL from\n" \
         "   FTDI web site and place the 64-bit FTD3XX.dll alongside pcileech.exe.       \n" \
         " Driver information (Dokany/Windows):                                          \n" \
-        "   To be able to use the 'mount' functionality for filesystem browsing and live\n" \
-        "   memory file access PCILeech requires Dokany to be installed for virtual file\n" \
-        "   system support. Please download and install Dokany on your computer before  \n" \
-        "   using the mount functionality.                                              \n" \
+        "   To be able to use the 'mount' functionality for filesystem browsing PCILeech\n" \
+        "   requires Dokany to be installed for virtual file system support. Download   \n" \
+        "   and install Dokany on your computer before using the mount functionality.   \n" \
         " Driver information (USB3380/Linux):                                           \n" \
         "   PCILeech on Linux requires that libusb is installed. Libusb is most probably\n" \
         "   installed by default, if not install by running:apt-get install libusb-1.0-0\n" \
@@ -201,20 +205,20 @@ VOID Help_ShowInfo()
     Help_ShowGeneral();
 }
 
-VOID _HelpShowExecCommand(_In_ PCONFIG pCfg)
+VOID _HelpShowExecCommand()
 {
     BOOL result;
     PKMDEXEC pKmdExec = NULL;
-    result = Util_LoadKmdExecShellcode(pCfg->szShellcodeName, &pKmdExec);
+    result = Util_LoadKmdExecShellcode(ctxMain->cfg.szShellcodeName, &pKmdExec);
     if(!result) {
-        printf("HELP: Failed loading shellcode from file: '%s.ksh' ...\n", pCfg->szShellcodeName);
+        printf("HELP: Failed loading shellcode from file: '%s.ksh' ...\n", ctxMain->cfg.szShellcodeName);
         return;
     }
     printf(
         " SHELLCODE IMPLANT HELP: Execute a custom implant in the target kernel.        \n" \
         " MODES   : KMD                                                                 \n" \
         " OPTIONS : -in, -out, -s, -0, -1, -2, -3, -4, -5, -6, -7, -8, -9               \n");
-    printf(" Implant loaded from file: %s.ksh\n", pCfg->szShellcodeName);
+    printf(" Implant loaded from file: %s.ksh\n", ctxMain->cfg.szShellcodeName);
     printf(
         " Implant specific help (output values are left empty/set to zero):             \n" \
         " ============================================================================= \n");
@@ -222,44 +226,46 @@ VOID _HelpShowExecCommand(_In_ PCONFIG pCfg)
     LocalFree(pKmdExec);
 }
 
-VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
+VOID Help_ShowDetailed()
 {
-    switch(pCfg->tpAction) {
+    switch(ctxMain->cfg.tpAction) {
     case DUMP:
         printf(
             " DUMP MEMORY FROM TARGET SYSTEM TO FILE.                                       \n" \
-            " MODES   : DMA, KMD                                                            \n" \
+            " MODES   : NATIVE, KMD                                                         \n" \
             " OPTIONS : -min, -max, -out, -force                                            \n" \
             " The physical memory is dumped to file. If no file is specified in the -out    \n" \
-            " option then a default named file is created. When dumping in DMA mode PCILeech\n" \
-            " tries to dump memory between 0-4GB unless a separate range is specified by the\n" \
-            " -min and -max parameters. When dumping in KMD mode readable physical memory   \n" \
-            " accessible to the kernel is dumped unless a separate range is specified in the\n" \
-            " -min and -max options. Memory related to PCIe and devices is not dumped (these\n" \
-            " memory ranges are written as zeroes) unless the -force option is specified.   \n" \
+            " option then a default named file is created. When dumping in NATIVE mode the  \n" \
+            " max memory will be auto-detected (unless if the USB3380 hardware is used).    \n" \
+            " When dumping in KMD mode readable physical memory accessible to the kernel is \n" \
+            " dumped automatically. It is possible to override auto-detected sections with  \n" \
+            " the -min and -max options. Unreadable memory will be zero-padded.             \n" \
             " Please note that using the -force option may result in a system crash.        \n" \
             " The DUMP command dumps 4kB memory pages. Partial pages are not supported.     \n" \
             " EXAMPLES:      (example kernel module is loaded at address 0x7fffe000)        \n" \
-            " 1) dump memory up to 4GB by using native DMA:                                 \n" \
+            " 1) dump memory up to 4GB by using NATIVE mode:                                \n" \
             "    pcileech dump                                                              \n" \
-            " 2) dump memory as seen by the kernel:                                         \n" \
+            " 2) dump memory as seen by the kernel using kernel module:                     \n" \
             "    pcileech dump -kmd 0x7fffe000                                              \n" \
             " 3) dump memory between 5GB and 6GB:                                           \n" \
-            "    pcileech dump -kmd 0x7fffe000 -min 0x140000000 -max 0x180000000            \n" \
+            "    pcileech dump -min 0x140000000 -max 0x180000000                            \n" \
             " 4) dump memory to file c:\\temp\\out.raw:                                     \n" \
-            "    pcileech dump -kmd 0x7fffe000 -out \"c:\\temp\\out.raw\"                   \n");
+            "    pcileech dump -kmd 0x7fffe000 -out \"c:\\temp\\out.raw\"                   \n" \
+            " 5) dump memory from remote LeechService using DumpIt:                         \n" \
+            "    pcileech dump -device dumpit -remote rpc://userspn@ad.domain.com -out 1.dmp\n" \
+        );
         break;
     case WRITE:
         printf(
             " WRITE DATA TO TARGET SYSTEM MEMORY.                                           \n" \
-            " MODES   : DMA, KMD                                                            \n" \
+            " MODES   : NATIVE, KMD                                                         \n" \
             " OPTIONS : -min, -in, -force                                                   \n" \
             " WRITE will write contents specified in the -in option to the memory address   \n" \
             " specified by the -min option. The memory address may be unaligned. It is also \n" \
             " possible to try to write to non-accessible memory - such as PCIe memory mapped\n" \
             " devices with the -force option. Please note that using the -force option may  \n" \
             " result in a system crash. In KMD mode the write is performed by the target    \n" \
-            " operating system. In DMA mode the write is performed by the PCILeech device.  \n" \
+            " operating system. In NATIVE mode the write is performed by the PCILeech device\n" \
             " EXAMPLES:      (example kernel module is loaded at address 0x7fffe000)        \n" \
             " 1) write the bytes 11223344 to the physical address 0x1003                    \n" \
             "    pcileech write -min 0x1003 -in 11223344                                    \n" \
@@ -271,7 +277,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case PATCH:
         printf(
             " PATCH THE MEMORY OF THE TARGET SYSTEM.                                        \n" \
-            " MODES   : DMA, KMD                                                            \n" \
+            " MODES   : NATIVE, KMD                                                         \n" \
             " OPTIONS : -min, -max, -sig, -all, -force                                      \n" \
             " Patch loads one or several signatures from the .sig file specified in the -sig\n" \
             " option. The -sig option should be specified without file extension. The memory\n" \
@@ -292,7 +298,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case SEARCH:
         printf(
             " SEARCH THE MEMORY OF THE TARGET SYSTEM FOR THE GIVEN SIGNATURE.               \n" \
-            " MODES   : DMA, KMD                                                            \n" \
+            " MODES   : NATIVE, KMD                                                         \n" \
             " OPTIONS : -min, -max, -sig, -in, -all, -force                                 \n" \
             " Search the memory for signatures specified in the -sig or -in options. If the \n" \
             " -sig option is specified signatures are loaded from the signature file and are\n" \
@@ -319,6 +325,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
         printf(
             " MOUNT TARGET LIVE RAM AND FILE SYSTEM AS 'NETWORK DRIVE'.                     \n" \
             " MODES   : KMD                                                                 \n" \
+            " REQUIRE : Windows/Dokany                                                      \n" \
             " OPTIONS : -s                                                                  \n" \
             " Mount the target system live ram and file system as the drive letter specified\n" \
             " in the -s option. If the -s option is not specified PCILeech will try to mount\n" \
@@ -327,17 +334,13 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
             " hardware device is used, and mount memory process file system (in read-only   \n" \
             " mode when dump file is used, in read-write mode when hardware device is used).\n" \
             " ------------------------------------------------------------------------------\n" \
-            " mode when dump file is used, in read-write mode when hardware device is used).\n" \
-            " mode when dump file is used, in read-write mode when hardware device is used).\n" \
-            " mode when dump file is used, in read-write mode when hardware device is used).\n" \
-            " ------------------------------------------------------------------------------\n" \
             " File system mount is currently supported for: macOS, Windows and Linux.  There\n" \
             " are limitations that are important to know, please see below. Use at own risk!\n" \
             "  - Create file: not implemented.                                              \n" \
             "  - Write to files may be buggy and may in rare cases corrupt the target file. \n" \
             "  - Delete file will most often work, but with errors.                         \n" \
             "  - Delete directory, rename/move file and other features may not be supported.\n" \
-            "  - Only the C:\\ driver is mounted on Windows target systems.                 \n" \
+            "  - Only the C:\\ drive is mounted on Windows target systems.                  \n" \
             " The target system files are found in the files directory.    The memory of the\n" \
             " target system is mapped into the files: liveram-kmd.raw and liveram-native.raw\n" \
             " Writing to the live memory may crash the target system.      Copying files and\n" \
@@ -359,7 +362,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case DISPLAY:
         printf(
             " DISPLAY MEMORY ON SCREEN.                                                     \n" \
-            " MODES   : DMA, KMD                                                            \n" \
+            " MODES   : NATIVE, KMD                                                         \n" \
             " OPTIONS : -min, -max (optional)                                               \n" \
             " The memory contents between min and max is shown on screen.                   \n" \
             " Use the -min option to specify the memory location.                           \n" \
@@ -374,7 +377,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case PAGEDISPLAY:
         printf(
             " DISPLAY A MEMORY PAGE ON SCREEN.                                              \n" \
-            " MODES   : DMA, KMD                                                            \n" \
+            " MODES   : NATIVE, KMD                                                            \n" \
             " OPTIONS : -min                                                                \n" \
             " The memory contents of a single page (4096 bytes) is shown on screen. Use the \n" \
             " -min option to specify the memory location. If the -min option is not aligned \n" \
@@ -392,13 +395,13 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case TESTMEMREADWRITE:
         printf(
             " TEST READING AND/OR READING+WRITING TO A PHYSICAL MEMORY ADDRESS.             \n" \
-            " MODES   : DMA                                                                 \n" \
+            " MODES   : NATIVE                                                                 \n" \
             " Used for debug purposes. Test reading and/or reading+writing to a physical    \n" \
-            " memory address with DMA. The address page read and optionally written to is   \n" \
-            " specified by the -min option. If the address is inside a protected range then \n" \
-            " the -force option could be specified to override. A number of reads and writes\n" \
-            " are executed. Unless there is a catastrophic failure the page is restored to  \n" \
-            " its original state after testing writes with testmemreadwrite.                \n" \
+            " memory address. The address page read and optionally written to is specified  \n" \
+            " by the -min option. If the address is inside a protected range then the -force\n" \
+            " option could be specified to override. A number of reads and writes are exec- \n" \
+            " cuted. Unless there is a catastrophic failure the page is restored to its     \n" \
+            " original state after testing writes with testmemreadwrite.                    \n" \
             " EXAMPLES:                                                                     \n" \
             " 1) test reading from the memory address at 0x1000                             \n" \
             "    pcileech testmemread -min 0x1000                                           \n" \
@@ -410,7 +413,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case KMDLOAD:
         printf(
             " LOAD A KERNEL MODULE INTO THE OPERATING SYSTEM KERNEL FOR LATER USE.          \n" \
-            " MODES   : DMA                                                                 \n" \
+            " MODES   : NATIVE                                                                 \n" \
             " OPTIONS : -kmd, -pt, -cr3                                                     \n" \
             " Load a kernel module into the running operating system kernel for later use.  \n" \
             " The kernel module is specified in the -kmd paramter. If the specified kernel  \n" \
@@ -442,7 +445,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case MAC_FVRECOVER:
         printf(
             " RECOVER FILEVAULT 2 PASSWORD FROM A LOCKED macOS SYSTEM.                      \n" \
-            " MODES   : DMA                                                                 \n" \
+            " MODES   : NATIVE                                                              \n" \
             " OPTIONS :                                                                     \n" \
             " Plug in the PCILeech device to any macOS system with a Thunderbolt 2 port. You\n" \
             " will be asked to reboot if PCILeech is ready. After the reboot PCILeech will  \n" \
@@ -460,7 +463,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case MAC_FVRECOVER2:
         printf(
             " RECOVER FILEVAULT 2 PASSWORD FROM A macOS SYSTEM IMMEDIATELY AFTER UNLOCK.    \n" \
-            " MODES   : DMA                                                                 \n" \
+            " MODES   : NATIVE                                                                 \n" \
             " OPTIONS :                                                                     \n" \
             " Plug in the PCILeech device to any macOS system with a Thunderbolt 2 port.    \n" \
             " Wait for the user to enter the filefault 2 password to unlock the computer.   \n" \
@@ -474,7 +477,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case MAC_DISABLE_VTD:
         printf(
             " DISABLE Vt-d DMA PROTECTIONS IMMEDIATELY AFTER macOS BOOT.                    \n" \
-            " MODES   : DMA                                                                 \n" \
+            " MODES   : NATIVE                                                              \n" \
             " OPTIONS :                                                                     \n" \
             " Plug in the PCILeech device to any macOS system with a Thunderbolt 2 port.    \n" \
             " Wait for the user to enter the filefault 2 password to unlock the computer.   \n" \
@@ -489,7 +492,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case PT_PHYS2VIRT:
         printf(
             " SEARCH FOR VIRTUAL ADDRESS MAPPED TO GIVEN PHYSICAL ADDRESS.                  \n" \
-            " MODES   : DMA, KMD                                                            \n" \
+            " MODES   : NATIVE, KMD                                                         \n" \
             " OPTIONS : -cr3, -0                                                            \n" \
             " Walk the page table of which base is specified on the 'cr3' option to find the\n" \
             " first occurrence of a virtual address mapped to the physical address specified\n" \
@@ -503,7 +506,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case PT_VIRT2PHYS:
         printf(
             " RETRIEVE PHYSICAL ADDRESS THAT VIRTUAL ADDRESS RESOLVES TO.                   \n" \
-            " MODES   : DMA, KMD                                                            \n" \
+            " MODES   : NATIVE, KMD                                                         \n" \
             " OPTIONS : -cr3, -0                                                            \n" \
             " Retrieve the physical address that the virtual address resolves to.  The Phys-\n" \
             " ical address of the CR3 register is specified in '-cr3' parameter. The virtual\n" \
@@ -516,7 +519,7 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case TLP:
         printf(
             " TRANSMIT AND RECEIVE RAW PCIe TLPs                                            \n" \
-            " MODES   : DMA                                                                 \n" \
+            " MODES   : NATIVE                                                              \n" \
             " OPTIONS : -in, -vv, -wait                                                     \n" \
             " Transmit and receive PCIe TLPs. Requires supported devices such as the SP605. \n" \
             " The USB3380 is not a supported device. Multiple TLPs may be stacked. If not   \n" \
@@ -531,27 +534,56 @@ VOID Help_ShowDetailed(_In_ PCONFIG pCfg)
     case PROBE:
         printf(
             " PROBE MEMORY FOR READABLE PAGES                                               \n" \
-            " MODES   : DMA                                                                 \n" \
+            " MODES   : NATIVE                                                              \n" \
             " Probe a memory region specified by defaults or -min, -max for readable pages. \n" \
-            " This is done in a device-effifient manner. Probing is performed in DMA mode.  \n" \
+            " This is done in a device-effifient manner. Probing is performed in NATIVE mode\n" \
             " The USB3380 is not a supported device.                                        \n" \
             " EXAMPLEs:                                                                     \n" \
             " 1) Probe memory up to 10GB                                                    \n" \
             "    pcileech probe -max 0x280000000                                            \n");
         break;
-    case IDENTIFY:
+    case PSLIST:
         printf(
-            " TRY TO IDENTIFY OPERATING SYSTEM IMPORTANT INFORMATION IN MEMORY IMAGE        \n" \
-            " MODES   : DMA                                                                 \n" \
-            " Scans the memory to identify important operatins system specific information  \n" \
-            " such as page directory bases (that can be used with the mount command).       \n" \
-            " Currently only Windows is supported. USB3380 devices are not supported        \n" \
+            " LIST PROCESSES OF THE TARGET SYSTEM                                           \n" \
+            " MODES   : NATIVE                                                              \n" \
+            " REQUIRE : Windows/MemProcFS vmm.dll                                           \n" \
+            " OPTIONS :                                                                     \n" \
+            " List the process names and pids of the targeted system.                       \n" \
             " EXAMPLEs:                                                                     \n" \
-            " 1) Scan for process page directories                                          \n" \
-            "    pcileech identify                                                          \n");
+            " 1) List devices using 'fpga' or 'usb3380' hardware device.                    \n" \
+            "    pcileech pslist                                                            \n" \
+            " 2) List devices in dump file win10.raw                                        \n" \
+            "    pcileech pslist -device win10.raw                                          \n");
         break;
-    case EXEC:
-        _HelpShowExecCommand(pCfg);
+    case PSVIRT2PHYS:
+        printf(
+            " TRANSLATE A VIRTUAL MEMORY ADDRESS INTO PHYSICAL MEMORY ADDRESS FOR GIVEN PID \n" \
+            " MODES   : NATIVE                                                              \n" \
+            " REQUIRE : Windows/MemProcFS vmm.dll                                           \n" \
+            " OPTIONS : -0, -1                                                              \n" \
+            " Translate a process virtual address into a physical address                   \n" \
+            " EXAMPLEs:                                                                     \n" \
+            " 1) Translate a virtual address of pid 638 into its physical address           \n" \
+            "    pcileech psvirt2phys -0 638 -1 0x7ffc8b41a000                              \n");
+        break;
+    case EXEC_UMD:
+        printf(
+            " EXECUTE A USER MODE SHELLCODE (EXPERIMENTAL)                                  \n" \
+            " MODES   : NATIVE                                                              \n" \
+            " REQUIRE : Windows/MemProcFS vmm.dll                                           \n" \
+            " OPTIONS : -0, -1 -hook -s                                                     \n" \
+            " Hook a user mode application (currently supported method is hooking the import\n" \
+            " address table - IAT). If the hook is successful the shellcode will be executed\n" \
+            " (currently supported is creating a new process.                               \n" \
+            " pcileech UMD_WINX64_IAT_PSEXEC -0 <pid> -1 <flags> -s <exe> -hook <hook-iat>  \n" \
+            " EXAMPLEs:                                                                     \n" \
+            " 1) Create a CMD from Utilman.exe by hooking RegCloseKey (632 is the pid):     \n" \
+            "    pcileech UMD_WINX64_IAT_PSEXEC -hook ADVAPI32.dll!RegCloseKey              \n" \
+            "             -0 632 -1 0x08000000 -s c:\\windows\\system32\\cmd.exe            \n" \
+        );
+        break;
+    case EXEC_KMD:
+        _HelpShowExecCommand();
         break;
     default:
         printf(

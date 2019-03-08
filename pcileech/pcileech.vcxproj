@@ -1,16 +1,12 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="DebugDLL|x64">
-      <Configuration>DebugDLL</Configuration>
-      <Platform>x64</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="ReleaseDLL|x64">
-      <Configuration>ReleaseDLL</Configuration>
+    <ProjectConfiguration Include="ReleaseMT|x64">
+      <Configuration>ReleaseMT</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
@@ -18,38 +14,77 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Makefile" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="pcileech.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="device.h" />
+    <ClInclude Include="dokan.h" />
+    <ClInclude Include="executor.h" />
+    <ClInclude Include="extra.h" />
+    <ClInclude Include="help.h" />
+    <ClInclude Include="kmd.h" />
+    <ClInclude Include="leechcore.h" />
+    <ClInclude Include="memdump.h" />
+    <ClInclude Include="mempatch.h" />
+    <ClInclude Include="oscompatibility.h" />
+    <ClInclude Include="pcileech.h" />
+    <ClInclude Include="shellcode.h" />
+    <ClInclude Include="statistics.h" />
+    <ClInclude Include="umd.h" />
+    <ClInclude Include="util.h" />
+    <ClInclude Include="version.h" />
+    <ClInclude Include="vfs.h" />
+    <ClInclude Include="vmmdll.h" />
+    <ClInclude Include="vmmprx.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="device.c" />
+    <ClCompile Include="executor.c" />
+    <ClCompile Include="extra.c" />
+    <ClCompile Include="help.c" />
+    <ClCompile Include="kmd.c" />
+    <ClCompile Include="memdump.c" />
+    <ClCompile Include="mempatch.c" />
+    <ClCompile Include="oscompatibility.c" />
+    <ClCompile Include="pcileech.c" />
+    <ClCompile Include="statistics.c" />
+    <ClCompile Include="umd.c" />
+    <ClCompile Include="util.c" />
+    <ClCompile Include="vfs.c" />
+    <ClCompile Include="vmmprx.c" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{DFFA1B4C-279B-4356-ADB1-08A6F4795931}</ProjectGuid>
     <RootNamespace>pcileech</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseMT|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -62,47 +97,47 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseMT|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)\pcileech_files\</OutDir>
-    <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
+    <OutDir>$(SolutionDir)\files\</OutDir>
+    <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">
-    <OutDir>$(SolutionDir)\pcileech_files\dll\</OutDir>
-    <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
-    <TargetExt>.dll</TargetExt>
-    <LinkIncremental>false</LinkIncremental>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">
-    <OutDir>$(SolutionDir)\pcileech_files\dll\</OutDir>
-    <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
-    <TargetExt>.dll</TargetExt>
-    <LinkIncremental>false</LinkIncremental>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseMT|x64'">
+    <OutDir>$(SolutionDir)\files\</OutDir>
+    <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)\pcileech_files\</OutDir>
-    <IntDir>$(SolutionDir)\pcileech_files\temp\</IntDir>
-    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)\files\</OutDir>
+    <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
+    <LinkIncremental>
+    </LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalOptions>/D WIN32 %(AdditionalOptions)</AdditionalOptions>
+      <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
     <Link>
       <FullProgramDatabaseFile>
       </FullProgramDatabaseFile>
       <GenerateDebugInformation>Debug</GenerateDebugInformation>
+      <AdditionalDependencies>$(SolutionDir)\files\leechcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ProgramDatabaseFile>$(OutDir)\lib\$(TargetName).pdb</ProgramDatabaseFile>
+      <SubSystem>Console</SubSystem>
     </Link>
+    <PreBuildEvent>
+      <Command>copy $(SolutionDir)\files\leechcore.h $(ProjectDir)\ /y</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>del "$(SolutionDir)\files\pcileech_files.zip"
+powershell Compress-Archive -Path '$(SolutionDir)\files\*.*','$(SolutionDir)\files\pcileech' -DestinationPath '$(SolutionDir)\files\pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -112,7 +147,6 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>
       </SDLCheck>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>/D WIN32 %(AdditionalOptions)</AdditionalOptions>
       <CompileAs>CompileAsC</CompileAs>
     </ClCompile>
@@ -126,23 +160,27 @@
       </ModuleDefinitionFile>
       <SubSystem>Console</SubSystem>
       <ProgramDatabaseFile />
+      <AdditionalDependencies>$(SolutionDir)\files\leechcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>copy $(SolutionDir)\files\leechcore.h $(ProjectDir)\ /y</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>del "$(SolutionDir)\files\pcileech_files.zip"
+powershell Compress-Archive -Path '$(SolutionDir)\files\*.*','$(SolutionDir)\files\pcileech' -DestinationPath '$(SolutionDir)\files\pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseMT|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <SDLCheck>
+      </SDLCheck>
       <AdditionalOptions>/D WIN32 %(AdditionalOptions)</AdditionalOptions>
       <CompileAs>CompileAsC</CompileAs>
-      <PrecompiledHeader />
-      <PrecompiledHeaderFile />
-      <PrecompiledHeaderOutputFile />
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ProgramDataBaseFileName />
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -150,100 +188,21 @@
       <FullProgramDatabaseFile>
       </FullProgramDatabaseFile>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <ModuleDefinitionFile>PCILeechDll.def</ModuleDefinitionFile>
-      <SubSystem>Console</SubSystem>
-      <ProgramDatabaseFile />
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>false</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalOptions>/D WIN32 %(AdditionalOptions)</AdditionalOptions>
-      <CompileAs>CompileAsC</CompileAs>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
-      <PrecompiledHeaderFile>
-      </PrecompiledHeaderFile>
-      <PrecompiledHeaderOutputFile>
-      </PrecompiledHeaderOutputFile>
-      <PreprocessorDefinitions>WIN32;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ProgramDataBaseFileName>
-      </ProgramDataBaseFileName>
-      <WholeProgramOptimization>false</WholeProgramOptimization>
-    </ClCompile>
-    <Link>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-      <FullProgramDatabaseFile>true</FullProgramDatabaseFile>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <ModuleDefinitionFile>PCILeechDll.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>
+      </ModuleDefinitionFile>
       <SubSystem>Console</SubSystem>
       <ProgramDatabaseFile>
       </ProgramDatabaseFile>
+      <AdditionalDependencies>$(SolutionDir)\files\leechcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>copy $(SolutionDir)\files\leechcore.h $(ProjectDir)\ /y</Command>
+    </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>del "$(SolutionDir)\files\pcileech_files.zip"
+powershell Compress-Archive -Path '$(SolutionDir)\files\*.*','$(SolutionDir)\files\pcileech' -DestinationPath '$(SolutionDir)\files\pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClInclude Include="device.h" />
-    <ClInclude Include="device3380.h" />
-    <ClInclude Include="device605_tcp.h" />
-    <ClInclude Include="devicefile.h" />
-    <ClInclude Include="devicefpga.h" />
-    <ClInclude Include="devicerawtcp.h" />
-    <ClInclude Include="devicetmd.h" />
-    <ClInclude Include="dokan.h" />
-    <ClInclude Include="executor.h" />
-    <ClInclude Include="extra.h" />
-    <ClInclude Include="help.h" />
-    <ClInclude Include="kmd.h" />
-    <ClInclude Include="memdump.h" />
-    <ClInclude Include="mempatch.h" />
-    <ClInclude Include="oscompatibility.h" />
-    <ClInclude Include="pcileech.h" />
-    <ClInclude Include="pcileech_dll.h" />
-    <ClInclude Include="shellcode.h" />
-    <ClInclude Include="statistics.h" />
-    <ClInclude Include="tlp.h" />
-    <ClInclude Include="util.h" />
-    <ClInclude Include="vfs.h" />
-    <ClInclude Include="vmm.h" />
-    <ClInclude Include="vmmproc.h" />
-    <ClInclude Include="vmmvfs.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="device.c" />
-    <ClCompile Include="device3380.c" />
-    <ClCompile Include="device605_tcp.c" />
-    <ClCompile Include="devicefile.c" />
-    <ClCompile Include="devicefpga.c" />
-    <ClCompile Include="devicerawtcp.c" />
-    <ClCompile Include="devicetmd.c" />
-    <ClCompile Include="executor.c" />
-    <ClCompile Include="extra.c" />
-    <ClCompile Include="help.c" />
-    <ClCompile Include="kmd.c" />
-    <ClCompile Include="memdump.c" />
-    <ClCompile Include="mempatch.c" />
-    <ClCompile Include="oscompatibility.c" />
-    <ClCompile Include="pcileech.c" />
-    <ClCompile Include="pcileech_dll.c" />
-    <ClCompile Include="statistics.c" />
-    <ClCompile Include="tlp.c" />
-    <ClCompile Include="util.c" />
-    <ClCompile Include="vfs.c" />
-    <ClCompile Include="vmm.c" />
-    <ClCompile Include="vmmproc.c" />
-    <ClCompile Include="vmmvfs.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Android.mk" />
-    <None Include="Makefile" />
-    <None Include="pcileechdll.def" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
