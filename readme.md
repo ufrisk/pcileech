@@ -23,38 +23,37 @@ Capabilities:
 * ALL memory can be accessed in native DMA mode (FPGA hardware).
 * ALL memory can be accessed if kernel module (KMD) is loaded.
 * Raw PCIe TLP access (FPGA hardware).
-* Mount live RAM as file [Linux, Windows, macOS*].
-* Mount file system as drive [Linux, Windows, macOS*].
-* Mount memory process file system as driver [Windows].
+* Mount live RAM as file [Linux, Windows, macOS Sierra*].
+* Mount file system as drive [Linux, Windows, macOS Sierra*].
 * Execute kernel code on the target system.
-* Spawn system shell [Windows].
-* Spawn any executable [Windows].
-* Pull files [Linux, FreeBSD, Windows, macOS*].
-* Push files [Linux, Windows, macOS*].
-* Patch / Unlock (remove password requirement) [Windows, macOS*].
+* Spawn system shell and other executables [Windows].
+* Pull and Push files [Linux, FreeBSD, Windows, macOS Sierra*].
+* Patch / Unlock (remove password requirement) [Windows, macOS Sierra*].
 * Easy to create own kernel shellcode and/or custom signatures.
 * Connect to a remote LeechService over the network.
 * Even more features not listed here ...
 
-\*) macOS High Sierra is not supported.
+\*) macOS High Sierra and above are not supported.
 
-Hardware:
-=================
-PCILeech supports multiple hardware devices. Please check out the [PCILeech FPGA project](https://github.com/ufrisk/pcileech-fpga/) for information about supported FPGA based hardware. Please check out [PCILeech USB3380](usb3380.md) for information about USB3380 based hardware. PCILeech also support memory dump files for limited functionality.
+Memory Acquisition Methods:
+===========================
+PCILeech supports both hardware based and software based memory acqusition methods. All memory acqusition is handled by the [LeechCore](https://github.com/ufrisk/LeechCore) library.
 
-Please find a device comparision table below.
+### Hardware based memory aqusition methods:
+
+Please find a summary of the supported hardware based memory acquisition methods listed below. All hardware based memory acquisition methods are supported on both Windows and Linux. The FPGA based methods however sports a slight performance penalty on Linux and will max out at approx: 90MB/s compared to 150MB/s on Windows.
 
 | Device                                    | Type | Interface | Speed | 64-bit memory access | PCIe TLP access |
-| -------------------------------------------------------- | ------- | ---- | ------- | ----------------- | --- |
-| [AC701/FT601](https://github.com/ufrisk/pcileech-fpga/)  | FPGA    | USB3 | 150MB/s | Yes               | Yes |
-| [PCIeScreamer](https://github.com/ufrisk/pcileech-fpga/) | FPGA    | USB3 | 100MB/s | Yes               | Yes |
-| [SP605/FT601](https://github.com/ufrisk/pcileech-fpga/)  | FPGA    | USB3 |  75MB/s | Yes               | Yes |
-| [SP605/TCP](https://github.com/ufrisk/pcileech-fpga/)    | FPGA  | TCP/IP | 100kB/s | Yes               | Yes |
-| [USB3380-EVB](usb3380.md)                                | USB3380 | USB3 | 150MB/s | No (via KMD only) | No  |
-| [PP3380](usb3380.md)                                     | USB3380 | USB3 | 150MB/s | No (via KMD only) | No  |
-| [DMA patched HP iLO](https://www.synacktiv.com/posts/exploit/using-your-bmc-as-a-dma-device-plugging-pcileech-to-hpe-ilo-4.html) | TCP | TCP | 1MB/s | Yes | No |
+| ---------------------------------------------------------------------- | ------- | ---- | ------- | --- | --- |
+| [AC701/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | FPGA    | USB3 | 150MB/s | Yes | Yes |
+| [PCIeScreamer](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)   | FPGA    | USB3 | 100MB/s | Yes | Yes |
+| [SP605/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | FPGA    | USB3 |  75MB/s | Yes | Yes |
+| [SP605/TCP](https://github.com/ufrisk/LeechCore/wiki/Device_SP605TCP)  | FPGA  | TCP/IP | 100kB/s | Yes | Yes |
+| [USB3380-EVB](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380) | USB3380 | USB3 | 150MB/s | No  | No  |
+| [PP3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)      | USB3380 | USB3 | 150MB/s | No  | No  |
+| [DMA patched HP iLO](https://github.com/ufrisk/LeechCore/wiki/Device_iLO) | TCP/IP | TCP | 1MB/s  | Yes | No  |
 
-Recommended adapters:
+#### Recommended adapters:
 * PE3B - ExpressCard to mini-PCIe.
 * PE3A - ExpressCard to PCIe.
 * ADP - PCIe to mini-PCIe.
@@ -64,6 +63,20 @@ Recommended adapters:
 
 Please note that other adapters may also work.
 
+### Software based memory aqusition methods:
+
+Please find a summary of the supported software based memory acquisition methods listed below. Please note that the LeechService only provides a network connection to a remote LeechCore library. It's possible to use both hardware and software based memory acquisition once connected.
+
+| Device                     | Type             | Linux Support |
+| -------------------------- | ---------------- | ------------- |
+| [RAW physical memory dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)         | File             | Yes |
+| [Full Microsoft Crash Dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)        | File             | Yes |
+| [Hyper-V Saved State](https://github.com/ufrisk/LeechCore/wiki/Device_HyperV_SavedState) | File             | No  |
+| [TotalMeltdown](https://github.com/ufrisk/LeechCore/wiki/Device_Totalmeltdown)           | CVE-2018-1038    | No  |
+| [DumpIt /LIVEKD](https://github.com/ufrisk/LeechCore/wiki/Device_DumpIt)                 | Live&nbsp;Memory | No  |
+| [WinPMEM](https://github.com/ufrisk/LeechCore/wiki/Device_WinPMEM)                       | Live&nbsp;Memory | No  |
+| [LeechService*](https://github.com/ufrisk/LeechCore/wiki/Device_Remote)                  | Remote           | No  |
+
 Installing PCILeech:
 ====================
 Please ensure you do have the most recent version of PCILeech by visiting the PCILeech github repository at: https://github.com/ufrisk/pcileech
@@ -72,14 +85,14 @@ Please ensure you do have the most recent version of PCILeech by visiting the PC
 
 #### Windows:
 
-Please see the [PCILeech-on-Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows) guide for information about running PCILeech on Windows.
+Please see the [PCILeech on Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows) guide for information about running PCILeech on Windows.
 
 The Google Android USB driver have to be installed if USB3380 hardware is used. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver.<br>
 FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card or PCIeScreamer. Download the 64-bit [`FTD3XX.dll`](http://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.2.0.6.zip) from FTDI and place it alongside `pcileech.exe`.<br>
 To mount live ram and target file system as drive in Windows the Dokany file system library must be installed. Please download and install the latest version of Dokany at: https://github.com/dokan-dev/dokany/releases/latest
 
 #### Linux:
-Please see the [PCILeech-on-Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) guide for information about running PCILeech on Linux.
+Please see the [PCILeech on Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) guide for information about running PCILeech on Linux.
 
 Examples:
 =========
@@ -99,7 +112,7 @@ Dump all memory from the target system given that a kernel module is loaded at a
 * ` pcileech.exe dump -kmd 0x7fffe000 `
 
 Force dump memory below 4GB including accessible memory mapped devices using more stable USB2 approach on USB3380.
-* ` pcileech.exe dump -force -usb2 `
+* ` pcileech.exe dump -force -device usb3380://usb2 `
 
 Receive PCIe TLPs (Transaction Layer Packets) and print them on screen (correctly configured FPGA dev board required).
 * ` pcileech.exe tlp -vv -wait 1000 `
@@ -136,10 +149,16 @@ Limitations/Known Issues:
 
 Building:
 =========
-The binaries are found in the [releases section](https://github.com/ufrisk/pcileech/releases/latest) of this repository. If one wish to build an own version it is possible to do so. Please see the [PCILeech-on-Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows) or [PCILeech-on-Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) for more information about building PCILeech. PCILeech is also dependant on LeechCore and optionally (for some extra functionality) on The Memory Process File System which must both be built separately.
+The binaries are found in the [releases section](https://github.com/ufrisk/pcileech/releases/latest) of this repository. If one wish to build an own version it is possible to do so. Please see the [PCILeech on Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows) or [PCILeech on Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) for more information about building PCILeech. PCILeech is also dependant on LeechCore and optionally (for some extra functionality) on The Memory Process File System which must both be built separately.
 
 Links:
 ======
+#### Projects:
+* PCILeech Wiki: https://github.com/ufrisk/pcileech/wiki
+* PCILeech FPGA: https://github.com/ufrisk/pcileech-fpga
+* LeechCore: https://github.com/ufrisk/LeechCore
+* MemProcFS: https://github.com/ufrisk/MemProcFS
+#### Other:
 * Blog: http://blog.frizk.net
 * Twitter: https://twitter.com/UlfFrisk
 * YouTube: https://www.youtube.com/channel/UC2aAi-gjqvKiC7s7Opzv9rg
