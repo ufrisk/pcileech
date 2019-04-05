@@ -23,12 +23,22 @@
 // kerberos. If not possible or desirable the 'insecure' value may be specified
 // to disable authentication and security.
 // Syntax:
-//    rpc://<remote_spn>:<host>:<port> (port = optional, remote_spn = kerberos)
-//                                     (SPN of remote service or 'insecure'   )
+//    rpc://<remote_spn>:<host>[:<options>] (remote_spn = kerberos SPN of     )
+//                                          (remote service or 'insecure'     )
+//
+// Valid options:                           (optional comma-separated list    )
+//    port=<port>                           (RPC TCP port of the remote system)
+//    nocompress                            (disable transport compression    )
+//    
 // Examples:
 //    rpc://insecure:remotehost.example.com (connect insecure to remote host  )
 //    rpc://user@ad.domain.com:192.0.0.5    (connect   secure to remote host  )
 //    rpc://insecure:127.0.0.0:6666         (connect insecure non-default port)
+//
+// The remote connector may also connect to pipe handles provided in the config
+// string. This is only used internally by the LeechAgent for communication for
+// parent/child process and may not be used by external applications. Syntax is
+// pipe://<handle_id_input>:<handle_id_output>.
 //
 // ----------------------------------------------------------------------------
 //
@@ -107,11 +117,16 @@
 //           Syntax:
 //           EXISTING
 //
+// EXISTINGREMOTE : Same as EXISTING but applying the EXISTING device on the
+//           remote system. Use only in conjunction with a remote system.
+//           Syntax:
+//           EXISTINGREMOTE
+//
 //
 // (c) Ulf Frisk, 2018-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 1.1.0
+// Header Version: 1.2.0
 //
 #ifndef __LEECHCORE_H__
 #define __LEECHCORE_H__
@@ -127,8 +142,12 @@ extern "C" {
 #include <Windows.h>
 typedef unsigned __int64                    QWORD, *PQWORD;
 #define DLLEXPORT                           __declspec(dllexport)
+#ifdef _WIN64
+#define ARCH_64
+#endif /* _WIN64 */
 #endif /* _WIN32 */
 #ifdef LINUX
+#define ARCH_X64
 #include <stdint.h>
 #include <stddef.h>
 typedef void                                VOID, *PVOID, *LPVOID;
@@ -163,6 +182,7 @@ typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
 #define MEM_IO_SCATTER_HEADER_MAGIC                     0xffff6548
 #define MEM_IO_SCATTER_HEADER_VERSION                   0x0003
 
+#ifdef ARCH_64
 typedef struct tdMEM_IO_SCATTER_HEADER {
     DWORD magic;            // magic
     WORD version;           // version
@@ -175,6 +195,26 @@ typedef struct tdMEM_IO_SCATTER_HEADER {
     PVOID pvReserved2;      // reserved for use by caller.
     PVOID Future2[8];
 } MEM_IO_SCATTER_HEADER, *PMEM_IO_SCATTER_HEADER, **PPMEM_IO_SCATTER_HEADER;
+#endif /* ARCH_64 */
+
+#ifndef ARCH_64
+typedef struct tdMEM_IO_SCATTER_HEADER {
+    DWORD magic;            // magic
+    WORD version;           // version
+    WORD Future1;
+    ULONG64 qwA;            // base address.
+    DWORD cbMax;            // bytes to read (DWORD boundry, max 0x1000); pb must have room for this.
+    DWORD cb;               // bytes read into result buffer.
+    PBYTE pb;               // ptr to 0x1000 sized buffer to receive read bytes.
+    DWORD dwFiller64_1;
+    PVOID pvReserved1;      // reserved for use by caller.
+    DWORD dwFiller64_2;
+    PVOID pvReserved2;      // reserved for use by caller.
+    DWORD dwFiller64_3;
+    PVOID Future2[8];
+    DWORD dwFiller64_4[8];
+} MEM_IO_SCATTER_HEADER, *PMEM_IO_SCATTER_HEADER, **PPMEM_IO_SCATTER_HEADER;
+#endif /* ARCH_64 */
 
 //-----------------------------------------------------------------------------
 // LEECHCORE INITIALIZATION / CLOSE FUNCTIONALITY BELOW:
@@ -221,12 +261,26 @@ typedef struct tdLEECHCORE_CONFIG {
     // optional 'printf' function pointer. if set to non null value 'printf'
     // calls will be redirected. useful when logging to files.
     _Check_return_opt_ int(*pfn_printf_opt)(_In_z_ _Printf_format_string_ char const* const _Format, ...);  // set by caller.
+#ifndef ARCH_64
+    DWORD dwFiller64_1;
+#endif /* ARCH_64 */
 } LEECHCORE_CONFIG, *PLEECHCORE_CONFIG;
 
+#ifdef ARCH_64
 typedef struct tdLEECHCORE_PAGESTAT_MINIMAL {
     HANDLE h;
     VOID(*pfnPageStatUpdate)(HANDLE h, ULONG64 pa, ULONG64 cPageSuccessAdd, ULONG64 cPageFailAdd);
 } LEECHCORE_PAGESTAT_MINIMAL, *PLEECHCORE_PAGESTAT_MINIMAL;
+#endif /* ARCH_64 */
+
+#ifndef ARCH_64
+typedef struct tdLEECHCORE_PAGESTAT_MINIMAL {
+    HANDLE h;
+    DWORD dwFiller64_1;
+    VOID(*pfnPageStatUpdate)(HANDLE h, ULONG64 pa, ULONG64 cPageSuccessAdd, ULONG64 cPageFailAdd);
+    DWORD dwFiller64_2;
+} LEECHCORE_PAGESTAT_MINIMAL, *PLEECHCORE_PAGESTAT_MINIMAL;
+#endif /* ARCH_64 */
 
 /*
 * Open a connection to the target device. The LeechCore initialization may fail
@@ -306,7 +360,7 @@ DLLEXPORT DWORD LeechCore_ReadEx(_In_ ULONG64 pa, _Out_writes_(cb) PBYTE pb, _In
 * -- return
 */
 _Success_(return)
-DLLEXPORT BOOL LeechCore_Write(_In_ ULONG64 pa, _In_ PBYTE pb, _In_ DWORD cb);
+DLLEXPORT BOOL LeechCore_Write(_In_ ULONG64 pa, _In_reads_(cb) PBYTE pb, _In_ DWORD cb);
 
 /*
 * Write data to the target system if supported by the device.
@@ -317,7 +371,7 @@ DLLEXPORT BOOL LeechCore_Write(_In_ ULONG64 pa, _In_ PBYTE pb, _In_ DWORD cb);
 * -- return
 */
 _Success_(return)
-DLLEXPORT BOOL LeechCore_WriteEx(_In_ ULONG64 pa, _In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD flags);
+DLLEXPORT BOOL LeechCore_WriteEx(_In_ ULONG64 pa, _In_reads_(cb) PBYTE pb, _In_ DWORD cb, _In_ DWORD flags);
 
 /*
 * Probe the memory of the target system to check whether it's readable or not.
@@ -350,6 +404,7 @@ DLLEXPORT BOOL LeechCore_Probe(_In_ QWORD pa, _In_ DWORD cPages, _Inout_updates_
 #define LEECHCORE_OPT_CORE_VERSION_MAJOR                0x01000001  // R
 #define LEECHCORE_OPT_CORE_VERSION_MINOR                0x01000002  // R
 #define LEECHCORE_OPT_CORE_VERSION_REVISION             0x01000003  // R
+#define LEECHCORE_OPT_CORE_FLAG_BACKEND_FUNCTIONS       0x01000004  // R
 
 #define LEECHCORE_OPT_MEMORYINFO_VALID                  0x02000001  // R
 #define LEECHCORE_OPT_MEMORYINFO_ADDR_MAX               0x02000002  // R
@@ -420,7 +475,8 @@ DLLEXPORT BOOL LeechCore_SetOption(_In_ ULONG64 fOption, _In_ ULONG64 qwValue);
 #define LEECHCORE_STATISTICS_ID_GETOPTION                     0x04
 #define LEECHCORE_STATISTICS_ID_SETOPTION                     0x05
 #define LEECHCORE_STATISTICS_ID_COMMANDDATA                   0x06
-#define LEECHCORE_STATISTICS_ID_MAX                           0x06
+#define LEECHCORE_STATISTICS_ID_COMMANDSVC                    0x07
+#define LEECHCORE_STATISTICS_ID_MAX                           0x07
 
 static const LPSTR LEECHCORE_STATISTICS_NAME[] = {
     "LeechCore_Open",
@@ -429,7 +485,8 @@ static const LPSTR LEECHCORE_STATISTICS_NAME[] = {
     "LeechCore_Probe",
     "LeechCore_GetOption",
     "LeechCore_SetOption",
-    "LeechCore_CommandData"
+    "LeechCore_CommandData",
+    "LeechCore_CommandSvc"
 };
 
 typedef struct tdLEECHCORE_STATISTICS {
@@ -462,6 +519,30 @@ DLLEXPORT BOOL LeechCore_CommandData(
     _In_ DWORD cbDataIn,
     _Out_writes_opt_(cbDataOut) PBYTE pbDataOut,
     _In_ DWORD cbDataOut,
+    _Out_opt_ PDWORD pcbDataOut
+);
+
+#define LEECHCORE_AGENTCOMMAND_EXEC_PYTHON_INMEM    0x1166000000000001
+#define LEECHCORE_AGENTCOMMAND_EXITPROCESS          0x1166000000000010
+
+/*
+* Transfer commands/data to/from the remote agent (if it exists).
+* NB! USER-FREE: ppbDataOut (LocalFree)
+* -- fCommand = the option / command to the remote service as defined in LEECHCORE_AGENTCOMMAND_*
+* -- fDataIn = optional 64-bit tiny input value
+* -- cbDataIn
+* -- pbDataIn
+* -- ppbDataOut =  ptr to receive function allocated output - must be LocalFree'd by caller!
+* -- pcbDataOut = ptr to receive length of *pbDataOut.
+* -- return
+*/
+_Success_(return)
+DLLEXPORT BOOL LeechCore_AgentCommand(
+    _In_ ULONG64 fCommand,
+    _In_ ULONG64 fDataIn,
+    _In_reads_(cbDataIn) PBYTE pbDataIn,
+    _In_ DWORD cbDataIn,
+    _Out_writes_opt_(*pcbDataOut) PBYTE *ppbDataOut,
     _Out_opt_ PDWORD pcbDataOut
 );
 

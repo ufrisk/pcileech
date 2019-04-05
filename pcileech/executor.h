@@ -52,4 +52,9 @@ BOOL Exec_ExecSilent(_In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbI
 */
 VOID ActionExecShellcode();
 
+/*
+* Try execute python code on a remote host in the context of the LeechSvc.
+*/
+VOID ActionSvcExecPy();
+
 #endif /* __EXECUTOR_H__ */

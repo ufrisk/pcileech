@@ -63,6 +63,7 @@ VOID Help_ShowGeneral()
         "   probe                  NATIVE       [ min, max ]   (FPGA)                   \n" \
         "   pslist                 NATIVE                      (MemProcFS/Windows)      \n" \
         "   psvirt2phys            NATIVE       [ 0, 1 ]       (MemProcFS/Windows)      \n" \
+        "   agent-execpy           NATIVE       [ in, out ]    (Remote LeechAgent)      \n" \
         " System specific commands and valid MODEs [ and options ]:                     \n" \
         "   mac_fvrecover          NATIVE                      (USB3380)                \n" \
         "   mac_fvrecover2         NATIVE                      (USB3380)                \n" \
@@ -580,6 +581,23 @@ VOID Help_ShowDetailed()
             " 1) Create a CMD from Utilman.exe by hooking RegCloseKey (632 is the pid):     \n" \
             "    pcileech UMD_WINX64_IAT_PSEXEC -hook ADVAPI32.dll!RegCloseKey              \n" \
             "             -0 632 -1 0x08000000 -s c:\\windows\\system32\\cmd.exe            \n" \
+        );
+        break;
+    case AGENT_EXEC_PY:
+        printf(
+            " EXECUTE A PYTHON SCRIPT ON A REMOTE HOST RUNNING LeechAgent                   \n" \
+            " MODES   : NATIVE                                                              \n" \
+            " REQUIRE : Windows/Remote LeechSvc                                             \n" \
+            " OPTIONS : -in, -out                                                           \n" \
+            " Execute a Python script contained in the -in parameter on a remote host having\n" \
+            " the LeechAgent installed.    The script will be executed in an embedded Python\n" \
+            "  and the MemProcFS/LeechCore python APIs will be available and initialized.   \n" \
+            " Outout will be displayed on screen unless -out parameter is specified.        \n" \
+            " EXAMPLE:                                                                      \n" \
+            " 1) Execute the script 'myscript.py' on the remote host test1.contoso.com using\n" \
+            "    physical memory acquired from WinPmem:                                     \n" \
+            "    pcileech.exe agent-execpy -in myscript.py -device pmem                     \n" \
+            "                 -remote rpc://test1$@contoso.com:test1.contoso.com            \n" \
         );
         break;
     case EXEC_KMD:

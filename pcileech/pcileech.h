@@ -44,7 +44,8 @@ typedef enum tdActionType {
     TLP,
     PROBE,
     PSLIST,
-    PSVIRT2PHYS
+    PSVIRT2PHYS,
+    AGENT_EXEC_PY
 } ACTION_TYPE;
 
 typedef struct tdCONFIG_OPTION {

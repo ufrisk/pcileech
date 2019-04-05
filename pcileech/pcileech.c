@@ -44,6 +44,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         {.tp = PROBE,.sz = "probe" },
         {.tp = PSLIST,.sz = "pslist" },
         {.tp = PSVIRT2PHYS,.sz = "psvirt2phys" },
+        {.tp = AGENT_EXEC_PY,.sz = "agent-execpy" },
     };
     DWORD j, i = 1;
     ctxMain = LocalAlloc(LMEM_ZEROINIT, sizeof(PCILEECH_CONTEXT));
@@ -59,19 +60,19 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
     // fetch command line actions/options
     loop:
     while(i < argc) {
-        for(j = 0; j < sizeof(ACTIONS) / sizeof(ACTION); j++) { // parse command (if found)
-            if(0 == strcmp(argv[i], ACTIONS[j].sz)) {
-                ctxMain->cfg.tpAction = ACTIONS[j].tp;
-                i++;
-                goto loop;
+            for(j = 0; j < sizeof(ACTIONS) / sizeof(ACTION); j++) { // parse command (if found)
+                if(0 == _stricmp(argv[i], ACTIONS[j].sz)) {
+                    ctxMain->cfg.tpAction = ACTIONS[j].tp;
+                    i++;
+                    goto loop;
+                }
             }
-        }
-        if(ctxMain->cfg.tpAction == NA && 0 != memcmp(argv[i], "-", 1)) {
-            ctxMain->cfg.tpAction = ((strlen(argv[i]) > 3) && !_strnicmp("umd", argv[i], 3)) ? EXEC_UMD : EXEC_KMD;
-            strcpy_s(ctxMain->cfg.szShellcodeName, MAX_PATH, argv[i]);
-            i++;
-            continue;
-        }
+            if(ctxMain->cfg.tpAction == NA && 0 != memcmp(argv[i], "-", 1)) {
+                ctxMain->cfg.tpAction = ((strlen(argv[i]) > 3) && !_strnicmp("umd", argv[i], 3)) ? EXEC_UMD : EXEC_KMD;
+                strcpy_s(ctxMain->cfg.szShellcodeName, MAX_PATH, argv[i]);
+                i++;
+                continue;
+            }
         // parse options (command not found)
         if(0 == strcmp(argv[i], "-pt")) {
             ctxMain->cfg.fPageTableScan = TRUE;
@@ -113,7 +114,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             ctxMain->cfg.qwAddrMax = Util_GetNumeric(argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-cr3")) {
             ctxMain->cfg.qwCR3 = Util_GetNumeric(argv[i + 1]);
-        }else if(0 == strcmp(argv[i], "-efibase")) {
+        } else if(0 == strcmp(argv[i], "-efibase")) {
             ctxMain->cfg.qwEFI_IBI_SYST = Util_GetNumeric(argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-iosize")) {
             ctxMain->cfg.qwMaxSizeDmaIo = Util_GetNumeric(argv[i + 1]);
@@ -195,6 +196,50 @@ VOID PCILeechFreeContext()
     ctxMain = NULL;
 }
 
+#ifdef _WIN32
+/*
+* Call the free context functionality in a separate thread (in case it gets stuck).
+* -- pv
+*/
+VOID PCILeechCtrlHandler_TryShutdownThread(PVOID pv)
+{
+	__try {
+		PCILeechFreeContext();
+	} __except(EXCEPTION_EXECUTE_HANDLER) { ; }
+}
+
+/*
+* SetConsoleCtrlHandler for PCILeech - clean up whenever CTRL+C is pressed.
+* -- fdwCtrlType
+* -- return
+*/
+BOOL WINAPI PCILeechCtrlHandler(DWORD fdwCtrlType)
+{
+    if(fdwCtrlType == CTRL_C_EVENT) {
+        printf("CTRL+C detected - shutting down ...\n");
+		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)PCILeechCtrlHandler_TryShutdownThread, NULL, 0, NULL);
+		Sleep(500);
+		TerminateProcess(GetCurrentProcess(), 1);
+		Sleep(1000);
+		ExitProcess(1);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+VOID PCILeechCtrlHandlerInitialize()
+{
+	SetConsoleCtrlHandler(PCILeechCtrlHandler, TRUE);
+}
+#endif /* _WIN32 */
+
+#ifdef LINUX
+VOID PCILeechCtrlHandlerInitialize()
+{
+	return;
+}
+#endif /* LINUX */
+
 int main(_In_ int argc, _In_ char* argv[])
 {
     BOOL result;
@@ -245,6 +290,9 @@ int main(_In_ int argc, _In_ char* argv[])
             return 1;
         }
     }
+    // enable ctrl+c event handler if remote (to circumvent blocking thread)
+	PCILeechCtrlHandlerInitialize();
+    // main dispatcher
     switch(ctxMain->cfg.tpAction) {
         case DUMP:
             ActionMemoryDump();
@@ -297,6 +345,9 @@ int main(_In_ int argc, _In_ char* argv[])
             break;
         case PSVIRT2PHYS:
             Action_UmdPsVirt2Phys();
+            break;
+        case AGENT_EXEC_PY:
+            ActionSvcExecPy();
             break;
         case KMDLOAD:
             if(ctxMain->cfg.qwKMD) {

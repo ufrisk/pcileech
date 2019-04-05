@@ -123,6 +123,7 @@ typedef struct tdEXCEPTION_RECORD64         { CHAR sz[152]; } EXCEPTION_RECORD64
 #define _fileno(f)                          (fileno(f))
 #define InterlockedAdd64(p, v)              (__sync_fetch_and_add(p, v))
 #define InterlockedIncrement64(p)           (__sync_fetch_and_add(p, 1))
+#define GetCurrentProcess()					((HANDLE)-1)
 
 typedef struct tdCRITICAL_SECTION {
     pthread_mutex_t mutex;
@@ -159,6 +160,7 @@ BOOL QueryPerformanceCounter(_Out_ LARGE_INTEGER *lpPerformanceCount);
 VOID GetLocalTime(LPSYSTEMTIME lpSystemTime);
 DWORD InterlockedAdd(DWORD *Addend, DWORD Value);
 BOOL WinUsb_Free(WINUSB_INTERFACE_HANDLE InterfaceHandle);
+BOOL IsWow64Process(HANDLE hProcess, PBOOL Wow64Process);
 
 HANDLE CreateThread(
     PVOID    lpThreadAttributes,

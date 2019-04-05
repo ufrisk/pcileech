@@ -693,40 +693,96 @@ VOID Util_WaitForPowerCycle()
     Util_WaitForPowerOn();
 }
 
-VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset)
+#define Util_2HexChar(x) (((((x) & 0xf) <= 9) ? '0' : ('a' - 10)) + ((x) & 0xf))
+
+#define UTIL_PRINTASCII \
+    "................................ !\"#$%&'()*+,-./0123456789:;<=>?" \
+    "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz`{|}~" \
+    "................................................................" \
+    "................................................................" \
+
+BOOL Util_FillHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset, _Inout_opt_ LPSTR sz, _Out_ PDWORD pcsz)
 {
-    DWORD i, j;
-    if(cb > 0x10000) {
-        printf("Large output. Only displaying first 65kB.\n");
-        cb = 0x10000 - cbInitialOffset;
-    }
-    cb += cbInitialOffset;
+    DWORD i, j, o = 0, szMax, iMod;
+    // checks
+    if((cbInitialOffset > cb) || (cbInitialOffset > 0x1000) || (cbInitialOffset & 0xf)) { return FALSE; }
+    *pcsz = szMax = cb * 5 + 80;
+    if(cb > szMax) { return FALSE; }
+    if(!sz) { return TRUE; }
+    // fill buffer with bytes
     for(i = cbInitialOffset; i < cb + ((cb % 16) ? (16 - cb % 16) : 0); i++)
     {
         // address
         if(0 == i % 16) {
-            printf("%04x    ", i % 0x10000);
+            iMod = i % 0x10000;
+            sz[o++] = Util_2HexChar(iMod >> 12);
+            sz[o++] = Util_2HexChar(iMod >> 8);
+            sz[o++] = Util_2HexChar(iMod >> 4);
+            sz[o++] = Util_2HexChar(iMod);
+            sz[o++] = ' ';
+            sz[o++] = ' ';
+            sz[o++] = ' ';
+            sz[o++] = ' ';
         } else if(0 == i % 8) {
-            putchar(' ');
+            sz[o++] = ' ';
         }
         // hex
         if(i < cb) {
-            printf("%02x ", pb[i]);
+            sz[o++] = Util_2HexChar(pb[i] >> 4);
+            sz[o++] = Util_2HexChar(pb[i]);
+            sz[o++] = ' ';
         } else {
-            printf("   ");
+            sz[o++] = ' ';
+            sz[o++] = ' ';
+            sz[o++] = ' ';
         }
         // ascii
         if(15 == i % 16) {
-            printf("  ");
+            sz[o++] = ' ';
+            sz[o++] = ' ';
             for(j = i - 15; j <= i; j++) {
                 if(j >= cb) {
-                    putchar(' ');
+                    sz[o++] = ' ';
                 } else {
-                    putchar(isprint(pb[j]) ? pb[j] : '.');
+                    sz[o++] = UTIL_PRINTASCII[pb[j]];
                 }
             }
-            putchar('\n');
+            sz[o++] = '\n';
         }
+    }
+    sz[o++] = 0;
+    return TRUE;
+}
+
+VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset)
+{
+    DWORD szMax;
+    LPSTR sz;
+    if(cb > 0x10000) {
+        printf("Large output. Only displaying first 65kB.\n");
+        cb = 0x10000 - cbInitialOffset;
+    }
+    Util_FillHexAscii(pb, cb, cbInitialOffset, NULL, &szMax);
+    if(!(sz = LocalAlloc(0, szMax))) { return; }
+    Util_FillHexAscii(pb, cb, cbInitialOffset, sz, &szMax);
+    printf("%s", sz);
+    LocalFree(sz);
+}
+
+#define UTIL_PRINTABLE_CHARACTERS_MAP "" \
+    "0000000001100100000000000000000011111111111111111111111111111111" \
+    "1111111111111111111111111111111111111111111111111111111111111110" \
+    "1111111111111111111111111111111111111111111111111111111111111111" \
+    "1111111111111111111111111111111111111111111111111111111111111110"
+
+VOID Util_AsciiFilter(_In_reads_(cb) PBYTE pb, _In_ DWORD cb)
+{
+    DWORD i;
+    CHAR ch;
+    for(i = 0; i < cb; i++) {
+        ch = pb[i];
+        if(0xff & UTIL_PRINTABLE_CHARACTERS_MAP[ch]) { continue; }
+        pb[i] = '?';
     }
 }
 

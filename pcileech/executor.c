@@ -7,6 +7,7 @@
 #include "device.h"
 #include "util.h"
 #include "vmmprx.h"
+#include "leechcore.h"
 
 #define EXEC_IO_MAGIC                   0x12651232dfef9521
 #define EXEC_IO_CONSOLE_BUFFER_SIZE     0x800
@@ -387,3 +388,50 @@ fail:
     LocalFree(szBufferText);
     if(pFile) { fclose(pFile); }
 }
+
+VOID ActionSvcExecPy()
+{
+    BOOL result;
+    DWORD cb = 0;
+    PBYTE pb = NULL;
+    FILE *pFile = NULL;
+    if(!ctxMain->cfg.pbIn || (ctxMain->cfg.cbIn < 4)) {
+        printf("AGENT-PYEXEC: Failed. Input file not valid. Please supply input file in -in option.\n");
+        return;
+    }
+    printf("AGENT-PYEXEC: Sending script to remote LeechAgent for processing.\n");
+    printf("AGENT-PYEXEC: Waiting for result ...\n");
+    result = LeechCore_AgentCommand(LEECHCORE_AGENTCOMMAND_EXEC_PYTHON_INMEM, 0, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, &pb, &cb);
+    if(!result) {
+        printf("AGENT-PYEXEC: Failed.\n");
+        return;
+    }
+    if(pb && (cb > 0)) {
+        // write to out file
+        if(ctxMain->cfg.szFileOut[0]) {
+            // open output file
+            if(!fopen_s(&pFile, ctxMain->cfg.szFileOut, "r") || pFile) {
+                printf("AGENT-PYEXEC: Error writing output to file. File already exists: %s\n", ctxMain->cfg.szFileOut);
+                goto fail;
+            }
+            if(fopen_s(&pFile, ctxMain->cfg.szFileOut, "wb") || !pFile) {
+                printf("AGENT-PYEXEC: Error writing output to file.\n");
+                goto fail;
+            }
+            if(cb != fwrite(pb, 1, cb, pFile)) {
+                printf("AGENT-PYEXEC: Error writing output to file.\n");
+                goto fail;
+            }
+            printf("AGENT-PYEXEC: Wrote %i bytes to file %s.\n", cb, ctxMain->cfg.szFileOut);
+        }
+        // print to screen
+        printf("AGENT-PYEXEC: Please see result below: \n================================ \n");
+        Util_AsciiFilter(pb, cb); // filter away potentially harmful chars from untrusted remote input
+        printf("%s\n", (LPSTR)pb);
+    }
+
+fail:
+    if(pFile) { fclose(pFile); }
+    LocalFree(pb);
+}
+

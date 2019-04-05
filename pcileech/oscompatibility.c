@@ -168,6 +168,15 @@ DWORD InterlockedAdd(DWORD *Addend, DWORD Value)
     return __sync_add_and_fetch(Addend, Value);
 }
 
+BOOL IsWow64Process(HANDLE hProcess, PBOOL Wow64Process)
+{
+    if(Wow64Process) {
+        *Wow64Process = FALSE;
+        return TRUE;
+    }
+    return FALSE;
+}
+
 // ----------------------------------------------------------------------------
 // Facade implementation of FTDI functions using functionality provided by
 // kernel driver ft60x by @key2fr in the backend. NB! functionality below

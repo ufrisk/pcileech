@@ -30,7 +30,9 @@ Capabilities:
 * Pull and Push files [Linux, FreeBSD, Windows, macOS Sierra*].
 * Patch / Unlock (remove password requirement) [Windows, macOS Sierra*].
 * Easy to create own kernel shellcode and/or custom signatures.
-* Connect to a remote LeechService over the network.
+* Connect to a remote LeechAgent over the network to remotely:
+   * Dump physical memory over the network.
+   * Execute Python memory analysis scripts on the remote host.
 * Even more features not listed here ...
 
 \*) macOS High Sierra and above are not supported.
@@ -126,8 +128,11 @@ Dump all memory between addresses min and max, don't stop on failed pages. Nativ
 Force the usage of a specific device (instead of default auto detecting it). The pmem device is not auto detected.
 * ` pcileech.exe pagedisplay -min 0x1000 -device pmem `
 
-Dump remote memory from a remote LeechService using connection encrypted and mutually authenticated by kerberos.
-* ` pcileech.exe dump -device pmem -remote rpc://computer$@ad.contoso.com `
+Dump remote memory from a remote LeechAgent running as `SYSTEM` on the computer `computer.ad.contoso.com` using connection encrypted and mutually authenticated by kerberos.
+* ` pcileech.exe dump -device pmem -remote rpc://computer$@ad.contoso.com:computer.ad.contoso.com `
+
+Execute the Python analysis script `example-find-rwx.py` on the remote computer `computer.ad.contoso.com` using the LeechAgent embedded Python environment.
+* ` pcileech.exe agent-execpy -in example-find-rwx.py -device pmem -remote rpc://computer$@ad.contoso.com:computer.ad.contoso.com `
 
 Dump memory using the the reported "TotalMeltdown" [Windows 7/2008R2 x64 PML4 page table permission vulnerability](https://blog.frizk.net/2018/03/total-meltdown.html).
 * ` pcileech.exe dump -out memdump_win7.raw -device totalmeltdown -v -force `
@@ -146,6 +151,7 @@ Limitations/Known Issues:
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * Linux based on the 4.8 kernel and later might not work with the USB3380 hardware. As an alternative, if target root access exists, compile and insert .ko (pcileech_kmd/linux). If the system is EFI booted an alternative signature exists.
 * File system mount support only exists for Windows.
+* Remote connectivity support only exists for Windows.
 
 Building:
 =========
@@ -183,3 +189,6 @@ v1.1-v3.6
   * remote devices via -remote setting.
 * Removal of API and built-in _Memory Process File System_ - please use the more capable APIs in the [LeechCore](https://github.com/ufrisk/LeechCore) and [Memory Process File System](https://github.com/ufrisk/MemProcFS) instead.
 * Multiple other changes and syntax updates.
+
+v4.1
+* LeechAgent support - remote memory acquisition and analysis.

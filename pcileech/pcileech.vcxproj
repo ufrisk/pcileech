@@ -60,20 +60,20 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{DFFA1B4C-279B-4356-ADB1-08A6F4795931}</ProjectGuid>
     <RootNamespace>pcileech</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
@@ -81,7 +81,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseMT|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
@@ -132,11 +132,11 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PreBuildEvent>
-      <Command>copy $(SolutionDir)\files\leechcore.h $(ProjectDir)\ /y</Command>
+      <Command>copy "$(OutDir)leechcore.h" "$(ProjectDir)" /y</Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>del "$(SolutionDir)\files\pcileech_files.zip"
-powershell Compress-Archive -Path '$(SolutionDir)\files\*.*','$(SolutionDir)\files\pcileech' -DestinationPath '$(SolutionDir)\files\pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
+      <Command>del "$(OutDir)pcileech_files.zip"
+powershell Compress-Archive -Path '$(OutDir)*.*','$(OutDir)pcileech' -DestinationPath '$(OutDir)pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -163,11 +163,11 @@ powershell Compress-Archive -Path '$(SolutionDir)\files\*.*','$(SolutionDir)\fil
       <AdditionalDependencies>$(SolutionDir)\files\leechcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>copy $(SolutionDir)\files\leechcore.h $(ProjectDir)\ /y</Command>
+      <Command>copy "$(OutDir)leechcore.h" "$(ProjectDir)" /y</Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>del "$(SolutionDir)\files\pcileech_files.zip"
-powershell Compress-Archive -Path '$(SolutionDir)\files\*.*','$(SolutionDir)\files\pcileech' -DestinationPath '$(SolutionDir)\files\pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
+      <Command>del "$(OutDir)pcileech_files.zip"
+powershell Compress-Archive -Path '$(OutDir)*.*','$(OutDir)pcileech' -DestinationPath '$(OutDir)pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseMT|x64'">
@@ -196,11 +196,11 @@ powershell Compress-Archive -Path '$(SolutionDir)\files\*.*','$(SolutionDir)\fil
       <AdditionalDependencies>$(SolutionDir)\files\leechcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>copy $(SolutionDir)\files\leechcore.h $(ProjectDir)\ /y</Command>
+      <Command>copy "$(OutDir)leechcore.h" "$(ProjectDir)" /y</Command>
     </PreBuildEvent>
     <PostBuildEvent>
-      <Command>del "$(SolutionDir)\files\pcileech_files.zip"
-powershell Compress-Archive -Path '$(SolutionDir)\files\*.*','$(SolutionDir)\files\pcileech' -DestinationPath '$(SolutionDir)\files\pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
+      <Command>del "$(OutDir)pcileech_files.zip"
+powershell Compress-Archive -Path '$(OutDir)*.*','$(OutDir)pcileech' -DestinationPath '$(OutDir)pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

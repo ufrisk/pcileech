@@ -232,6 +232,14 @@ VOID Util_WaitForPowerOn();
 VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset);
 
 /*
+* Filter away (replace with '?') potentially harmful characters from an ascii
+* string / text.
+* -- pb
+* -- cb
+*/
+VOID Util_AsciiFilter(_In_reads_(cb) PBYTE pb, _In_ DWORD cb);
+
+/*
 * Split a string into two at the first 'chSplit' character. If no 2nd string
 * is found then it's returned as null character '\0' (i.e. not as NULL).
 * -- sz = the original string to split (of maximum MAX_PATH length)
