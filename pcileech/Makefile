@@ -13,7 +13,7 @@ pcileech: $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 	rm *.o
 	mv pcileech ../files/
-	mv leechcore.so ../files/
+	mv leechcore.so ../files/ |true
 
 clean:
 	rm *.o
