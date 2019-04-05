@@ -191,4 +191,5 @@ v1.1-v3.6
 * Multiple other changes and syntax updates.
 
 v4.1
+* Project upgrade to Visual Studio 2019.
 * LeechAgent support - remote memory acquisition and analysis.
