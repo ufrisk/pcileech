@@ -1,8 +1,8 @@
-# replace sethc.exe with cmd.exe on Windows
+# replace sethc.exe with cmd.exe in memory on Windows
 # Signatur for PCILeech version 1.1
 # syntax: see signature_info.txt for more information.
 #
-# Signature by Ian Vitek
+# Signature by Ian Vitek (Sigtrap)
 #
 # Signature only found after activating sticky keys at least once.
 # (Not 100% reliable to find the signature in memory, but fiddeling around
