@@ -54,7 +54,10 @@ BOOL Patch_FindAndPatch(_Inout_ PBYTE pbPage, _In_ PSIGNATURE pSignatures, _In_ 
             o += dwRelBase;
         }
         if(o + ps->chunk[2].cb < 0x1000) {
-            if (pPatch) memcpy(pbPage + o, ps->chunk[2].pb, ps->chunk[2].cb);
+            if (pPatch) {
+                memcpy(ps->chunk[2].pbsave, pbPage + o, ps->chunk[2].cb);
+                memcpy(pbPage + o, ps->chunk[2].pb, ps->chunk[2].cb);
+            }
             *pdwPatchOffset = o;
             *pps = ps;
             return TRUE;
@@ -75,7 +78,9 @@ VOID ActionPatchAndSearch()
     PPAGE_STATISTICS pPageStat = NULL;
     BOOL result, result_cmd, isModePatch = ctxMain->cfg.tpAction == PATCH;
     LPSTR szAction = isModePatch ? "Patch" : "Search";
-    QWORD i, qwoPages, qwoPages_cmd, qwPatchList[MAX_NUM_PATCH_LOCATIONS], cPatchList = 0;
+    QWORD i, j, qwoPages, qwoPages_cmd, qwPatchList[MAX_NUM_PATCH_LOCATIONS], cPatchList = 0, cPagesaveList = 0;
+    PPOSAVE qwPagesaveList[MAX_NUM_PATCH_LOCATIONS];
+
     // initialize / allocate memory
     if(!(pbBuffer16M = LocalAlloc(0, 0x01000000))) { goto cleanup; }
     qwAddrBase = ctxMain->cfg.qwAddrMin;
@@ -131,6 +136,12 @@ VOID ActionPatchAndSearch()
             }
 
             if(isModePatch) {
+                qwPagesaveList[cPagesaveList].cb = pps->chunk[2].cb;
+                qwPagesaveList[cPagesaveList].dwoPatch = dwoPatch;
+                qwPagesaveList[cPagesaveList].qwAddrBase = qwAddrBase;
+                qwPagesaveList[cPagesaveList].qwoPages = qwoPages;
+                memcpy(qwPagesaveList[cPagesaveList].pbsave, pps->chunk[2].pbsave, pps->chunk[2].cb);
+                cPagesaveList++;
                 result = DeviceWriteMEM(qwAddrBase + qwoPages + dwoPatch, pbBuffer16M + qwoPages + dwoPatch, pps->chunk[2].cb, 0);
             }
             if(result) {
@@ -154,7 +165,15 @@ VOID ActionPatchAndSearch()
     if(0 == cPatchList) {
         if (result_cmd && isModePatch) {
             Util_Read16M(pbBuffer16M, qwAddrBase_cmd, pPageStat);
+            memcpy(qwPagesaveList[cPagesaveList].pbsave, pbBuffer16M + qwoPages_cmd + dwoPatch_cmd, pps_cmd->chunk[2].cb);
             memcpy(pbBuffer16M + qwoPages_cmd + dwoPatch_cmd, pps_cmd->chunk[2].pb, pps_cmd->chunk[2].cb);
+
+            qwPagesaveList[cPagesaveList].cb = pps_cmd->chunk[2].cb;
+            qwPagesaveList[cPagesaveList].dwoPatch = dwoPatch_cmd;
+            qwPagesaveList[cPagesaveList].qwAddrBase = qwAddrBase_cmd;
+            qwPagesaveList[cPagesaveList].qwoPages = qwoPages_cmd;
+            cPagesaveList++;
+
             DeviceWriteMEM(qwAddrBase_cmd + qwoPages_cmd + dwoPatch_cmd, pbBuffer16M + qwoPages_cmd + dwoPatch_cmd, pps_cmd->chunk[2].cb, 0);
             PageStatClose(&pPageStat);
             printf("Patch: [stickykeys_cmd_win] Successful.\n");
@@ -170,5 +189,36 @@ cleanup:
             printf("%s: Successful. Location: 0x%llx\n", szAction, qwPatchList[i]);
         }
     }
+    if (cPagesaveList) {
+        for (i = 0; i < cPagesaveList; i++) {
+            printf("AddrBase:0x%llx Pages:0x%llx Patch:0x%llx ",
+                   qwPagesaveList[i].qwAddrBase,
+                   qwPagesaveList[i].qwoPages,
+                   qwPagesaveList[i].dwoPatch);
+            printf("ReData:");
+            for (j = 0; j < qwPagesaveList[i].cb; j++)
+                printf("%02x", qwPagesaveList[i].pbsave[j]);
+            printf(" ");
+            printf("len:0x%llx\n", qwPagesaveList[i].cb);
+        }
+    }
     LocalFree(pbBuffer16M);
+}
+
+VOID ActionPatchRestore()
+{
+    QWORD j = 0;
+
+    printf("Writing ... \nAddrBase:0x%llx \nPages:0x%llx \nPatch:0x%llx \n",
+           ctxMain->cfg.posave.qwAddrBase,
+           ctxMain->cfg.posave.qwoPages,
+           ctxMain->cfg.posave.dwoPatch);
+    printf("ReData:");
+    for (j = 0; j < ctxMain->cfg.posave.cb; j++)
+        printf("%02x", ctxMain->cfg.posave.pbsave[j]);
+    printf(" ");
+    printf("len:0x%llx\n", ctxMain->cfg.posave.cb);
+
+    DeviceWriteMEM(ctxMain->cfg.posave.qwAddrBase + ctxMain->cfg.posave.qwoPages + ctxMain->cfg.posave.dwoPatch,
+                   ctxMain->cfg.posave.pbsave, ctxMain->cfg.posave.cb, 0);
 }

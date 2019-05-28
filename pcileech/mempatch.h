@@ -13,4 +13,6 @@
 */
 VOID ActionPatchAndSearch();
 
+VOID ActionPatchRestore();
+
 #endif /* __MEMPATCH_H__ */

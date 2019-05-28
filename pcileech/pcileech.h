@@ -26,6 +26,7 @@ typedef enum tdActionType {
     DUMP,
     WRITE,
     PATCH,
+    PATCHRESTORE,
     SEARCH,
     DISPLAY,
     PAGEDISPLAY,
@@ -53,6 +54,14 @@ typedef struct tdCONFIG_OPTION {
     QWORD qwValue;
 } CONFIG_OPTION;
 
+typedef struct tdPposave{
+QWORD qwAddrBase;
+QWORD qwoPages;
+DWORD dwoPatch;
+DWORD cb;
+BYTE pbsave[4096];
+} PPOSAVE;
+
 typedef struct tdConfig {
     QWORD qwAddrMin;
     QWORD qwAddrMax;
@@ -67,6 +76,7 @@ typedef struct tdConfig {
     CHAR szInS[MAX_PATH];
     QWORD qwDataIn[10];
     ACTION_TYPE tpAction;
+    PPOSAVE posave;
     CHAR szSignatureName[MAX_PATH];
     CHAR szKMDName[MAX_PATH];
     CHAR szShellcodeName[MAX_PATH];
@@ -97,6 +107,7 @@ typedef struct tdSignatureChunk {
     DWORD cb;
     BYTE tpOffset;
     BYTE pb[4096];
+    BYTE pbsave[4096];
 } SIGNATURE_CHUNK, *PSIGNATURE_CHUNK;
 
 typedef struct tdSignature {

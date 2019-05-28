@@ -27,6 +27,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         {.tp = DUMP,.sz = "dump" },
         {.tp = WRITE,.sz = "write" },
         {.tp = PATCH,.sz = "patch" },
+        {.tp = PATCHRESTORE,.sz = "patchstore"},
         {.tp = SEARCH,.sz = "search" },
         {.tp = KMDLOAD,.sz = "kmdload" },
         {.tp = KMDEXIT,.sz = "kmdexit" },
@@ -47,6 +48,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         {.tp = AGENT_EXEC_PY,.sz = "agent-execpy" },
     };
     DWORD j, i = 1;
+    CHAR ctmp[32];
     ctxMain = LocalAlloc(LMEM_ZEROINIT, sizeof(PCILEECH_CONTEXT));
     if(!ctxMain) {
         return 1;
@@ -149,6 +151,17 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             } else {
                 ctxMain->cfg.fAddrKMDSetByArgument = TRUE;
             }
+        } else if (0 == strcmp(argv[i], "-abin")) {
+            ctxMain->cfg.posave.qwAddrBase = Util_GetNumeric(argv[i + 1]);
+            ctxMain->cfg.posave.qwoPages = Util_GetNumeric(argv[i + 2]);
+            ctxMain->cfg.posave.dwoPatch = Util_GetNumeric(argv[i + 3]);
+            ctxMain->cfg.posave.cb = Util_GetNumeric(argv[i + 5]);
+            for (j = 0; j < ctxMain->cfg.posave.cb; j++) {
+                memset(ctmp, 0, sizeof(CHAR) * 32);
+                strcpy_s(ctmp, 2, argv[i + 4] + j * 2);
+                ctxMain->cfg.posave.pbsave[j] = strtoull(ctmp, NULL, 16);
+            }
+            i += 4;
         } else if(2 == strlen(argv[i]) && '0' <= argv[i][1] && '9' >= argv[i][1]) { // -0..9 param
             ctxMain->cfg.qwDataIn[argv[i][1] - '0'] = Util_GetNumeric(argv[i + 1]);
         }
@@ -308,6 +321,9 @@ int main(_In_ int argc, _In_ char* argv[])
             break;
         case PATCH:
             ActionPatchAndSearch();
+            break;
+        case PATCHRESTORE:
+            ActionPatchRestore();
             break;
         case SEARCH:
             ActionPatchAndSearch();
