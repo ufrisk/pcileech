@@ -194,4 +194,6 @@ v4.1
 * LeechAgent support - remote memory acquisition and analysis.
 
 [v4.2](https://github.com/ufrisk/pcileech/releases/tag/v4.2)
-* Signature updates (Linux and Windows).
+* Signature updates:
+  * Linux kernel module - LINUX_X64_48 (latest versions)
+  * Win10 1903 kernel module - WIN10_X64_2 (requires windows version of PCILeech)
