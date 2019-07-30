@@ -28,7 +28,7 @@ VOID Exec_Callback(_Inout_ PHANDLE phCallback);
 * Close handle opened/used in Exec_Callback.
 * -- hCallback = handle to close.
 */
-VOID Exec_CallbackClose(_In_ HANDLE hCallback);
+VOID Exec_CallbackClose(_In_opt_ HANDLE hCallback);
 
 /*
 * Execute specified shellcode silently (do not display anything on-screen).

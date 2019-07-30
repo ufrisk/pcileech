@@ -128,11 +128,11 @@ Dump all memory between addresses min and max, don't stop on failed pages. Nativ
 Force the usage of a specific device (instead of default auto detecting it). The pmem device is not auto detected.
 * ` pcileech.exe pagedisplay -min 0x1000 -device pmem `
 
-Dump remote memory from a remote LeechAgent running as `SYSTEM` on the computer `computer.ad.contoso.com` using connection encrypted and mutually authenticated by kerberos.
-* ` pcileech.exe dump -device pmem -remote rpc://computer$@ad.contoso.com:computer.ad.contoso.com `
+Dump remote memory from a remote LeechAgent using connection encrypted and mutually authenticated by kerberos.
+* ` pcileech.exe dump -device pmem -remote rpc://computer$@ad.contoso.com `
 
-Execute the Python analysis script `example-find-rwx.py` on the remote computer `computer.ad.contoso.com` using the LeechAgent embedded Python environment.
-* ` pcileech.exe agent-execpy -in example-find-rwx.py -device pmem -remote rpc://computer$@ad.contoso.com:computer.ad.contoso.com `
+Execute the Python analysis script `find-rwx.py` on a remote computer using the LeechAgent embedded Python environment.
+* ` pcileech.exe agent-execpy -in find-rwx.py -device pmem -remote rpc://computer$@ad.contoso.com `
 
 Dump memory using the the reported "TotalMeltdown" [Windows 7/2008R2 x64 PML4 page table permission vulnerability](https://blog.frizk.net/2018/03/total-meltdown.html).
 * ` pcileech.exe dump -out memdump_win7.raw -device totalmeltdown -v -force `
@@ -177,7 +177,7 @@ v1.0
 v1.1-v3.6
 * Various updates. please see individual relases for more information.
 
-[v4.0](https://github.com/ufrisk/pcileech/releases/tag/v4.0)
+v4.0
 * Major cleanup and internal refactorings.
 * FPGA max memory auto-detect and more stable dumping strategy.
 * New stable Windows 10 kernel injects with FPGA hardware on non-virtualization based security systems.
@@ -191,5 +191,7 @@ v1.1-v3.6
 * Multiple other changes and syntax updates.
 
 v4.1
-* Project upgrade to Visual Studio 2019.
 * LeechAgent support - remote memory acquisition and analysis.
+
+[v4.2](https://github.com/ufrisk/pcileech/releases/tag/v4.2)
+* Signature updates (Linux and Windows).

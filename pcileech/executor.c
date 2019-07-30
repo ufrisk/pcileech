@@ -185,7 +185,7 @@ VOID Exec_Callback(_Inout_ PHANDLE phCallback)
     LeechCore_Write(ctxMain->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, (PBYTE)&ph->is, 0x1000);
 }
 
-VOID Exec_CallbackClose(_In_ HANDLE hCallback)
+VOID Exec_CallbackClose(_In_opt_ HANDLE hCallback)
 {
     PEXEC_HANDLE ph = hCallback;
     if(hCallback == NULL) { return; }

@@ -12,6 +12,7 @@
 * the configuration data.
 * -- return
 */
+_Success_(return)
 BOOL KMDOpen();
 
 /*
@@ -33,6 +34,7 @@ VOID KMDClose();
 * -- cb = length of data to read, must not be larger than pb.
 * -- return
 */
+_Success_(return)
 BOOL KMDReadMemory(_In_ QWORD qwAddress, _Out_ PBYTE pb, _In_ DWORD cb);
 
 /*
@@ -42,6 +44,7 @@ BOOL KMDReadMemory(_In_ QWORD qwAddress, _Out_ PBYTE pb, _In_ DWORD cb);
 * -- cb = number of bytes to write.
 * -- return TRUE on success, otherwise FALSE.
 */
+_Success_(return)
 BOOL KMDWriteMemory(_In_ QWORD qwAddress, _In_ PBYTE pb, _In_ DWORD cb);
 
 /*
@@ -49,6 +52,7 @@ BOOL KMDWriteMemory(_In_ QWORD qwAddress, _In_ PBYTE pb, _In_ DWORD cb);
 * -- op = the command (opcode) to submit for processing.
 * -- return TRUE on success, otherwise FALSE.
 */
+_Success_(return)
 BOOL KMD_SubmitCommand(_In_ QWORD op);
 
 #endif /* __KMD_H__ */

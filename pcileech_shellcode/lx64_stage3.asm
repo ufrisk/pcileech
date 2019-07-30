@@ -49,7 +49,6 @@ main ENDP
 ; Lookup function pointers and place them in the supplied struct
 ; rcx -> address of kallsyms_lookup_name
 ; rdx -> ptr to FNLX struct 
-; rax <- 0 = FAIL, 1 = SUCCESS
 ; ------------------------------------------------------------------
 LookupFunctions PROC
 	; ----------------------------------------------------
@@ -60,7 +59,7 @@ LookupFunctions PROC
 	PUSH r13
 	MOV r15, rcx				; address of kallsyms_lookup_name
 	MOV r14, rdx				; ptr to FNLX struct 
-	MOV r13, 10*8				; num functions * 8
+	MOV r13, 11*8				; num functions * 8
 	; ----------------------------------------------------
 	; 1: PUSH FUNCTION NAME POINTERS ON STACK
 	; ----------------------------------------------------
@@ -84,6 +83,8 @@ LookupFunctions PROC
 	PUSH rax
 	LEA rax, str_ioremap_nocache
 	PUSH rax
+	LEA rax, str_ktime_get_real_ts64
+	PUSH rax
 	; ----------------------------------------------------
 	; 2: LOOKUP FUNCTION POINTERS BY NAME
 	; ----------------------------------------------------
@@ -92,8 +93,6 @@ LookupFunctions PROC
 	MOV rcx, r15
 	POP rdx
 	CALL SysVCall
-	TEST rax, rax
-	JZ lookup_fail
 	MOV [r14+r13], rax
 	TEST r13, r13
 	JNZ lookup_loop
@@ -103,10 +102,6 @@ LookupFunctions PROC
 	POP r13
 	POP r14
 	POP r15
-	MOV RAX, 1
-	RET
-	lookup_fail:
-	XOR rax, rax
 	RET
 LookupFunctions ENDP
 
@@ -121,6 +116,7 @@ str_vmemmap_base				db		'vmemmap_base', 0
 str_walk_system_ram_range		db		'walk_system_ram_range', 0
 str_iounmap						db		'iounmap', 0
 str_ioremap_nocache				db		'ioremap_nocache', 0
+str_ktime_get_real_ts64			db		'ktime_get_real_ts64', 0
 
 ; ------------------------------------------------------------------
 ; Convert from the Windows X64 calling convention to the SystemV

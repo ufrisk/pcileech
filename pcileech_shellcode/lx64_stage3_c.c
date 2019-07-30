@@ -25,6 +25,8 @@ extern VOID callback_walk_system_ram_range();
 extern VOID callback_ismemread_inrange();
 extern VOID CacheFlush();
 
+#define LOOKUP_FUNCTION(pk, szFn) (SysVCall(pk->AddrKallsymsLookupName, szFn))
+
 typedef struct _PHYSICAL_MEMORY_RANGE {
 	QWORD BaseAddress;
 	QWORD NumberOfBytes;
@@ -46,7 +48,9 @@ typedef struct tdFNLX { // VOID definitions for LINUX functions (used in main co
 	QWORD walk_system_ram_range;
 	QWORD iounmap;
 	QWORD ioremap_nocache;
-	QWORD ReservedFutureUse[22];
+    // optional values below - do not use
+    QWORD ktime_get_real_ts64;      // do_gettimeofday alternative if export is missing.
+	QWORD ReservedFutureUse[21];
 } FNLX, *PFNLX;
 
 #define KMDDATA_OPERATING_SYSTEM_LINUX			0x02
@@ -152,6 +156,22 @@ QWORD AllocateMemoryDma(PKMDDATA pk, BOOL fRetry)
 	return pStructPages[0];
 }
 
+BOOL LookupFunctionsEx(PKMDDATA pk)
+{
+    DWORD i;
+    PFNLX pfn = &pk->fn;
+    LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)pfn);
+    if(!pfn->do_gettimeofday) {
+        pfn->do_gettimeofday = pfn->ktime_get_real_ts64;
+    }
+    for(i = 0; i < 10; i++) {
+        if(!*(((PQWORD)pfn) + i)) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
 // status:
 //     1: ready for command
 //     2: processing
@@ -172,7 +192,7 @@ VOID stage3_c_EntryPoint(PKMDDATA pk)
 	// 0: set up symbols and kmd data
 	pk->MAGIC = 0x0ff11337711333377;
 	pk->OperatingSystem = KMDDATA_OPERATING_SYSTEM_LINUX;
-	if(!LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)&pk->fn)) {
+	if(!LookupFunctionsEx(pk)) {
 		pk->_status = 0xf0000001;
 		return;
 	}
