@@ -126,7 +126,7 @@
 // (c) Ulf Frisk, 2018-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 1.2.0
+// Header Version: 1.3.0
 //
 #ifndef __LEECHCORE_H__
 #define __LEECHCORE_H__

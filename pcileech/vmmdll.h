@@ -4,7 +4,7 @@
 // (c) Ulf Frisk, 2018-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.7.2
+// Header Version: 2.9
 //
 
 #include <windows.h>
@@ -94,6 +94,7 @@ BOOL VMMDLL_Refresh(_In_ DWORD dwReserved);
 #define VMMDLL_OPT_CONFIG_VMM_VERSION_MINOR             0x40000008  // R
 #define VMMDLL_OPT_CONFIG_VMM_VERSION_REVISION          0x40000009  // R
 #define VMMDLL_OPT_CONFIG_STATISTICS_FUNCTIONCALL       0x4000000A  // RW - enable function call statistics (.status/statistics_fncall file)
+#define VMMDLL_OPT_CONFIG_IS_PAGING_ENABLED             0x4000000B  // RW - 1/0
 
 #define VMMDLL_OPT_WIN_VERSION_MAJOR                    0x40000101  // R
 #define VMMDLL_OPT_WIN_VERSION_MINOR                    0x40000102  // R
@@ -151,17 +152,60 @@ BOOL VMMDLL_ConfigSet(_In_ ULONG64 fOption, _In_ ULONG64 qwValue);
 #define VMMDLL_STATUS_FILE_INVALID                  ((NTSTATUS)0xC0000098L)
 #define VMMDLL_STATUS_FILE_SYSTEM_LIMITATION        ((NTSTATUS)0xC0000427L)
 
+#define VMMDLL_VFS_FILELIST_EXINFO_VERSION          1
+#define VMMDLL_VFS_FILELIST_VERSION                 1
+
+typedef struct tdVMMDLL_VFS_FILELIST_EXINFO {
+    DWORD dwVersion;
+    BOOL fCompressed;                   // set flag FILE_ATTRIBUTE_COMPRESSED - (no meaning but shows gui artifact in explorer.exe)
+    union {
+        FILETIME ftCreationTime;        // 0 = default time
+        QWORD qwCreationTime;
+    };
+    union {
+        FILETIME ftLastAccessTime;      // 0 = default time
+        QWORD qwLastAccessTime;
+    };
+    union {
+        FILETIME ftLastWriteTime;       // 0 = default time
+        QWORD qwLastWriteTime;
+    };
+} VMMDLL_VFS_FILELIST_EXINFO, *PVMMDLL_VFS_FILELIST_EXINFO;
+
 typedef struct tdVMMDLL_VFS_FILELIST {
-    VOID(*pfnAddFile)     (_Inout_ HANDLE h, _In_ LPSTR szName, _In_ ULONG64 cb, _In_ PVOID pvReserved);
-    VOID(*pfnAddDirectory)(_Inout_ HANDLE h, _In_ LPSTR szName, _In_ PVOID pvReserved);
+    DWORD dwVersion;
+    VOID(*pfnAddFile)     (_Inout_ HANDLE h, _In_opt_ LPSTR szName, _In_opt_ LPWSTR wszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
+    VOID(*pfnAddDirectory)(_Inout_ HANDLE h, _In_opt_ LPSTR szName, _In_opt_ LPWSTR wszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
     HANDLE h;
 } VMMDLL_VFS_FILELIST, *PVMMDLL_VFS_FILELIST;
 
 /*
-* Helper function macros for callbacks into the VMM_VFS_FILELIST structure.
+* Helper inline functions for callbacks into the VMM_VFS_FILELIST structure.
 */
-#define VMMDLL_VfsList_AddFile(pFileList, szName, cb)      { ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddFile(((PVMMDLL_VFS_FILELIST)pFileList)->h, szName, cb, NULL); }
-#define VMMDLL_VfsList_AddDirectory(pFileList, szName)     { ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddDirectory(((PVMMDLL_VFS_FILELIST)pFileList)->h, szName, NULL); }
+inline VOID VMMDLL_VfsList_AddFile(_In_ HANDLE pFileList, _In_opt_ LPSTR szName, _In_ ULONG64 cb)
+{
+    ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddFile(((PVMMDLL_VFS_FILELIST)pFileList)->h, szName, NULL, cb, NULL);
+}
+
+inline VOID VMMDLL_VfsList_AddFileEx(_In_ HANDLE pFileList, _In_opt_ LPSTR szName, _In_opt_ LPWSTR wszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo)
+{
+    ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddFile(((PVMMDLL_VFS_FILELIST)pFileList)->h, szName, wszName, cb, pExInfo);
+}
+
+inline VOID VMMDLL_VfsList_AddDirectory(_In_ HANDLE pFileList, _In_opt_ LPSTR szName)
+{
+    ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddDirectory(((PVMMDLL_VFS_FILELIST)pFileList)->h, szName, NULL, NULL);
+}
+
+inline VOID VMMDLL_VfsList_AddDirectoryEx(_In_ HANDLE pFileList, _In_opt_ LPSTR szName, _In_opt_ LPWSTR wszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo)
+{
+    ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddDirectory(((PVMMDLL_VFS_FILELIST)pFileList)->h, szName, wszName, pExInfo);
+}
+
+inline BOOL VMMDLL_VfsList_IsHandleValid(_In_ HANDLE pFileList)
+{
+    return ((PVMMDLL_VFS_FILELIST)pFileList)->dwVersion == VMMDLL_VFS_FILELIST_VERSION;
+}
 
 /*
 * List a directory of files in the memory process file system. Directories and
@@ -233,9 +277,9 @@ _Success_(return)
 BOOL VMMDLL_VfsInitializePlugins();
 
 #define VMMDLL_PLUGIN_CONTEXT_MAGIC             0xc0ffee663df9301c
-#define VMMDLL_PLUGIN_CONTEXT_VERSION           2
+#define VMMDLL_PLUGIN_CONTEXT_VERSION           3
 #define VMMDLL_PLUGIN_REGINFO_MAGIC             0xc0ffee663df9301d
-#define VMMDLL_PLUGIN_REGINFO_VERSION           3
+#define VMMDLL_PLUGIN_REGINFO_VERSION           4
 
 #define VMMDLL_PLUGIN_EVENT_VERBOSITYCHANGE     0x01
 #define VMMDLL_PLUGIN_EVENT_TOTALREFRESH        0x02
@@ -246,8 +290,8 @@ typedef struct tdVMMDLL_PLUGIN_CONTEXT {
     WORD wSize;
     DWORD dwPID;
     PVOID pProcess;
-    LPSTR szModule;
-    LPSTR szPath;
+    LPWSTR wszModule;
+    LPWSTR wszPath;
     PVOID pvReserved1;
     PVOID pvReserved2;
 } VMMDLL_PLUGIN_CONTEXT, *PVMMDLL_PLUGIN_CONTEXT;
@@ -265,7 +309,7 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
     PVOID pvReserved2;
     // general plugin registration info to be filled out by the plugin below:
     struct {
-        CHAR szModuleName[32];
+        WCHAR wszModuleName[32];
         BOOL fRootModule;
         BOOL fProcessModule;
         PVOID pvReserved1;
@@ -297,6 +341,7 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
 #define VMMDLL_FLAG_NOCACHE                        0x0001  // do not use the data cache (force reading from memory acquisition device)
 #define VMMDLL_FLAG_ZEROPAD_ON_FAIL                0x0002  // zero pad failed physical memory reads and report success if read within range of physical memory.
 #define VMMDLL_FLAG_FORCECACHE_READ                0x0008  // force use of cache - fail non-cached pages - only valid for reads, invalid with VMM_FLAG_NOCACHE/VMM_FLAG_ZEROPAD_ON_FAIL.
+#define VMMDLL_FLAG_NOPAGING                       0x0010  // do not try to retrieve memory from paged out memory from pagefile/compressed (even if possible)
 
 /*
 * Read memory in various non-contigious locations specified by the pointers to
@@ -654,6 +699,82 @@ BOOL VMMDLL_WinReg_HiveReadEx(_In_ ULONG64 vaCMHive, _In_ DWORD ra, _Out_ PBYTE 
 _Success_(return)
 BOOL VMMDLL_WinReg_HiveWrite(_In_ ULONG64 vaCMHive, _In_ DWORD ra, _In_ PBYTE pb, _In_ DWORD cb);
 
+/*
+* Enumerate registry sub keys - similar to WINAPI function 'RegEnumKeyExW.'
+* Please consult WINAPI function documentation for information.
+* May be called with HKLM base or virtual address of CMHIVE base examples:
+*   1) 'HKLM\SOFTWARE\Key\SubKey'
+*   2) 'HKLM\ORPHAN\SAM\Key\SubKey'              (orphan key)
+*   3) '0x<vaCMHIVE>\ROOT\Key\SubKey'
+*   4) '0x<vaCMHIVE>\ORPHAN\Key\SubKey'          (orphan key)
+* -- wszFullPathKey
+* -- dwIndex
+* -- lpName
+* -- lpcchName
+* -- lpftLastWriteTime
+* -- return
+*/
+_Success_(return)
+BOOL VMMDLL_WinReg_EnumKeyExW(
+    _In_ LPWSTR wszFullPathKey,
+    _In_ DWORD dwIndex,
+    _Out_writes_opt_(*lpcchName) LPWSTR lpName,
+    _Inout_ LPDWORD lpcchName,
+    _Out_opt_ PFILETIME lpftLastWriteTime
+);
+
+/*
+* Enumerate registry values given a registry key - similar to WINAPI function
+* 'EnumValueW'. Please consult WINAPI function documentation for information.
+* May be called in two ways:
+* May be called with HKLM base or virtual address of CMHIVE base examples:
+*   1) 'HKLM\SOFTWARE\Key\SubKey'
+*   2) 'HKLM\ORPHAN\SAM\Key\SubKey'              (orphan key)
+*   3) '0x<vaCMHIVE>\ROOT\Key\SubKey'
+*   4) '0x<vaCMHIVE>\ORPHAN\Key\SubKey'          (orphan key)
+* -- wszFullPathKey
+* -- dwIndex
+* -- lpValueName
+* -- lpcchValueName
+* -- lpType
+* -- lpData
+* -- lpcbData
+* -- return
+*/
+_Success_(return)
+BOOL VMMDLL_WinReg_EnumValueW(
+    _In_ LPWSTR wszFullPathKey,
+    _In_ DWORD dwIndex,
+    _Out_writes_opt_(*lpcchValueName) LPWSTR lpValueName,
+    _Inout_ LPDWORD lpcchValueName,
+    _Out_opt_ LPDWORD lpType,
+    _Out_writes_opt_(*lpcbData) LPBYTE lpData,
+    _Inout_opt_ LPDWORD lpcbData
+);
+
+/*
+* Query a registry value given a registry key/value path - similar to WINAPI
+* function 'RegQueryValueEx'.
+* Please consult WINAPI function documentation for information.
+* May be called with HKLM base or virtual address of CMHIVE base examples:
+*   1) 'HKLM\SOFTWARE\Key\SubKey\Value'
+*   2) 'HKLM\ORPHAN\SAM\Key\SubKey\'             (orphan key and default value)
+*   3) '0x<vaCMHIVE>\ROOT\Key\SubKey\Value'
+*   4) '0x<vaCMHIVE>\ORPHAN\Key\SubKey\Value'    (orphan key value)
+* -- wszFullPathKeyValue
+* -- lpType
+* -- lpData
+* -- lpcbData
+* -- return
+*/
+_Success_(return)
+BOOL VMMDLL_WinReg_QueryValueExW(
+    _In_ LPWSTR wszFullPathKeyValue,
+    _Out_opt_ LPDWORD lpType,
+    _Out_writes_opt_(*lpcbData) LPBYTE lpData,
+    _When_(lpData == NULL, _Out_opt_) _When_(lpData != NULL, _Inout_opt_) LPDWORD lpcbData
+);
+
 
 
 //-----------------------------------------------------------------------------
@@ -751,22 +872,6 @@ BOOL VMMDLL_WinGetThunkInfoIAT(_In_ DWORD dwPID, _In_ LPSTR szModuleName, _In_ L
 _Success_(return)
 BOOL VMMDLL_WinGetThunkInfoEAT(_In_ DWORD dwPID, _In_ LPSTR szModuleName, _In_ LPSTR szExportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_EAT pThunkInfoEAT);
 
-/*
-* Decompress compressed memory page stored in the MemCompression process.
-* -- vaCompressedData = virtual address in 'MemCompression' to decompress.
-* -- cbCompressedData = length of compressed data in 'MemCompression' to decompress (or zero for auto-detect).
-* -- pbDecompressedPage
-* -- pcbCompressedData = optional ptr to receive length of compressed buffer.
-* -- return
-*/
-_Success_(return)
-BOOL VMMDLL_WinMemCompression_DecompressPage(
-    _In_ ULONG64 vaCompressedData,
-    _In_opt_ DWORD cbCompressedData,
-    _Out_writes_(4096) PBYTE pbDecompressedPage,
-    _Out_opt_ PDWORD pcbCompressedData
-);
-
 
 
 //-----------------------------------------------------------------------------
@@ -778,11 +883,12 @@ BOOL VMMDLL_WinMemCompression_DecompressPage(
 * -- pb
 * -- cb
 * -- cbInitialOffset = offset, must be max 0x1000 and multiple of 0x10.
-* -- sz = buffer to fill, NULL to retrieve size in pcsz parameter.
-* -- pcsz = ptr to size of buffer on entry, size of characters on exit.
+* -- sz = buffer to fill, NULL to retrieve buffer size in pcsz parameter.
+* -- pcsz = IF sz==NULL :: size of buffer (including space for terminating NULL) on exit
+*           IF sz!=NULL :: size of buffer on entry, size of characters (excluding terminating NULL) on exit.
 */
 _Success_(return)
-BOOL VMMDLL_UtilFillHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset, _Inout_opt_ LPSTR sz, _Out_ PDWORD pcsz);
+BOOL VMMDLL_UtilFillHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset, _Out_opt_ LPSTR sz, _Inout_ PDWORD pcsz);
 
 #ifdef __cplusplus
 }

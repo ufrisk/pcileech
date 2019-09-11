@@ -136,6 +136,7 @@
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>del "$(OutDir)pcileech_files.zip"
+
 powershell Compress-Archive -Path '$(OutDir)*.*','$(OutDir)pcileech' -DestinationPath '$(OutDir)pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -167,6 +168,7 @@ powershell Compress-Archive -Path '$(OutDir)*.*','$(OutDir)pcileech' -Destinatio
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>del "$(OutDir)pcileech_files.zip"
+
 powershell Compress-Archive -Path '$(OutDir)*.*','$(OutDir)pcileech' -DestinationPath '$(OutDir)pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -200,6 +202,7 @@ powershell Compress-Archive -Path '$(OutDir)*.*','$(OutDir)pcileech' -Destinatio
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>del "$(OutDir)pcileech_files.zip"
+
 powershell Compress-Archive -Path '$(OutDir)*.*','$(OutDir)pcileech' -DestinationPath '$(OutDir)pcileech_files.zip' -Force -CompressionLevel Optimal</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
