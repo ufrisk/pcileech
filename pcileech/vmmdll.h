@@ -4,7 +4,7 @@
 // (c) Ulf Frisk, 2018-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.9
+// Header Version: 2.10
 //
 
 #include <windows.h>
@@ -35,6 +35,8 @@ extern "C" {
 *              documentation for additional information.
 *    -norefresh = disable background refreshes (even if backing memory is
 *              volatile memory).
+*    -symbolserverdisable = disable symbol server until user change. This
+*              parameter will take precedence over registry settings.
 * -- argc
 * -- argv
 * -- return = success/fail
@@ -61,6 +63,12 @@ BOOL VMMDLL_Close();
 */
 _Success_(return)
 BOOL VMMDLL_Refresh(_In_ DWORD dwReserved);
+
+/*
+* Free memory allocated by the VMMDLL.
+* -- pvMem
+*/
+VOID VMMDLL_MemFree(_Frees_ptr_opt_ PVOID pvMem);
 
 
 //-----------------------------------------------------------------------------
@@ -580,11 +588,11 @@ BOOL VMMDLL_ProcessGetInformation(_In_ DWORD dwPID, _Inout_opt_ PVMMDLL_PROCESS_
 * Retrieve a string value belonging to a process. The function allocates a new
 * string buffer and returns the requested string in it. The string is always
 * NULL terminated. On failure NULL is returned.
-* NB! CALLER IS RESPONSIBLE FOR LocalFree return value!
-* CALLER LocalFree: return
+* NB! CALLER IS RESPONSIBLE FOR VMMDLL_MemFree return value!
+* CALLER FREE: VMMDLL_MemFree(return)
 * -- dwPID
 * -- fOptionString = string value to retrieve as given by VMMDLL_PROCESS_INFORMATION_OPT_STRING_*
-* -- return - fail: NULL, success: the string - NB! must be LocalFree'd by caller!
+* -- return - fail: NULL, success: the string - NB! must be VMMDLL_MemFree'd by caller!
 */
 LPSTR VMMDLL_ProcessGetInformationString(_In_ DWORD dwPID, _In_ DWORD fOptionString);
 
@@ -637,6 +645,49 @@ ULONG64 VMMDLL_ProcessGetProcAddress(_In_ DWORD dwPID, _In_ LPSTR szModuleName, 
 * -- return = virtual address of module base, zero on fail.
 */
 ULONG64 VMMDLL_ProcessGetModuleBase(_In_ DWORD dwPID, _In_ LPSTR szModuleName);
+
+
+
+//-----------------------------------------------------------------------------
+// WINDOWS SPECIFIC DEBUGGING / SYMBOL FUNCTIONALITY BELOW:
+//-----------------------------------------------------------------------------
+
+/*
+* Retrieve a symbol virtual address given a module name and a symbol name.
+* NB! not all modules may exist - initially only module "nt" is available.
+* NB! if multiple modules have the same name the 1st to be added will be used.
+* -- szModule
+* -- szSymbolName
+* -- pvaSymbolAddress
+* -- return
+*/
+_Success_(return)
+BOOL VMMDLL_PdbSymbolAddress(_In_ LPSTR szModule, _In_ LPSTR szSymbolName, _Out_ PULONG64 pvaSymbolAddress);
+
+/*
+* Retrieve a type size given a module name and a type name.
+* NB! not all modules may exist - initially only module "nt" is available.
+* NB! if multiple modules have the same name the 1st to be added will be used.
+* -- szModule
+* -- szTypeName
+* -- pcbTypeSize
+* -- return
+*/
+_Success_(return)
+BOOL VMMDLL_PdbTypeSize(_In_ LPSTR szModule, _In_ LPSTR szTypeName, _Out_ PDWORD pcbTypeSize);
+
+/*
+* Locate the offset of a type child - typically a sub-item inside a struct.
+* NB! not all modules may exist - initially only module "nt" is available.
+* NB! if multiple modules have the same name the 1st to be added will be used.
+* -- szModule
+* -- szTypeName
+* -- wszTypeChildName
+* -- pcbTypeChildOffset
+* -- return
+*/
+_Success_(return)
+BOOL VMMDLL_PdbTypeChildOffset(_In_ LPSTR szModule, _In_ LPSTR szTypeName, _In_ LPWSTR wszTypeChildName, _Out_ PDWORD pcbTypeChildOffset);
 
 
 
@@ -817,9 +868,9 @@ typedef struct tdVMMDLL_WIN_TCPIP {
 
 /*
 * Retrieve networking information about network connections related to Windows TCP/IP stack.
-* NB! CALLER IS RESPONSIBLE FOR LocalFree return value!
-* CALLER LocalFree: return
-* -- return - fail: NULL, success: a PVMMDLL_WIN_TCPIP struct scontaining the result - NB! Caller responsible for LocalFree!
+* NB! CALLER IS RESPONSIBLE FOR VMMDLL_MemFree return value!
+* CALLER FREE: VMMDLL_MemFree(return)
+* -- return - fail: NULL, success: a PVMMDLL_WIN_TCPIP struct scontaining the result - NB! Caller responsible for VMMDLL_MemFree!
 */
 PVMMDLL_WIN_TCPIP VMMDLL_WinNet_Get();
 

@@ -126,7 +126,7 @@
 // (c) Ulf Frisk, 2018-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 1.2.0
+// Header Version: 1.4
 //
 #ifndef __LEECHCORE_H__
 #define __LEECHCORE_H__
@@ -155,6 +155,7 @@ typedef void                                *HANDLE, **PHANDLE;
 typedef uint32_t                            BOOL, *PBOOL;
 typedef uint8_t                             BYTE, *PBYTE;
 typedef char                                CHAR, *PCHAR, *PSTR, *LPSTR;
+typedef const CHAR                          *LPCSTR;
 typedef uint16_t                            WORD, *PWORD, USHORT, *PUSHORT;
 typedef uint32_t                            DWORD, *PDWORD;
 typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
@@ -173,6 +174,7 @@ typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
 #define _In_reads_(cbDataIn)
 #define _Out_writes_opt_(x)
 #define _Success_(return)
+#define _Frees_ptr_opt_
 #endif /* LINUX */
 
 //-----------------------------------------------------------------------------
@@ -309,8 +311,16 @@ DLLEXPORT VOID LeechCore_Close();
 #define LEECHCORE_FLAG_WRITE_VERIFY         0x02
 
 /*
+* Free memory allocated by the LeechCore.
+* -- pvMem
+* -- return
+*/
+DLLEXPORT VOID LeechCore_MemFree(_Frees_ptr_opt_ PVOID pvMem);
+
+/*
 * Allocate a scatter buffer containing empty 0x1000-sized ppMEMs with address
-* set to zero. Caller is responsible for calling LocalFree(ppMEMs).
+* set to zero. Caller is responsible for calling LeechCore_MemFree(ppMEMs).
+* CALLER FREE: LeechCore_MemFree(ppMEMs)
 * -- cMEMs
 * -- pppMEMs = pointer to receive ppMEMs on success.
 * -- return
@@ -422,6 +432,7 @@ DLLEXPORT BOOL LeechCore_Probe(_In_ QWORD pa, _In_ DWORD cPages, _Inout_updates_
 #define LEECHCORE_OPT_MEMORYINFO_OS_UPTIME              0x0200000e  // R
 #define LEECHCORE_OPT_MEMORYINFO_OS_KERNELBASE          0x0200000f  // R
 #define LEECHCORE_OPT_MEMORYINFO_OS_KERNELHINT          0x02000010  // R
+#define LEECHCORE_OPT_MEMORYINFO_OS_KdDebuggerDataBlock 0x02000011  // R
 
 #define LEECHCORE_OPT_FPGA_PROBE_MAXPAGES               0x03000001  // RW
 #define LEECHCORE_OPT_FPGA_RX_FLUSH_LIMIT               0x03000002  // RW
@@ -464,6 +475,7 @@ DLLEXPORT BOOL LeechCore_SetOption(_In_ ULONG64 fOption, _In_ ULONG64 qwValue);
 
 #define LEECHCORE_COMMANDDATA_FPGA_WRITE_TLP            0x00000101  // R
 #define LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP           0x00000102  // R
+#define LEECHCORE_COMMANDDATA_FILE_DUMPHEADER_GET       0x00000201  // R
 #define LEECHCORE_COMMANDDATA_STATISTICS_GET            0x80000100  // R
 
 #define LEECHCORE_STATISTICS_MAGIC                      0xffff6550
@@ -478,7 +490,7 @@ DLLEXPORT BOOL LeechCore_SetOption(_In_ ULONG64 fOption, _In_ ULONG64 qwValue);
 #define LEECHCORE_STATISTICS_ID_COMMANDSVC                    0x07
 #define LEECHCORE_STATISTICS_ID_MAX                           0x07
 
-static const LPSTR LEECHCORE_STATISTICS_NAME[] = {
+static LPCSTR LEECHCORE_STATISTICS_NAME[] = {
     "LeechCore_Open",
     "LeechCore_ReadScatter",
     "LeechCore_Write",
