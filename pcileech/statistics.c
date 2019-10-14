@@ -47,7 +47,7 @@ VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
     QWORD qwSpeed = ((ps->cPageSuccess + ps->cPageFail) * 4) / (1 + (qwTickCountElapsed / 1000));
     HANDLE hConsole;
     CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
-    BOOL isMBs = qwSpeed >= 1024;
+    BOOL isMBs = qwSpeed >= 2048;
     if(ps->i.fIsFirstPrintCompleted) {
 #ifdef WIN32
         hConsole = GetStdHandle(STD_OUTPUT_HANDLE);

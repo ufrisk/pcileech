@@ -697,7 +697,7 @@ VOID Util_WaitForPowerCycle()
 
 #define UTIL_PRINTASCII \
     "................................ !\"#$%&'()*+,-./0123456789:;<=>?" \
-    "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz`{|}~" \
+    "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ " \
     "................................................................" \
     "................................................................" \
 

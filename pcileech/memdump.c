@@ -258,7 +258,7 @@ VOID ActionMemoryProbe()
             return;
         }
         for(i = 0; i < cPages; i++) {
-            PageStatUpdate(pPageStat, (qwA + i * 0x1000), (pbResultMap[i] ? 1 : 0), (pbResultMap[i] ? 0 : 1));
+            PageStatUpdate(pPageStat, (qwA + i * 0x1000 + 0x1000), (pbResultMap[i] ? 1 : 0), (pbResultMap[i] ? 0 : 1));
         }
         qwA += MEMORY_PROBE_PAGES_PER_SWEEP * 0x1000;
     }

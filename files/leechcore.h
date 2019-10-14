@@ -59,7 +59,14 @@
 //           http://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.2.0.6.zip
 //           Syntax:
 //           FGPA
-//           FPGA://<read_uS>[:<write_uS>[:<probe_uS>]]   (values are optional)
+//           FPGA://pcie_gen:[<read_uS>[:<write_uS>[:<probe_uS>]]]
+//
+// RAWUDP :  hardware, read/write - connect to a remote FPGA over the network
+//           using a rudimentary UDP implmentation of the FPGA USB protocol.
+//           Supported devices: NeTV2 - https://github.com/ufrisk/pcileech-fpga
+//           Syntax:
+//           RAWUDP://<target_ipv4>:[pcie_gen:[<read_uS>[:<write_uS>[:<probe_uS>]]]]
+//           Example: RAWUDP://192.168.0.222
 //
 // SP605TCP : hardware, read/write - connect to a remote SP605 FPGA over the
 //           network using the implementation created by @d_olex.
@@ -92,10 +99,11 @@
 //           Syntax:
 //           TOTALMELTDOWN
 //
-// FILE :    use dump file, either a raw linear memory dump or full crash dump.
+// FILE :    use dump file, either a raw linear memory dump, full crash dump or
+//           full elf core dump (virtualbox).
 //           Which format to use is auto-detected. If it looks like a full cash
-//           dump that format will be used, otherwise it will be assumed that a
-//           raw linear memory dump is to be used.
+//           dump or full elf core dump those formats will be used, otherwise
+//           it will be assumed that a raw linear memory dump is to be used.
 //           Syntax:
 //           <filename>        (no device-type prefix - just use the file name)
 //           FILE://<filename>
@@ -126,7 +134,7 @@
 // (c) Ulf Frisk, 2018-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 1.4
+// Header Version: 1.5
 //
 #ifndef __LEECHCORE_H__
 #define __LEECHCORE_H__
@@ -248,7 +256,7 @@ typedef struct tdLEECHCORE_CONFIG {
     WORD version;               // set by caller.
     WORD flags;                 // set by caller, updated by device.
     ULONG64 paMax;              // set by caller, updated by device.
-    ULONG64 cbMaxSizeMemIo;     // set by caller, updated by device.
+    ULONG64 cbMaxValueDummy;    // set by device. (dummy - set to MAX_VALUE [deprecated cbMaxSizeMemIo])
     ULONG64 paMaxNative;        // set by device.
     LEECHCORE_DEVICE tpDevice;  // set by device.
     BOOL fWritable;             // set by device. (is device writable?)
@@ -475,6 +483,9 @@ DLLEXPORT BOOL LeechCore_SetOption(_In_ ULONG64 fOption, _In_ ULONG64 qwValue);
 
 #define LEECHCORE_COMMANDDATA_FPGA_WRITE_TLP            0x00000101  // R
 #define LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP           0x00000102  // R
+#define LEECHCORE_COMMANDDATA_FPGA_PCIECFGSPACE         0x00000103  // R
+#define LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE           0x00000104  // RW
+#define LEECHCORE_COMMANDDATA_FPGA_CFGREGCFG            0x00000105  // RW
 #define LEECHCORE_COMMANDDATA_FILE_DUMPHEADER_GET       0x00000201  // R
 #define LEECHCORE_COMMANDDATA_STATISTICS_GET            0x80000100  // R
 

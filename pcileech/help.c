@@ -98,8 +98,6 @@ VOID Help_ShowGeneral()
         "   -force: force reads and writes even though target memory is marked as not   \n" \
         "          accessible. Dangerous! Affects all modes and commands.               \n" \
         "          Option has no value. Example: -force                                 \n" \
-        "   -iosize: max i/o size. Hardware DMA requests larger than iosize will be     \n" \
-        "          discarded. Affects all modes and commands.                           \n" \
         "   -tlpwait: Wait in seconds while listening for PCIe TLPs.                    \n" \
         "          Wait occurs after any other actions have been completed.             \n" \
         "   -help: show help about the selected command or implant and then exit        \n" \

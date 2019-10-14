@@ -4,7 +4,7 @@
 // (c) Ulf Frisk, 2018-2019
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.10
+// Header Version: 2.11
 //
 
 #include <windows.h>
@@ -88,7 +88,6 @@ VOID VMMDLL_MemFree(_Frees_ptr_opt_ PVOID pvMem);
 #define VMMDLL_OPT_CORE_VERBOSE_EXTRA                   0x80000003  // RW
 #define VMMDLL_OPT_CORE_VERBOSE_EXTRA_TLP               0x80000004  // RW
 #define VMMDLL_OPT_CORE_MAX_NATIVE_ADDRESS              0x80000005  // R
-#define VMMDLL_OPT_CORE_MAX_NATIVE_IOSIZE               0x80000006  // R
 #define VMMDLL_OPT_CORE_SYSTEM                          0x80000007  // R
 #define VMMDLL_OPT_CORE_MEMORYMODEL                     0x80000008  // R
 

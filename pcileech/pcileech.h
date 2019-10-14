@@ -71,7 +71,6 @@ typedef struct tdConfig {
     CHAR szKMDName[MAX_PATH];
     CHAR szShellcodeName[MAX_PATH];
     CHAR szHook[MAX_PATH];
-    QWORD qwMaxSizeDmaIo;
     DWORD dwListenTlpTimeMs;
     // flags below
     BOOL fPageTableScan;

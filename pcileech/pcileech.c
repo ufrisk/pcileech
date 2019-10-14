@@ -56,7 +56,6 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
     ctxMain->cfg.tpAction = NA;
     ctxMain->cfg.qwAddrMax = ~0;
     ctxMain->cfg.fOutFile = TRUE;
-    ctxMain->cfg.qwMaxSizeDmaIo = ~0;
     // fetch command line actions/options
     loop:
     while(i < argc) {
@@ -116,9 +115,6 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             ctxMain->cfg.qwCR3 = Util_GetNumeric(argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-efibase")) {
             ctxMain->cfg.qwEFI_IBI_SYST = Util_GetNumeric(argv[i + 1]);
-        } else if(0 == strcmp(argv[i], "-iosize")) {
-            ctxMain->cfg.qwMaxSizeDmaIo = Util_GetNumeric(argv[i + 1]);
-            ctxMain->cfg.qwMaxSizeDmaIo = ~0xfff & max(0x1000, ctxMain->cfg.qwMaxSizeDmaIo);
         } else if(0 == strcmp(argv[i], "-tlpwait")) {
             ctxMain->cfg.dwListenTlpTimeMs = (DWORD)(1000 * Util_GetNumeric(argv[i + 1]));
         } else if((0 == strcmp(argv[i], "-device")) || (0 == strcmp(argv[i], "-z"))) {
@@ -167,8 +163,6 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
 VOID PCILeechConfigFixup()
 {
     QWORD qw;
-    // device specific configuration
-    ctxMain->cfg.qwMaxSizeDmaIo = min(ctxMain->cfg.qwMaxSizeDmaIo, ctxMain->dev.cbMaxSizeMemIo);
     // no kmd -> max address == max address that device support
     if(!ctxMain->cfg.szKMDName[0] && !ctxMain->cfg.qwKMD) {
         if(ctxMain->cfg.qwAddrMax == 0 || ctxMain->cfg.qwAddrMax > ctxMain->dev.paMaxNative) {
