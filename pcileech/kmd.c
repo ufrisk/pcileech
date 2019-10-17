@@ -785,7 +785,7 @@ BOOL KMDOpen_WINX64_VMM()
 {
     BOOL result = FALSE;
     BYTE pbPage[0x1000];
-    BYTE pbExec[0x800];
+    BYTE pbExec[0x800], pbExecVerify[0x800];
     DWORD cbExec = 0;
     QWORD i = 0, j, cMemMap = 0;
     PVMMDLL_MEMMAP_ENTRY pMemMap = NULL;
@@ -903,8 +903,12 @@ success_locate_hook:
     VmmPrx_MemWrite(4, vaHalBugCheckSystem, (PBYTE)&qwTMP, 8);
     qwTMP = vaExec + 2;
     VmmPrx_MemWrite(4, vaHalBugCheckSystem + 8, (PBYTE)&qwTMP, 8);
-    if(!VmmPrx_MemWrite(4, vaExec, pbExec, 0x800) || !VmmPrx_MemWrite(4, vaHook, (PBYTE)&vaExec, sizeof(QWORD))) {
+    if(!VmmPrx_MemWrite(4, vaExec, pbExec, 0x800) || !VmmPrx_MemRead(4, vaExec, pbExecVerify, 0x800) || memcmp(pbExec, pbExecVerify, 0x800)) {
         printf("KMD: Failed vmm.dll!MemWrite (kdcom.dll) #2.\n");
+        goto fail;
+    }
+    if(!VmmPrx_MemWrite(4, vaHook, (PBYTE)&vaExec, sizeof(QWORD))) {
+        printf("KMD: Failed vmm.dll!MemWrite (kdcom.dll) #3.\n");
         goto fail;
     }
     printf("KMD: Code inserted into the kernel - Waiting to receive execution.\n");
@@ -938,6 +942,7 @@ success_kmd_load:
     //------------------------------------------------
     if(!KMD_GetPhysicalMemoryMap()) {
         printf("KMD: Failed. Failed to retrieve physical memory map.\n");
+        printf("             KMD _may_ still be located at: 0x%08x\n", (DWORD)paKMD);
         KMDClose();
         goto fail;
     }
@@ -1085,13 +1090,19 @@ BOOL KMD_IsRangeInPhysicalMap(_In_ PKMDHANDLE phKMD, _In_ QWORD qwBaseAddress, _
 _Success_(return)
 BOOL KMD_SubmitCommand(_In_ QWORD op)
 {
+    DWORD cFailCount;
     HANDLE hCallback = NULL;
     ctxMain->pk->_op = op;
     if(!LeechCore_Write(ctxMain->phKMD->dwPageAddr32, ctxMain->phKMD->pbPageData, 4096)) {
         return FALSE;
     }
     do {
-        if(4096 != LeechCore_ReadEx(ctxMain->phKMD->dwPageAddr32, ctxMain->phKMD->pbPageData, 4096, LEECHCORE_FLAG_READ_RETRY, NULL)) {
+        cFailCount = 0;
+        while(4096 != LeechCore_ReadEx(ctxMain->phKMD->dwPageAddr32, ctxMain->phKMD->pbPageData, 4096, LEECHCORE_FLAG_READ_RETRY, NULL)) {
+            cFailCount++;
+            if(cFailCount < 10) { usleep(250); continue; }
+            if(cFailCount < 20) { SwitchToThread(); continue; }
+            if(cFailCount < 30) { Sleep(100); continue; }
             Exec_CallbackClose(hCallback);
             return FALSE;
         }

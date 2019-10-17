@@ -193,3 +193,6 @@ v4.1
 [v4.3](https://github.com/ufrisk/pcileech/releases/tag/v4.3)
 * Bug fixes.
 * Support for new device (NeTV2 / RawUDP) via LeechCore library.
+
+Latest:
+* Bug fixes and stability improvements.
