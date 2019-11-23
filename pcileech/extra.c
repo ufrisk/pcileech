@@ -215,6 +215,7 @@ VOID Action_PT_Virt2Phys()
 
 VOID Action_TlpTx()
 {
+    DWORD dwListenTlpMs = 100;
     if(ctxMain->cfg.cbIn < 12) {
         printf("Action_TlpTx: Invalid TLP (too short).\n");
         return;
@@ -233,5 +234,5 @@ VOID Action_TlpTx()
         return;
     }
     LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_WRITE_TLP, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, NULL, 0, NULL);
-    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP, NULL, 0, NULL, 100, NULL);
+    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP, (PBYTE)&dwListenTlpMs, sizeof(DWORD), NULL, 0, NULL);
 }
