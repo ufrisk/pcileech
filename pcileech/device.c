@@ -28,20 +28,21 @@ BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
         ctxMain->dev.flags =
             LEECHCORE_CONFIG_FLAG_PRINTF |
             (ctxMain->cfg.fVerbose ? LEECHCORE_CONFIG_FLAG_PRINTF_VERBOSE_1 : 0) |
-            (ctxMain->cfg.fVerboseExtra ? LEECHCORE_CONFIG_FLAG_PRINTF_VERBOSE_2 : 0) |
-            (ctxMain->cfg.fVerboseExtraTlp ? LEECHCORE_CONFIG_FLAG_PRINTF_VERBOSE_3 : 0);
+            (ctxMain->cfg.fVerboseExtra ? LEECHCORE_CONFIG_FLAG_PRINTF_VERBOSE_2 : 0);
     }
     strcpy_s(ctxMain->dev.szDevice, MAX_PATH, szDevice);
     strcpy_s(ctxMain->dev.szRemote, MAX_PATH, ctxMain->cfg.szRemote);
     ctxMain->dev.paMax = ctxMain->cfg.qwAddrMax;
     result = LeechCore_Open(&ctxMain->dev);
     if(result) {
+        // enable standard verbosity levels upon success (if not already set)
         if(fFailSilent) {
-            // enable standard verbosity levels upon success
             LeechCore_SetOption(LEECHCORE_OPT_CORE_PRINTF_ENABLE, 1);
             LeechCore_SetOption(LEECHCORE_OPT_CORE_VERBOSE, (ctxMain->cfg.fVerbose ? 1 : 0));
             LeechCore_SetOption(LEECHCORE_OPT_CORE_VERBOSE_EXTRA, (ctxMain->cfg.fVerboseExtra ? 1 : 0));
-            LeechCore_SetOption(LEECHCORE_OPT_CORE_VERBOSE_EXTRA_TLP, (ctxMain->cfg.fVerboseExtraTlp ? 1 : 0));
+        }
+        if(ctxMain->cfg.fVerboseExtraTlp) {
+            LeechCore_SetOption(LEECHCORE_OPT_CORE_VERBOSE_EXTRA_TLP, 1);
         }
     } else {
         ZeroMemory(&ctxMain->dev, sizeof(ctxMain->dev));

@@ -50,35 +50,37 @@ VOID MemoryDump_SetOutFileName()
     }
 }
 
+_Success_(return)
 BOOL MemoryDump_AsyncFileAlloc(_Out_ PFILE_WRITE_ASYNC_BUFFER *ppFileBuffer)
 {
+    PFILE_WRITE_ASYNC_BUFFER pFileBuffer;
     *ppFileBuffer = NULL;
-    if(ctxMain->cfg.fOutFile != FALSE) {
-        MemoryDump_SetOutFileName();
-        *ppFileBuffer = LocalAlloc(LMEM_ZEROINIT, sizeof(FILE_WRITE_ASYNC_BUFFER));
-        if(!*ppFileBuffer) {
-            printf("Memory Dump: Failed. Failed to allocate memory buffers.\n");
-            return FALSE;
-        }
-        if(!fopen_s(&(*ppFileBuffer)->phFile, ctxMain->cfg.szFileOut, "r") || (*ppFileBuffer)->phFile) {
-            if((*ppFileBuffer)->phFile) {
-                fclose((*ppFileBuffer)->phFile);
-            }
-            printf("Memory Dump: Failed. File already exists.\n");
-            return FALSE;
-        }
-        if(fopen_s(&(*ppFileBuffer)->phFile, ctxMain->cfg.szFileOut, "wb") || !(*ppFileBuffer)->phFile) {
-            printf("Memory Dump: Failed. Error writing to file.\n");
-            return FALSE;
-        }
-        (*ppFileBuffer)->isSuccess = TRUE;
-    } else {
-        *ppFileBuffer = NULL;
+    if(!ctxMain->cfg.fOutFile) { return TRUE; }
+    MemoryDump_SetOutFileName();
+    pFileBuffer = LocalAlloc(LMEM_ZEROINIT, sizeof(FILE_WRITE_ASYNC_BUFFER));
+    if(!pFileBuffer) {
+        printf("Memory Dump: Failed. Failed to allocate memory buffers.\n");
+        return FALSE;
     }
+    if(!fopen_s(&pFileBuffer->phFile, ctxMain->cfg.szFileOut, "r") || pFileBuffer->phFile) {
+        if(pFileBuffer->phFile) {
+            fclose(pFileBuffer->phFile);
+        }
+        printf("Memory Dump: Failed. File already exists.\n");
+        LocalFree(pFileBuffer);
+        return FALSE;
+    }
+    if(fopen_s(&pFileBuffer->phFile, ctxMain->cfg.szFileOut, "wb") || !pFileBuffer->phFile) {
+        printf("Memory Dump: Failed. Error writing to file.\n");
+        LocalFree(pFileBuffer);
+        return FALSE;
+    }
+    pFileBuffer->isSuccess = TRUE;
+    *ppFileBuffer = pFileBuffer;
     return TRUE;
 }
 
-VOID MemoryDump_AsyncFileClose(_In_ PFILE_WRITE_ASYNC_BUFFER pFileBuffer)
+VOID MemoryDump_AsyncFileClose(_In_opt_ PFILE_WRITE_ASYNC_BUFFER pFileBuffer)
 {
     if(pFileBuffer) {
         if(pFileBuffer->phFile) {
@@ -288,7 +290,7 @@ VOID ActionMemoryDisplay()
         return;
     }
     printf("Memory Display: Contents for address: 0x%016llX\n", qwAddrBase);
-    Util_PrintHexAscii(pb, (DWORD)qwSize, (DWORD)qwAddrOffset);
+    Util_PrintHexAscii(pb, (DWORD)(qwSize + qwAddrOffset), (DWORD)qwAddrOffset);
     LocalFree(pb);
 }
 

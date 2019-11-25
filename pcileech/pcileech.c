@@ -153,6 +153,12 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
     if(!ctxMain->cfg.pbIn) {
         ctxMain->cfg.pbIn = LocalAlloc(LMEM_ZEROINIT, 0x40000);
     }
+    // set dummy qwAddrMax value (if possible) to disable auto-detect in LeechCore.
+    if(ctxMain->cfg.qwAddrMax == ~0) {
+        if((ctxMain->cfg.tpAction == TLP) || (ctxMain->cfg.tpAction == DISPLAY) || (ctxMain->cfg.tpAction == PAGEDISPLAY)) {
+            ctxMain->cfg.qwAddrMax = 0x00001fffffffffff;
+        }
+    }
     // try correct erroneous options, if needed
     if(ctxMain->cfg.tpAction == NA) {
         return FALSE;
