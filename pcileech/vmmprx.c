@@ -20,17 +20,17 @@ typedef struct tdVMMPRX_CONTEXT {
         BOOL(*VMMDLL_MemWrite)(_In_ DWORD dwPID, _In_ ULONG64 qwVA, _In_ PBYTE pb, _In_ DWORD cb);
         BOOL(*VMMDLL_MemVirt2Phys)(_In_ DWORD dwPID, _In_ ULONG64 qwVA, _Out_ PULONG64 pqwPA);
 
-        BOOL(*VMMDLL_ProcessGetSections)(_In_ DWORD dwPID, _In_ LPSTR szModule, _Out_opt_ PIMAGE_SECTION_HEADER pData, _In_ DWORD cData, _Out_ PDWORD pcData);
-        ULONG64(*VMMDLL_ProcessGetModuleBase)(_In_ DWORD dwPID, _In_ LPSTR szModuleName);
-        ULONG64(*VMMDLL_ProcessGetProcAddress)(_In_ DWORD dwPID, _In_ LPSTR szModuleName, _In_ LPSTR szFunctionName);
-        BOOL(*VMMDLL_ProcessGetMemoryMap)(_In_ DWORD dwPID, _Out_opt_ PVMMDLL_MEMMAP_ENTRY pMemMapEntries, _Inout_ PULONG64 pcMemMapEntries, _In_ BOOL fIdentifyModules);
-        BOOL(*VMMDLL_ProcessGetModuleFromName)(_In_ DWORD dwPID, _In_ LPSTR szModuleName, _Out_ PVMMDLL_MODULEMAP_ENTRY pModuleEntry);
+        BOOL(*VMMDLL_ProcessGetSections)(_In_ DWORD dwPID, _In_ LPWSTR wszModule, _Out_opt_ PIMAGE_SECTION_HEADER pData, _In_ DWORD cData, _Out_ PDWORD pcData);
+        ULONG64(*VMMDLL_ProcessGetModuleBase)(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName);
+        ULONG64(*VMMDLL_ProcessGetProcAddress)(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_ LPSTR szFunctionName);
+        BOOL(*VMMDLL_ProcessMap_GetPte)(_In_ DWORD dwPID, _Out_writes_bytes_opt_(*pcbPteMap) PVMMDLL_MAP_PTE pPteMap, _Inout_ PDWORD pcbPteMap, _In_ BOOL fIdentifyModules);
+        BOOL(*VMMDLL_ProcessMap_GetModuleFromName)(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _Out_ PVMMDLL_MAP_MODULEENTRY pModuleMapEntry);
 
         BOOL(*VMMDLL_PidList)(_Out_opt_ PDWORD pPIDs, _Inout_ PULONG64 pcPIDs);
         BOOL(*VMMDLL_PidGetFromName)(_In_ LPSTR szProcName, _Out_ PDWORD pdwPID);
         BOOL(*VMMDLL_ProcessGetInformation)(_In_ DWORD dwPID, _Inout_opt_ PVMMDLL_PROCESS_INFORMATION pProcessInformation, _In_ PSIZE_T pcbProcessInformation);
 
-        BOOL(*VMMDLL_WinGetThunkInfoIAT)(_In_ DWORD dwPID, _In_ LPSTR szModuleName, _In_ LPSTR szImportModuleName, _In_ LPSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT);
+        BOOL(*VMMDLL_WinGetThunkInfoIAT)(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_ LPSTR szImportModuleName, _In_ LPSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT);
     } fn;
 } VMMPRX_CONTEXT, *PVMMPRX_CONTEXT;
 
@@ -64,8 +64,8 @@ BOOL VmmPrx_Initialize(_In_ BOOL fRefresh)
         "VMMDLL_ProcessGetSections",
         "VMMDLL_ProcessGetModuleBase",
         "VMMDLL_ProcessGetProcAddress",
-        "VMMDLL_ProcessGetMemoryMap",
-        "VMMDLL_ProcessGetModuleFromName",
+        "VMMDLL_ProcessMap_GetPte",
+        "VMMDLL_ProcessMap_GetModuleFromName",
 
         "VMMDLL_PidList",
         "VMMDLL_PidGetFromName",
@@ -142,32 +142,32 @@ BOOL VmmPrx_MemVirt2Phys(_In_ DWORD dwPID, _In_ ULONG64 qwVA, _Out_ PULONG64 pqw
     return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_MemVirt2Phys(dwPID, qwVA, pqwPA);
 }
 
-ULONG64 VmmPrx_ProcessGetModuleBase(_In_ DWORD dwPID, _In_ LPSTR szModuleName)
+ULONG64 VmmPrx_ProcessGetModuleBase(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName)
 {
-    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_ProcessGetModuleBase(dwPID, szModuleName);
+    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_ProcessGetModuleBase(dwPID, wszModuleName);
 }
 
-ULONG64 VmmPrx_ProcessGetProcAddress(_In_ DWORD dwPID, _In_ LPSTR szModuleName, _In_ LPSTR szFunctionName)
+ULONG64 VmmPrx_ProcessGetProcAddress(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_ LPSTR szFunctionName)
 {
-    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_ProcessGetProcAddress(dwPID, szModuleName, szFunctionName);
-}
-
-_Success_(return)
-BOOL VmmPrx_ProcessGetMemoryMap(_In_ DWORD dwPID, _Out_opt_ PVMMDLL_MEMMAP_ENTRY pMemMapEntries, _Inout_ PULONG64 pcMemMapEntries, _In_ BOOL fIdentifyModules)
-{
-    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_ProcessGetMemoryMap(dwPID, pMemMapEntries, pcMemMapEntries, fIdentifyModules);
+    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_ProcessGetProcAddress(dwPID, wszModuleName, szFunctionName);
 }
 
 _Success_(return)
-BOOL VmmPrx_ProcessGetSections(_In_ DWORD dwPID, _In_ LPSTR szModule, _Out_opt_ PIMAGE_SECTION_HEADER pData, _In_ DWORD cData, _Out_ PDWORD pcData)
+BOOL VmmPrx_ProcessMap_GetPte(_In_ DWORD dwPID, _Out_writes_bytes_opt_(*pcbPteMap) PVMMDLL_MAP_PTE pPteMap, _Inout_ PDWORD pcbPteMap, _In_ BOOL fIdentifyModules)
 {
-    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_ProcessGetSections(dwPID, szModule, pData, cData, pcData);
+    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_ProcessMap_GetPte(dwPID, pPteMap, pcbPteMap, fIdentifyModules);
 }
 
 _Success_(return)
-BOOL VmmPrx_ProcessGetModuleFromName(_In_ DWORD dwPID, _In_ LPSTR szModuleName, _Out_ PVMMDLL_MODULEMAP_ENTRY pModuleEntry)
+BOOL VmmPrx_ProcessMap_GetModuleFromName(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _Out_ PVMMDLL_MAP_MODULEENTRY pModuleMapEntry)
 {
-    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_ProcessGetModuleFromName(dwPID, szModuleName, pModuleEntry);
+    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_ProcessMap_GetModuleFromName(dwPID, wszModuleName, pModuleMapEntry);
+}
+
+_Success_(return)
+BOOL VmmPrx_ProcessGetSections(_In_ DWORD dwPID, _In_ LPWSTR wszModule, _Out_opt_ PIMAGE_SECTION_HEADER pData, _In_ DWORD cData, _Out_ PDWORD pcData)
+{
+    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_ProcessGetSections(dwPID, wszModule, pData, cData, pcData);
 }
 
 _Success_(return)
@@ -189,9 +189,9 @@ BOOL VmmPrx_ProcessGetInformation(_In_ DWORD dwPID, _Inout_opt_ PVMMDLL_PROCESS_
 }
 
 _Success_(return)
-BOOL VmmPrx_WinGetThunkInfoIAT(_In_ DWORD dwPID, _In_ LPSTR szModuleName, _In_ LPSTR szImportModuleName, _In_ LPSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT)
+BOOL VmmPrx_WinGetThunkInfoIAT(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_ LPSTR szImportModuleName, _In_ LPSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT)
 {
-    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_WinGetThunkInfoIAT(dwPID, szModuleName, szImportModuleName, szImportFunctionName, pThunkInfoIAT);
+    return ((PVMMPRX_CONTEXT)ctxMain->hMemProcFS)->fn.VMMDLL_WinGetThunkInfoIAT(dwPID, wszModuleName, szImportModuleName, szImportFunctionName, pThunkInfoIAT);
 }
 
 #endif /* WIN32 */

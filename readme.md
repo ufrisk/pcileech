@@ -196,3 +196,4 @@ v4.1
 
 Latest:
 * Bug fixes and stability improvements.
+* Support for MemProcFS v3 library.

@@ -120,7 +120,7 @@ typedef struct tdUMD_EXEC_CONTEXT_LIMITED {
 VOID UmdWinExec()
 {
     BOOL result;
-    LPSTR szModuleName;
+    WCHAR wszModuleName[16];
     DWORD cbExec = 0;
     BYTE pbExec[0x500], pbPage[0x1000];
     DWORD i, dwPID, cSections;
@@ -132,7 +132,7 @@ VOID UmdWinExec()
     UMD_EXEC_CONTEXT_LIMITED ctx = { 0 };
     QWORD qwTickCountLimit;
     CHAR szHookBuffer[MAX_PATH] = { 0 };
-    LPSTR szHookModule = NULL, szHookFunction = NULL;
+    LPSTR szHookModule, szHookFunction = NULL;
     //--------------------------------------------------------------------------
     // 1: Retrieve process PID and module/function to hook in the main executable IAT.
     //--------------------------------------------------------------------------
@@ -157,8 +157,10 @@ VOID UmdWinExec()
         printf("UMD: EXEC: Could not retrieve process for PID: %i\n", dwPID);
         return;
     }
-    szModuleName = oProcessInformation.szName;
-    result = VmmPrx_WinGetThunkInfoIAT(dwPID, oProcessInformation.szName, szHookModule, szHookFunction, &oThunkInfoIAT);
+    for(i = 0; i < 16; i++) {
+        wszModuleName[i] = oProcessInformation.szName[i];
+    }
+    result = VmmPrx_WinGetThunkInfoIAT(dwPID, wszModuleName, szHookModule, szHookFunction, &oThunkInfoIAT);
     if(!result) {
         printf("UMD: EXEC: Could not retrieve hook for %s!%s in '%s'\n", szHookModule, szHookFunction, oProcessInformation.szName);
         return;
@@ -167,24 +169,24 @@ VOID UmdWinExec()
         printf("UMD: EXEC: Could not retrieve valid hook in 64-bit process.\n");
         return;
     }
-    if(!VmmPrx_ProcessGetSections(dwPID, szModuleName, NULL, 0, &cSections) || !cSections) {
-        printf("UMD: EXEC: Could not retrieve sections #1 for '%s'\n", szModuleName);
+    if(!VmmPrx_ProcessGetSections(dwPID, wszModuleName, NULL, 0, &cSections) || !cSections) {
+        printf("UMD: EXEC: Could not retrieve sections #1 for '%S'\n", wszModuleName);
         return;
     }
     pSections = (PIMAGE_SECTION_HEADER)LocalAlloc(LMEM_ZEROINIT, cSections * sizeof(IMAGE_SECTION_HEADER));
-    if(!pSections || !VmmPrx_ProcessGetSections(dwPID, szModuleName, pSections, cSections, &cSections) || !cSections) {
-        printf("UMD: EXEC: Could not retrieve sections #2 for '%s'\n", szModuleName);
+    if(!pSections || !VmmPrx_ProcessGetSections(dwPID, wszModuleName, pSections, cSections, &cSections) || !cSections) {
+        printf("UMD: EXEC: Could not retrieve sections #2 for '%S'\n", wszModuleName);
         return;
     }
     for(i = 0; i < cSections; i++) {
         if(!vaCodeCave && (pSections[i].Characteristics & IMAGE_SCN_MEM_EXECUTE) && ((pSections[i].Misc.VirtualSize & 0xfff) < (0x1000 - sizeof(pbExec)))) {
-            vaCodeCave = VmmPrx_ProcessGetModuleBase(dwPID, szModuleName) + ((pSections[i].VirtualAddress + pSections[i].Misc.VirtualSize + 0xfff) & ~0xfff) - sizeof(pbExec);
+            vaCodeCave = VmmPrx_ProcessGetModuleBase(dwPID, wszModuleName) + ((pSections[i].VirtualAddress + pSections[i].Misc.VirtualSize + 0xfff) & ~0xfff) - sizeof(pbExec);
             if(!VmmPrx_MemReadPage(dwPID, vaCodeCave & ~0xfff, pbPage)) {
                 vaCodeCave = 0;     // read test failed!
             }
         }
         if(!vaWriteCave && (pSections[i].Characteristics & IMAGE_SCN_MEM_WRITE) && ((pSections[i].Misc.VirtualSize & 0xfff) < (0x1000 - sizeof(ctx)))) {
-            vaWriteCave += VmmPrx_ProcessGetModuleBase(dwPID, szModuleName) + ((pSections[i].VirtualAddress + pSections[i].Misc.VirtualSize + 0xfff) & ~0xfff) - sizeof(ctx);
+            vaWriteCave += VmmPrx_ProcessGetModuleBase(dwPID, wszModuleName) + ((pSections[i].VirtualAddress + pSections[i].Misc.VirtualSize + 0xfff) & ~0xfff) - sizeof(ctx);
             if(!VmmPrx_MemReadPage(dwPID, vaWriteCave & ~0xfff, pbPage)) {
                 vaWriteCave = 0;     // read test failed!
             }
@@ -192,10 +194,10 @@ VOID UmdWinExec()
     }
     if(!vaCodeCave || !vaWriteCave) {
         if(!vaCodeCave) {
-            printf("UMD: EXEC: Could not locate suitable code cave in '%s'\n", szModuleName);
+            printf("UMD: EXEC: Could not locate suitable code cave in '%S'\n", wszModuleName);
         }
         if(!vaWriteCave) {
-            printf("UMD: EXEC: Could not locate suitable write cave in '%s'\n", szModuleName);
+            printf("UMD: EXEC: Could not locate suitable write cave in '%S'\n", wszModuleName);
         }
         return;
     }
@@ -208,22 +210,22 @@ VOID UmdWinExec()
     *(PQWORD)(pbExec + 0x10) = oThunkInfoIAT.vaFunction;
     // prepare configuration data (goes into rw- section)
     ctx.qwDEBUG = 0;
-    ctx.fn.CloseHandle = VmmPrx_ProcessGetProcAddress(dwPID, "kernel32.dll", "CloseHandle");
-    ctx.fn.CreatePipe = VmmPrx_ProcessGetProcAddress(dwPID, "kernel32.dll", "CreatePipe");
-    ctx.fn.CreateProcessA = VmmPrx_ProcessGetProcAddress(dwPID, "kernel32.dll", "CreateProcessA");
-    ctx.fn.CreateThread = VmmPrx_ProcessGetProcAddress(dwPID, "kernel32.dll", "CreateThread");
-    ctx.fn.GetExitCodeProcess = VmmPrx_ProcessGetProcAddress(dwPID, "kernel32.dll", "GetExitCodeProcess");
-    ctx.fn.LocalAlloc = VmmPrx_ProcessGetProcAddress(dwPID, "kernel32.dll", "LocalAlloc");
-    ctx.fn.ReadFile = VmmPrx_ProcessGetProcAddress(dwPID, "kernel32.dll", "ReadFile");
-    ctx.fn.Sleep = VmmPrx_ProcessGetProcAddress(dwPID, "kernel32.dll", "Sleep");
-    ctx.fn.WriteFile = VmmPrx_ProcessGetProcAddress(dwPID, "kernel32.dll", "WriteFile");
+    ctx.fn.CloseHandle = VmmPrx_ProcessGetProcAddress(dwPID, L"kernel32.dll", "CloseHandle");
+    ctx.fn.CreatePipe = VmmPrx_ProcessGetProcAddress(dwPID, L"kernel32.dll", "CreatePipe");
+    ctx.fn.CreateProcessA = VmmPrx_ProcessGetProcAddress(dwPID, L"kernel32.dll", "CreateProcessA");
+    ctx.fn.CreateThread = VmmPrx_ProcessGetProcAddress(dwPID, L"kernel32.dll", "CreateThread");
+    ctx.fn.GetExitCodeProcess = VmmPrx_ProcessGetProcAddress(dwPID, L"kernel32.dll", "GetExitCodeProcess");
+    ctx.fn.LocalAlloc = VmmPrx_ProcessGetProcAddress(dwPID, L"kernel32.dll", "LocalAlloc");
+    ctx.fn.ReadFile = VmmPrx_ProcessGetProcAddress(dwPID, L"kernel32.dll", "ReadFile");
+    ctx.fn.Sleep = VmmPrx_ProcessGetProcAddress(dwPID, L"kernel32.dll", "Sleep");
+    ctx.fn.WriteFile = VmmPrx_ProcessGetProcAddress(dwPID, L"kernel32.dll", "WriteFile");
     strcpy_s(ctx.szProcToStart, MAX_PATH - 1, ctxMain->cfg.szInS);
     ctx.dwFlagsCreateProcessA = (DWORD)ctxMain->cfg.qwDataIn[1];
     ctx.fEnableConsoleRedirect = ctxMain->cfg.qwDataIn[2] ? 1 : 0;
     //------------------------------------------------
     // 4: Inject & Hook
     //------------------------------------------------
-    printf("UMD: EXEC: Injecting code and configuration data into process %s\n", szModuleName);
+    printf("UMD: EXEC: Injecting code and configuration data into process %S\n", wszModuleName);
     printf("           IAT Hook : %s!%s at 0x%llx [0x%llx]\n", szHookModule, szHookFunction, oThunkInfoIAT.vaThunk, oThunkInfoIAT.vaFunction);
     VmmPrx_MemWrite(dwPID, vaWriteCave, (PBYTE)&ctx, sizeof(UMD_EXEC_CONTEXT_LIMITED));
     VmmPrx_MemWrite(dwPID, vaCodeCave, pbExec, sizeof(pbExec));
