@@ -45,16 +45,17 @@ PCILeech supports both hardware based and software based memory acqusition metho
 
 Please find a summary of the supported hardware based memory acquisition methods listed below. All hardware based memory acquisition methods are supported on both Windows and Linux. The FPGA based methods however sports a slight performance penalty on Linux and will max out at approx: 90MB/s compared to 150MB/s on Windows.
 
-| Device                                      | Type | Interface | Speed | 64-bit memory access | PCIe TLP access |
-| ---------------------------------------------------------------------- | ------- | ------ | ------- | --- | --- |
-| [AC701/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | FPGA    | USB3   | 150MB/s | Yes | Yes |
-| [PCIeScreamer](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)   | FPGA    | USB3   | 100MB/s | Yes | Yes |
-| [SP605/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | FPGA    | USB3   |  75MB/s | Yes | Yes |
-| [SP605/TCP](https://github.com/ufrisk/LeechCore/wiki/Device_SP605TCP)  | FPGA    | TCP/IP | 100kB/s | Yes | Yes |
-| [NeTV2/UDP](https://github.com/ufrisk/LeechCore/wiki/Device_RawUDP)    | FPGA    | UDP/IP |   7MB/s | Yes | Yes |
-| [USB3380-EVB](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380) | USB3380 | USB3   | 150MB/s | No  | No  |
-| [PP3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)      | USB3380 | USB3   | 150MB/s | No  | No  |
-| [DMA patched HP iLO](https://github.com/ufrisk/LeechCore/wiki/Device_iLO) | BMC  | TCP/IP |   1MB/s | Yes | No  |
+| Device                                                                 | Type                                       | Interface | Speed | 64-bit memory access | PCIe TLP access |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------ | ------- | --- | --- |
+| [ScreamerM2](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)     | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB3   | 100MB/s | Yes | Yes |
+| [PCIeScreamer](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)   | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/pciescreamer) | USB3   | 100MB/s | Yes | Yes |
+| [AC701/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ac701_ft601)  | USB3   | 150MB/s | Yes | Yes |
+| [SP605/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/sp605_ft601)  | USB3   |  75MB/s | Yes | Yes |
+| [SP605/TCP](https://github.com/ufrisk/LeechCore/wiki/Device_SP605TCP)  | FPGA                                                                     | TCP/IP | 100kB/s | Yes | Yes |
+| [NeTV2/UDP](https://github.com/ufrisk/LeechCore/wiki/Device_RawUDP)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/NeTV2)        | UDP/IP |   7MB/s | Yes | Yes |
+| [USB3380-EVB](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380) | USB3380                                                                  | USB3   | 150MB/s | No  | No  |
+| [PP3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)      | USB3380                                                                  | USB3   | 150MB/s | No  | No  |
+| [DMA patched HP iLO](https://github.com/ufrisk/LeechCore/wiki/Device_iLO) | BMC                                                                   | TCP/IP |   1MB/s | Yes | No  |
 
 ### Software based memory aqusition methods:
 
