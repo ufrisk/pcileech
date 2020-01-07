@@ -1,6 +1,6 @@
 // help.c : implementation related to displaying help texts.
 //
-// (c) Ulf Frisk, 2016-2019
+// (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "help.h"
@@ -60,6 +60,7 @@ VOID Help_ShowGeneral()
         "   testmemreadwrite       NATIVE       [ min ]                                 \n" \
         " Device specific commands and valid MODEs [ and options ] (and device):        \n" \
         "   tlp                    NATIVE       [ in ]         (FPGA)                   \n" \
+        "   tlploop                NATIVE       [ in ]         (FPGA)                   \n" \
         "   probe                  NATIVE       [ min, max ]   (FPGA)                   \n" \
         "   pslist                 NATIVE                      (MemProcFS/Windows)      \n" \
         "   psvirt2phys            NATIVE       [ 0, 1 ]       (MemProcFS/Windows)      \n" \

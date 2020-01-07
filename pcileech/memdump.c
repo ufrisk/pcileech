@@ -1,6 +1,6 @@
 // memdump.c : implementation related to memory dumping functionality.
 //
-// (c) Ulf Frisk, 2016-2019
+// (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "memdump.h"
@@ -104,6 +104,7 @@ VOID MemoryDump_AsyncFileClose(_In_opt_ PFILE_WRITE_ASYNC_BUFFER pFileBuffer)
 VOID ActionMemoryDump_KMD_USB3380()
 {
     BOOL result;
+    HANDLE hThread;
     QWORD qwCurrentAddress;
     PBYTE pbMemoryDump = NULL;
     PPAGE_STATISTICS pPageStat = NULL;
@@ -137,7 +138,8 @@ VOID ActionMemoryDump_KMD_USB3380()
             pFileBuffer->cb = (DWORD)min(0x01000000, ctxMain->cfg.qwAddrMax - qwCurrentAddress);
             memcpy(pFileBuffer->pb, pbMemoryDump, 0x01000000);
             pFileBuffer->isExecuting = TRUE;
-            CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)MemoryDump_FileWriteAsync_Thread, pFileBuffer, 0, NULL);
+            hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)MemoryDump_FileWriteAsync_Thread, pFileBuffer, 0, NULL);
+            if(hThread) { CloseHandle(hThread); }
         }
         // add to address
         qwCurrentAddress += 0x01000000;
@@ -152,6 +154,7 @@ cleanup:
 VOID ActionMemoryDump_Native()
 {
     BOOL fSaferDump;
+    HANDLE hThread;
     DWORD cbMemoryDump;
     PBYTE pbMemoryDump = NULL;
     PPAGE_STATISTICS pPageStat = NULL;
@@ -201,7 +204,8 @@ VOID ActionMemoryDump_Native()
             pFileBuffer->cb = cbMemoryDump;
             memcpy(pFileBuffer->pb, pbMemoryDump, cbMemoryDump);
             pFileBuffer->isExecuting = TRUE;
-            CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)MemoryDump_FileWriteAsync_Thread, pFileBuffer, 0, NULL);
+            hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)MemoryDump_FileWriteAsync_Thread, pFileBuffer, 0, NULL);
+            if(hThread) { CloseHandle(hThread); }
         }
         if(paMax == paCurrent + cbMemoryDump) {
             if(fSaferDump) {

@@ -1,6 +1,6 @@
 // shellcode.h : default shellcode used by pcileech in default scenarios.
 //
-// (c) Ulf Frisk, 2016-2019
+// (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __SHELLCODE_H__

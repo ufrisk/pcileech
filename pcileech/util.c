@@ -1,6 +1,6 @@
 // util.c : implementation of various utility functions.
 //
-// (c) Ulf Frisk, 2016-2019
+// (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "pcileech.h"
@@ -701,14 +701,18 @@ VOID Util_WaitForPowerCycle()
     "................................................................" \
     "................................................................" \
 
-BOOL Util_FillHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset, _Inout_opt_ LPSTR sz, _Out_ PDWORD pcsz)
+_Success_(return)
+BOOL Util_FillHexAscii(_In_opt_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset, _Out_opt_ LPSTR sz, _Inout_ PDWORD pcsz)
 {
-    DWORD i, j, o = 0, szMax, iMod;
+    DWORD i, j, o = 0, iMod, cRows;
     // checks
     if((cbInitialOffset > cb) || (cbInitialOffset > 0x1000) || (cbInitialOffset & 0xf)) { return FALSE; }
-    *pcsz = szMax = cb * 5 + 80;
-    if(cb > szMax) { return FALSE; }
-    if(!sz) { return TRUE; }
+    cRows = (cb + 0xf) >> 4;
+    if(!sz) {
+        *pcsz = 1 + cRows * 76;
+        return TRUE;
+    }
+    if(!pb || (*pcsz <= cRows * 76)) { return FALSE; }
     // fill buffer with bytes
     for(i = cbInitialOffset; i < cb + ((cb % 16) ? (16 - cb % 16) : 0); i++)
     {
@@ -750,7 +754,8 @@ BOOL Util_FillHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset,
             sz[o++] = '\n';
         }
     }
-    sz[o++] = 0;
+    sz[o] = 0;
+    *pcsz = o;
     return TRUE;
 }
 

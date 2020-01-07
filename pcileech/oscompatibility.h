@@ -1,6 +1,6 @@
 // oscompatibility.h : pcileech windows/linux compatibility layer.
 //
-// (c) Ulf Frisk, 2017-2019
+// (c) Ulf Frisk, 2017-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __OSCOMPATIBILITY_H__
@@ -190,6 +190,7 @@ BOOL __WinUsb_ReadWritePipe(
 FARPROC GetProcAddress(HMODULE hModule, LPSTR lpProcName);
 HMODULE LoadLibrary(LPWSTR lpFileName);
 #define FreeLibrary(hModule)                (TRUE)
+BOOL _kbhit();
 #endif /* LINUX */
 
 #endif /* __OSCOMPATIBILITY_H__ */

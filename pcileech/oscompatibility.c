@@ -1,3 +1,9 @@
+// oscompatibility.c : pcileech windows/linux compatibility layer.
+//
+// (c) Ulf Frisk, 2017-2020
+// Author: Ulf Frisk, pcileech@frizk.net
+//
+
 #ifdef _WIN32
 
 #include "oscompatibility.h"
@@ -20,6 +26,7 @@ VOID usleep(_In_ DWORD us)
 #include "oscompatibility.h"
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <termios.h>
 
 #define INTERNAL_HANDLE_TYPE_THREAD        0xdeadbeeffedfed01
 
@@ -329,6 +336,36 @@ VOID EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
 
 VOID LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
     pthread_mutex_unlock(&lpCriticalSection->mutex);
+}
+
+// ----------------------------------------------------------------------------
+// _kbhit functionality below:
+// ----------------------------------------------------------------------------
+
+VOID terminal_enable_raw_mode()
+{
+    struct termios term;
+    tcgetattr(0, &term);
+    term.c_lflag &= ~(ICANON | ECHO); // Disable echo as well
+    tcsetattr(0, TCSANOW, &term);
+}
+
+VOID terminal_disable_raw_mode()
+{
+    struct termios term;
+    tcgetattr(0, &term);
+    term.c_lflag |= ICANON | ECHO;
+    tcsetattr(0, TCSANOW, &term);
+}
+
+BOOL _kbhit()
+{
+    int byteswaiting;
+    terminal_enable_raw_mode();
+    ioctl(0, FIONREAD, &byteswaiting);
+    terminal_disable_raw_mode();
+    tcflush(0, TCIFLUSH);
+    return byteswaiting > 0;
 }
 
 #endif /* LINUX */

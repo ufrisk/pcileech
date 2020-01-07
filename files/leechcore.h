@@ -131,10 +131,10 @@
 //           EXISTINGREMOTE
 //
 //
-// (c) Ulf Frisk, 2018-2019
+// (c) Ulf Frisk, 2018-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 1.5
+// Header Version: 1.6
 //
 #ifndef __LEECHCORE_H__
 #define __LEECHCORE_H__
@@ -484,8 +484,13 @@ DLLEXPORT BOOL LeechCore_SetOption(_In_ ULONG64 fOption, _In_ ULONG64 qwValue);
 #define LEECHCORE_COMMANDDATA_FPGA_WRITE_TLP            0x00000101  // R
 #define LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP           0x00000102  // R
 #define LEECHCORE_COMMANDDATA_FPGA_PCIECFGSPACE         0x00000103  // R
-#define LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE           0x00000104  // RW
-#define LEECHCORE_COMMANDDATA_FPGA_CFGREGCFG            0x00000105  // RW
+#define LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE           0x00000104  // RW - [high-part fOption = address]
+#define LEECHCORE_COMMANDDATA_FPGA_CFGREGCFG            0x00000105  // RW - [high-part fOption = address]
+#define LEECHCORE_COMMANDDATA_FPGA_CFGREGDRP            0x00000106  // RW - [high-part fOption = address]
+#define LEECHCORE_COMMANDDATA_FPGA_CFGREGCFG_MARKWR     0x00000107  // W  - write with mask [bytes: 0-1: data, 2-3: mask] [high-part fOption = address]
+#define LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE_MARKWR    0x00000108  // W  - write with mask [bytes: 0-1: data, 2-3: mask] [high-part fOption = address]
+#define LEECHCORE_COMMANDDATA_FPGA_PCIECFGSPACE_WR      0x00000109  // W
+#define LEECHCORE_COMMANDDATA_FPGA_CFGREG_DEBUGPRINT    0x0000010a  //
 #define LEECHCORE_COMMANDDATA_FILE_DUMPHEADER_GET       0x00000201  // R
 #define LEECHCORE_COMMANDDATA_STATISTICS_GET            0x80000100  // R
 

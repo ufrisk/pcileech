@@ -1,6 +1,6 @@
 // pcileech.c : implementation of core pcileech functionality.
 //
-// (c) Ulf Frisk, 2016-2019
+// (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "pcileech.h"
@@ -41,6 +41,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         {.tp = PT_PHYS2VIRT,.sz = "pt_phys2virt" },
         {.tp = PT_VIRT2PHYS,.sz = "pt_virt2phys" },
         {.tp = TLP,.sz = "tlp" },
+        {.tp = TLPLOOP,.sz = "tlploop" },
         {.tp = PROBE,.sz = "probe" },
         {.tp = PSLIST,.sz = "pslist" },
         {.tp = PSVIRT2PHYS,.sz = "psvirt2phys" },
@@ -333,6 +334,9 @@ int main(_In_ int argc, _In_ char* argv[])
             break;
         case TLP:
             Action_TlpTx();
+            break;
+        case TLPLOOP:
+            Action_TlpTxLoop();
             break;
         case PROBE:
             ActionMemoryProbe();

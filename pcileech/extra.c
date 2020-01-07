@@ -1,6 +1,6 @@
 // extra.c : implementation related various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016-2019
+// (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "extra.h"
@@ -235,4 +235,53 @@ VOID Action_TlpTx()
     }
     LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_WRITE_TLP, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, NULL, 0, NULL);
     LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP, (PBYTE)&dwListenTlpMs, sizeof(DWORD), NULL, 0, NULL);
+}
+
+VOID Action_TlpTxLoop()
+{
+    WORD wTxSleep = 64, wValid = 0;
+    DWORD dwMax = 0xffffffff, dwListenTlpMs = 100, dwEnableTx = 0x00080008, dwDisableTx = 0x00080000;
+    QWORD i, qwFpgaVersionMajor = 0, qwFpgaVersionMinor = 0;
+    if(ctxMain->cfg.cbIn < 12) {
+        printf("Action_TlpTxLoop: Invalid TLP (too short).\n");
+        return;
+    }
+    if(ctxMain->cfg.cbIn > 48) {
+        printf("Action_TlpTxLoop: Invalid TLP (too long).\n");
+        return;
+    }
+    if(ctxMain->cfg.cbIn % 4) {
+        printf("Action_TlpTxLoop: Invalid TLP (length not multiple of 4).\n");
+        return;
+    }
+    LeechCore_GetOption(LEECHCORE_OPT_FPGA_VERSION_MAJOR, &qwFpgaVersionMajor);
+    LeechCore_GetOption(LEECHCORE_OPT_FPGA_VERSION_MINOR, &qwFpgaVersionMinor);
+    if((qwFpgaVersionMajor < 4) || ((qwFpgaVersionMajor == 4) && (qwFpgaVersionMajor < 2))) {
+        printf("Action_TlpTxLoop: FPGA version not supported (bitstream v4.2 or later required).\n");
+        return;
+    }
+    printf("TLP: Transmitting PCIe LOOP TLPs. Press any key to stop.%s\n", ctxMain->cfg.fVerboseExtra ? "" : " (use -vvv option for detailed info).");
+    // tx each 64 clk [66MHz - 15ns clk] (15ns * 64 -> ~1uS)
+    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE | 0x801e00000000, (PBYTE)&wTxSleep, 2, NULL, 0, NULL);
+    // tlp value
+    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE | 0x802000000000, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, NULL, 0, NULL);
+    // set "infinite" [very long] loop
+    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE | 0x805000000000, (PBYTE)&dwMax, 4, NULL, 0, NULL);
+    // set valid TLP QWORDs
+    i = ctxMain->cfg.cbIn;
+    wValid = 1 | ((i % 8) ? 0 : 2);
+    i -= (i % 8) ? 4 : 8;
+    while(i) {
+        i -= 8;
+        wValid = 2 | (wValid << 2);
+    }
+    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE | 0x801c00000000, (PBYTE)&wValid, 2, NULL, 0, NULL);
+    // start tx
+    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE_MARKWR | 0x800200000000, (PBYTE)&dwEnableTx, 4, NULL, 0, NULL);
+    // wait for keypress to stop
+    while(!_kbhit()) {
+        LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP, (PBYTE)&dwListenTlpMs, sizeof(DWORD), NULL, 0, NULL);
+    }
+    // stop
+    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE_MARKWR | 0x800200000000, (PBYTE)&dwDisableTx, 4, NULL, 0, NULL);
 }

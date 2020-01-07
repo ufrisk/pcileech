@@ -195,6 +195,8 @@ v4.1
 * Bug fixes.
 * Support for new device (NeTV2 / RawUDP) via LeechCore library.
 
-Latest:
+[v4.4](https://github.com/ufrisk/pcileech/releases/tag/v4.4)
 * Bug fixes and stability improvements.
 * Support for MemProcFS v3 library.
+* Code signing of binaries.
+* "tlploop" command.

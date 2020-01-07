@@ -1,6 +1,6 @@
 // extra.h : definitions related to various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016-2019
+// (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __EXTRA_H__
@@ -39,5 +39,10 @@ VOID Action_PT_Virt2Phys();
 * Transmit the TLP data specified in the -in parameter.
 */
 VOID Action_TlpTx();
+
+/*
+* Transmit TLPs in a hardware-assisted loop using on-board fpga logic.
+*/
+VOID Action_TlpTxLoop();
 
 #endif /* __EXTRA_H__ */

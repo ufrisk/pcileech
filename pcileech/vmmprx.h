@@ -1,6 +1,6 @@
 // vmmprx.h : definitions related to dynamically loaded memory process file system functionality.
 //
-// (c) Ulf Frisk, 2019
+// (c) Ulf Frisk, 2019-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __VMM_PRX_H__

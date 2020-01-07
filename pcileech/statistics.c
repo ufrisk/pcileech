@@ -1,6 +1,6 @@
 // statistics.c : implementation of statistics related functionality.
 //
-// (c) Ulf Frisk, 2016-2019
+// (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "statistics.h"
@@ -130,6 +130,7 @@ VOID PageStatClose(_In_opt_ PPAGE_STATISTICS *ppPageStat)
     if(!status) {
         Sleep(200);
     }
+    CloseHandle((*ppPageStat)->i.hThread);
     LocalFree(*ppPageStat);
     *ppPageStat = NULL;
 }

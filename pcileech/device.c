@@ -1,6 +1,6 @@
 // device.c : implementation related to hardware devices.
 //
-// (c) Ulf Frisk, 2016-2019
+// (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "device.h"
