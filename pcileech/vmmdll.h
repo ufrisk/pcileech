@@ -1,10 +1,10 @@
 // vmmdll.h : header file to include in projects that use vmm.dll either as
 // stand anlone projects or as native plugins to vmm.dll.
 //
-// (c) Ulf Frisk, 2018-2019
+// (c) Ulf Frisk, 2018-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 3.0
+// Header Version: 3.1
 //
 
 #include <windows.h>
@@ -171,7 +171,7 @@ BOOL VMMDLL_ConfigSet(_In_ ULONG64 fOption, _In_ ULONG64 qwValue);
 #define VMMDLL_STATUS_FILE_SYSTEM_LIMITATION        ((NTSTATUS)0xC0000427L)
 
 #define VMMDLL_VFS_FILELIST_EXINFO_VERSION          1
-#define VMMDLL_VFS_FILELIST_VERSION                 1
+#define VMMDLL_VFS_FILELIST_VERSION                 2
 
 typedef struct tdVMMDLL_VFS_FILELIST_EXINFO {
     DWORD dwVersion;
@@ -192,32 +192,23 @@ typedef struct tdVMMDLL_VFS_FILELIST_EXINFO {
 
 typedef struct tdVMMDLL_VFS_FILELIST {
     DWORD dwVersion;
-    VOID(*pfnAddFile)     (_Inout_ HANDLE h, _In_opt_ LPSTR szName, _In_opt_ LPWSTR wszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
-    VOID(*pfnAddDirectory)(_Inout_ HANDLE h, _In_opt_ LPSTR szName, _In_opt_ LPWSTR wszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
+    VOID(*pfnAddFile)     (_Inout_ HANDLE h, _In_ LPWSTR wszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
+    VOID(*pfnAddDirectory)(_Inout_ HANDLE h, _In_ LPWSTR wszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
     HANDLE h;
 } VMMDLL_VFS_FILELIST, *PVMMDLL_VFS_FILELIST;
 
 /*
 * Helper inline functions for callbacks into the VMM_VFS_FILELIST structure.
 */
-inline VOID VMMDLL_VfsList_AddFile(_In_ HANDLE pFileList, _In_opt_ LPSTR szName, _In_ ULONG64 cb)
+
+inline VOID VMMDLL_VfsList_AddFile(_In_ HANDLE pFileList, _In_ LPWSTR wszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo)
 {
-    ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddFile(((PVMMDLL_VFS_FILELIST)pFileList)->h, szName, NULL, cb, NULL);
+    ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddFile(((PVMMDLL_VFS_FILELIST)pFileList)->h, wszName, cb, pExInfo);
 }
 
-inline VOID VMMDLL_VfsList_AddFileEx(_In_ HANDLE pFileList, _In_opt_ LPSTR szName, _In_opt_ LPWSTR wszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo)
+inline VOID VMMDLL_VfsList_AddDirectory(_In_ HANDLE pFileList, _In_ LPWSTR wszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo)
 {
-    ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddFile(((PVMMDLL_VFS_FILELIST)pFileList)->h, szName, wszName, cb, pExInfo);
-}
-
-inline VOID VMMDLL_VfsList_AddDirectory(_In_ HANDLE pFileList, _In_opt_ LPSTR szName)
-{
-    ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddDirectory(((PVMMDLL_VFS_FILELIST)pFileList)->h, szName, NULL, NULL);
-}
-
-inline VOID VMMDLL_VfsList_AddDirectoryEx(_In_ HANDLE pFileList, _In_opt_ LPSTR szName, _In_opt_ LPWSTR wszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo)
-{
-    ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddDirectory(((PVMMDLL_VFS_FILELIST)pFileList)->h, szName, wszName, pExInfo);
+    ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddDirectory(((PVMMDLL_VFS_FILELIST)pFileList)->h, wszName, pExInfo);
 }
 
 inline BOOL VMMDLL_VfsList_IsHandleValid(_In_ HANDLE pFileList)
@@ -297,7 +288,7 @@ BOOL VMMDLL_VfsInitializePlugins();
 #define VMMDLL_PLUGIN_CONTEXT_MAGIC             0xc0ffee663df9301c
 #define VMMDLL_PLUGIN_CONTEXT_VERSION           3
 #define VMMDLL_PLUGIN_REGINFO_MAGIC             0xc0ffee663df9301d
-#define VMMDLL_PLUGIN_REGINFO_VERSION           4
+#define VMMDLL_PLUGIN_REGINFO_VERSION           5
 
 #define VMMDLL_PLUGIN_EVENT_VERBOSITYCHANGE     0x01
 #define VMMDLL_PLUGIN_EVENT_TOTALREFRESH        0x02
@@ -323,15 +314,14 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
     HMODULE hDLL;
     HMODULE hReservedDllPython3X;   // not for general use (only used for python).
     BOOL(*pfnPluginManager_Register)(struct tdVMMDLL_PLUGIN_REGINFO *pPluginRegInfo);
-    HMODULE hReservedDllPython3;   // not for general use (only used for python).
+    HMODULE hReservedDllPython3;    // not for general use (only used for python).
     PVOID pvReserved2;
     // general plugin registration info to be filled out by the plugin below:
     struct {
-        WCHAR wszModuleName[32];
+        WCHAR wszPathName[128];
         BOOL fRootModule;
         BOOL fProcessModule;
-        PVOID pvReserved1;
-        PVOID pvReserved2;
+        PVOID pvReserved[2];
     } reg_info;
     // function plugin registration info to be filled out by the plugin below:
     struct {
@@ -340,8 +330,7 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
         NTSTATUS(*pfnWrite)(_In_ PVMMDLL_PLUGIN_CONTEXT ctx, _In_ PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ ULONG64 cbOffset);
         VOID(*pfnNotify)(_In_ DWORD fEvent, _In_opt_ PVOID pvEvent, _In_opt_ DWORD cbEvent);
         VOID(*pfnClose)();
-        PVOID pvReserved1;
-        PVOID pvReserved2;
+        PVOID pvReserved[16];
     } reg_fn;
 } VMMDLL_PLUGIN_REGINFO, *PVMMDLL_PLUGIN_REGINFO;
 
@@ -367,7 +356,8 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
 * the items in the ppMEMs array. Result for each unit of work will be given
 * individually. No upper limit of number of items to read, but no performance
 * boost will be given if above hardware limit. Max size of each unit of work is
-* one 4k page (4096 bytes).
+* one 4k page (4096 bytes). Reads must not cross 4k page boundaries. Reads must
+* start at even DWORDs (4-bytes).
 * -- dwPID - PID of target process, (DWORD)-1 to read physical memory.
 * -- ppMEMs = array of scatter read headers.
 * -- cpMEMs = count of ppMEMs.
@@ -460,11 +450,12 @@ BOOL VMMDLL_MemVirt2Phys(_In_ DWORD dwPID, _In_ ULONG64 qwVA, _Out_ PULONG64 pqw
 //-----------------------------------------------------------------------------
 
 #define VMMDLL_MAP_PTE_VERSION              1
-#define VMMDLL_MAP_VAD_VERSION              1
+#define VMMDLL_MAP_VAD_VERSION              3
 #define VMMDLL_MAP_MODULE_VERSION           1
 #define VMMDLL_MAP_HEAP_VERSION             1
 #define VMMDLL_MAP_THREAD_VERSION           1
 #define VMMDLL_MAP_HANDLE_VERSION           1
+#define VMMDLL_MAP_USER_VERSION             1
 
 // flags to check for existence in the fPage field of VMMDLL_MAP_PTEENTRY
 #define VMMDLL_MEMMAP_FLAG_PAGE_W          0x0000000000000002
@@ -508,7 +499,8 @@ typedef struct tdVMMDLL_MAP_VADENTRY {
     QWORD vaSubsection;
     LPWSTR wszText;                 // optional LPWSTR pointed into VMMDLL_MAP_VAD.wszMultiText
     DWORD cwszText;                 // WCHAR count not including terminating null
-    DWORD _Reserved1;
+    DWORD _Reserved;
+    QWORD vaFileObject;             // only valid if fFile/fImage _and_ after wszText is initialized
 } VMMDLL_MAP_VADENTRY, *PVMMDLL_MAP_VADENTRY;
 
 typedef struct tdVMMDLL_MAP_MODULEENTRY {
@@ -567,6 +559,14 @@ typedef struct tdVMMDLL_MAP_HANDLEENTRY {
     LPWSTR wszType;
 } VMMDLL_MAP_HANDLEENTRY, *PVMMDLL_MAP_HANDLEENTRY;
 
+typedef struct tdVMMDLL_MAP_USERENTRY {
+    DWORD cwszText;                 // WCHAR count not including terminating null
+    LPWSTR wszText;                 // LPWSTR pointed into VMMOB_MAP_USER.wszMultiText
+    ULONG64 vaRegHive;
+    CHAR szSID[MAX_PATH];
+    DWORD _FutureUse[9];
+} VMMDLL_MAP_USERENTRY, *PVMMDLL_MAP_USERENTRY;
+
 typedef struct tdVMMDLL_MAP_PTE {
     DWORD dwVersion;
     DWORD _Reserved1[5];
@@ -616,6 +616,15 @@ typedef struct tdVMMDLL_MAP_HANDLE {
     DWORD cMap;                     // # map entries.
     VMMDLL_MAP_HANDLEENTRY pMap[];  // map entries.
 } VMMDLL_MAP_HANDLE, *PVMMDLL_MAP_HANDLE;
+
+typedef struct tdVMMDLL_MAP_USER {
+    DWORD dwVersion;
+    DWORD _Reserved1[5];
+    LPWSTR wszMultiText;            // multi-wstr pointed into by VMMDLL_MAP_HANDLEENTRY.wszText
+    DWORD cbMultiText;
+    DWORD cMap;                     // # map entries.
+    VMMDLL_MAP_USERENTRY pMap[];    // map entries.
+} VMMDLL_MAP_USER, *PVMMDLL_MAP_USER;
 
 /*
 * Retrieve the memory map entries based on hardware page tables (PTE) for the
@@ -703,6 +712,18 @@ BOOL VMMDLL_ProcessMap_GetThread(_In_ DWORD dwPID, _Out_writes_bytes_opt_(*pcbTh
 _Success_(return)
 BOOL VMMDLL_ProcessMap_GetHandle(_In_ DWORD dwPID, _Out_writes_bytes_opt_(*pcbHandleMap) PVMMDLL_MAP_HANDLE pHandleMap, _Inout_ PDWORD pcbHandleMap);
 
+/*
+* Retrieve the non well known users that are detected in the target system.
+* NB! There may be more users in the system than the ones that are detected,
+* only users with mounted registry hives may currently be detected - this is
+* the normal behaviour for users with active processes.
+* -- pUserMap = buffer of minimum byte length *pcbUserMap or NULL.
+* -- pcbUserMap = pointer to byte count of pUserMap buffer.
+* -- return = success/fail.
+*/
+_Success_(return)
+BOOL VMMDLL_Map_GetUsers(_Out_writes_bytes_opt_(*pcbUserMap) PVMMDLL_MAP_USER pUserMap, _Inout_ PDWORD pcbUserMap);
+
 
 
 //-----------------------------------------------------------------------------
@@ -732,7 +753,7 @@ _Success_(return)
 BOOL VMMDLL_PidList(_Out_writes_opt_(*pcPIDs) PDWORD pPIDs, _Inout_ PULONG64 pcPIDs); 
 
 #define VMMDLL_PROCESS_INFORMATION_MAGIC        0xc0ffee663df9301e
-#define VMMDLL_PROCESS_INFORMATION_VERSION      5
+#define VMMDLL_PROCESS_INFORMATION_VERSION      6
 
 typedef struct tdVMMDLL_PROCESS_INFORMATION {
     ULONG64 magic;
@@ -748,15 +769,16 @@ typedef struct tdVMMDLL_PROCESS_INFORMATION {
     CHAR szNameLong[64];
     ULONG64 paDTB;
     ULONG64 paDTB_UserOpt;                  // may not exist
-    union {
-        struct {
-            ULONG64 vaEPROCESS;
-            ULONG64 vaPEB;
-            ULONG64 _Reserved1;
-            BOOL fWow64;
-            DWORD vaPEB32;                  // WoW64 only
-        } win;
-    } os;
+    struct {
+        ULONG64 vaEPROCESS;
+        ULONG64 vaPEB;
+        ULONG64 _Reserved1;
+        BOOL fWow64;
+        DWORD vaPEB32;                  // WoW64 only
+        DWORD dwSessionId;
+        ULONG64 qwLUID;
+        CHAR szSID[MAX_PATH];
+    } win;
 } VMMDLL_PROCESS_INFORMATION, *PVMMDLL_PROCESS_INFORMATION;
 
 /*
@@ -886,7 +908,7 @@ BOOL VMMDLL_PdbTypeChildOffset(_In_ LPSTR szModule, _In_ LPSTR szTypeName, _In_ 
 //-----------------------------------------------------------------------------
 
 #define VMMDLL_REGISTRY_HIVE_INFORMATION_MAGIC      0xc0ffee653df8d01e
-#define VMMDLL_REGISTRY_HIVE_INFORMATION_VERSION    1
+#define VMMDLL_REGISTRY_HIVE_INFORMATION_VERSION    2
 
 typedef struct td_VMMDLL_REGISTRY_HIVE_INFORMATION {
     ULONG64 magic;
@@ -896,10 +918,10 @@ typedef struct td_VMMDLL_REGISTRY_HIVE_INFORMATION {
     ULONG64 vaCMHIVE;
     ULONG64 vaHBASE_BLOCK;
     DWORD cbLength;
-    CHAR szName[136 + 1];
+    CHAR szName[128];
     WCHAR wszNameShort[32 + 1];
     WCHAR wszHiveRootPath[MAX_PATH];
-    ULONG64 _FutureReserved2[0x10];
+    QWORD _FutureReserved[0x10];
 } VMMDLL_REGISTRY_HIVE_INFORMATION, *PVMMDLL_REGISTRY_HIVE_INFORMATION;
 
 /*
