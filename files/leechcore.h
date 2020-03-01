@@ -49,36 +49,49 @@
 //           Android WinUSB drivers to be installed. Download and install from:
 //           http://developer.android.com/sdk/win-usb.html#download
 //           Syntax:
-//           USB3380
-//           USB3380://USB2                       (force USB2 connection speed)
+//             USB3380
+//             USB3380://USB2                     (force USB2 connection speed)
 //
 // FPGA :    hardware, read/write - requires a PCILeech FPGA flashed hardware
 //           device as shown at: https://github.com/ufrisk/pcileech-fpga
 //           Also requires the FTD3XX.DLL from ftdichip to be placed in the
 //           same directory as the executable. Download from ftdichip at:
-//           http://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.2.0.6.zip
+//           https://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.3.0.2.zip
 //           Syntax:
-//           FGPA
-//           FPGA://pcie_gen:[<read_uS>[:<write_uS>[:<probe_uS>]]]
+//             FGPA
+//             FPGA://<comma_separated_options_list>
+//           Example: FPGA://pciegen=1,deviceindex=1
+//           Options:
+//             pciegen=     PCIe generation to use, 1 or 2
+//             tmread=      Read delay in uS
+//             tmwrite=     Write delay in uS
+//             tmprobe=     Probe delay in uS
+//             algo=        1 (normal) or 2 (tiny)
+//             readsize=    max chunk read size in bytes
+//             readretry=   number of retries on fail
+//             deviceindex= device index to open
 //
 // RAWUDP :  hardware, read/write - connect to a remote FPGA over the network
 //           using a rudimentary UDP implmentation of the FPGA USB protocol.
 //           Supported devices: NeTV2 - https://github.com/ufrisk/pcileech-fpga
 //           Syntax:
-//           RAWUDP://<target_ipv4>:[pcie_gen:[<read_uS>[:<write_uS>[:<probe_uS>]]]]
-//           Example: RAWUDP://192.168.0.222
+//             RAWUDP://<comma_separated_options_list>
+//           Example: RAWUDP://ip=192.168.0.222
+//           Options:
+//             ip= ip address or host name to connect to.
+//           (options for fpga device type also applies).
 //
 // SP605TCP : hardware, read/write - connect to a remote SP605 FPGA over the
 //           network using the implementation created by @d_olex.
 //           https://github.com/Cr4sh/s6_pcie_microblaze
 //           Syntax:
-//           SP605TCP://<target_ip>[:<target_port>]          (port is optional)
+//             SP605TCP://<target_ip>[:<target_port>]        (port is optional)
 //
 // RAWTCP :  read/write - connect to a remote raw tcp device - such as HPE iLO
 //           that have been patched to support DMA as per blog entry below:
 //           https://www.synacktiv.com/posts/exploit/using-your-bmc-as-a-dma-device-plugging-pcileech-to-hpe-ilo-4.html
 //           Syntax:
-//           RAWTCP://<target_ip>[:<target_port>]            (port is optional)
+//             RAWTCP://<target_ip>[:<target_port>]          (port is optional)
 //
 // HvSavedState : read-only - connect to a Hyper-V saved state file. In order
 //           to do so the .dll file 'vmsavedstatedumpprovider.dll' must be
@@ -91,50 +104,51 @@
 //           directory of leechcore.dll and run executable as elevated admin
 //           using syntax below:
 //           Syntax:
-//           PMEM              (use att_winpmem_64.sys in directory of executable)
-//           PMEM://<non_default_path_to_file_winpmem_64.sys>
+//             PMEM              (use att_winpmem_64.sys in directory of executable)
+//             PMEM://<non_default_path_to_file_winpmem_64.sys>
 //
 // TOTALMELTDOWN : read/write - requires a Windows 7 system vulnerable to the
 //           "Total Meltdown" vulnerability - CVE-2018-1038.
 //           Syntax:
-//           TOTALMELTDOWN
+//             TOTALMELTDOWN
 //
-// FILE :    use dump file, either a raw linear memory dump, full crash dump or
-//           full elf core dump (virtualbox).
-//           Which format to use is auto-detected. If it looks like a full cash
-//           dump or full elf core dump those formats will be used, otherwise
-//           it will be assumed that a raw linear memory dump is to be used.
+// FILE :    use dump file of any of the below listed formats:
+//             - raw linear memory dump.
+//             - full microsoft crash dump (DumpIt).
+//             - full elf core dump (VirtualBox).
+//             - VMware save/dump file (.vmem + .vmss/.vmsn).
+//           The format to use is auto-detected.
 //           Syntax:
-//           <filename>        (no device-type prefix - just use the file name)
-//           FILE://<filename>
+//             <filename>        (no device-type prefix - just use the file name)
+//             FILE://<filename>
 //
 // DumpIt :  DumpIt is a "virtual" device. It's only possible to use the DumpIt
 //           device if the main process containing LeechCore has been started
 //           with DumpIt in LiveKD mode.
 //           Example 1:
-//           DumpIt.exe /LIVEKD /A MemProcFS.exe
+//             DumpIt.exe /LIVEKD /A MemProcFS.exe
 //           Example 2:
-//           DumpIt.exe /LIVEKD /A LeechSvc.exe /C "interactive insecure"
-//           and then connect to remote service by:
-//           MemProcFS.exe -remote rpc://insecure:192.168.x.x -device DumpIt
+//             DumpIt.exe /LIVEKD /A LeechSvc.exe /C "interactive insecure"
+//             and then connect to remote service by:
+//             MemProcFS.exe -remote rpc://insecure:192.168.x.x -device DumpIt
 //
 // EXISTING : Attach to existing already loaded configuration. This is done
 //           instead of the default behaviour of closing any existing devices
 //           and initializing the new requested device. If no existing device
 //           exists the call to LeechCore_Open will fail.
 //           Syntax:
-//           EXISTING
+//             EXISTING
 //
 // EXISTINGREMOTE : Same as EXISTING but applying the EXISTING device on the
 //           remote system. Use only in conjunction with a remote system.
 //           Syntax:
-//           EXISTINGREMOTE
+//             EXISTINGREMOTE
 //
 //
 // (c) Ulf Frisk, 2018-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 1.6
+// Header Version: 1.7
 //
 #ifndef __LEECHCORE_H__
 #define __LEECHCORE_H__
