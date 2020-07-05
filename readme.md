@@ -167,9 +167,8 @@ Support PCILeech/MemProcFS development:
 =======================================
 PCILeech and MemProcFS are hobby projects of mine. I put a lot of time and energy into my projects. The time being most of my spare time - since I'm not able to work with this. Unfortunately since some aspects also relate to hardware I also put quite some of money into my projects. If you think PCILeech and/or MemProcFS are awesome tools and/or if you had a use for them it's now possible to contribute.
 
-Please do note that PCILeech and MemProcFS are free and open source - as such I'm not expecting donations; even though a donation would be very much appreciated. I'm also not able to promise product features, consultancy or other things in return for a donation. A donation will have to stay donation and no more.  I'll set up the Github sponsors as soon as I'm able to; but I need tax papers signed by a now closed embassy for that.
+Please do note that PCILeech and MemProcFS are free and open source - as such I'm not expecting donations; even though a donation would be very much appreciated. I'm also not able to promise product features, consultancy or other things in return for a donation. A donation will have to stay donation and no more.  I'll set up the Github sponsors as soon as I'm able to; but for now it's possible to contribute with:
 
-Until my Github Sponsors are set up it's possible to contribute with:
  - Paypal: `paypal@ulffrisk.com` 
  - Bitcoin: `bc1q9kur5pym8wmh5yxkf65792rdqm0guncd2gl4tu`
  
