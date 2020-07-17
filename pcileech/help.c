@@ -316,9 +316,9 @@ VOID Help_ShowDetailed()
             "    pcileech search -sig unlock_win10x64 -all                                  \n" \
             " 3) search for all unlock_win10x64 locations by using a kernel module.         \n" \
             "    pcileech search -sig unlock_win10x64 -all -kmd 0x7fffe000                  \n" \
-            " 3) search for all locations that contain the pattern 444d4152.                \n" \
+            " 4) search for all locations that contain the pattern 444d4152.                \n" \
             "    pcileech search -in 444d4152 -all -kmd 0x7fffe000                          \n" \
-            " 4) search for the first location containing the pattern in the file pat.bin.  \n" \
+            " 5) search for the first location containing the pattern in the file pat.bin.  \n" \
             "    pcileech search -in pat.bin -all -kmd 0x7fffe000                           \n");
         break;
     case MOUNT:
@@ -405,9 +405,9 @@ VOID Help_ShowDetailed()
             " EXAMPLES:                                                                     \n" \
             " 1) test reading from the memory address at 0x1000                             \n" \
             "    pcileech testmemread -min 0x1000                                           \n" \
-            " 1) test reading from the normally protected address 0xf4000000                \n" \
+            " 2) test reading from the normally protected address 0xf4000000                \n" \
             "    pcileech testmemread -min 0xf4000000 -force                                \n" \
-            " 2) test reading and writing to/from the memory address 0x1000                 \n" \
+            " 3) test reading and writing to/from the memory address 0x1000                 \n" \
             "    pcileech testmemreadwrite -min 0x1000                                      \n");
         break;
     case KMDLOAD:
