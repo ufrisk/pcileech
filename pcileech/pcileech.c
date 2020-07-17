@@ -50,7 +50,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
     DWORD j, i = 1;
     ctxMain = LocalAlloc(LMEM_ZEROINIT, sizeof(PCILEECH_CONTEXT));
     if(!ctxMain) {
-        return 1;
+        return FALSE;
     }
     if(argc < 2) { return FALSE; }
     // set defaults
