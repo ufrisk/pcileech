@@ -153,15 +153,14 @@ The binaries are found in the [releases section](https://github.com/ufrisk/pcile
 
 Links:
 ======
-#### Projects:
-* PCILeech Wiki: https://github.com/ufrisk/pcileech/wiki
+* Twitter: [![Twitter](https://img.shields.io/twitter/follow/UlfFrisk?label=UlfFrisk&style=social)](https://twitter.com/intent/follow?screen_name=UlfFrisk)
+* Discord: [![Discord | Porchetta Industries](https://img.shields.io/discord/736724457258745996.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/sEkn3aa)
+* PCILeech: https://github.com/ufrisk/pcileech
 * PCILeech FPGA: https://github.com/ufrisk/pcileech-fpga
 * LeechCore: https://github.com/ufrisk/LeechCore
 * MemProcFS: https://github.com/ufrisk/MemProcFS
-#### Other:
-* Blog: http://blog.frizk.net
-* Twitter: https://twitter.com/UlfFrisk
 * YouTube: https://www.youtube.com/channel/UC2aAi-gjqvKiC7s7Opzv9rg
+* Blog: http://blog.frizk.net
 
 Support PCILeech/MemProcFS development:
 =======================================
