@@ -14,7 +14,7 @@
 #include "kmd.h"
 #include "umd.h"
 #include "vfs.h"
-#include "vmmprx.h"
+#include "vmmx.h"
 
 BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
 {
@@ -48,31 +48,53 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         {.tp = AGENT_EXEC_PY,.sz = "agent-execpy" },
     };
     DWORD j, i = 1;
+    FILE *hFile;
+    CHAR szCommandModule[MAX_PATH];
     ctxMain = LocalAlloc(LMEM_ZEROINIT, sizeof(PCILEECH_CONTEXT));
     if(!ctxMain) {
         return 1;
     }
+    ctxMain->magic = PCILEECH_CONTEXT_MAGIC;
+    ctxMain->version = PCILEECH_CONTEXT_VERSION;
     if(argc < 2) { return FALSE; }
     // set defaults
     ctxMain->cfg.tpAction = NA;
-    ctxMain->cfg.qwAddrMax = ~0;
+    ctxMain->cfg.qwAddrMax = 0;
     ctxMain->cfg.fOutFile = TRUE;
     // fetch command line actions/options
     loop:
     while(i < argc) {
-            for(j = 0; j < sizeof(ACTIONS) / sizeof(ACTION); j++) { // parse command (if found)
-                if(0 == _stricmp(argv[i], ACTIONS[j].sz)) {
-                    ctxMain->cfg.tpAction = ACTIONS[j].tp;
+        // try parse action command
+        for(j = 0; j < sizeof(ACTIONS) / sizeof(ACTION); j++) {
+            if(0 == _stricmp(argv[i], ACTIONS[j].sz)) {
+                ctxMain->cfg.tpAction = ACTIONS[j].tp;
+                i++;
+                goto loop;
+            }
+        }
+        // try parse external command module name
+        if((ctxMain->cfg.tpAction == NA) && (0 != memcmp(argv[i], "-", 1))) {
+            Util_GetPathExe(szCommandModule);
+            if(strlen(szCommandModule) + strlen(argv[i]) < MAX_PATH - 16) {
+                strcat_s(szCommandModule, sizeof(szCommandModule), "leechp_");
+                strcat_s(szCommandModule, sizeof(szCommandModule), argv[i]);
+                strcat_s(szCommandModule, sizeof(szCommandModule), PCILEECH_LIBRARY_FILETYPE);
+                if(0 == fopen_s(&hFile, szCommandModule, "rb")) {
+                    memcpy(ctxMain->cfg.szExternalCommandModule, szCommandModule, MAX_PATH);
+                    ctxMain->cfg.tpAction = EXTERNAL_COMMAND_MODULE;
+                    fclose(hFile);
                     i++;
-                    goto loop;
+                    continue;
                 }
             }
-            if(ctxMain->cfg.tpAction == NA && 0 != memcmp(argv[i], "-", 1)) {
-                ctxMain->cfg.tpAction = ((strlen(argv[i]) > 3) && !_strnicmp("umd", argv[i], 3)) ? EXEC_UMD : EXEC_KMD;
-                strcpy_s(ctxMain->cfg.szShellcodeName, MAX_PATH, argv[i]);
-                i++;
-                continue;
-            }
+        }
+        // try parse 
+        if((ctxMain->cfg.tpAction == NA) && (0 != memcmp(argv[i], "-", 1))) {
+            ctxMain->cfg.tpAction = ((strlen(argv[i]) > 3) && !_strnicmp("umd", argv[i], 3)) ? EXEC_UMD : EXEC_KMD;
+            strcpy_s(ctxMain->cfg.szShellcodeName, MAX_PATH, argv[i]);
+            i++;
+            continue;
+        }
         // parse options (command not found)
         if(0 == strcmp(argv[i], "-pt")) {
             ctxMain->cfg.fPageTableScan = TRUE;
@@ -122,6 +144,8 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             strcpy_s(ctxMain->cfg.szDevice, MAX_PATH, argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-remote")) {
             strcpy_s(ctxMain->cfg.szRemote, MAX_PATH, argv[i + 1]);
+        } else if(0 == strcmp(argv[i], "-memmap")) {
+            strcpy_s(ctxMain->cfg.szMemMap, MAX_PATH, argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-out")) {
             if((0 == _stricmp(argv[i + 1], "none")) || (0 == _stricmp(argv[i + 1], "null"))) {
                 ctxMain->cfg.fOutFile = FALSE;
@@ -155,10 +179,8 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         ctxMain->cfg.pbIn = LocalAlloc(LMEM_ZEROINIT, 0x40000);
     }
     // set dummy qwAddrMax value (if possible) to disable auto-detect in LeechCore.
-    if(ctxMain->cfg.qwAddrMax == ~0) {
-        if((ctxMain->cfg.tpAction == TLP) || (ctxMain->cfg.tpAction == DISPLAY) || (ctxMain->cfg.tpAction == PAGEDISPLAY)) {
-            ctxMain->cfg.qwAddrMax = 0x00001fffffffffff;
-        }
+    if((ctxMain->cfg.tpAction == TLP) || (ctxMain->cfg.tpAction == DISPLAY) || (ctxMain->cfg.tpAction == PAGEDISPLAY)) {
+        ctxMain->cfg.qwAddrMax = -1;
     }
     // try correct erroneous options, if needed
     if(ctxMain->cfg.tpAction == NA) {
@@ -172,8 +194,8 @@ VOID PCILeechConfigFixup()
     QWORD qw;
     // no kmd -> max address == max address that device support
     if(!ctxMain->cfg.szKMDName[0] && !ctxMain->cfg.qwKMD) {
-        if(ctxMain->cfg.qwAddrMax == 0 || ctxMain->cfg.qwAddrMax > ctxMain->dev.paMaxNative) {
-            ctxMain->cfg.qwAddrMax = ctxMain->dev.paMaxNative;
+        if(ctxMain->cfg.qwAddrMax == 0 || ctxMain->cfg.qwAddrMax > ctxMain->dev.paMax) {
+            ctxMain->cfg.qwAddrMax = ctxMain->dev.paMax;
         }
     }
     // fixup addresses
@@ -190,8 +212,8 @@ VOID PCILeechFreeContext()
 {
     if(!ctxMain) { return; }
     KMDClose();
-    VmmPrx_Close();
-    LeechCore_Close();
+    Vmmx_Close();
+    LcClose(ctxMain->hLC);
     LocalFree(ctxMain->cfg.pbIn);
     LocalFree(ctxMain);
     ctxMain = NULL;
@@ -244,6 +266,8 @@ VOID PCILeechCtrlHandlerInitialize()
 int main(_In_ int argc, _In_ char* argv[])
 {
     BOOL result;
+    HMODULE hExternalCommandModule;
+    VOID(*pfnExternalCommandModuleDoAction)(_Inout_ PPCILEECH_CONTEXT pLeechContext);
     PKMDEXEC pKmdExec = NULL;
     result = PCILeechConfigIntialize((DWORD)argc, argv);
     printf("\n");
@@ -290,6 +314,9 @@ int main(_In_ int argc, _In_ char* argv[])
             PCILeechFreeContext();
             return 1;
         }
+    }
+    if(ctxMain->cfg.qwAddrMax == 0) {
+        LcGetOption(ctxMain->hLC, LC_OPT_CORE_ADDR_MAX, &ctxMain->cfg.qwAddrMax);
     }
     // enable ctrl+c event handler if remote (to circumvent blocking thread)
 	PCILeechCtrlHandlerInitialize();
@@ -364,6 +391,18 @@ int main(_In_ int argc, _In_ char* argv[])
             KMDUnload();
             printf("KMD: Hopefully unloaded.\n");
             break;
+        case EXTERNAL_COMMAND_MODULE:
+            if((hExternalCommandModule = LoadLibraryA(ctxMain->cfg.szExternalCommandModule))) {
+                if((pfnExternalCommandModuleDoAction = (VOID(*)(PPCILEECH_CONTEXT))GetProcAddress(hExternalCommandModule, "DoAction"))) {
+                    pfnExternalCommandModuleDoAction(ctxMain);
+                } else {
+                    printf("Failed. External command module '%s' could not locate required DoAction function.\n", ctxMain->cfg.szExternalCommandModule);
+                }
+                FreeLibrary(hExternalCommandModule);
+            } else {
+                printf("Failed. External command module '%s' could not be loaded.\n", ctxMain->cfg.szExternalCommandModule);
+            }
+            break;
         default:
             printf("Failed. Not yet implemented.\n");
             break;
@@ -373,9 +412,15 @@ int main(_In_ int argc, _In_ char* argv[])
         printf("KMD: Hopefully unloaded.\n");
     }
     if(ctxMain->cfg.dwListenTlpTimeMs) {
-        LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP, (PBYTE)&ctxMain->cfg.dwListenTlpTimeMs, sizeof(DWORD), NULL, 0, NULL);
+        LcCommand(ctxMain->hLC, LC_CMD_FPGA_LISTEN_TLP, sizeof(DWORD), (PBYTE)&ctxMain->cfg.dwListenTlpTimeMs, NULL, NULL);
     }
     PCILeechFreeContext();
+#ifdef LINUX
     ExitProcess(0);
+#else /* LINUX */
+    __try {
+        ExitProcess(0);
+    } __except(EXCEPTION_EXECUTE_HANDLER) { ; }
+#endif /* LINUX */
     return 0;
 }

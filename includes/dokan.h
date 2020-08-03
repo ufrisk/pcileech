@@ -1,7 +1,8 @@
 /*
   Dokan : user-mode file system library for Windows
 
-  Copyright (C) 2015 - 2018 Adrien J. <liryna.stark@gmail.com> and Maxime C. <maxime@islog.com>
+  Copyright (C) 2015 - 2019 Adrien J. <liryna.stark@gmail.com> and Maxime C. <maxime@islog.com>
+  Copyright (C) 2020 Google, Inc.
   Copyright (C) 2007 - 2011 Hiroki Asakawa <info@dokan-dev.net>
 
   http://dokan-dev.github.io
@@ -55,11 +56,9 @@ extern "C" {
 /** @{ */
 
 /** The current Dokan version (ver 1.2.0). \ref DOKAN_OPTIONS.Version */
-#define DOKAN_VERSION 120
+#define DOKAN_VERSION 140
 /** Minimum Dokan version (ver 1.1.0) accepted. */
 #define DOKAN_MINIMUM_COMPATIBLE_VERSION 110
-/** Maximum number of dokan instances.*/
-#define DOKAN_MAX_INSTANCES 32
 /** Driver file name including the DOKAN_MAJOR_API_VERSION */
 #define DOKAN_DRIVER_NAME L"dokan" DOKAN_MAJOR_API_VERSION L".sys"
 /** Network provider name including the DOKAN_MAJOR_API_VERSION */
@@ -78,7 +77,11 @@ extern "C" {
 #define DOKAN_OPTION_DEBUG 1
 /** Enable ouput debug message to stderr */
 #define DOKAN_OPTION_STDERR 2
-/** Use alternate stream */
+/**
+ * Enable the use of alternate stream paths in the form
+ * <file-name>:<stream-name>. If this is not specified then the driver will
+ * fail any attempt to access a path with a colon.
+ */
 #define DOKAN_OPTION_ALT_STREAM 4
 /** Enable mount drive as write-protected */
 #define DOKAN_OPTION_WRITE_PROTECT 8
@@ -92,6 +95,23 @@ extern "C" {
 #define DOKAN_OPTION_CURRENT_SESSION 128
 /** Enable Lockfile/Unlockfile operations. Otherwise Dokan will take care of it */
 #define DOKAN_OPTION_FILELOCK_USER_MODE 256
+/**
+ * Whether DokanNotifyXXX functions should be enabled, which requires this
+ * library to maintain a special handle while the file system is mounted.
+ * Without this flag, the functions always return FALSE if invoked.
+ */
+#define DOKAN_OPTION_ENABLE_NOTIFICATION_API 512
+/**
+ * Whether to disable any oplock support on the volume.
+ * Regular range locks are enabled regardless.
+ */
+#define DOKAN_OPTION_DISABLE_OPLOCKS 1024
+/**
+ * The advantage of the FCB GC approach is that it prevents filter drivers (Anti-virus)
+ * from exponentially slowing down procedures like zip file extraction due to
+ * repeatedly rebuilding state that they attach to the FCB header.
+ */
+#define DOKAN_OPTION_ENABLE_FCB_GARBAGE_COLLECTION 2048
 
 /** @} */
 
@@ -101,22 +121,26 @@ extern "C" {
  * \see DokanMain
  */
 typedef struct _DOKAN_OPTIONS {
-  /** Version of the Dokan features requested (version "123" is equal to Dokan version 1.2.3). */
+  /** Version of the Dokan features requested without dots (version "123" is equal to Dokan version 1.2.3). */
   USHORT Version;
-  /** Number of threads to be used internally by Dokan library. More threads will handle more events at the same time. */
+  /** Number of threads to be used by Dokan library internally. More threads will handle more events at the same time. */
   USHORT ThreadCount;
   /** Features enabled for the mount. See \ref DOKAN_OPTION. */
   ULONG Options;
   /** FileSystem can store anything here. */
   ULONG64 GlobalContext;
-  /** Mount point. Can be "M:\" (drive letter) or "C:\mount\dokan" (path in NTFS). */
+  /** Mount point. It can be a driver letter like "M:\" or a folder path "C:\mount\dokan" on a NTFS partition. */
   LPCWSTR MountPoint;
   /**
-  * UNC Name for the Network Redirector
-  * \see <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff556761(v=vs.85).aspx">Support for UNC Naming</a>
-  */
+   * UNC Name for the Network Redirector
+   * \see <a href="https://msdn.microsoft.com/en-us/library/windows/hardware/ff556761(v=vs.85).aspx">Support for UNC Naming</a>
+   */
   LPCWSTR UNCName;
-  /** Max timeout in milliseconds of each request before Dokan gives up. */
+  /**
+   * Max timeout in milliseconds of each request before Dokan gives up to wait events to complete.
+   * A timeout request is a sign that the userland implementation is no longer able to properly manage requests in time.
+   * The driver will therefore unmount the device when a timeout trigger in order to keep the system stable.
+   */
   ULONG Timeout;
   /** Allocation Unit Size of the volume. This will affect the file size. */
   ULONG AllocationUnitSize;
@@ -350,7 +374,8 @@ typedef struct _DOKAN_OPERATIONS {
   /**
   * \brief FindFilesWithPattern Dokan API callback
   *
-  * Same as \ref DOKAN_OPERATIONS.FindFiles but with a search pattern.
+  * Same as \ref DOKAN_OPERATIONS.FindFiles but with a search pattern.\n
+  * The search pattern is a Windows MS-DOS-style expression. See \ref DokanIsNameInExpression .
   *
   * \param PathName Path requested by the Kernel on the FileSystem.
   * \param SearchPattern Search pattern.
@@ -358,6 +383,7 @@ typedef struct _DOKAN_OPERATIONS {
   * \param DokanFileInfo Information about the file or directory.
   * \return \c STATUS_SUCCESS on success or NTSTATUS appropriate to the request result.
   * \see FindFiles
+  * \see DokanIsNameInExpression
   */
   NTSTATUS(DOKAN_CALLBACK *FindFilesWithPattern)(LPCWSTR PathName,
     LPCWSTR SearchPattern,
@@ -613,7 +639,7 @@ typedef struct _DOKAN_OPERATIONS {
   *
   * \param DokanFileInfo Information about the file or directory.
   * \return \c STATUS_SUCCESS on success or \c NTSTATUS appropriate to the request result.
-  * \see Unmounted
+  * \see Mounted
   */
   NTSTATUS(DOKAN_CALLBACK *Unmounted)(PDOKAN_FILE_INFO DokanFileInfo);
 
@@ -741,7 +767,7 @@ int DOKANAPI DokanMain(PDOKAN_OPTIONS DokanOptions,
  * \brief Unmount a Dokan device from a driver letter.
  *
  * \param DriveLetter Dokan driver letter to unmount.
- * \return \c TRUE if device was unmounted or False in case of failure or device not found.
+ * \return \c TRUE if device was unmounted or \c FALSE in case of failure or device not found.
  */
 BOOL DOKANAPI DokanUnmount(WCHAR DriveLetter);
 
@@ -749,29 +775,24 @@ BOOL DOKANAPI DokanUnmount(WCHAR DriveLetter);
  * \brief Unmount a Dokan device from a mount point
  *
  * \param MountPoint Mount point to unmount ("Z", "Z:", "Z:\", "Z:\MyMountPoint").
- * \return \c TRUE if device was unmounted or False in case of failure or device not found.
+ * \return \c TRUE if device was unmounted or \c FALSE in case of failure or device not found.
  */
 BOOL DOKANAPI DokanRemoveMountPoint(LPCWSTR MountPoint);
 
 /**
- * \brief Unmount a Dokan device from a mount point
- *
- * Same as \ref DokanRemoveMountPoint
- * If Safe is \c TRUE, it will broadcast to all desktops and Shells
- * Safe should not be used during DLL_PROCESS_DETACH
- *
- * \see DokanRemoveMountPoint
- *
- * \param MountPoint Mount point to unmount ("Z", "Z:", "Z:\", "Z:\MyMountPoint").
- * \param Safe Process is not in DLL_PROCESS_DETACH state.
- * \return True if device was unmounted or False in case of failure or device not found.
- */
-BOOL DOKANAPI DokanRemoveMountPointEx(LPCWSTR MountPoint, BOOL Safe);
-
-/**
  * \brief Checks whether Name matches Expression
  *
- * \param Expression Expression can contain wildcard characters (? and *)
+ * Behave like \c FsRtlIsNameInExpression routine from <a href="https://msdn.microsoft.com/en-us/library/ff546850(v=VS.85).aspx">Microsoft</a>\n
+ * \c * (asterisk) Matches zero or more characters.\n
+ * <tt>?</tt> (question mark) Matches a single character.\n
+ * \c DOS_DOT (\c " quotation mark) Matches either a period or zero characters beyond the name string.\n
+ * \c DOS_QM (\c > greater than) Matches any single character or, upon encountering a period or end
+ *        of name string, advances the expression to the end of the set of
+ *        contiguous DOS_QMs.\n
+ * \c DOS_STAR (\c < less than) Matches zero or more characters until encountering and matching
+ *          the final \c . in the name.
+ *
+ * \param Expression Expression can contain any of the above characters.
  * \param Name Name to check
  * \param IgnoreCase Case sensitive or not
  * \return result if name matches the expression
@@ -817,14 +838,24 @@ HANDLE DOKANAPI DokanOpenRequestorToken(PDOKAN_FILE_INFO DokanFileInfo);
 /**
  * \brief Get active Dokan mount points.
  *
- * \param list Allocate array of DOKAN_CONTROL.
- * \param length Number of \ref DOKAN_CONTROL instances in list.
+ * Returned array need to be released by calling \ref DokanReleaseMountPointList
+ *
  * \param uncOnly Get only instances that have UNC Name.
  * \param nbRead Number of instances successfully retrieved.
- * \return List retrieved or not.
+ * \return Allocate array of DOKAN_CONTROL.
  */
-BOOL DOKANAPI DokanGetMountPointList(PDOKAN_CONTROL list, ULONG length,
-                                     BOOL uncOnly, PULONG nbRead);
+PDOKAN_CONTROL DOKANAPI DokanGetMountPointList(BOOL uncOnly, PULONG nbRead);
+
+/**
+ * \brief Release Mount point list resources from \ref DokanGetMountPointList.
+ *
+ * After \ref DokanGetMountPointList call you will receive a dynamically allocated array of DOKAN_CONTROL.
+ * This array needs to be released when no longer needed by calling this function.
+ *
+ * \param list Allocated array of DOKAN_CONTROL from \ref DokanGetMountPointList.
+ * \return Nothing.
+ */
+VOID DOKANAPI DokanReleaseMountPointList(PDOKAN_CONTROL list);
 
 /**
  * \brief Convert \ref DOKAN_OPERATIONS.ZwCreateFile parameters to <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858(v=vs.85).aspx">CreateFile</a> parameters.
@@ -843,8 +874,78 @@ BOOL DOKANAPI DokanGetMountPointList(PDOKAN_CONTROL list, ULONG length,
  * \see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858(v=vs.85).aspx">CreateFile function (MSDN)</a>
  */
 void DOKANAPI DokanMapKernelToUserCreateFileFlags(
-	ACCESS_MASK DesiredAccess, ULONG FileAttributes, ULONG CreateOptions, ULONG CreateDisposition,
-	ACCESS_MASK* outDesiredAccess, DWORD *outFileAttributesAndFlags, DWORD *outCreationDisposition);
+    ACCESS_MASK DesiredAccess, ULONG FileAttributes, ULONG CreateOptions,
+    ULONG CreateDisposition, ACCESS_MASK *outDesiredAccess,
+    DWORD *outFileAttributesAndFlags, DWORD *outCreationDisposition);
+
+/**
+ * \defgroup DokanNotify Dokan Notify
+ * \brief Dokan User FS file-change notification
+ *
+ * The application implementing the user file system can notify
+ * the Dokan kernel driver of external file- and directory-changes.
+ *
+ * For example, the mirror application can notify the driver about
+ * changes made in the mirrored directory so that those changes will
+ * be automatically reflected in the implemented mirror file system.
+ *
+ * This requires the FilePath passed to the respective DokanNotify*-functions
+ * to include the absolute path of the changed file including the drive-letter
+ * and the path to the mount point, e.g. "C:\Dokan\ChangedFile.txt".
+ *
+ * These functions SHOULD NOT be called from within the implemented
+ * file system and thus be independent of any Dokan file system operation.
+ * @{
+ */
+
+/**
+ * \brief Notify dokan that a file or a directory has been created.
+ *
+ * \param FilePath Absolute path to the file or directory, including the mount-point of the file system.
+ * \param IsDirectory Indicates if the path is a directory.
+ * \return \c TRUE if notification succeeded.
+ */
+BOOL DOKANAPI DokanNotifyCreate(LPCWSTR FilePath, BOOL IsDirectory);
+
+/**
+ * \brief Notify dokan that a file or a directory has been deleted.
+ *
+ * \param FilePath Absolute path to the file or directory, including the mount-point of the file system.
+ * \param IsDirectory Indicates if the path was a directory.
+ * \return \c TRUE if notification succeeded.
+ */
+BOOL DOKANAPI DokanNotifyDelete(LPCWSTR FilePath, BOOL IsDirectory);
+
+/**
+ * \brief Notify dokan that file or directory attributes have changed.
+ *
+ * \param FilePath Absolute path to the file or directory, including the mount-point of the file system.
+ * \return \c TRUE if notification succeeded.
+ */
+BOOL DOKANAPI DokanNotifyUpdate(LPCWSTR FilePath);
+
+/**
+ * \brief Notify dokan that file or directory extended attributes have changed.
+ *
+ * \param FilePath Absolute path to the file or directory, including the mount-point of the file system.
+ * \return \c TRUE if notification succeeded.
+ */
+BOOL DOKANAPI DokanNotifyXAttrUpdate(LPCWSTR FilePath);
+
+/**
+ * \brief Notify dokan that a file or a directory has been renamed. This method
+ *  supports in-place rename for file/directory within the same parent.
+ *
+ * \param OldPath Old, absolute path to the file or directory, including the mount-point of the file system.
+ * \param NewPath New, absolute path to the file or directory, including the mount-point of the file system.
+ * \param IsDirectory Indicates if the path is a directory.
+ * \param IsInSameDirectory Indicates if the file or directory have the same parent directory.
+ * \return \c TRUE if notification succeeded.
+ */
+BOOL DOKANAPI DokanNotifyRename(LPCWSTR OldPath, LPCWSTR NewPath,
+                                BOOL IsDirectory, BOOL IsInSameDirectory);
+
+/**@}*/
 
 /**
  * \brief Convert WIN32 error to NTSTATUS

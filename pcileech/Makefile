@@ -1,8 +1,8 @@
 CC=gcc
-CFLAGS=-I. -D LINUX -L. -l:leechcore.so -pthread `pkg-config libusb-1.0 --libs --cflags`
-LDFLAGS=-Wl,-rpath,'$$ORIGIN'
+CFLAGS=-I. -I../includes -D LINUX -L. -l:leechcore.so -pthread
+LDFLAGS=-Wl,-rpath,'$$ORIGIN' -ldl
 DEPS = pcileech.h
-OBJ = oscompatibility.o device.o pcileech.o executor.o extra.o help.o kmd.o memdump.o mempatch.o statistics.o umd.o util.o vfs.o vmmprx.o
+OBJ = oscompatibility.o device.o pcileech.o executor.o extra.o help.o kmd.o memdump.o mempatch.o statistics.o umd.o util.o vfs.o vmmx.o
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -16,3 +16,4 @@ pcileech: $(OBJ)
 
 clean:
 	rm -f *.o
+	rm -f *.so

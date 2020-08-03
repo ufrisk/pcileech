@@ -6,6 +6,7 @@
 #ifndef __VFS_H__
 #define __VFS_H__
 #include "pcileech.h"
+#include "oscompatibility.h"
 
 #define VFS_FLAGS_FILE_NORMAL           0x01
 #define VFS_FLAGS_FILE_DIRECTORY        0x02

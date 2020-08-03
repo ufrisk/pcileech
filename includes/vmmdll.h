@@ -4,7 +4,7 @@
 // (c) Ulf Frisk, 2018-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 3.1
+// Header Version: 3.3
 //
 
 #include <windows.h>
@@ -18,7 +18,7 @@ extern "C" {
 
 //-----------------------------------------------------------------------------
 // INITIALIZATION FUNCTIONALITY BELOW:
-// Choose one way of initialzing the VMM / Memory Process File System.
+// Choose one way of initializing the VMM / MemProcFS.
 //-----------------------------------------------------------------------------
 
 /*
@@ -35,18 +35,29 @@ extern "C" {
 *              documentation for additional information.
 *    -norefresh = disable background refreshes (even if backing memory is
 *              volatile memory).
-*    -symbolserverdisable = disable symbol server until user change.
-*              This parameter will take precedence over registry settings.
+*    -memmap = specify a physical memory map given by file or specify 'auto'.
+*              example: -memmap c:\\temp\\my_custom_memory_map.txt
+*              example: -memmap auto
 *    -pagefile[0-9] = page file(s) to use in addition to physical memory.
 *              Normally pagefile.sys have index 0 and swapfile.sys index 1.
 *              Page files are in constant flux - do not use if time diff
 *              between memory dump and page files are more than few minutes.
 *              Example: 'pagefile0 swapfile.sys'
+*    -symbolserverdisable = disable symbol server until user change.
+*              This parameter will take precedence over registry settings.
 *    -waitinitialize = Wait for initialization to complete before returning.
 *              Normal use is that some initialization is done asynchronously
 *              and may not be completed when initialization call is completed.
 *              This includes virtual memory compression, registry and more.
 *              Example: '-waitinitialize'
+*   -forensic = start a forensic scan of the physical memory immediately after
+*              startup if possible. Allowed parameter values range from 0-4.
+*              Note! forensic mode is not available for live memory.
+*              1 = forensic mode with in-memory sqlite database.
+*              2 = forensic mode with temp sqlite database deleted upon exit.
+*              3 = forensic mode with temp sqlite database remaining upon exit.
+*              4 = forensic mode with static named sqlite database (vmm.sqlite3).
+*              Example -forensic 4
 *
 * -- argc
 * -- argv
@@ -64,18 +75,6 @@ _Success_(return)
 BOOL VMMDLL_Close();
 
 /*
-* Perform a force refresh of all internal caches including:
-* - process listings
-* - memory cache
-* - page table cache
-* WARNING: function may take some time to execute!
-* -- dwReserved = reserved future use - must be zero
-* -- return = sucess/fail
-*/
-_Success_(return)
-BOOL VMMDLL_Refresh(_In_ DWORD dwReserved);
-
-/*
 * Free memory allocated by the VMMDLL.
 * -- pvMem
 */
@@ -84,41 +83,56 @@ VOID VMMDLL_MemFree(_Frees_ptr_opt_ PVOID pvMem);
 
 //-----------------------------------------------------------------------------
 // CONFIGURATION SETTINGS BELOW:
-// Configure the memory process file system or the underlying memory
+// Configure MemProcFS or the underlying memory
 // acquisition devices.
 //-----------------------------------------------------------------------------
 
 /*
 * Options used together with the functions: VMMDLL_ConfigGet & VMMDLL_ConfigSet
 * Options are defined with either: VMMDLL_OPT_* in this header file or as
-* LEECHCORE_OPT_* in leechcore.h
+* LC_OPT_* in leechcore.h
 * For more detailed information check the sources for individual device types.
 */
-#define VMMDLL_OPT_CORE_PRINTF_ENABLE                   0x80000001  // RW
-#define VMMDLL_OPT_CORE_VERBOSE                         0x80000002  // RW
-#define VMMDLL_OPT_CORE_VERBOSE_EXTRA                   0x80000003  // RW
-#define VMMDLL_OPT_CORE_VERBOSE_EXTRA_TLP               0x80000004  // RW
-#define VMMDLL_OPT_CORE_MAX_NATIVE_ADDRESS              0x80000005  // R
-#define VMMDLL_OPT_CORE_SYSTEM                          0x80000007  // R
-#define VMMDLL_OPT_CORE_MEMORYMODEL                     0x80000008  // R
+#define VMMDLL_OPT_CORE_PRINTF_ENABLE                   0x40000001'00000000  // RW
+#define VMMDLL_OPT_CORE_VERBOSE                         0x40000002'00000000  // RW
+#define VMMDLL_OPT_CORE_VERBOSE_EXTRA                   0x40000003'00000000  // RW
+#define VMMDLL_OPT_CORE_VERBOSE_EXTRA_TLP               0x40000004'00000000  // RW
+#define VMMDLL_OPT_CORE_MAX_NATIVE_ADDRESS              0x40000008'00000000  // R
 
-#define VMMDLL_OPT_CONFIG_IS_REFRESH_ENABLED            0x40000001  // R - 1/0
-#define VMMDLL_OPT_CONFIG_TICK_PERIOD                   0x40000002  // RW - base tick period in ms
-#define VMMDLL_OPT_CONFIG_READCACHE_TICKS               0x40000003  // RW - memory cache validity period (in ticks)
-#define VMMDLL_OPT_CONFIG_TLBCACHE_TICKS                0x40000004  // RW - page table (tlb) cache validity period (in ticks)
-#define VMMDLL_OPT_CONFIG_PROCCACHE_TICKS_PARTIAL       0x40000005  // RW - process refresh (partial) period (in ticks)
-#define VMMDLL_OPT_CONFIG_PROCCACHE_TICKS_TOTAL         0x40000006  // RW - process refresh (full) period (in ticks)
-#define VMMDLL_OPT_CONFIG_VMM_VERSION_MAJOR             0x40000007  // R
-#define VMMDLL_OPT_CONFIG_VMM_VERSION_MINOR             0x40000008  // R
-#define VMMDLL_OPT_CONFIG_VMM_VERSION_REVISION          0x40000009  // R
-#define VMMDLL_OPT_CONFIG_STATISTICS_FUNCTIONCALL       0x4000000A  // RW - enable function call statistics (.status/statistics_fncall file)
-#define VMMDLL_OPT_CONFIG_IS_PAGING_ENABLED             0x4000000B  // RW - 1/0
+#define VMMDLL_OPT_CORE_SYSTEM                          0x20000001'00000000  // R
+#define VMMDLL_OPT_CORE_MEMORYMODEL                     0x20000002'00000000  // R
 
-#define VMMDLL_OPT_WIN_VERSION_MAJOR                    0x40000101  // R
-#define VMMDLL_OPT_WIN_VERSION_MINOR                    0x40000102  // R
-#define VMMDLL_OPT_WIN_VERSION_BUILD                    0x40000103  // R
+#define VMMDLL_OPT_CONFIG_IS_REFRESH_ENABLED            0x20000003'00000000  // R - 1/0
+#define VMMDLL_OPT_CONFIG_TICK_PERIOD                   0x20000004'00000000  // RW - base tick period in ms
+#define VMMDLL_OPT_CONFIG_READCACHE_TICKS               0x20000005'00000000  // RW - memory cache validity period (in ticks)
+#define VMMDLL_OPT_CONFIG_TLBCACHE_TICKS                0x20000006'00000000  // RW - page table (tlb) cache validity period (in ticks)
+#define VMMDLL_OPT_CONFIG_PROCCACHE_TICKS_PARTIAL       0x20000007'00000000  // RW - process refresh (partial) period (in ticks)
+#define VMMDLL_OPT_CONFIG_PROCCACHE_TICKS_TOTAL         0x20000008'00000000  // RW - process refresh (full) period (in ticks)
+#define VMMDLL_OPT_CONFIG_VMM_VERSION_MAJOR             0x20000009'00000000  // R
+#define VMMDLL_OPT_CONFIG_VMM_VERSION_MINOR             0x2000000A'00000000  // R
+#define VMMDLL_OPT_CONFIG_VMM_VERSION_REVISION          0x2000000B'00000000  // R
+#define VMMDLL_OPT_CONFIG_STATISTICS_FUNCTIONCALL       0x2000000C'00000000  // RW - enable function call statistics (.status/statistics_fncall file)
+#define VMMDLL_OPT_CONFIG_IS_PAGING_ENABLED             0x2000000D'00000000  // RW - 1/0
 
-static const LPSTR VMMDLL_MEMORYMODEL_TOSTRING[4] = { "N/A", "X86", "X86PAE", "X64" };
+#define VMMDLL_OPT_WIN_VERSION_MAJOR                    0x20000101'00000000  // R
+#define VMMDLL_OPT_WIN_VERSION_MINOR                    0x20000102'00000000  // R
+#define VMMDLL_OPT_WIN_VERSION_BUILD                    0x20000103'00000000  // R
+
+#define VMMDLL_OPT_FORENSIC_MODE                        0x20000201'00000000  // RW - enable/retrieve forensic mode type [0-4].
+
+#define VMMDLL_OPT_REFRESH_ALL                          0x2001ffff'00000000  // W - refresh all caches
+#define VMMDLL_OPT_REFRESH_PROCESS                      0x20010001'00000000  // W - refresh process listings
+#define VMMDLL_OPT_REFRESH_READ                         0x20010002'00000000  // W - refresh physical read cache
+#define VMMDLL_OPT_REFRESH_TLB                          0x20010004'00000000  // W - refresh page table (TLB) cache
+#define VMMDLL_OPT_REFRESH_PAGING                       0x20010008'00000000  // W - refresh virtual memory 'paging' cache
+#define VMMDLL_OPT_REFRESH_REGISTRY                     0x20010010'00000000  // W
+#define VMMDLL_OPT_REFRESH_USER                         0x20010020'00000000  // W
+#define VMMDLL_OPT_REFRESH_PHYSMEMMAP                   0x20010040'00000000  // W
+#define VMMDLL_OPT_REFRESH_PFN                          0x20010080'00000000  // W
+#define VMMDLL_OPT_REFRESH_OBJ                          0x20010100'00000000  // W
+#define VMMDLL_OPT_REFRESH_NET                          0x20010200'00000000  // W
+
+static LPCSTR VMMDLL_MEMORYMODEL_TOSTRING[4] = { "N/A", "X86", "X86PAE", "X64" };
 
 typedef enum tdVMMDLL_MEMORYMODEL_TP {
     VMMDLL_MEMORYMODEL_NA       = 0,
@@ -160,8 +174,9 @@ BOOL VMMDLL_ConfigSet(_In_ ULONG64 fOption, _In_ ULONG64 qwValue);
 
 //-----------------------------------------------------------------------------
 // VFS - VIRTUAL FILE SYSTEM FUNCTIONALITY BELOW:
-// This is the core of the memory process file system. All implementation and
-// analysis towards the file system is possible by using functionality below. 
+// NB! VFS FUNCTIONALITY REQUIRES PLUGINS TO BE INITIALZED VIA CALL TO VMMDLL_InitializePlugins().
+// This is the core of MemProcFS. All implementation and analysis towards
+// the file system is possible by using functionality below. 
 //-----------------------------------------------------------------------------
 
 #define VMMDLL_STATUS_SUCCESS                       ((NTSTATUS)0x00000000L)
@@ -217,10 +232,10 @@ inline BOOL VMMDLL_VfsList_IsHandleValid(_In_ HANDLE pFileList)
 }
 
 /*
-* List a directory of files in the memory process file system. Directories and
-* files will be listed by callbacks into functions supplied in the pFileList
-* parameter. If information of an individual file is needed it's neccessary
-* to list all files in its directory.
+* List a directory of files in MemProcFS. Directories and files will be listed
+* by callbacks into functions supplied in the pFileList parameter.
+* If information of an individual file is needed it's neccessary to list all
+* files in its directory.
 * -- wcsPath
 * -- pFileList
 * -- return
@@ -229,7 +244,7 @@ _Success_(return)
 BOOL VMMDLL_VfsList(_In_ LPCWSTR wcsPath, _Inout_ PVMMDLL_VFS_FILELIST pFileList);
 
 /*
-* Read select parts of a file in the memory process file system.
+* Read select parts of a file in MemProcFS.
 * -- wcsFileName
 * -- pb
 * -- cb
@@ -241,7 +256,7 @@ BOOL VMMDLL_VfsList(_In_ LPCWSTR wcsPath, _Inout_ PVMMDLL_VFS_FILELIST pFileList
 NTSTATUS VMMDLL_VfsRead(_In_ LPCWSTR wcsFileName, _Out_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbRead, _In_ ULONG64 cbOffset);
 
 /*
-* Write select parts to a file in the memory process file system.
+* Write select parts to a file in MemProcFS.
 * -- wcsFileName
 * -- pb
 * -- cb
@@ -252,8 +267,8 @@ NTSTATUS VMMDLL_VfsRead(_In_ LPCWSTR wcsFileName, _Out_ LPVOID pb, _In_ DWORD cb
 NTSTATUS VMMDLL_VfsWrite(_In_ LPCWSTR wcsFileName, _In_ LPVOID pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ ULONG64 cbOffset);
 
 /*
-* Utility functions for memory process file system read/write towards different
-* underlying data representations.
+* Utility functions for MemProcFS read/write towards different underlying data
+* representations.
 */
 NTSTATUS VMMDLL_UtilVfsReadFile_FromPBYTE(_In_ PBYTE pbFile, _In_ ULONG64 cbFile, _Out_ PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbRead, _In_ ULONG64 cbOffset);
 NTSTATUS VMMDLL_UtilVfsReadFile_FromQWORD(_In_ ULONG64 qwValue, _Out_ PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbRead, _In_ ULONG64 cbOffset, _In_ BOOL fPrefix);
@@ -265,8 +280,8 @@ NTSTATUS VMMDLL_UtilVfsWriteFile_DWORD(_Inout_ PDWORD pdwTarget, _In_ PBYTE pb, 
 
 //-----------------------------------------------------------------------------
 // PLUGIN MANAGER FUNCTIONALITY BELOW:
-// Function and structures to initialize and use the memory process file system
-// plugin functionality. The plugin manager is started by a call to function:
+// Function and structures to initialize and use MemProcFS plugin functionality.
+// The plugin manager is started by a call to function:
 // VMM_VfsInitializePlugins. Each built-in plugin and external plugin of which
 // the DLL name matches m_*.dll will receive a call to its InitializeVmmPlugin
 // function. The plugin/module may decide to call pfnPluginManager_Register to
@@ -277,21 +292,25 @@ NTSTATUS VMMDLL_UtilVfsWriteFile_DWORD(_Inout_ PDWORD pdwTarget, _In_ PBYTE pb, 
 
 /*
 * Initialize all potential plugins, both built-in and external, that maps into
-* the memory process file system. Please note that plugins are not loaded by
-* default - they have to be explicitly loaded by calling this function. They
-* will be unloaded on a general close of the vmm dll.
+* MemProcFS. Please note that plugins are not loaded by default - they have to
+* be explicitly loaded by calling this function. They will be unloaded on a
+* general close of the vmm dll.
 * -- return
 */
 _Success_(return)
-BOOL VMMDLL_VfsInitializePlugins();
+BOOL VMMDLL_InitializePlugins();
 
-#define VMMDLL_PLUGIN_CONTEXT_MAGIC             0xc0ffee663df9301c
-#define VMMDLL_PLUGIN_CONTEXT_VERSION           3
-#define VMMDLL_PLUGIN_REGINFO_MAGIC             0xc0ffee663df9301d
-#define VMMDLL_PLUGIN_REGINFO_VERSION           5
+#define VMMDLL_PLUGIN_CONTEXT_MAGIC                 0xc0ffee663df9301c
+#define VMMDLL_PLUGIN_CONTEXT_VERSION               3
+#define VMMDLL_PLUGIN_REGINFO_MAGIC                 0xc0ffee663df9301d
+#define VMMDLL_PLUGIN_REGINFO_VERSION               7
 
-#define VMMDLL_PLUGIN_EVENT_VERBOSITYCHANGE     0x01
-#define VMMDLL_PLUGIN_EVENT_TOTALREFRESH        0x02
+#define VMMDLL_PLUGIN_EVENT_VERBOSITYCHANGE         0x01
+#define VMMDLL_PLUGIN_EVENT_REFRESH_PROCESS_TOTAL   0x02
+#define VMMDLL_PLUGIN_EVENT_REFRESH_REGISTRY        0x04
+
+#define VMMDLL_PLUGIN_EVENT_FORENSIC_INIT           0x01000100
+#define VMMDLL_PLUGIN_EVENT_FORENSIC_INIT_COMPLETE  0x01000200
 
 typedef struct tdVMMDLL_PLUGIN_CONTEXT {
     ULONG64 magic;
@@ -321,7 +340,12 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
         WCHAR wszPathName[128];
         BOOL fRootModule;
         BOOL fProcessModule;
-        PVOID pvReserved[2];
+        BOOL fRootModuleHidden;
+        BOOL fProcessModuleHidden;
+        CHAR sTimelineNameShort[6];
+        CHAR _Reserved[2];
+        CHAR szTimelineFileUTF8[32];
+        CHAR szTimelineFileJSON[32];
     } reg_info;
     // function plugin registration info to be filled out by the plugin below:
     struct {
@@ -330,7 +354,8 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
         NTSTATUS(*pfnWrite)(_In_ PVMMDLL_PLUGIN_CONTEXT ctx, _In_ PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ ULONG64 cbOffset);
         VOID(*pfnNotify)(_In_ DWORD fEvent, _In_opt_ PVOID pvEvent, _In_opt_ DWORD cbEvent);
         VOID(*pfnClose)();
-        PVOID pvReserved[16];
+        VOID(*pfnTimeline)(_In_ HANDLE hTimeline, _In_ VOID(*pfnAddEntry)(_In_ HANDLE hTimeline, _In_ QWORD ft, _In_ DWORD dwAction, _In_ DWORD dwPID, _In_ QWORD qwValue, _In_ LPWSTR wszText));
+        PVOID pvReserved[15];
     } reg_fn;
 } VMMDLL_PLUGIN_REGINFO, *PVMMDLL_PLUGIN_REGINFO;
 
@@ -342,14 +367,17 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
 // To read physical memory specify dwPID as (DWORD)-1
 //-----------------------------------------------------------------------------
 
+#define VMMDLL_PID_PROCESS_WITH_KERNELMEMORY        0x80000000      // Combine with dwPID to enable process kernel memory (NB! use with extreme care).
+
 // FLAG used to supress the default read cache in calls to VMM_MemReadEx()
 // which will lead to the read being fetched from the target system always.
 // Cached page tables (used for translating virtual2physical) are still used.
-#define VMMDLL_FLAG_NOCACHE                        0x0001  // do not use the data cache (force reading from memory acquisition device)
-#define VMMDLL_FLAG_ZEROPAD_ON_FAIL                0x0002  // zero pad failed physical memory reads and report success if read within range of physical memory.
-#define VMMDLL_FLAG_FORCECACHE_READ                0x0008  // force use of cache - fail non-cached pages - only valid for reads, invalid with VMM_FLAG_NOCACHE/VMM_FLAG_ZEROPAD_ON_FAIL.
-#define VMMDLL_FLAG_NOPAGING                       0x0010  // do not try to retrieve memory from paged out memory from pagefile/compressed (even if possible)
-#define VMMDLL_FLAG_NOPAGING_IO                    0x0020  // do not try to retrieve memory from paged out memory if read would incur additional I/O (even if possible).
+#define VMMDLL_FLAG_NOCACHE                         0x0001  // do not use the data cache (force reading from memory acquisition device)
+#define VMMDLL_FLAG_ZEROPAD_ON_FAIL                 0x0002  // zero pad failed physical memory reads and report success if read within range of physical memory.
+#define VMMDLL_FLAG_FORCECACHE_READ                 0x0008  // force use of cache - fail non-cached pages - only valid for reads, invalid with VMM_FLAG_NOCACHE/VMM_FLAG_ZEROPAD_ON_FAIL.
+#define VMMDLL_FLAG_NOPAGING                        0x0010  // do not try to retrieve memory from paged out memory from pagefile/compressed (even if possible)
+#define VMMDLL_FLAG_NOPAGING_IO                     0x0020  // do not try to retrieve memory from paged out memory if read would incur additional I/O (even if possible).
+#define VMMDLL_FLAG_NOCACHEPUT                      0x0100  // do not write back to the data cache upon successful read from memory acquisition device.
 
 /*
 * Read memory in various non-contigious locations specified by the pointers to
@@ -364,7 +392,7 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
 * -- flags = optional flags as given by VMMDLL_FLAG_*
 * -- return = the number of successfully read items.
 */
-DWORD VMMDLL_MemReadScatter(_In_ DWORD dwPID, _Inout_ PPMEM_IO_SCATTER_HEADER ppMEMs, _In_ DWORD cpMEMs, _In_ DWORD flags);
+DWORD VMMDLL_MemReadScatter(_In_ DWORD dwPID, _Inout_ PPMEM_SCATTER ppMEMs, _In_ DWORD cpMEMs, _In_ DWORD flags);
 
 /*
 * Read a single 4096-byte page of memory.
@@ -451,10 +479,12 @@ BOOL VMMDLL_MemVirt2Phys(_In_ DWORD dwPID, _In_ ULONG64 qwVA, _Out_ PULONG64 pqw
 
 #define VMMDLL_MAP_PTE_VERSION              1
 #define VMMDLL_MAP_VAD_VERSION              3
-#define VMMDLL_MAP_MODULE_VERSION           1
+#define VMMDLL_MAP_MODULE_VERSION           3
 #define VMMDLL_MAP_HEAP_VERSION             1
-#define VMMDLL_MAP_THREAD_VERSION           1
+#define VMMDLL_MAP_THREAD_VERSION           2
 #define VMMDLL_MAP_HANDLE_VERSION           1
+#define VMMDLL_MAP_NET_VERSION              1
+#define VMMDLL_MAP_PHYSMEM_VERSION          1
 #define VMMDLL_MAP_USER_VERSION             1
 
 // flags to check for existence in the fPage field of VMMDLL_MAP_PTEENTRY
@@ -470,7 +500,8 @@ typedef struct tdVMMDLL_MAP_PTEENTRY {
     BOOL  fWoW64;
     DWORD cwszText;
     LPWSTR wszText;
-    DWORD _Reserved1[2];
+    DWORD _Reserved1;
+    DWORD cSoftware;    // # software (non active) PTEs in region
 } VMMDLL_MAP_PTEENTRY, *PVMMDLL_MAP_PTEENTRY;
 
 typedef struct tdVMMDLL_MAP_VADENTRY {
@@ -510,6 +541,8 @@ typedef struct tdVMMDLL_MAP_MODULEENTRY {
     BOOL  fWoW64;
     LPWSTR wszText;
     DWORD cwszText;                 // wchar count not including terminating null
+    LPWSTR wszFullName;
+    DWORD cwszFullName;             // wchar count not including terminating null
     DWORD _Reserved1[7];
 } VMMDLL_MAP_MODULEENTRY, *PVMMDLL_MAP_MODULEENTRY;
 
@@ -534,11 +567,19 @@ typedef struct tdVMMDLL_MAP_THREADENTRY {
     QWORD ftCreateTime;
     QWORD ftExitTime;
     QWORD vaStartAddress;
-    QWORD vaStackBaseUser;
-    QWORD vaStackLimitUser;
+    QWORD vaStackBaseUser;          // value from _NT_TIB / _TEB
+    QWORD vaStackLimitUser;         // value from _NT_TIB / _TEB
     QWORD vaStackBaseKernel;
     QWORD vaStackLimitKernel;
-    DWORD _FutureUse[10];
+    QWORD vaTrapFrame;
+    QWORD vaRIP;                    // RIP register (if user mode)
+    QWORD vaRSP;                    // RSP register (if user mode)
+    QWORD qwAffinity;
+    DWORD dwUserTime;
+    DWORD dwKernelTime;
+    UCHAR bSuspendCount;
+    UCHAR _FutureUse1[3];
+    DWORD _FutureUse2[15];
 } VMMDLL_MAP_THREADENTRY, *PVMMDLL_MAP_THREADENTRY;
 
 typedef struct tdVMMDLL_MAP_HANDLEENTRY {
@@ -558,6 +599,38 @@ typedef struct tdVMMDLL_MAP_HANDLEENTRY {
     DWORD cwszType;
     LPWSTR wszType;
 } VMMDLL_MAP_HANDLEENTRY, *PVMMDLL_MAP_HANDLEENTRY;
+
+typedef struct tdVMMDLL_MAP_NETENTRY {
+    DWORD dwPID;
+    DWORD dwState;
+    WORD _FutureUse3[3];
+    WORD AF;                        // address family (IPv4/IPv6)
+    struct {
+        BOOL fValid;
+        WORD _Reserved;
+        WORD port;
+        BYTE pbAddr[16];            // ipv4 = 1st 4 bytes, ipv6 = all bytes
+        LPWSTR wszText;
+    } Src;
+    struct {
+        BOOL fValid;
+        WORD _Reserved;
+        WORD port;
+        BYTE pbAddr[16];            // ipv4 = 1st 4 bytes, ipv6 = all bytes
+        LPWSTR wszText;
+    } Dst;
+    QWORD vaObj;
+    QWORD ftTime;
+    DWORD _FutureUse1;
+    DWORD cwszText;                 // WCHAR count not including terminating null
+    LPWSTR wszText;                 // LPWSTR pointed into VMMOB_MAP_NET.wszMultiText
+    DWORD _FutureUse2[4];
+} VMMDLL_MAP_NETENTRY, *PVMMDLL_MAP_NETENTRY;
+
+typedef struct tdVMMDLL_MAP_PHYSMEMENTRY {
+    QWORD pa;
+    QWORD cb;
+} VMMDLL_MAP_PHYSMEMENTRY, *PVMMDLL_MAP_PHYSMEMENTRY;
 
 typedef struct tdVMMDLL_MAP_USERENTRY {
     DWORD cwszText;                 // WCHAR count not including terminating null
@@ -616,6 +689,21 @@ typedef struct tdVMMDLL_MAP_HANDLE {
     DWORD cMap;                     // # map entries.
     VMMDLL_MAP_HANDLEENTRY pMap[];  // map entries.
 } VMMDLL_MAP_HANDLE, *PVMMDLL_MAP_HANDLE;
+
+typedef struct tdVMMDLL_MAP_NET {
+    DWORD dwVersion;
+    LPWSTR wszMultiText;            // multi-wstr pointed into by VMM_MAP_USERENTRY.wszText
+    DWORD cbMultiText;
+    DWORD cMap;                     // # map entries.
+    VMMDLL_MAP_NETENTRY pMap[];     // map entries.
+} VMMDLL_MAP_NET, *PVMMDLL_MAP_NET;
+
+typedef struct tdVMMDLL_MAP_PHYSMEM {
+    DWORD dwVersion;
+    DWORD _Reserved1[5];
+    DWORD cMap;                     // # map entries.
+    VMMDLL_MAP_PHYSMEMENTRY pMap[]; // map entries.
+} VMMDLL_MAP_PHYSMEM, *PVMMDLL_MAP_PHYSMEM;
 
 typedef struct tdVMMDLL_MAP_USER {
     DWORD dwVersion;
@@ -713,6 +801,26 @@ _Success_(return)
 BOOL VMMDLL_ProcessMap_GetHandle(_In_ DWORD dwPID, _Out_writes_bytes_opt_(*pcbHandleMap) PVMMDLL_MAP_HANDLE pHandleMap, _Inout_ PDWORD pcbHandleMap);
 
 /*
+* Retrieve the physical memory ranges from the physical memory map that Windows
+* have enumerated.
+* -- pPhysMemMap = buffer of minimum byte length *pcbPhysMemMap or NULL.
+* -- pcbPhysMemMap = pointer to byte count of pPhysMemMap buffer.
+* -- return = success/fail.
+*/
+_Success_(return)
+BOOL VMMDLL_Map_GetPhysMem(_Out_writes_bytes_opt_(*pcbPhysMemMap) PVMMDLL_MAP_PHYSMEM pPhysMemMap, _Inout_ PDWORD pcbPhysMemMap);
+
+/*
+* Retrieve the network connection map - consisting of active network connections,
+* listening sockets and other networking functionality.
+* -- pNetMap = buffer of minimum byte length *pcbNetMap or NULL.
+* -- pcbNetMap = pointer to byte count of pNetrMap buffer.
+* -- return = success/fail.
+*/
+_Success_(return)
+BOOL VMMDLL_Map_GetNet(_Out_writes_bytes_opt_(*pcbNetMap) PVMMDLL_MAP_NET pNetMap, _Inout_ PDWORD pcbNetMap);
+
+/*
 * Retrieve the non well known users that are detected in the target system.
 * NB! There may be more users in the system than the ones that are detected,
 * only users with mounted registry hives may currently be detected - this is
@@ -723,6 +831,101 @@ BOOL VMMDLL_ProcessMap_GetHandle(_In_ DWORD dwPID, _Out_writes_bytes_opt_(*pcbHa
 */
 _Success_(return)
 BOOL VMMDLL_Map_GetUsers(_Out_writes_bytes_opt_(*pcbUserMap) PVMMDLL_MAP_USER pUserMap, _Inout_ PDWORD pcbUserMap);
+
+
+
+//-----------------------------------------------------------------------------
+// WINDOWS SPECIFIC PAGE FRAME NUMBER (PFN) FUNCTIONALITY BELOW
+//-----------------------------------------------------------------------------
+
+#define VMMDLL_MAP_PFN_VERSION              1
+
+static LPCSTR VMMDLL_PFN_TYPE_TEXT[] = { "Zero", "Free", "Standby", "Modifiy", "ModNoWr", "Bad", "Active", "Transit" };
+static LPCSTR VMMDLL_PFN_TYPEEXTENDED_TEXT[] = { "-", "Unused", "ProcPriv", "PageTable", "LargePage", "DriverLock", "Shareable", "File" };
+
+typedef enum tdVMMDLL_MAP_PFN_TYPE {
+    VmmDll_PfnTypeZero = 0,
+    VmmDll_PfnTypeFree = 1,
+    VmmDll_PfnTypeStandby = 2,
+    VmmDll_PfnTypeModified = 3,
+    VmmDll_PfnTypeModifiedNoWrite = 4,
+    VmmDll_PfnTypeBad = 5,
+    VmmDll_PfnTypeActive = 6,
+    VmmDll_PfnTypeTransition = 7
+} VMMDLL_MAP_PFN_TYPE;
+
+typedef enum tdVMMDLL_MAP_PFN_TYPEEXTENDED {
+    VmmDll_PfnExType_Unknown = 0,
+    VmmDll_PfnExType_Unused = 1,
+    VmmDll_PfnExType_ProcessPrivate = 2,
+    VmmDll_PfnExType_PageTable = 3,
+    VmmDll_PfnExType_LargePage = 4,
+    VmmDll_PfnExType_DriverLocked = 5,
+    VmmDll_PfnExType_Shareable = 6,
+    VmmDll_PfnExType_File = 7,
+} VMMDLL_MAP_PFN_TYPEEXTENDED;
+
+typedef struct tdVMMDLL_MAP_PFNENTRY {
+    DWORD dwPfn;
+    VMMDLL_MAP_PFN_TYPEEXTENDED tpExtended;
+    struct {        // Only valid if active non-prototype PFN
+        union {
+            DWORD dwPid;
+            DWORD dwPfnPte[5];  // PFN of paging levels 1-4 (x64)
+        };
+        QWORD va;               // valid if non-zero
+    } AddressInfo;
+    QWORD vaPte;
+    QWORD OriginalPte;
+    union {
+        DWORD _u3;
+        struct {
+            WORD ReferenceCount;
+            // MMPFNENTRY
+            BYTE PageLocation       : 3;    // Pos 0  - VMMDLL_MAP_PFN_TYPE
+            BYTE WriteInProgress    : 1;    // Pos 3
+            BYTE Modified           : 1;    // Pos 4
+            BYTE ReadInProgress     : 1;    // Pos 5
+            BYTE CacheAttribute     : 2;    // Pos 6
+            BYTE Priority           : 3;    // Pos 0
+            BYTE Rom_OnProtectedStandby : 1;// Pos 3
+            BYTE InPageError        : 1;    // Pos 4
+            BYTE KernelStack_SystemChargedPage : 1; // Pos 5
+            BYTE RemovalRequested   : 1;    // Pos 6
+            BYTE ParityError        : 1;    // Pos 7
+        };
+    };
+    union {
+        QWORD _u4;
+        struct {
+            DWORD PteFrame;
+            DWORD PteFrameHigh      : 4;    // Pos 32
+            DWORD _Reserved         : 21;   // Pos 36
+            DWORD PrototypePte      : 1;    // Pos 57
+            DWORD PageColor         : 6;    // Pos 58
+        };
+    };
+    DWORD _FutureUse[6];
+} VMMDLL_MAP_PFNENTRY, *PVMMDLL_MAP_PFNENTRY;
+
+typedef struct tdVMMDLL_MAP_PFN {
+    DWORD dwVersion;
+    DWORD _Reserved1[5];
+    DWORD cMap;                     // # map entries.
+    VMMDLL_MAP_PFNENTRY pMap[];     // map entries.
+} VMMDLL_MAP_PFN, *PVMMDLL_MAP_PFN;
+
+/*
+* Retrieve information about scattered PFNs. The PFNs are returned in order of
+* in which they are stored in the pPfns set.
+* -- pPfns
+* -- cPfns
+* -- pPfnMap = buffer of minimum byte length *pcbPfnMap or NULL.
+* -- pcbPfnMap = pointer to byte count of pPhysMemMap buffer.
+* -- return = success/fail.
+*/
+_Success_(return)
+BOOL VMMDLL_Map_GetPfn(_In_ DWORD pPfns[], _In_ DWORD cPfns, _Out_writes_bytes_opt_(*pcbPfnMap) PVMMDLL_MAP_PFN pPfnMap, _Inout_ PDWORD pcbPfnMap);
 
 
 
@@ -863,6 +1066,29 @@ ULONG64 VMMDLL_ProcessGetModuleBase(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName)
 //-----------------------------------------------------------------------------
 // WINDOWS SPECIFIC DEBUGGING / SYMBOL FUNCTIONALITY BELOW:
 //-----------------------------------------------------------------------------
+
+/*
+* Load a .pdb symbol file and return its associated module name upon success.
+* -- dwPID
+* -- vaModuleBase
+* -- szModuleName = buffer to receive module name upon success.
+* -- return
+*/
+_Success_(return)
+BOOL VMMDLL_PdbLoad(_In_ DWORD dwPID, _In_ ULONG64 vaModuleBase, _Out_writes_(MAX_PATH) LPSTR szModuleName);
+
+/*
+* Retrieve a symbol virtual address given a module name and a symbol name.
+* NB! not all modules may exist - initially only module "nt" is available.
+* NB! if multiple modules have the same name the 1st to be added will be used.
+* -- szModule
+* -- cbSymbolOffset
+* -- szSymbolName = buffer to receive symbol name upon success.
+* -- pdwSymbolDisplacement = displacement from the beginning of the symbol.
+* -- return
+*/
+_Success_(return)
+BOOL VMMDLL_PdbSymbolName(_In_ LPSTR szModule, _In_ DWORD cbSymbolOffset, _Out_writes_(MAX_PATH) LPSTR szSymbolName, _Out_opt_ PDWORD pdwSymbolDisplacement);
 
 /*
 * Retrieve a symbol virtual address given a module name and a symbol name.
@@ -1041,54 +1267,6 @@ BOOL VMMDLL_WinReg_QueryValueExW(
 
 
 //-----------------------------------------------------------------------------
-// WINDOWS SPECIFIC NETWORKING FUNCTIONALITY BELOW:
-//-----------------------------------------------------------------------------
-
-#define VMMDLL_WIN_TCPIP_MAGIC        0xc0ffee663df93685
-#define VMMDLL_WIN_TCPIP_VERSION      1
-
-typedef struct tdVMMDLL_WIN_TCPIP_ENTRY {   // SHARED WITH VMMWINTCPIP
-    DWORD dwPID;
-    DWORD dwState;
-    CHAR szState[12];
-    struct {    // address family (IPv4/IPv6)
-        BOOL fValid;
-        WORD wAF;
-    } AF;
-    struct {
-        BOOL fValid;
-        WORD wPort;
-        BYTE pbA[16];   // ipv4 = 1st 4 bytes, ipv6 = all bytes
-    } Src;
-    struct {
-        BOOL fValid;
-        WORD wPort;
-        BYTE pbA[16];   // ipv4 = 1st 4 bytes, ipv6 = all bytes
-    } Dst;
-    QWORD vaTcpE;
-    QWORD qwTime;
-    QWORD vaEPROCESS;
-    QWORD _Reserved[2];
-} VMMDLL_WIN_TCPIP_ENTRY, *PVMMDLL_WIN_TCPIP_ENTRY;
-
-typedef struct tdVMMDLL_WIN_TCPIP {
-    QWORD magic;
-    DWORD dwVersion;
-    DWORD cTcpE;
-    VMMDLL_WIN_TCPIP_ENTRY pTcpE[];
-} VMMDLL_WIN_TCPIP, *PVMMDLL_WIN_TCPIP;
-
-/*
-* Retrieve networking information about network connections related to Windows TCP/IP stack.
-* NB! CALLER IS RESPONSIBLE FOR VMMDLL_MemFree return value!
-* CALLER FREE: VMMDLL_MemFree(return)
-* -- return - fail: NULL, success: a PVMMDLL_WIN_TCPIP struct scontaining the result - NB! Caller responsible for VMMDLL_MemFree!
-*/
-PVMMDLL_WIN_TCPIP VMMDLL_WinNet_Get();
-
-
-
-//-----------------------------------------------------------------------------
 // WINDOWS SPECIFIC UTILITY FUNCTIONS BELOW:
 //-----------------------------------------------------------------------------
 
@@ -1121,7 +1299,13 @@ typedef struct tdVMMDLL_WIN_THUNKINFO_EAT {
 * -- return
 */
 _Success_(return)
-BOOL VMMDLL_WinGetThunkInfoIAT(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_ LPSTR szImportModuleName, _In_ LPSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT);
+BOOL VMMDLL_WinGetThunkInfoIAT(
+    _In_ DWORD dwPID,
+    _In_ LPWSTR wszModuleName,
+    _In_ LPSTR szImportModuleName,
+    _In_ LPSTR szImportFunctionName,
+    _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT
+);
 
 /*
 * Retrieve information about the export address table EAT thunk for an exported
@@ -1133,7 +1317,12 @@ BOOL VMMDLL_WinGetThunkInfoIAT(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_
 * -- return
 */
 _Success_(return)
-BOOL VMMDLL_WinGetThunkInfoEAT(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_ LPSTR szExportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_EAT pThunkInfoEAT);
+BOOL VMMDLL_WinGetThunkInfoEAT(
+    _In_ DWORD dwPID,
+    _In_ LPWSTR wszModuleName,
+    _In_ LPSTR szExportFunctionName,
+    _Out_ PVMMDLL_WIN_THUNKINFO_EAT pThunkInfoEAT
+);
 
 
 
@@ -1151,7 +1340,13 @@ BOOL VMMDLL_WinGetThunkInfoEAT(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_
 *           IF sz!=NULL :: size of buffer on entry, size of characters (excluding terminating NULL) on exit.
 */
 _Success_(return)
-BOOL VMMDLL_UtilFillHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset, _Out_opt_ LPSTR sz, _Inout_ PDWORD pcsz);
+BOOL VMMDLL_UtilFillHexAscii(
+    _In_reads_opt_(cb) PBYTE pb,
+    _In_ DWORD cb,
+    _In_ DWORD cbInitialOffset,
+    _Out_writes_opt_(*pcsz) LPSTR sz,
+    _Inout_ PDWORD pcsz
+);
 
 #ifdef __cplusplus
 }

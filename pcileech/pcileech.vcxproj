@@ -21,13 +21,16 @@
     <ResourceCompile Include="pcileech.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\includes\dokan.h" />
+    <ClInclude Include="..\includes\fileinfo.h" />
+    <ClInclude Include="..\includes\leechcore.h" />
+    <ClInclude Include="..\includes\public.h" />
+    <ClInclude Include="..\includes\vmmdll.h" />
     <ClInclude Include="device.h" />
-    <ClInclude Include="dokan.h" />
     <ClInclude Include="executor.h" />
     <ClInclude Include="extra.h" />
     <ClInclude Include="help.h" />
     <ClInclude Include="kmd.h" />
-    <ClInclude Include="leechcore.h" />
     <ClInclude Include="memdump.h" />
     <ClInclude Include="mempatch.h" />
     <ClInclude Include="oscompatibility.h" />
@@ -38,8 +41,7 @@
     <ClInclude Include="util.h" />
     <ClInclude Include="version.h" />
     <ClInclude Include="vfs.h" />
-    <ClInclude Include="vmmdll.h" />
-    <ClInclude Include="vmmprx.h" />
+    <ClInclude Include="vmmx.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.c" />
@@ -55,7 +57,7 @@
     <ClCompile Include="umd.c" />
     <ClCompile Include="util.c" />
     <ClCompile Include="vfs.c" />
-    <ClCompile Include="vmmprx.c" />
+    <ClCompile Include="vmmx.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{DFFA1B4C-279B-4356-ADB1-08A6F4795931}</ProjectGuid>
@@ -104,16 +106,22 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)\files\</OutDir>
     <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)includes;</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(SolutionDir)includes\lib64;</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseMT|x64'">
     <OutDir>$(SolutionDir)\files\</OutDir>
     <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)includes;</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(SolutionDir)includes\lib64;</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)\files\</OutDir>
     <IntDir>$(SolutionDir)\files\temp\$(ProjectName)\</IntDir>
     <LinkIncremental>
     </LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)includes;</IncludePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(SolutionDir)includes\lib64;</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -127,12 +135,13 @@
       <FullProgramDatabaseFile>
       </FullProgramDatabaseFile>
       <GenerateDebugInformation>Debug</GenerateDebugInformation>
-      <AdditionalDependencies>$(SolutionDir)\files\leechcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>leechcore.lib;vmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ProgramDatabaseFile>$(OutDir)\lib\$(TargetName).pdb</ProgramDatabaseFile>
       <SubSystem>Console</SubSystem>
     </Link>
     <PreBuildEvent>
-      <Command>copy "$(OutDir)leechcore.h" "$(ProjectDir)" /y</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>
@@ -160,10 +169,11 @@
       </ModuleDefinitionFile>
       <SubSystem>Console</SubSystem>
       <ProgramDatabaseFile />
-      <AdditionalDependencies>$(SolutionDir)\files\leechcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>leechcore.lib;vmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>copy "$(OutDir)leechcore.h" "$(ProjectDir)" /y</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>
@@ -193,10 +203,11 @@
       <SubSystem>Console</SubSystem>
       <ProgramDatabaseFile>
       </ProgramDatabaseFile>
-      <AdditionalDependencies>$(SolutionDir)\files\leechcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>leechcore.lib;vmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>copy "$(OutDir)leechcore.h" "$(ProjectDir)" /y</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>

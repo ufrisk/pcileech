@@ -3,51 +3,140 @@
 // (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
+#include <leechcore.h>
 #include "device.h"
 #include "kmd.h"
 #include "statistics.h"
-#include "leechcore.h"
+#include "vmmx.h"
 
-DWORD DeviceReadDMAEx(_In_ QWORD qwAddr, _Out_writes_(cb) PBYTE pb, _In_ DWORD cb, _Inout_opt_ PPAGE_STATISTICS pPageStat, _In_ QWORD flags)
+_Success_(return)
+BOOL DeviceReadDMA_Retry(_In_ HANDLE hLC, _In_ QWORD pa, _In_ DWORD cb, _Out_writes_(cb) PBYTE pb)
 {
-    LEECHCORE_PAGESTAT_MINIMAL StatMin;
-    StatMin.h = (HANDLE)pPageStat;
-    StatMin.pfnPageStatUpdate = (VOID(*)(HANDLE, ULONG64, ULONG64, ULONG64))PageStatUpdate;
-    return LeechCore_ReadEx(qwAddr, pb, cb, 0, &StatMin);
+    return LcRead(hLC, pa, cb, pb) || LcRead(hLC, pa, cb, pb);
+}
+
+_Success_(return)
+BOOL DeviceWriteDMA_Retry(_In_ HANDLE hLC, _In_ QWORD pa, _In_ DWORD cb, _In_reads_(cb) PBYTE pb)
+{
+    return LcWrite(hLC, pa, cb, pb) || LcWrite(hLC, pa, cb, pb);
+}
+
+_Success_(return)
+BOOL DeviceWriteDMA_Verify(_In_ HANDLE hLC, _In_ QWORD pa, _In_ DWORD cb, _In_reads_(cb) PBYTE pb)
+{
+    PBYTE pbBuffer = NULL;
+    BOOL fResult =
+        DeviceWriteDMA_Retry(hLC, pa, cb, pb) &&
+        (pbBuffer = LocalAlloc(0, cb)) &&
+        DeviceReadDMA_Retry(hLC, pa, cb, pbBuffer) &&
+        (0 == memcmp(pb, pbBuffer, cb));
+    LocalFree(pbBuffer);
+    return fResult;
+}
+
+DWORD DeviceReadDMA(_In_ QWORD pa, _In_ DWORD cb, _Out_writes_(cb) PBYTE pb, _Inout_opt_ PPAGE_STATISTICS pPageStat)
+{
+    PMEM_SCATTER pMEM, *ppMEMs = NULL;
+    DWORD i, cMEMs, cbRead = 0;
+    cMEMs = cb >> 12;
+    if((pa & 0xfff) || !cb || (cb & 0xfff)) { return 0; }
+    if(!LcAllocScatter2(cb, pb, cMEMs, &ppMEMs)) { return 0; }
+    for(i = 0; i < cMEMs; i++) {
+        ppMEMs[i]->qwA = pa + ((QWORD)i << 12);
+    }
+    LcReadScatter(ctxMain->hLC, cMEMs, ppMEMs);
+    for(i = 0; i < cMEMs; i++) {
+        pMEM = ppMEMs[i];
+        if(pMEM->f) {
+            cbRead += pMEM->cb;
+        } else {
+            ZeroMemory(pMEM->pb, pMEM->cb);
+        }
+        if(pPageStat) {
+            PageStatUpdate(pPageStat, ppMEMs[i]->qwA + 0x1000, pMEM->f ? 1 : 0, pMEM->f ? 0 : 1);
+        }
+    }
+    LcMemFree(ppMEMs);
+    return cbRead;
+}
+
+/*
+* Set a custom user-defined or auto-generated memory map either from:
+* - file: a user defined memory map text file.
+* - auto: auto generated memory map retrieved using MemProcFS when target OS
+*         is Windows and when PCILeech is running on Windows OS.
+* -- return
+*/
+_Success_(return)
+BOOL DeviceOpen2_SetCustomMemMap()
+{
+    BOOL fResult = FALSE;
+    FILE *hFile = NULL;
+    DWORD cb;
+    PBYTE pb = NULL, pbResult = NULL;
+    if(!(pb = LocalAlloc(LMEM_ZEROINIT, 0x01000000))) { goto fail; }
+    if(0 == _stricmp("auto", ctxMain->cfg.szMemMap)) {
+        if(!Vmmx_Initialize(FALSE, TRUE)) { goto fail; }
+    } else {
+        if(fopen_s(&hFile, ctxMain->cfg.szMemMap, "rb") || !hFile) { goto fail; }
+        cb = (DWORD)fread(pb, 1, 0x01000000, hFile);
+        if((cb == 0) || (cb > 0x01000000)) { goto fail; }
+        if(!LcCommand(ctxMain->hLC, LC_CMD_MEMMAP_SET, cb, pb, NULL, NULL)) { goto fail; }
+    }
+    fResult =
+        LcCommand(ctxMain->hLC, LC_CMD_MEMMAP_GET, 0, NULL, &pbResult, NULL) &&
+        LcGetOption(ctxMain->hLC, LC_OPT_CORE_ADDR_MAX, &ctxMain->dev.paMax);
+    if(fResult && ctxMain->cfg.fVerbose) {
+        printf("TARGET SYSTEM MEMORY MAP:\n");
+        printf("   #       RANGE_BASE          RANGE_TOP         RANGE_REMAP\n");
+        printf("============================================================\n");
+        printf("%s\n", (LPSTR)pbResult);
+    }
+fail:
+    LocalFree(pb);
+    LcMemFree(pbResult);
+    Vmmx_Close();
+    if(hFile) { fclose(hFile); }
+    return fResult;
 }
 
 _Success_(return)
 BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
 {
-    BOOL result;
     ZeroMemory(&ctxMain->dev, sizeof(ctxMain->dev));
-    ctxMain->dev.magic = LEECHCORE_CONFIG_MAGIC;
-    ctxMain->dev.version = LEECHCORE_CONFIG_VERSION;
+    ctxMain->dev.dwVersion = LC_CONFIG_VERSION;
     if(!fFailSilent) {
         // do not initially enable leechcore error messages / printouts if set to fail silent
-        ctxMain->dev.flags =
-            LEECHCORE_CONFIG_FLAG_PRINTF |
-            (ctxMain->cfg.fVerbose ? LEECHCORE_CONFIG_FLAG_PRINTF_VERBOSE_1 : 0) |
-            (ctxMain->cfg.fVerboseExtra ? LEECHCORE_CONFIG_FLAG_PRINTF_VERBOSE_2 : 0);
+        ctxMain->dev.dwPrintfVerbosity =
+            LC_CONFIG_PRINTF_ENABLED |
+            (ctxMain->cfg.fVerbose ? LC_CONFIG_PRINTF_V : 0) |
+            (ctxMain->cfg.fVerboseExtra ? LC_CONFIG_PRINTF_VV : 0);
     }
     strcpy_s(ctxMain->dev.szDevice, MAX_PATH, szDevice);
     strcpy_s(ctxMain->dev.szRemote, MAX_PATH, ctxMain->cfg.szRemote);
     ctxMain->dev.paMax = ctxMain->cfg.qwAddrMax;
-    result = LeechCore_Open(&ctxMain->dev);
-    if(result) {
-        // enable standard verbosity levels upon success (if not already set)
-        if(fFailSilent) {
-            LeechCore_SetOption(LEECHCORE_OPT_CORE_PRINTF_ENABLE, 1);
-            LeechCore_SetOption(LEECHCORE_OPT_CORE_VERBOSE, (ctxMain->cfg.fVerbose ? 1 : 0));
-            LeechCore_SetOption(LEECHCORE_OPT_CORE_VERBOSE_EXTRA, (ctxMain->cfg.fVerboseExtra ? 1 : 0));
-        }
-        if(ctxMain->cfg.fVerboseExtraTlp) {
-            LeechCore_SetOption(LEECHCORE_OPT_CORE_VERBOSE_EXTRA_TLP, 1);
-        }
-    } else {
+    ctxMain->hLC = LcCreate(&ctxMain->dev);
+    if(!ctxMain->hLC) {
         ZeroMemory(&ctxMain->dev, sizeof(ctxMain->dev));
+        return FALSE;
     }
-    return result;
+    // enable standard verbosity levels upon success (if not already set)
+    if(fFailSilent) {
+        LcSetOption(ctxMain->hLC, LC_OPT_CORE_PRINTF_ENABLE, 1);
+        LcSetOption(ctxMain->hLC, LC_OPT_CORE_VERBOSE, (ctxMain->cfg.fVerbose ? 1 : 0));
+        LcSetOption(ctxMain->hLC, LC_OPT_CORE_VERBOSE_EXTRA, (ctxMain->cfg.fVerboseExtra ? 1 : 0));
+    }
+    if(ctxMain->cfg.fVerboseExtraTlp) {
+        LcSetOption(ctxMain->hLC, LC_OPT_CORE_VERBOSE_EXTRA_TLP, 1);
+    }
+    // enable custom memory map (if option is set)
+    if(ctxMain->cfg.szMemMap[0]) {
+        if(!DeviceOpen2_SetCustomMemMap()) {
+            printf("PCILEECH: Invalid memory map: '%s'.\n", ctxMain->cfg.szMemMap);
+            return FALSE;
+        }
+    }
+    return TRUE;
 }
 
 _Success_(return)
@@ -64,25 +153,19 @@ BOOL DeviceOpen()
 }
 
 _Success_(return)
-BOOL DeviceWriteMEM(_In_ QWORD qwAddr, _In_reads_(cb) PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)
+BOOL DeviceWriteMEM(_In_ QWORD qwAddr, _In_ DWORD cb, _In_reads_(cb) PBYTE pb, _In_ BOOL fRetryOnFail)
 {
     if(ctxMain->phKMD) {
         return KMDWriteMemory(qwAddr, pb, cb);
-    } else {
-        return LeechCore_Write(qwAddr, pb, cb);
     }
+    return LcWrite(ctxMain->hLC, qwAddr, cb, pb) || (fRetryOnFail && LcWrite(ctxMain->hLC, qwAddr, cb, pb));
 }
 
 _Success_(return)
-BOOL DeviceReadMEM(_In_ QWORD qwAddr, _Out_writes_(cb) PBYTE pb, _In_ DWORD cb, _In_ QWORD flags)
+BOOL DeviceReadMEM(_In_ QWORD qwAddr, _In_ DWORD cb, _Out_writes_(cb) PBYTE pb, _In_ BOOL fRetryOnFail)
 {
-    DWORD fLeechCore;
     if(ctxMain->phKMD) {
         return KMDReadMemory(qwAddr, pb, cb);
-    } else if(flags || cb == 0x1000) {
-        fLeechCore = (flags & PCILEECH_MEM_FLAG_RETRYONFAIL) ? LEECHCORE_FLAG_READ_RETRY : 0;
-        return cb == LeechCore_ReadEx(qwAddr, pb, cb, fLeechCore, NULL);
-    } else {
-        return cb == DeviceReadDMAEx(qwAddr, pb, cb, NULL, 0);
     }
+    return LcRead(ctxMain->hLC, qwAddr, cb, pb) || (fRetryOnFail && LcRead(ctxMain->hLC, qwAddr, cb, pb));
 }

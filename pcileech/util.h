@@ -6,6 +6,7 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 #include "pcileech.h"
+#include "oscompatibility.h"
 #include "statistics.h"
 
 /*
@@ -37,6 +38,7 @@ BOOL Util_PageTable_SetMode(_In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ B
 * -- pqwSignatureBase = ptr to receive the module base
 * -- return
 */
+_Success_(return)
 BOOL Util_PageTable_FindSignatureBase(_Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE pPTEs, _In_ QWORD cPTEs, _Out_ PQWORD pqwSignatureBase);
 
 /*
@@ -51,6 +53,7 @@ BOOL Util_PageTable_FindSignatureBase(_Inout_ PQWORD pqwCR3, _In_ PSIGNATUREPTE 
 * -- pqwPML4E = ptr to optionally receive value of PML4E
 * -- return
 */
+_Success_(return)
 BOOL Util_PageTable_FindMappedAddress(_In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _Out_ PQWORD pqwAddrVirt, _Out_opt_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPDE, _Out_opt_ PQWORD pqwPDPTE, _Out_opt_ PQWORD pqwPML4E);
 
 /*
@@ -62,6 +65,7 @@ BOOL Util_PageTable_FindMappedAddress(_In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _
 * -- pqwPageSize = ptr to receive size of physical page in bytes.
 * -- return
 */
+_Success_(return)
 BOOL Util_PageTable_Virtual2Physical(_In_ QWORD qwCR3, _In_ QWORD qwVA, _Out_ PQWORD pqwPA, _Out_ PQWORD pqwPageBase, _Out_ PQWORD pqwPageSize);
 
 /*
@@ -73,6 +77,7 @@ BOOL Util_PageTable_Virtual2Physical(_In_ QWORD qwCR3, _In_ QWORD qwVA, _Out_ PQ
 * -- cSignatureChunks = # of chunks in signature lines to parse.
 * -- return
 */
+_Success_(return)
 BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension, _Out_ PSIGNATURE pSignatures, _In_ PDWORD cSignatures, _In_ DWORD cSignatureChunks);
 
 /*
@@ -113,6 +118,7 @@ VOID Util_GenRandom(_Out_ PBYTE pb, _In_ DWORD cb);
 *    on success. Caller is responsible to call LocalFree.
 * -- return
 */
+_Success_(return)
 BOOL Util_LoadKmdExecShellcode(_In_ LPSTR szKmdExecName, _Out_ PKMDEXEC* ppKmdExec);
 
 /*
@@ -249,5 +255,11 @@ VOID Util_AsciiFilter(_In_reads_(cb) PBYTE pb, _In_ DWORD cb);
 * -- psz2
 */
 VOID Util_SplitString2(_In_ LPSTR sz, _In_ CHAR chSplit, _Out_writes_(MAX_PATH) PCHAR _szBuf, _Out_ LPSTR *psz1, _Out_ LPSTR *psz2);
+
+/*
+* Return the path of the executable (not including the executable).
+* -- szPath
+*/
+VOID Util_GetPathExe(_Out_writes_(MAX_PATH) PCHAR szPath);
 
 #endif /* __UTIL_H__ */

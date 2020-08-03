@@ -44,39 +44,10 @@ MODULE_DESCRIPTION("PCILeech Firmware Automatic Flasher");
 #define DEVICE_WAIT_TIME			10
 #define SET_LED(v)					*(unsigned int*)(pbar0 + OFFSET_USBREG_GPIO) = (0x0000000f & v) | 0xf0
 
-// Assumes the USB3380 is in Legacy Adapter mode (which is the suggested default config in the manual)
-//	Enhanced/Legacy mode selected by STRAP_LEGACY (pin 66, PU)
-//	Adapter/RootComplex selected by STRAP_RC_MODE (pin 57, PD)
-// Meaning of "block" targets:
-//	PCI: USB Controller PCI Configuration registers (Type 0)
-//	USB: USB Controller Configuration registers
 static const unsigned char g_firmware_pcileech[] = {
-    0x5a,                               // validation signature
-    0x00,                               // reg_load=true, mem_load=false, uc_unreset=false
-    0x2a, 0x00,                         // REG_BYTE_COUNT=7*sizeof(REGADDR+REGDATA)
-    0x23, 0x10, 0x49, 0x38, 0x00, 0x00,	// block=USB, reg=USBCTL, val=0x00003849
-                                        //	SelfPoweredStatus=1,RemoteWakeEn=0,PcieWakeEn=0,UsbDetectEn=1,
-                                        //	RemoteWakeSupport=0,SelfPoweredUsb=1,ImmediateSuspend=0,
-                                        //	TimedDisconnect=0,VbusPin=0,UsbRootPortWakeEn=1,VIDStringEn=1,
-                                        //	PIDStringEn=1
-    0x00, 0x00, 0xe4, 0x14, 0xbc, 0x16,	// block=PCI, reg=VID/DID, val=0x16bc14e4
-                                        //	VID=0x14e4,DID=0x16bc (BCM57765/57785 SDXC/MMC Card Reader)
-                                        //	PCIe device target sees
-    0xc8, 0x10, 0x02, 0x06, 0x04, 0x00,	// block=USB, reg=EP_CFG GPEP0, val=0x00040602
-                                        //	Number=2,Dir=OUT,Type=Bulk,Enable=true,FIFOWidth=4
-    0xd0, 0x10, 0x84, 0x06, 0x04, 0x00,	// block=USB, reg=EP_CFG GPEP1, val=0x00040684
-                                        //	Number=4,Dir=IN,Type=Bulk,Enable=true,FIFOWidth=4
-    0xd8, 0x10, 0x86, 0x06, 0x04, 0x00,	// block=USB, reg=EP_CFG GPEP2, val=0x00040686
-                                        //	Number=6,Dir=IN,Type=Bulk,Enable=true,FIFOWidth=4
-    0xe0, 0x10, 0x88, 0x06, 0x04, 0x00,	// block=USB, reg=EP_CFG GPEP3, val=0x00040688
-                                        //	Number=8,Dir=IN,Type=Bulk,Enable=true,FIFOWidth=4
-    0x21, 0x10, 0xd1, 0x18, 0x01, 0x90,	// block=USB, reg=PRODVENDID, val=0x900118d1
-                                        //	VID=0x18d1,PID=0x9001 (Google Glass)
-                                        //	USB device host sees
-                                        //	This is just to load a signed WinUSB driver
-    0x00, 0x00                          // padding
-};
-
+	0x5a, 0x00, 0x2a, 0x00, 0x23, 0x10, 0x49, 0x38, 0x00, 0x00, 0x00, 0x00, 0xe4, 0x14, 0xbc, 0x16,
+	0xc8, 0x10, 0x02, 0x06, 0x04, 0x00, 0xd0, 0x10, 0x84, 0x06, 0x04, 0x00, 0xd8, 0x10, 0x86, 0x06,
+	0x04, 0x00, 0xe0, 0x10, 0x88, 0x06, 0x04, 0x00, 0x21, 0x10, 0xd1, 0x18, 0x01, 0x90, 0x00, 0x00 };
 
 static int _action_flash_verify(unsigned char *pbar0)
 {

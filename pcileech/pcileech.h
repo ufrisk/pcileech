@@ -3,13 +3,23 @@
 // (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
+// Header Version: 4.5
+//
 #ifndef __PCILEECH_H__
 #define __PCILEECH_H__
-#include "oscompatibility.h"
-#include "leechcore.h"
+#include <leechcore.h>
+
+#ifdef _WIN32
+typedef unsigned __int64                    QWORD, *PQWORD;
+#endif /* _WIN32 */
+#ifdef LINUX
+typedef uint16_t                            WORD, *PWORD, USHORT, *PUSHORT;
+typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
+#endif /* LINUX */
 
 #define SIZE_PAGE_ALIGN_4K(x)                ((x + 0xfff) & ~0xfff)
 #define CONFIG_MAX_SIGNATURES                16
+#define PCILEECH_DEVICE_EQUALS(name)         (0 == _stricmp(ctxMain->dev.szDeviceName, name))
 
 #pragma pack(push, 1) /* DISABLE STRUCT PADDINGS (REENABLE AFTER STRUCT DEFINITIONS) */
 typedef struct tdSignaturePTE {
@@ -46,7 +56,8 @@ typedef enum tdActionType {
     PROBE,
     PSLIST,
     PSVIRT2PHYS,
-    AGENT_EXEC_PY
+    AGENT_EXEC_PY,
+    EXTERNAL_COMMAND_MODULE
 } ACTION_TYPE;
 
 typedef struct tdCONFIG_OPTION {
@@ -62,6 +73,7 @@ typedef struct tdConfig {
     QWORD qwKMD;
     CHAR szDevice[MAX_PATH];
     CHAR szRemote[MAX_PATH];
+    CHAR szMemMap[MAX_PATH];
     CHAR szFileOut[MAX_PATH];
     PBYTE pbIn;
     QWORD cbIn;
@@ -73,6 +85,7 @@ typedef struct tdConfig {
     CHAR szShellcodeName[MAX_PATH];
     CHAR szHook[MAX_PATH];
     DWORD dwListenTlpTimeMs;
+    CHAR szExternalCommandModule[MAX_PATH];
     // flags below
     BOOL fPageTableScan;
     BOOL fPatchAll;
@@ -200,10 +213,23 @@ typedef struct tdKMDHANDLE {
     BYTE pbPageData[4096];
 } KMDHANDLE, *PKMDHANDLE;
 
+#define PCILEECH_CONTEXT_MAGIC              0xfeefd00d
+#define PCILEECH_CONTEXT_VERSION                  0x45
+
+/*
+* The main PCILeech context as found in the ctxMain global variable.
+* Any external command module using this struct or any of its sub-
+* structs must check the fields magic and version against the defines
+* PCILEECH_CONTEXT_MAGIC and PCILEECH_CONTEXT_VERSION to determine
+* compatibility before taking any actions on the struct.
+*/
 struct tdPCILEECH_CONTEXT {
+    DWORD magic;
+    DWORD version;
     CONFIG cfg;
-    LEECHCORE_CONFIG dev;
-    HANDLE hMemProcFS;
+    HANDLE hLC;
+    LC_CONFIG dev;
+    BOOL fVmmInitialized;
     HANDLE hDevice;
     PKMDHANDLE phKMD;
     PKMDDATA pk;

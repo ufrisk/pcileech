@@ -7,6 +7,7 @@
 #include "device.h"
 #include "util.h"
 
+_Success_(return)
 BOOL Patch_CmpChunk(_In_ PBYTE pbPage, _In_ PSIGNATURE_CHUNK pChunk, _In_opt_ DWORD dwRelBase, _Out_opt_ PDWORD pdwOffset)
 {
     DWORD o;
@@ -37,6 +38,7 @@ BOOL Patch_CmpChunk(_In_ PBYTE pbPage, _In_ PSIGNATURE_CHUNK pChunk, _In_opt_ DW
     return FALSE;
 }
 
+_Success_(return)
 BOOL Patch_FindAndPatch(_Inout_ PBYTE pbPage, _In_ PSIGNATURE pSignatures, _In_ DWORD cSignatures, _Out_ PDWORD pdwPatchOffset, _Out_ PDWORD pcbPatch)
 {
     DWORD i, o, dwRelBase;
@@ -67,7 +69,7 @@ BOOL Patch_FindAndPatch(_Inout_ PBYTE pbPage, _In_ PSIGNATURE pSignatures, _In_ 
 
 VOID ActionPatchAndSearch()
 {
-    SIGNATURE oSignatures[CONFIG_MAX_SIGNATURES];
+    PSIGNATURE pSignatures;
     DWORD dwoPatch, cbPatch, cSignatures = CONFIG_MAX_SIGNATURES;
     QWORD qwAddrBase;
     PBYTE pbBuffer16M = NULL;
@@ -76,6 +78,7 @@ VOID ActionPatchAndSearch()
     LPSTR szAction = isModePatch ? "Patch" : "Search";
     QWORD i, qwoPages, qwPatchList[MAX_NUM_PATCH_LOCATIONS], cPatchList = 0;
     // initialize / allocate memory
+    if(!(pSignatures = LocalAlloc(LMEM_ZEROINIT, cSignatures * sizeof(SIGNATURE)))) { goto cleanup; }
     if(!(pbBuffer16M = LocalAlloc(0, 0x01000000))) { goto cleanup; }
     qwAddrBase = ctxMain->cfg.qwAddrMin;
     if(ctxMain->cfg.qwAddrMax < qwAddrBase + 0xfff) {
@@ -84,10 +87,10 @@ VOID ActionPatchAndSearch()
     }
     // load and verify signatures
     if(ctxMain->cfg.cbIn) {
-        Util_CreateSignatureSearchAll(ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, oSignatures);
+        Util_CreateSignatureSearchAll(ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, pSignatures);
         cSignatures = 1;
     } else {
-        result = Util_LoadSignatures(ctxMain->cfg.szSignatureName, ".sig", oSignatures, &cSignatures, 3);
+        result = Util_LoadSignatures(ctxMain->cfg.szSignatureName, ".sig", pSignatures, &cSignatures, 3);
         if(!result || !cSignatures) {
             printf("%s: Failed. Failed to load signature.\n", szAction);
             goto cleanup;
@@ -95,7 +98,7 @@ VOID ActionPatchAndSearch()
     }
     if(isModePatch) {
         for(i = 0; i < cSignatures; i++) {
-            if(oSignatures[i].chunk[2].cb == 0 || oSignatures[i].chunk[2].cb > 4096 || oSignatures[i].chunk[2].tpOffset == SIGNATURE_CHUNK_TP_OFFSET_ANY) {
+            if(pSignatures[i].chunk[2].cb == 0 || pSignatures[i].chunk[2].cb > 4096 || pSignatures[i].chunk[2].tpOffset == SIGNATURE_CHUNK_TP_OFFSET_ANY) {
                 printf("%s: Failed. Invalid patch signature.\n", szAction);
             }
         }
@@ -104,19 +107,19 @@ VOID ActionPatchAndSearch()
     PageStatInitialize(&pPageStat, qwAddrBase, ctxMain->cfg.qwAddrMax, isModePatch ? "Patching" : "Searching", ctxMain->phKMD ? TRUE : FALSE, ctxMain->cfg.fVerbose);
     for(; qwAddrBase < ctxMain->cfg.qwAddrMax; qwAddrBase += 0x01000000) {
         result = Util_Read16M(pbBuffer16M, qwAddrBase, pPageStat);
-        if(!result && !ctxMain->cfg.fForceRW && !ctxMain->phKMD && (ctxMain->dev.tpDevice == LEECHCORE_DEVICE_USB3380)) {
+        if(!result && !ctxMain->cfg.fForceRW && !ctxMain->phKMD && PCILEECH_DEVICE_EQUALS("usb3380")) {
             // terminate if 16MB cannot be read from the USB3380 device.
             PageStatClose(&pPageStat);
             printf("%s: Failed. Cannot dump any sequential data in 16MB - terminating.\n", szAction);
             goto cleanup;
         }
         for(qwoPages = 0; (qwoPages < 0x01000000) && (qwAddrBase + qwoPages < ctxMain->cfg.qwAddrMax); qwoPages += 0x1000) {
-            result = Patch_FindAndPatch(pbBuffer16M + qwoPages, oSignatures, cSignatures, &dwoPatch, &cbPatch);
+            result = Patch_FindAndPatch(pbBuffer16M + qwoPages, pSignatures, cSignatures, &dwoPatch, &cbPatch);
             if(!result) {
                 continue;
             }
             if(isModePatch) {
-                result = DeviceWriteMEM(qwAddrBase + qwoPages + dwoPatch, pbBuffer16M + qwoPages + dwoPatch, cbPatch, 0);
+                result = DeviceWriteMEM(qwAddrBase + qwoPages + dwoPatch, cbPatch, pbBuffer16M + qwoPages + dwoPatch, FALSE);
             }
             if(result) {
                 if(cPatchList == MAX_NUM_PATCH_LOCATIONS) {
@@ -147,5 +150,6 @@ cleanup:
             printf("%s: Successful. Location: 0x%llx\n", szAction, qwPatchList[i]);
         }
     }
+    LocalFree(pSignatures);
     LocalFree(pbBuffer16M);
 }

@@ -11,7 +11,7 @@
 #include "util.h"
 #pragma warning( push )  
 #pragma warning( disable : 4005 )   
-#include "dokan.h"
+#include <dokan.h>
 #pragma warning( pop )
 
 //-------------------------------------------------------------------------------
@@ -112,7 +112,7 @@ typedef struct tdVFS_GLOBAL_STATE {
     BOOL fKMD;
 } VFS_GLOBAL_STATE, *PVFS_GLOBAL_STATE;
 
-VOID Vfs_UtilSplitPathFile(_Out_ WCHAR wszPath[MAX_PATH], _Out_ LPWSTR *pwcsFile, _In_ LPCWSTR wcsFileName);
+VOID Vfs_UtilSplitPathFile(_Out_writes_(MAX_PATH) LPWSTR wszPath, _Out_ LPWSTR *pwcsFile, _In_ LPCWSTR wcsFileName);
 
 //-------------------------------------------------------------------------------
 // Read cache functionality below.
@@ -216,6 +216,7 @@ VOID VfsCache_DirectoryDel(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo, 
     LeaveCriticalSection(&pds->LockCache);
 }
 
+_Success_(return)
 BOOL VfsCache_MemGet(_In_ BYTE tp, _Out_ LPVOID pbBuffer, _In_ QWORD qwA, _In_ DWORD cbLength, _In_ PVFS_GLOBAL_STATE pds)
 {
     QWORD i, qwOffset, qwCurrentTickCount;
@@ -333,7 +334,8 @@ VOID VfsCache_FilePut(_In_ LPCWSTR wcsFileName, _In_ QWORD cbOffset, _In_ PBYTE 
 
 #define _VFS_SET_FILETIME_OPT(p_ft_dst, p_ft_src, p_st_src) (*(PQWORD)p_ft_dst = (p_ft_src && *(PQWORD)p_ft_src) ? *(PQWORD)p_ft_src : (SystemTimeToFileTime(p_st_src, p_ft_dst) ? *(PQWORD)p_ft_dst : 0))
 
-BOOL UnicodeToAscii(_Out_ LPSTR szDst, _In_ SIZE_T cDst, _In_ LPCWSTR wcsSrc)
+_Success_(return)
+BOOL UnicodeToAscii(_Out_writes_(cDst) LPSTR szDst, _In_ SIZE_T cDst, _In_ LPCWSTR wcsSrc)
 {
     DWORD i = 0;
     while(TRUE) {
@@ -345,7 +347,7 @@ BOOL UnicodeToAscii(_Out_ LPSTR szDst, _In_ SIZE_T cDst, _In_ LPCWSTR wcsSrc)
     }
 }
 
-VOID Vfs_UtilSplitPathFile(_Out_ WCHAR wszPath[MAX_PATH], _Out_ LPWSTR *pwcsFile, _In_ LPCWSTR wcsFileName)
+VOID Vfs_UtilSplitPathFile(_Out_writes_(MAX_PATH) LPWSTR wszPath, _Out_ LPWSTR *pwcsFile, _In_ LPCWSTR wcsFileName)
 {
     DWORD i, iSplitFilePath = 0;
     wcsncpy_s(wszPath, MAX_PATH, wcsFileName, _TRUNCATE);
@@ -504,12 +506,12 @@ VOID Vfs_StatisticsShowUpdate(_In_ PVFS_STATISTICS s)
     }
     printf(
         " CACHE STATISTICS            CACHE HIT /   CACHE MISS /        TOTAL       \n" \
-        " RAM ACCESS COUNT:   %12lli %3i%% / %12lli / %12lli       \n" \
-        " RAM BYTES READ:     %12lli %3i%% / %12lli / %12lli       \n" \
-        " FILE ACCESS COUNT:  %12lli %3i%% / %12lli / %12lli       \n" \
-        " FILE BYTES READ:    %12lli %3i%% / %12lli / %12lli       \n" \
-        " DIR LIST COUNT:     %12lli %3i%% / %12lli / %12lli       \n" \
-        " FILE LIST COUNT:    %12lli %3i%% / %12lli / %12lli       \n",
+        " RAM ACCESS COUNT:   %12lli %3lli%% / %12lli / %12lli       \n" \
+        " RAM BYTES READ:     %12lli %3lli%% / %12lli / %12lli       \n" \
+        " FILE ACCESS COUNT:  %12lli %3lli%% / %12lli / %12lli       \n" \
+        " FILE BYTES READ:    %12lli %3lli%% / %12lli / %12lli       \n" \
+        " DIR LIST COUNT:     %12lli %3lli%% / %12lli / %12lli       \n" \
+        " FILE LIST COUNT:    %12lli %3lli%% / %12lli / %12lli       \n",
         s->cRAM.hit,      100 * s->cRAM.hit / max(1, s->cRAM.hit + s->cRAM.miss),                s->cRAM.miss,      s->cRAM.hit + s->cRAM.miss,
         s->cbRAM.hit,     100 * s->cbRAM.hit / max(1, s->cbRAM.hit + s->cbRAM.miss),             s->cbRAM.miss,     s->cbRAM.hit + s->cbRAM.miss,
         s->cFILE.hit,     100 * s->cFILE.hit / max(1, s->cFILE.hit + s->cFILE.miss),             s->cFILE.miss,     s->cFILE.hit + s->cFILE.miss,
@@ -728,7 +730,7 @@ NTSTATUS _VfsReadFile_RAM(_In_ BYTE tp, _Out_ LPVOID Buffer, _In_ DWORD BufferLe
             ctxMain->cfg.qwAddrMax = qwCfgAddrMaxOrig;
             break;
         case VFS_RAM_TP_NATIVE:
-            result = (0 != DeviceReadDMAEx(qwBase, pds->pbDMA16M, 0x01000000, NULL, 0));
+            result = (0 != DeviceReadDMA(qwBase, 0x01000000, pds->pbDMA16M, NULL));
             break;
     }
     memcpy(Buffer, pds->pbDMA16M + qwBaseOffset, *ReadLength);
@@ -824,7 +826,7 @@ VfsCallback_WriteFile(LPCWSTR wcsFileName, LPCVOID Buffer, DWORD NumberOfBytesTo
     BOOL result;
     if(!_wcsicmp(wcsFileName, L"\\liveram-kmd.raw") && pds->cbRAM[VFS_RAM_TP_KMD]) { // kernel module backed RAM file
         EnterCriticalSection(&pds->LockDma);
-        result = DeviceWriteMEM(Offset, (PBYTE)Buffer, NumberOfBytesToWrite, PCILEECH_MEM_FLAG_RETRYONFAIL);
+        result = DeviceWriteMEM(Offset, NumberOfBytesToWrite, (PBYTE)Buffer, TRUE);
         LeaveCriticalSection(&pds->LockDma);
         VfsCache_MemDel(VFS_RAM_TP_KMD, Offset, NumberOfBytesToWrite, pds);
         *NumberOfBytesWritten = NumberOfBytesToWrite;
@@ -832,7 +834,7 @@ VfsCallback_WriteFile(LPCWSTR wcsFileName, LPCVOID Buffer, DWORD NumberOfBytesTo
     }
     if(!_wcsicmp(wcsFileName, L"\\liveram-native.raw") && pds->cbRAM[VFS_RAM_TP_NATIVE]) { // native DMA backed RAM file
         EnterCriticalSection(&pds->LockDma);
-        result = LeechCore_Write(Offset, (PBYTE)Buffer, NumberOfBytesToWrite);
+        result = LcWrite(ctxMain->hLC, Offset, NumberOfBytesToWrite, (PBYTE)Buffer);
         LeaveCriticalSection(&pds->LockDma);
         VfsCache_MemDel(VFS_RAM_TP_NATIVE, Offset, NumberOfBytesToWrite, pds);
         *NumberOfBytesWritten = NumberOfBytesToWrite;
@@ -869,7 +871,7 @@ VOID ActionMount()
     WCHAR wszMountPoint[] = { 'K', ':', '\\', 0 };
     int(*fnDokanMain)(PDOKAN_OPTIONS, PDOKAN_OPERATIONS);
     // sanity checks
-    if(!ctxMain->phKMD && ((ctxMain->dev.tpDevice == LEECHCORE_DEVICE_USB3380) || (ctxMain->cfg.qwAddrMax > 0x0000040000000000) || (ctxMain->cfg.qwAddrMax < 0x00400000))) {
+    if(!ctxMain->phKMD && (PCILEECH_DEVICE_EQUALS("usb3380") || (ctxMain->cfg.qwAddrMax > 0x0000040000000000) || (ctxMain->cfg.qwAddrMax < 0x00400000))) {
         printf(
             "MOUNT: Failed. Please see below for possible reasons:               \n" \
             "   - Mounting file system requires an active kernel module (KMD).   \n" \
@@ -899,7 +901,7 @@ VOID ActionMount()
     GetSystemTime(&pDokanState->time);
     pDokanState->fKMD = (ctxMain->phKMD != NULL);
     pDokanState->cbRAM[VFS_RAM_TP_KMD] = pDokanState->fKMD ? (ctxMain->phKMD->pPhysicalMap[ctxMain->phKMD->cPhysicalMap - 1].BaseAddress + ctxMain->phKMD->pPhysicalMap[ctxMain->phKMD->cPhysicalMap - 1].NumberOfBytes) : 0;
-    pDokanState->cbRAM[VFS_RAM_TP_NATIVE] = (ctxMain->dev.tpDevice == LEECHCORE_DEVICE_USB3380) ? 0 : (pDokanState->fKMD ? pDokanState->cbRAM[VFS_RAM_TP_KMD] : ctxMain->cfg.qwAddrMax);
+    pDokanState->cbRAM[VFS_RAM_TP_NATIVE] = PCILEECH_DEVICE_EQUALS("usb3380") ? 0 : (pDokanState->fKMD ? pDokanState->cbRAM[VFS_RAM_TP_KMD] : ctxMain->cfg.qwAddrMax);
     InitializeCriticalSection(&pDokanState->LockDma);
     InitializeCriticalSection(&pDokanState->LockCache);
     pDokanState->DokanNtStatusFromWin32 = (NTSTATUS(*)(DWORD))GetProcAddress(hModuleDokan, "DokanNtStatusFromWin32");

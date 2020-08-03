@@ -16,7 +16,7 @@ VOID Extra_MacFVRecover_ReadMemory_Optimized(_Inout_ PBYTE pb512M)
         0x88000000, 0x89000000, 0x8a000000, 0x8b000000, 0x8c000000, 0x8d000000, 0x8e000000, 0x8f000000
     };
     for(i = 0; i < sizeof(dwOffsets) / sizeof(DWORD); i++) {
-        DeviceReadDMAEx(dwOffsets[i], pb512M + dwOffsets[i] - 0x70000000, 0x01000000, NULL, 0);
+        DeviceReadDMA(dwOffsets[i], 0x01000000, pb512M + dwOffsets[i] - 0x70000000, NULL);
     }
 }
 
@@ -157,11 +157,11 @@ VOID Action_MacDisableVtd()
     // DMAR table assumed to be on page boundary. This doesn't have to be true,
     // but it seems like it is on the MACs.
     for(i = 0; i < sizeof(dwOffsets) / sizeof(DWORD); i++) {
-        if(DeviceReadDMAEx(dwOffsets[i], pb16M, 0x01000000, NULL, 0)) {
+        if(DeviceReadDMA(dwOffsets[i], 0x01000000, pb16M, NULL)) {
             for(j = 0; j < 0x01000000; j += 0x1000) {
                 if(*(PQWORD)(pb16M + j) == 0x0000008852414d44) {
                     dwAddress = dwOffsets[i] + j;
-                    if(LeechCore_Write(dwAddress, ZERO16, 16)) {
+                    if(LcWrite(ctxMain->hLC, dwAddress, 16, ZERO16)) {
                         printf("MAC_DISABLE_VTD: VT-d DMA protections should now be disabled ...\n");
                         printf("MAC_DISABLE_VTD: DMAR ACPI table found and removed at: 0x%08x\n", dwAddress);
                         LocalFree(pb16M);
@@ -228,13 +228,13 @@ VOID Action_TlpTx()
     if(ctxMain->cfg.fLoop) {
         printf("TLP: Starting loop TLP transmit. Press CTRL+C to abort.\n");
         while(TRUE) {
-            LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_WRITE_TLP, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, NULL, 0, NULL);
-            LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP, NULL, 0, NULL, 100, NULL);
+            LcCommand(ctxMain->hLC, LC_CMD_FPGA_WRITE_TLP, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, NULL, NULL);
+            LcCommand(ctxMain->hLC, LC_CMD_FPGA_LISTEN_TLP, sizeof(DWORD), (PBYTE)&dwListenTlpMs, NULL, NULL);
         }
         return;
     }
-    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_WRITE_TLP, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, NULL, 0, NULL);
-    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP, (PBYTE)&dwListenTlpMs, sizeof(DWORD), NULL, 0, NULL);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_WRITE_TLP, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, NULL, NULL);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_LISTEN_TLP, sizeof(DWORD), (PBYTE)&dwListenTlpMs, NULL, NULL);
 }
 
 VOID Action_TlpTxLoop()
@@ -254,19 +254,19 @@ VOID Action_TlpTxLoop()
         printf("Action_TlpTxLoop: Invalid TLP (length not multiple of 4).\n");
         return;
     }
-    LeechCore_GetOption(LEECHCORE_OPT_FPGA_VERSION_MAJOR, &qwFpgaVersionMajor);
-    LeechCore_GetOption(LEECHCORE_OPT_FPGA_VERSION_MINOR, &qwFpgaVersionMinor);
+    LcGetOption(ctxMain->hLC, LC_OPT_FPGA_VERSION_MAJOR, &qwFpgaVersionMajor);
+    LcGetOption(ctxMain->hLC, LC_OPT_FPGA_VERSION_MINOR, &qwFpgaVersionMinor);
     if((qwFpgaVersionMajor < 4) || ((qwFpgaVersionMajor == 4) && (qwFpgaVersionMajor < 2))) {
         printf("Action_TlpTxLoop: FPGA version not supported (bitstream v4.2 or later required).\n");
         return;
     }
     printf("TLP: Transmitting PCIe LOOP TLPs. Press any key to stop.%s\n", ctxMain->cfg.fVerboseExtra ? "" : " (use -vvv option for detailed info).");
     // tx each 64 clk [66MHz - 15ns clk] (15ns * 64 -> ~1uS)
-    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE | 0x801e00000000, (PBYTE)&wTxSleep, 2, NULL, 0, NULL);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_CFGREGPCIE | 0x801e, sizeof(WORD), (PBYTE)&wTxSleep, NULL, NULL);
     // tlp value
-    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE | 0x802000000000, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, NULL, 0, NULL);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_CFGREGPCIE | 0x8020, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, NULL, NULL);
     // set "infinite" [very long] loop
-    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE | 0x805000000000, (PBYTE)&dwMax, 4, NULL, 0, NULL);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_CFGREGPCIE | 0x8050, sizeof(DWORD), (PBYTE)&dwMax, NULL, NULL);
     // set valid TLP QWORDs
     i = ctxMain->cfg.cbIn;
     wValid = 1 | ((i % 8) ? 0 : 2);
@@ -275,13 +275,13 @@ VOID Action_TlpTxLoop()
         i -= 8;
         wValid = 2 | (wValid << 2);
     }
-    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE | 0x801c00000000, (PBYTE)&wValid, 2, NULL, 0, NULL);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_CFGREGPCIE | 0x801c, sizeof(WORD), (PBYTE)&wValid, NULL, NULL);
     // start tx
-    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE_MARKWR | 0x800200000000, (PBYTE)&dwEnableTx, 4, NULL, 0, NULL);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_CFGREGPCIE_MARKWR | 0x8002, sizeof(DWORD), (PBYTE)&dwEnableTx, NULL, NULL);
     // wait for keypress to stop
     while(!_kbhit()) {
-        LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_LISTEN_TLP, (PBYTE)&dwListenTlpMs, sizeof(DWORD), NULL, 0, NULL);
+        LcCommand(ctxMain->hLC, LC_CMD_FPGA_LISTEN_TLP, sizeof(DWORD), (PBYTE)&dwListenTlpMs, NULL, NULL);
     }
     // stop
-    LeechCore_CommandData(LEECHCORE_COMMANDDATA_FPGA_CFGREGPCIE_MARKWR | 0x800200000000, (PBYTE)&dwDisableTx, 4, NULL, 0, NULL);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_CFGREGPCIE_MARKWR | 0x8002, sizeof(DWORD), (PBYTE)&dwDisableTx, NULL, NULL);
 }

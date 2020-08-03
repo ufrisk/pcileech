@@ -13,14 +13,8 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Header Files\dokan">
-      <UniqueIdentifier>{1fff3dd1-43d5-442d-a79b-d80adbcbc80c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\leechcore">
-      <UniqueIdentifier>{c97bdfb0-f88b-453e-a7c2-8c1bd7cd1b1c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\vmm">
-      <UniqueIdentifier>{00063ca4-5dc9-4d3d-b078-d39e50b9959b}</UniqueIdentifier>
+    <Filter Include="Header Files\includes">
+      <UniqueIdentifier>{b5332eb1-5727-4efd-84e5-83cda653c431}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -34,15 +28,6 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="vmmdll.h">
-      <Filter>Header Files\vmm</Filter>
-    </ClInclude>
-    <ClInclude Include="leechcore.h">
-      <Filter>Header Files\leechcore</Filter>
-    </ClInclude>
-    <ClInclude Include="dokan.h">
-      <Filter>Header Files\dokan</Filter>
-    </ClInclude>
     <ClInclude Include="device.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -88,7 +73,22 @@
     <ClInclude Include="vfs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vmmprx.h">
+    <ClInclude Include="..\includes\dokan.h">
+      <Filter>Header Files\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\includes\fileinfo.h">
+      <Filter>Header Files\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\includes\leechcore.h">
+      <Filter>Header Files\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\includes\public.h">
+      <Filter>Header Files\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\includes\vmmdll.h">
+      <Filter>Header Files\includes</Filter>
+    </ClInclude>
+    <ClInclude Include="vmmx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -132,7 +132,7 @@
     <ClCompile Include="vfs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vmmprx.c">
+    <ClCompile Include="vmmx.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -20,6 +20,7 @@
 #pragma comment (lib, "bcrypt.lib")
 
 typedef unsigned __int64                    QWORD, *PQWORD;
+#define PCILEECH_LIBRARY_FILETYPE           ".dll"
 
 #pragma warning( disable : 4477)
 
@@ -29,7 +30,6 @@ VOID usleep(_In_ DWORD us);
 #ifdef LINUX
 #define _GNU_SOURCE
 
-#include <libusb-1.0/libusb.h>
 #include <byteswap.h>
 #include <ctype.h>
 #include <dirent.h>
@@ -41,6 +41,7 @@ VOID usleep(_In_ DWORD us);
 #include <pthread.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/types.h>
 
 typedef void                                VOID, *PVOID;
 typedef void                                *HANDLE, **PHANDLE;
@@ -82,6 +83,7 @@ typedef struct tdEXCEPTION_RECORD64         { CHAR sz[152]; } EXCEPTION_RECORD64
 #define WINUSB_INTERFACE_HANDLE             libusb_device_handle*
 #define PIPE_TRANSFER_TIMEOUT               0x03
 #define CONSOLE_SCREEN_BUFFER_INFO          PVOID    // TODO: remove this dummy
+#define PCILEECH_LIBRARY_FILETYPE           ".so"
 
 #define _In_
 #define _Out_
@@ -92,8 +94,9 @@ typedef struct tdEXCEPTION_RECORD64         { CHAR sz[152]; } EXCEPTION_RECORD64
 #define __bcount(x)
 #define _Inout_bytecount_(x)
 #define _Inout_updates_bytes_(x)
+#define _Out_writes_bytes_(x)
 #define _Out_writes_opt_(x)
-#define _Success_(return)
+//#define _Success_(return)
 
 #define max(a, b)                           (((a) > (b)) ? (a) : (b))
 #define min(a, b)                           (((a) < (b)) ? (a) : (b))
@@ -101,6 +104,7 @@ typedef struct tdEXCEPTION_RECORD64         { CHAR sz[152]; } EXCEPTION_RECORD64
 #define _byteswap_uint64(v)                 (bswap_64(v))
 #define _countof(_Array)                    (sizeof(_Array) / sizeof(_Array[0]))
 #define strnlen_s(s, maxcount)              (strnlen(s, maxcount))
+#define strcat_s(dst, len, src)             (strncat(dst, src, len-strlen(dst)))
 #define strcpy_s(dst, len, src)             (strncpy(dst, src, len))
 #define strncpy_s(dst, len, src, srclen)    (strncpy(dst, src, len))
 #define _stricmp(s1, s2)                    (strcasecmp(s1, s2))
@@ -159,8 +163,6 @@ BOOL QueryPerformanceFrequency(_Out_ LARGE_INTEGER *lpFrequency);
 BOOL QueryPerformanceCounter(_Out_ LARGE_INTEGER *lpPerformanceCount);
 VOID GetLocalTime(LPSYSTEMTIME lpSystemTime);
 DWORD InterlockedAdd(DWORD *Addend, DWORD Value);
-BOOL WinUsb_Free(WINUSB_INTERFACE_HANDLE InterfaceHandle);
-BOOL IsWow64Process(HANDLE hProcess, PBOOL Wow64Process);
 
 HANDLE CreateThread(
     PVOID    lpThreadAttributes,
@@ -176,20 +178,10 @@ BOOL GetExitCodeThread(
     PDWORD    lpExitCode
 );
 
-BOOL __WinUsb_ReadWritePipe(
-    WINUSB_INTERFACE_HANDLE InterfaceHandle,
-    UCHAR    PipeID,
-    PUCHAR    Buffer,
-    ULONG    BufferLength,
-    PULONG    LengthTransferred,
-    PVOID    Overlapped
-);
-#define WinUsb_ReadPipe(h, p, b, l, t, o)   (__WinUsb_ReadWritePipe(h, p, b, l, t, o))
-#define WinUsb_WritePipe(h, p, b, l, t, o)  (__WinUsb_ReadWritePipe(h, p, b, l, t, o))
-
+HMODULE LoadLibraryA(LPSTR lpFileName);
+BOOL FreeLibrary(_In_ HMODULE hLibModule);
 FARPROC GetProcAddress(HMODULE hModule, LPSTR lpProcName);
-HMODULE LoadLibrary(LPWSTR lpFileName);
-#define FreeLibrary(hModule)                (TRUE)
+
 BOOL _kbhit();
 #endif /* LINUX */
 

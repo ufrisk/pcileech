@@ -3,31 +3,35 @@
 // (c) Ulf Frisk, 2016-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
+#include <leechcore.h>
 #include "memdump.h"
 #include "device.h"
 #include "statistics.h"
 #include "util.h"
-#include "leechcore.h"
 #ifdef WIN32
 #include <io.h>
 #endif /* WIN32 */
 
 #define MEMDUMP_DATABUFFER_SIZE     0x01000000          // 16MB
-#define MEMDUMP_4GB                0x100000000
+#define MEMDUMP_4GB                 0x100000000
+#define MEMDUMP_NUM_BUFFER          3
 
-typedef struct tdFILE_WRITE_ASYNC_BUFFER {
-    FILE *phFile;
-    BOOL isSuccess;
-    BOOL isExecuting;
+
+typedef struct tdMEMDUMP_FILEWRITE_DATA {
+    QWORD pa;
     DWORD cb;
     BYTE pb[MEMDUMP_DATABUFFER_SIZE];
-} FILE_WRITE_ASYNC_BUFFER, *PFILE_WRITE_ASYNC_BUFFER;
+} MEMDUMP_FILEWRITE_DATA, *PMEMDUMP_FILEWRITE_DATA;
 
-VOID MemoryDump_FileWriteAsync_Thread(PFILE_WRITE_ASYNC_BUFFER pfb)
-{
-    pfb->isSuccess = 0 != fwrite(pfb->pb, 1, pfb->cb, pfb->phFile);
-    pfb->isExecuting = FALSE;
-}
+typedef struct tdMEMDUMP_FILEWRITE {
+    FILE *hFile;
+    BOOL fFileNone;
+    BOOL fValid;
+    BOOL fTerminated;
+    QWORD iRead;    // index of reader thread
+    QWORD iWrite;   // index of writer thread
+    MEMDUMP_FILEWRITE_DATA Data[MEMDUMP_NUM_BUFFER];
+} MEMDUMP_FILEWRITE, *PMEMDUMP_FILEWRITE;
 
 VOID MemoryDump_SetOutFileName()
 {
@@ -50,194 +54,185 @@ VOID MemoryDump_SetOutFileName()
     }
 }
 
-_Success_(return)
-BOOL MemoryDump_AsyncFileAlloc(_Out_ PFILE_WRITE_ASYNC_BUFFER *ppFileBuffer)
+DWORD MemoryDump_File_ThreadProc(_In_ PMEMDUMP_FILEWRITE ctx)
 {
-    PFILE_WRITE_ASYNC_BUFFER pFileBuffer;
-    *ppFileBuffer = NULL;
-    if(!ctxMain->cfg.fOutFile) { return TRUE; }
-    MemoryDump_SetOutFileName();
-    pFileBuffer = LocalAlloc(LMEM_ZEROINIT, sizeof(FILE_WRITE_ASYNC_BUFFER));
-    if(!pFileBuffer) {
-        printf("Memory Dump: Failed. Failed to allocate memory buffers.\n");
-        return FALSE;
-    }
-    if(!fopen_s(&pFileBuffer->phFile, ctxMain->cfg.szFileOut, "r") || pFileBuffer->phFile) {
-        if(pFileBuffer->phFile) {
-            fclose(pFileBuffer->phFile);
+    PMEMDUMP_FILEWRITE_DATA pd;
+    while(ctx->fValid) {
+        if(ctx->iRead == ctx->iWrite) {
+            Sleep(25);
+            continue;
         }
-        printf("Memory Dump: Failed. File already exists.\n");
-        LocalFree(pFileBuffer);
-        return FALSE;
+        pd = &ctx->Data[ctx->iRead % MEMDUMP_NUM_BUFFER];
+        _fseeki64(ctx->hFile, pd->pa, SEEK_SET);
+        if(pd->cb != fwrite(pd->pb, 1, pd->cb, ctx->hFile)) {
+            printf("Memory Dump: Failed. Write to file.\n");
+            break;
+        }
+        InterlockedIncrement64(&ctx->iRead);
     }
-    if(fopen_s(&pFileBuffer->phFile, ctxMain->cfg.szFileOut, "wb") || !pFileBuffer->phFile) {
-        printf("Memory Dump: Failed. Error writing to file.\n");
-        LocalFree(pFileBuffer);
-        return FALSE;
-    }
-    pFileBuffer->isSuccess = TRUE;
-    *ppFileBuffer = pFileBuffer;
-    return TRUE;
+    ctx->fTerminated = TRUE;
+    return 0;
 }
 
-VOID MemoryDump_AsyncFileClose(_In_opt_ PFILE_WRITE_ASYNC_BUFFER pFileBuffer)
+VOID MemoryDump_File_Close(_Post_ptr_invalid_ PMEMDUMP_FILEWRITE pfw)
 {
-    if(pFileBuffer) {
-        if(pFileBuffer->phFile) {
-            while(pFileBuffer->isExecuting) {
-                SwitchToThread();
-            }
-            fclose(pFileBuffer->phFile);
-        }
-        LocalFree(pFileBuffer);
+    pfw->fValid = FALSE;
+    while(!pfw->fFileNone && !pfw->fTerminated) {
+        Sleep(25);
     }
+    if(pfw->hFile) { fclose(pfw->hFile); }
+    LocalFree(pfw);
+}
+
+PMEMDUMP_FILEWRITE MemoryDump_File_Initialize(_In_ BOOL fAllocFile4GB)
+{
+    FILE *hFileTMP;
+    HANDLE hThread;
+    PMEMDUMP_FILEWRITE pfw;
+    MemoryDump_SetOutFileName();
+    if(!(pfw = LocalAlloc(LMEM_ZEROINIT, sizeof(MEMDUMP_FILEWRITE)))) {
+        printf("Memory Dump: Failed. Out of memory.\n");
+        goto fail;
+    }
+    if(0 == ctxMain->cfg.szFileOut[0]) {
+        pfw->fFileNone = TRUE;
+        return pfw;
+    }
+    if(!fopen_s(&hFileTMP, ctxMain->cfg.szFileOut, "r")) {
+        fclose(hFileTMP);
+        printf("Memory Dump: Failed. File already exists.\n");
+        goto fail;
+    }
+    if(fopen_s(&pfw->hFile, ctxMain->cfg.szFileOut, "wb")) {
+        printf("Memory Dump: Failed. Error writing to file.\n");
+        goto fail;
+    }
+    if(fAllocFile4GB) {
+        printf("Memory Dump: Initializing ...");
+        if(_chsize_s(_fileno(pfw->hFile), MEMDUMP_4GB)) {
+            printf("Memory Dump: Failed. Cannot set initial file size to 4GB for 'safer dump'.\n");
+            goto fail;
+        }
+        printf(" Done.\n");
+    }
+    pfw->fValid = TRUE;
+    if(!(hThread = CreateThread(NULL, 0, MemoryDump_File_ThreadProc, pfw, 0, NULL))) {
+        printf("Memory Dump: Failed. Create Thread.\n");
+        goto fail;
+    }
+    CloseHandle(hThread);
+    return pfw;
+fail:
+    if(pfw) {
+        if(pfw->hFile) { fclose(pfw->hFile); }
+        LocalFree(pfw);
+    }
+    return NULL;
 }
 
 /*
 * Dump memory with the kernel module (KMD) / USB3380 strategy - that is:
 * - read chunks:
 *      from zero (or user-specified value)
-*      to to max supported memory (or specified by user) 
+*      to to max supported memory (or specified by user)
 *      in 16MB chunks.
 * If the mode is USB3380 native a failed read for 16MB will stop the dumping.
 */
 VOID ActionMemoryDump_KMD_USB3380()
 {
-    BOOL result;
-    HANDLE hThread;
-    QWORD qwCurrentAddress;
-    PBYTE pbMemoryDump = NULL;
-    PPAGE_STATISTICS pPageStat = NULL;
-    PFILE_WRITE_ASYNC_BUFFER pFileBuffer = NULL;
-    // 1: Initialize
-    if(!(pbMemoryDump = LocalAlloc(0, 0x01000000))) {
-        printf("Memory Dump: Failed. Failed to allocate memory buffers.\n");
-        goto cleanup;
-    }
-    if(!MemoryDump_AsyncFileAlloc(&pFileBuffer)) { goto cleanup; }
-    ctxMain->cfg.qwAddrMin &= ~0xfff;
-    ctxMain->cfg.qwAddrMax = (ctxMain->cfg.qwAddrMax + 1) & ~0xfff;
-    // 2: start dump in 16MB blocks
-    qwCurrentAddress = ctxMain->cfg.qwAddrMin;
-    PageStatInitialize(&pPageStat, ctxMain->cfg.qwAddrMin, ctxMain->cfg.qwAddrMax, "Dumping Memory", ctxMain->phKMD ? TRUE : FALSE, ctxMain->cfg.fVerbose);
-    while(qwCurrentAddress < ctxMain->cfg.qwAddrMax) {
-        result = Util_Read16M(pbMemoryDump, qwCurrentAddress, pPageStat);
-        if(!result && !ctxMain->cfg.fForceRW && !ctxMain->phKMD) {
+    QWORD paCurrent, paMin, paMax;
+    PMEMDUMP_FILEWRITE_DATA pd;
+    PMEMDUMP_FILEWRITE pfw = NULL;
+    PPAGE_STATISTICS pStat = NULL;
+    // 1: Initialize result file, buffers and statistics:
+    paMin = ctxMain->cfg.qwAddrMin & ~0xfff;
+    paMax = (ctxMain->cfg.qwAddrMax + 1) & ~0xfff;
+    if(!(pfw = MemoryDump_File_Initialize(FALSE))) { return; }
+    PageStatInitialize(&pStat, paMin, paMax, "Dumping Memory", ctxMain->phKMD ? TRUE : FALSE, ctxMain->cfg.fVerbose);
+    // 2: Dump memory in 16MB blocks:
+    paCurrent = paMin;
+    PageStatUpdate(pStat, paCurrent, 0, 0);
+    while(!pfw->fTerminated && (paCurrent < paMax)) {
+        if(!pfw->fFileNone && (pfw->iWrite >= pfw->iRead + 3)) {
+            Sleep(25);
+            continue;
+        }
+        pd = &pfw->Data[pfw->iWrite % MEMDUMP_NUM_BUFFER];
+        pd->cb = (DWORD)min(MEMDUMP_DATABUFFER_SIZE, paMax - paCurrent);
+        pd->pa = paCurrent;
+        if(!Util_Read16M(pd->pb, paCurrent, pStat)) {
             printf("Memory Dump: Failed. Cannot dump any sequential data in 16MB - terminating.\n");
-            goto cleanup;
+            goto fail;
         }
-        if(pFileBuffer) {
-            // write file async
-            if(!pFileBuffer->isSuccess) {
-                printf("Memory Dump: Failed. Failed to write to dump file - terminating.\n");
-                goto cleanup;
-            }
-            while(pFileBuffer->isExecuting) {
-                SwitchToThread();
-            }
-            pFileBuffer->cb = (DWORD)min(0x01000000, ctxMain->cfg.qwAddrMax - qwCurrentAddress);
-            memcpy(pFileBuffer->pb, pbMemoryDump, 0x01000000);
-            pFileBuffer->isExecuting = TRUE;
-            hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)MemoryDump_FileWriteAsync_Thread, pFileBuffer, 0, NULL);
-            if(hThread) { CloseHandle(hThread); }
-        }
-        // add to address
-        qwCurrentAddress += 0x01000000;
+        InterlockedIncrement64(&pfw->iWrite);
+        paCurrent += pd->cb;
     }
-    printf("Memory Dump: Successful.\n");
-cleanup:
-    MemoryDump_AsyncFileClose(pFileBuffer);
-    PageStatClose(&pPageStat);
-    LocalFree(pbMemoryDump);
+    PageStatClose(&pStat);
+    if(!pfw->fTerminated) {
+        printf("Memory Dump: Successful.\n");
+    }
+fail:
+    PageStatClose(&pStat);
+    MemoryDump_File_Close(pfw);
 }
 
+/*
+* Dump memory with native mode strategy:
+* If more than 4GB memory exists, dump memory above 4GB first and then start
+* dumping between zero and 4GB - this to dump as much memory as possible before
+* hitting problematic PCIe memory mapped devices between 3-4GB which commonly
+* crashes computer when read ...
+*/
 VOID ActionMemoryDump_Native()
 {
     BOOL fSaferDump;
-    HANDLE hThread;
-    DWORD cbMemoryDump;
-    PBYTE pbMemoryDump = NULL;
-    PPAGE_STATISTICS pPageStat = NULL;
-    LEECHCORE_PAGESTAT_MINIMAL oLeechCoreStat;
-    PFILE_WRITE_ASYNC_BUFFER pFileBuffer = NULL;
-    QWORD paMin, paMax, paCurrent;
-    // 1: Initialize
-    if(!(pbMemoryDump = LocalAlloc(0, MEMDUMP_DATABUFFER_SIZE))) { goto fail; }
-    if(!MemoryDump_AsyncFileAlloc(&pFileBuffer)) { goto fail; }
+    QWORD paCurrent, paMin, paMax;
+    PMEMDUMP_FILEWRITE_DATA pd;
+    PMEMDUMP_FILEWRITE pfw = NULL;
+    PPAGE_STATISTICS pStat = NULL;
+    // 1: Initialize result file, buffers and statistics:
     paMin = ctxMain->cfg.qwAddrMin & ~0xfff;
     paMax = (ctxMain->cfg.qwAddrMax + 1) & ~0xfff;
-    // 2: adjust starting location to 4GB if FPGA "safer dump" technique should
-    // be employed. i.e. dump memory above 4GB first and then after finish dump
-    // memory below 4GB. This is done to reduce impact of any freezes by reads
-    // to PCIe "device" addresses that are more common in memory below 4GB.
-    paCurrent = paMin;
-    fSaferDump = (ctxMain->dev.tpDevice == LEECHCORE_DEVICE_FPGA) && (paMin == 0) && (paMax > MEMDUMP_4GB);
-    if(fSaferDump) {
-        if(pFileBuffer) {
-            printf("Memory Dump: Initializing ...");
-            if(_chsize_s(_fileno(pFileBuffer->phFile), MEMDUMP_4GB)) {
-                printf("Memory Dump: Failed. Cannot set initial file size to 4GB for 'safer dump'.\n");
-                goto fail;
-            }
-            _fseeki64(pFileBuffer->phFile, MEMDUMP_4GB, SEEK_SET);
-            printf(" Done.\n");
+    fSaferDump = PCILEECH_DEVICE_EQUALS("fpga") && (paMin == 0) && (paMax > MEMDUMP_4GB);
+    if(!(pfw = MemoryDump_File_Initialize(fSaferDump))) { return; }
+    PageStatInitialize(&pStat, paMin, paMax, "Dumping Memory", FALSE, ctxMain->cfg.fVerbose);
+    // 2: Dump memory in 16MB blocks:
+    paCurrent = fSaferDump ? MEMDUMP_4GB : paMin;
+    PageStatUpdate(pStat, paCurrent, 0, 0);
+    while(!pfw->fTerminated) {
+        if(!pfw->fFileNone && (pfw->iWrite >= pfw->iRead + 3)) {
+            Sleep(25);
+            continue;
         }
-        paCurrent = MEMDUMP_4GB;
-    }
-    // 3: start dump
-    PageStatInitialize(&pPageStat, paMin, paMax, "Dumping memory", FALSE, ctxMain->cfg.fVerbose);
-    PageStatUpdate(pPageStat, paCurrent, 0, 0);
-    oLeechCoreStat.h = (HANDLE)pPageStat;
-    oLeechCoreStat.pfnPageStatUpdate = (VOID(*)(HANDLE, ULONG64, ULONG64, ULONG64))PageStatUpdate;
-    while(TRUE) {
-        cbMemoryDump = (DWORD)min(MEMDUMP_DATABUFFER_SIZE, paMax - paCurrent);
-        LeechCore_ReadEx(paCurrent, pbMemoryDump, cbMemoryDump, 0, &oLeechCoreStat);
-        if(pFileBuffer) {
-            // write file async
-            if(!pFileBuffer->isSuccess) {
-                printf("Memory Dump: Failed. Failed to write to dump file - terminating.\n");
-                goto fail;
-            }
-            while(pFileBuffer->isExecuting) {
-                SwitchToThread();
-            }
-            pFileBuffer->cb = cbMemoryDump;
-            memcpy(pFileBuffer->pb, pbMemoryDump, cbMemoryDump);
-            pFileBuffer->isExecuting = TRUE;
-            hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)MemoryDump_FileWriteAsync_Thread, pFileBuffer, 0, NULL);
-            if(hThread) { CloseHandle(hThread); }
-        }
-        if(paMax == paCurrent + cbMemoryDump) {
+        pd = &pfw->Data[pfw->iWrite % MEMDUMP_NUM_BUFFER];
+        pd->cb = (DWORD)min(MEMDUMP_DATABUFFER_SIZE, paMax - paCurrent);
+        pd->pa = paCurrent;
+        ZeroMemory(pd->pb, pd->cb);
+        DeviceReadDMA(pd->pa, pd->cb, pd->pb, pStat);
+        InterlockedIncrement64(&pfw->iWrite);
+        if(paMax == pd->pa + pd->cb) {
             if(fSaferDump) {
-                if(pFileBuffer) {
-                    while(pFileBuffer->isExecuting) {
-                        SwitchToThread();
-                    }
-                    _fseeki64(pFileBuffer->phFile, 0, SEEK_SET);
-                }
                 paCurrent = 0;
-                PageStatUpdate(pPageStat, paCurrent, 0, 0);
+                PageStatUpdate(pStat, paCurrent, 0, 0);
                 continue;
             }
             break;
         }
-        if(fSaferDump && (MEMDUMP_4GB == paCurrent + cbMemoryDump)) {
+        if(fSaferDump && (MEMDUMP_4GB == pd->pa + pd->cb)) {
             break;
         }
-        paCurrent += cbMemoryDump;
+        paCurrent += pd->cb;
     }
-    PageStatClose(&pPageStat);
-    printf("Memory Dump: Successful.\n");
-    // fall-through to cleanup
-fail:
-    MemoryDump_AsyncFileClose(pFileBuffer);
-    PageStatClose(&pPageStat);
-    LocalFree(pbMemoryDump);
+    PageStatClose(&pStat);
+    if(!pfw->fTerminated) {
+        printf("Memory Dump: Successful.\n");
+    }
+    MemoryDump_File_Close(pfw);
 }
 
 VOID ActionMemoryDump()
 {
-    if(ctxMain->phKMD || (ctxMain->dev.tpDevice == LEECHCORE_DEVICE_USB3380)) {
+    if(ctxMain->phKMD || PCILEECH_DEVICE_EQUALS("usb3380")) {
         ActionMemoryDump_KMD_USB3380();
     } else {
         ActionMemoryDump_Native();
@@ -248,25 +243,25 @@ VOID ActionMemoryDump()
 
 VOID ActionMemoryProbe()
 {
-    QWORD qwA, cPages, i;
+    QWORD pa, i, cPages;
     PPAGE_STATISTICS pPageStat = NULL;
-    BYTE pbResultMap[MEMORY_PROBE_PAGES_PER_SWEEP];
+    PBYTE pbProbeResultMap = NULL;
+    DWORD cbProbeResultMap;
     ctxMain->cfg.qwAddrMin &= ~0xfff;
     ctxMain->cfg.qwAddrMax = (ctxMain->cfg.qwAddrMax + 1) & ~0xfff;
-    qwA = ctxMain->cfg.qwAddrMin;
+    pa = ctxMain->cfg.qwAddrMin;
     PageStatInitialize(&pPageStat, ctxMain->cfg.qwAddrMin, ctxMain->cfg.qwAddrMax, "Probing Memory", FALSE, TRUE);
-    while(qwA < ctxMain->cfg.qwAddrMax) {
-        cPages = min(MEMORY_PROBE_PAGES_PER_SWEEP, (ctxMain->cfg.qwAddrMax - qwA) / 0x1000);
-        memset(pbResultMap, 0, cPages);
-        if(!LeechCore_Probe(qwA, (DWORD)cPages, pbResultMap)) {
+    while(pa < ctxMain->cfg.qwAddrMax) {
+        cPages = (DWORD)min(MEMORY_PROBE_PAGES_PER_SWEEP, (ctxMain->cfg.qwAddrMax - pa) / 0x1000);
+        if(!LcCommand(ctxMain->hLC, LC_CMD_FPGA_PROBE | cPages, sizeof(QWORD), (PBYTE)&pa, &pbProbeResultMap, &cbProbeResultMap) || (cPages > cbProbeResultMap)) {
             PageStatClose(&pPageStat);
             printf("Memory Probe: Failed. Unsupported device or other failure.\n");
             return;
         }
         for(i = 0; i < cPages; i++) {
-            PageStatUpdate(pPageStat, (qwA + i * 0x1000 + 0x1000), (pbResultMap[i] ? 1 : 0), (pbResultMap[i] ? 0 : 1));
+            PageStatUpdate(pPageStat, (pa + i * 0x1000 + 0x1000), (pbProbeResultMap[i] ? 1 : 0), (pbProbeResultMap[i] ? 0 : 1));
         }
-        qwA += MEMORY_PROBE_PAGES_PER_SWEEP * 0x1000;
+        pa += MEMORY_PROBE_PAGES_PER_SWEEP * 0x1000;
     }
     PageStatClose(&pPageStat);
     printf("Memory Probe: Completed.\n");
@@ -288,7 +283,7 @@ VOID ActionMemoryDisplay()
         qwSize_4kAlign = (qwAddrOffset <= 0xf00) ? 0x1000 : 0x2000;
     }
     // read memory and display output
-    if(!DeviceReadMEM(qwAddrBase, pb, (DWORD)qwSize_4kAlign, PCILEECH_MEM_FLAG_RETRYONFAIL)) {
+    if(!DeviceReadMEM(qwAddrBase, (DWORD)qwSize_4kAlign, pb, TRUE)) {
         printf("Memory Display: Failed reading memory at address: 0x%016llX.\n", qwAddrBase);
         LocalFree(pb);
         return;
@@ -315,12 +310,12 @@ VOID ActionMemoryTestReadWrite()
         printf("Memory Test Read: Failed. Memory test may not run in KMD mode.\n");
         return;
     }
-    LeechCore_Read(dwAddrPci32, pb1, 4096);
+    LcRead(ctxMain->hLC, dwAddrPci32, 4096, pb1);
     // READ DMA
     printf("Memory Test Read: starting, reading %i times from address: 0x%08x\n", dwRuns, dwAddrPci32);
-    LeechCore_Read(dwAddrPci32, pb1, 4096);
+    LcRead(ctxMain->hLC, dwAddrPci32, 4096, pb1);
     for(i = 0; i < dwRuns; i++) {
-        r1 = 4096 == LeechCore_Read(dwAddrPci32, pb2, 4096);
+        r1 = LcRead(ctxMain->hLC, dwAddrPci32, 4096, pb2);
         if(!r1 || (dwOffset = Util_memcmpEx(pb1, pb2, 4096))) {
             printf("Memory Test Read: Failed. DMA failed / data changed by target computer / memory corruption. Read: %i. Run: %i. Offset: 0x%03x\n", r1, i, (r1 ? --dwOffset : 0));
             return;
@@ -333,15 +328,15 @@ VOID ActionMemoryTestReadWrite()
         printf("Memory Test Write: starting, reading/writing %i times from address: 0x%08x\n", dwRuns, dwAddrPci32);
         for(i = 0; i < dwRuns; i++) {
             Util_GenRandom(pb3, 4096);
-            r1 = LeechCore_Write(dwAddrPci32, pb3, 4096);
-            r2 = 4096 == LeechCore_Read(dwAddrPci32, pb2, 4096);
+            r1 = LcWrite(ctxMain->hLC, dwAddrPci32, 4096, pb3);
+            r2 = LcRead(ctxMain->hLC, dwAddrPci32, 4096, pb2);
             if(!r1 || !r2 || (dwOffset = Util_memcmpEx(pb2, pb3, 4096))) {
-                LeechCore_Write(dwAddrPci32, pb1, 4096);
+                LcWrite(ctxMain->hLC, dwAddrPci32, 4096, pb1);
                 printf("Memory Test Write: Failed. DMA failed / data changed by target computer / memory corruption. Write: %i. Read: %i. Run: %i. Offset: 0x%03x\n", r1, r2, i, --dwOffset);
                 return;
             }
         }
-        LeechCore_Write(dwAddrPci32, pb1, 4096);
+        LcWrite(ctxMain->hLC, dwAddrPci32, 4096, pb1);
         printf("Memory Test Write: Success!\n");
     }
 }
@@ -361,7 +356,7 @@ VOID ActionMemoryWrite()
         printf("Memory Write: Starting loop write. Press CTRL+C to abort.\n");
     }
     do {
-        result = DeviceWriteMEM(ctxMain->cfg.qwAddrMin, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, 0);
+        result = DeviceWriteMEM(ctxMain->cfg.qwAddrMin, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, FALSE);
         if(!result) {
             printf("Memory Write: Failed. Write failed (partial memory may be written).\n");
             return;

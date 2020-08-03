@@ -4,6 +4,7 @@
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "statistics.h"
+#include "oscompatibility.h"
 
 VOID _PageStatPrintMemMap(_Inout_ PPAGE_STATISTICS ps)
 {

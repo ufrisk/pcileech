@@ -6,6 +6,7 @@
 #ifndef __EXECUTOR_H__
 #define __EXECUTOR_H__
 #include "pcileech.h"
+#include "oscompatibility.h"
 #include "kmd.h"
 
 /*
@@ -43,6 +44,7 @@ VOID Exec_CallbackClose(_In_opt_ HANDLE hCallback);
 * -- pcbOut
 * -- result
 */
+_Success_(return)
 BOOL Exec_ExecSilent(_In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbIn, _Out_opt_ PBYTE *ppbOut, _Out_opt_ PQWORD pcbOut);
 
 /*

@@ -7,7 +7,7 @@
 #include "util.h"
 #include "version.h"
 
-VOID ShowListFiles(_In_ LPSTR szSearchPattern)
+VOID ShowListFiles(_In_ LPSTR szSearchPattern, _In_ DWORD cchSpaces, _In_ DWORD cchPre, _In_ DWORD cchPost)
 {
     WIN32_FIND_DATAA data;
     HANDLE h;
@@ -15,8 +15,10 @@ VOID ShowListFiles(_In_ LPSTR szSearchPattern)
     Util_GetFileInDirectory(szSearch, szSearchPattern);
     h = FindFirstFileA(szSearch, &data);
     while(h != INVALID_HANDLE_VALUE) {
-        data.cFileName[strlen(data.cFileName) - 4] = 0;
-        printf("             %s\n", data.cFileName);
+        data.cFileName[strlen(data.cFileName) - cchPost] = 0;
+        if(!cchPre || !memcmp(data.cFileName, szSearchPattern, cchPre)) {
+            printf("%*c%s\n", cchSpaces, ' ', data.cFileName + cchPre);
+        }
         if(!FindNextFileA(h, &data)) {
             return;
         }
@@ -62,13 +64,16 @@ VOID Help_ShowGeneral()
         "   tlp                    NATIVE       [ in ]         (FPGA)                   \n" \
         "   tlploop                NATIVE       [ in ]         (FPGA)                   \n" \
         "   probe                  NATIVE       [ min, max ]   (FPGA)                   \n" \
-        "   pslist                 NATIVE                      (MemProcFS/Windows)      \n" \
-        "   psvirt2phys            NATIVE       [ 0, 1 ]       (MemProcFS/Windows)      \n" \
+        "   pslist                 NATIVE                      (Windows)                \n" \
+        "   psvirt2phys            NATIVE       [ 0, 1 ]       (Windows)                \n" \
         "   agent-execpy           NATIVE       [ in, out ]    (Remote LeechAgent)      \n" \
         " System specific commands and valid MODEs [ and options ]:                     \n" \
         "   mac_fvrecover          NATIVE                      (USB3380)                \n" \
         "   mac_fvrecover2         NATIVE                      (USB3380)                \n" \
         "   mac_disablevtd         NATIVE                      (USB3380)                \n" \
+        " External plugin commands:                                                     \n");
+    ShowListFiles("leechp_*"PCILEECH_LIBRARY_FILETYPE, 3, 7, (DWORD)strlen(PCILEECH_LIBRARY_FILETYPE));
+    printf(
         " Valid options:                                                                \n" \
         "   -device: The memory acquisition device to including config options in the   \n" \
         "          device connection string. If option is not given the USB3380 and FPGA\n" \
@@ -118,11 +123,15 @@ VOID Help_ShowGeneral()
         "   -cr3 : base address of page table (PML4) / CR3 CPU register.                \n" \
         "   -efibase : base address of EFI table when inserting select kernel modules.  \n" \
         "          EFI_SYSTEM_TABLE(IBI SYST) == UEFI ; RUNTSERV == LINUX RUNTSERV EFI. \n" \
+        "   -memmap : specify a physical memory map given in a file or specify 'auto'.  \n" \
+        "          to use MemProcFS (Windows required on target&host)                   \n" \
+        "          example: -memmap c:\\temp\\my_custom_memory_map.txt                  \n" \
+        "          example: -memmap auto                                                \n" \
         "   -kmd : address of already loaded kernel module helper (KMD).                \n" \
         "          ALTERNATIVELY                                                        \n" \
         "          kernel module to use, see list below for choices:                    \n" \
         "             WIN10_X64                                                         \n" \
-        "             WIN10_X64_2         (Requires: FPGA & Windows MemProcFS 'vmm.dll')\n" \
+        "             WIN10_X64_2         (Requires: FPGA & Windows)                    \n" \
         "             LINUX_X64_46        (NB! Kernels 2.6.33 - 4.6)                    \n" \
         "             LINUX_X64_48        (NB! Kernels 4.8+, FPGA only)                 \n" \
         "             LINUX_X64_EFI       (NB! UEFI booted systems only)                \n" \
@@ -130,15 +139,15 @@ VOID Help_ShowGeneral()
         "             MACOS                                                             \n" \
         "             UEFI_EXIT_BOOT_SERVICES                                           \n" \
         "             UEFI_SIGNAL_EVENT                                                 \n");
-    ShowListFiles("*.kmd");
+    ShowListFiles("*.kmd", 13, 0, 4);
     printf(
         "   -sig : available patches - including operating system unlock patches:       \n");
-    ShowListFiles("*.sig");
+    ShowListFiles("*.sig", 13, 0, 4);
     printf(
-        " User-Mode implants: EXPERIMENTAL! (Requires: MemProcFS/Windows 'vmm.dll')     \n" \
+        " User-Mode implants: EXPERIMENTAL! (Requires: Windows)                         \n" \
         "             UMD_WINX64_IAT_PSEXEC                                             \n" \
         " Kernel-mode implants:                                                         \n");
-    ShowListFiles("*.ksh");
+    ShowListFiles("*.ksh", 13, 0, 4);
     printf("\n");
 }
 
@@ -146,10 +155,10 @@ VOID Help_ShowInfo()
 {
     printf(
         " PCILEECH INFORMATION                                                          \n" \
-        " PCILeech (c) 2016-2019 Ulf Frisk                                              \n" \
+        " PCILeech (c) 2016-2020 Ulf Frisk                                              \n" \
         " Version: " \
         VER_FILE_VERSION_STR "\n" \
-        "                                                                \n" \
+        "                                                                               \n" \
         " License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
         " Contact information: pcileech@frizk.net                                       \n" \
         " System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \
@@ -546,7 +555,7 @@ VOID Help_ShowDetailed()
         printf(
             " LIST PROCESSES OF THE TARGET SYSTEM                                           \n" \
             " MODES   : NATIVE                                                              \n" \
-            " REQUIRE : Windows/MemProcFS vmm.dll                                           \n" \
+            " REQUIRE : Windows                                                             \n" \
             " OPTIONS :                                                                     \n" \
             " List the process names and pids of the targeted system.                       \n" \
             " EXAMPLEs:                                                                     \n" \
@@ -559,7 +568,7 @@ VOID Help_ShowDetailed()
         printf(
             " TRANSLATE A VIRTUAL MEMORY ADDRESS INTO PHYSICAL MEMORY ADDRESS FOR GIVEN PID \n" \
             " MODES   : NATIVE                                                              \n" \
-            " REQUIRE : Windows/MemProcFS vmm.dll                                           \n" \
+            " REQUIRE : Windows                                                             \n" \
             " OPTIONS : -0, -1                                                              \n" \
             " Translate a process virtual address into a physical address                   \n" \
             " EXAMPLEs:                                                                     \n" \
@@ -570,7 +579,7 @@ VOID Help_ShowDetailed()
         printf(
             " EXECUTE A USER MODE SHELLCODE (EXPERIMENTAL)                                  \n" \
             " MODES   : NATIVE                                                              \n" \
-            " REQUIRE : Windows/MemProcFS vmm.dll                                           \n" \
+            " REQUIRE : Windows                                                             \n" \
             " OPTIONS : -0, -1 -hook -s                                                     \n" \
             " Hook a user mode application (currently supported method is hooking the import\n" \
             " address table - IAT). If the hook is successful the shellcode will be executed\n" \

@@ -6,8 +6,7 @@
 #include "executor.h"
 #include "device.h"
 #include "util.h"
-#include "vmmprx.h"
-#include "leechcore.h"
+#include "vmmx.h"
 
 #define EXEC_IO_MAGIC                   0x12651232dfef9521
 #define EXEC_IO_CONSOLE_BUFFER_SIZE     0x800
@@ -92,8 +91,8 @@ BOOL Exec_ConsoleRedirect_Initialize(_In_ QWORD ConsoleBufferAddr_InputStream, _
     pd->pInfoOS = (PEXEC_IO)pd->pbDataOSConsoleBuffer;
     // read initial buffer and check validity
     result = dwPID ?
-        VmmPrx_MemReadEx(dwPID, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, NULL, VMMDLL_FLAG_NOCACHE) :
-        DeviceReadMEM(ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, 0);
+        Vmmx_MemReadEx(dwPID, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, NULL, VMMDLL_FLAG_NOCACHE) :
+        DeviceReadMEM(ConsoleBufferAddr_OutputStream, 0x1000, pd->pbDataOSConsoleBuffer, FALSE);
     if(!result || (pd->pInfoOS->magic != EXEC_IO_MAGIC)) {
         return FALSE;
     }
@@ -123,16 +122,16 @@ VOID Exec_ConsoleRedirect(_In_ QWORD ConsoleBufferAddr_InputStream, _In_ QWORD C
     while(TRUE) {
         SwitchToThread();
         result = dwPID ?
-            VmmPrx_MemReadEx(dwPID, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, NULL, VMMDLL_FLAG_NOCACHE) :
-            DeviceReadMEM(ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, 0);
+            Vmmx_MemReadEx(dwPID, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, NULL, VMMDLL_FLAG_NOCACHE) :
+            DeviceReadMEM(ConsoleBufferAddr_OutputStream, 0x1000, pd->pbDataOSConsoleBuffer, FALSE);
         if(!result || pd->pInfoOS->magic != EXEC_IO_MAGIC) {
             printf("\nCONSOLE_REDIRECT: Error: Address 0x%016llX does not\ncontain a valid console buffer.\n", ConsoleBufferAddr_OutputStream);
             goto fail;
         }
         if(dwPID) {
-            VmmPrx_MemWrite(dwPID, ConsoleBufferAddr_InputStream, pd->pbDataISConsoleBuffer, 0x1000);
+            Vmmx_MemWrite(dwPID, ConsoleBufferAddr_InputStream, pd->pbDataISConsoleBuffer, 0x1000);
         } else {
-            DeviceWriteMEM(ConsoleBufferAddr_InputStream, pd->pbDataISConsoleBuffer, 0x1000, 0);
+            DeviceWriteMEM(ConsoleBufferAddr_InputStream, 0x1000, pd->pbDataISConsoleBuffer, FALSE);
         }
     }
     fail:
@@ -162,7 +161,7 @@ VOID Exec_Callback(_Inout_ PHANDLE phCallback)
         }
         if(fopen_s(&ph->pFileOutput, ctxMain->cfg.szFileOut, "wb") || !ph->pFileOutput) {
             ph->is.bin.fCompletedAck = TRUE;
-            LeechCore_Write(ctxMain->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, (PBYTE)&ph->is, 0x1000);
+            LcWrite(ctxMain->hLC, ctxMain->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, 0x1000, (PBYTE)&ph->is);
             ph->fError = TRUE;
             printf("EXEC: Failed writing large outut to file: %s\n", ctxMain->cfg.szFileOut);
             return;
@@ -171,19 +170,19 @@ VOID Exec_Callback(_Inout_ PHANDLE phCallback)
     }
     // write to output file and ack to buffer
     if(ph->is.bin.fCompletedAck) { return; }
-    LeechCore_Read(ctxMain->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_OS, (PBYTE)&ph->os, 0x1000);
+    LcRead(ctxMain->hLC, ctxMain->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_OS, 0x1000, (PBYTE)&ph->os);
     if(ph->os.magic != EXEC_IO_MAGIC) { return; }
     if(ph->is.bin.seqAck >= ph->os.bin.seq) { return; }
     cbLength = 0;
     result =
-        DeviceReadDMAEx(ctxMain->pk->DMAAddrPhysical + ctxMain->pk->dataOutExtraOffset, ph->pbDMA, (DWORD)SIZE_PAGE_ALIGN_4K(ctxMain->pk->dataOutExtraLength), NULL, 0) &&
+        DeviceReadDMA(ctxMain->pk->DMAAddrPhysical + ctxMain->pk->dataOutExtraOffset, (DWORD)SIZE_PAGE_ALIGN_4K(ctxMain->pk->dataOutExtraLength), ph->pbDMA, NULL) &&
         (cbLength = fwrite(ph->pbDMA, 1, ctxMain->pk->dataOutExtraLength, ph->pFileOutput)) &&
         (ctxMain->pk->dataOutExtraLength == cbLength);
     ph->qwFileWritten += cbLength;
     ph->fError = !result;
     ph->is.bin.fCompletedAck = ph->is.bin.fCompletedAck || ph->os.bin.fCompleted || !result;
     ph->is.bin.seqAck = ph->os.bin.seq;
-    LeechCore_Write(ctxMain->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, (PBYTE)&ph->is, 0x1000);
+    LcWrite(ctxMain->hLC, ctxMain->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, 0x1000, (PBYTE)&ph->is);
 }
 
 VOID Exec_CallbackClose(_In_opt_ HANDLE hCallback)
@@ -202,6 +201,7 @@ VOID Exec_CallbackClose(_In_opt_ HANDLE hCallback)
     LocalFree(ph);
 }
 
+_Success_(return)
 BOOL Exec_ExecSilent(_In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbIn, _Out_opt_ PBYTE *ppbOut, _Out_opt_ PQWORD pcbOut)
 {
     PKMDDATA pk = ctxMain->pk;
@@ -228,7 +228,7 @@ BOOL Exec_ExecSilent(_In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbI
     //------------------------------------------------
     memcpy(pbBuffer, pKmdExec->pbShellcode, pKmdExec->cbShellcode);
     memcpy(pbBuffer + SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode), pbIn, cbIn);
-    result = LeechCore_WriteEx(pk->DMAAddrPhysical, pbBuffer, cbBuffer, LEECHCORE_FLAG_WRITE_RETRY);
+    result = DeviceWriteDMA_Retry(ctxMain->hLC, pk->DMAAddrPhysical, cbBuffer, pbBuffer);
     if(!result) { goto fail; }
     pk->dataInExtraOffset = SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode);
     pk->dataInExtraLength = cbIn;
@@ -252,7 +252,7 @@ BOOL Exec_ExecSilent(_In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbI
         *pcbOut = pk->dataOutExtraLength;
         *ppbOut = (PBYTE)LocalAlloc(0, SIZE_PAGE_ALIGN_4K(*pcbOut));
         if(!*ppbOut) { result = FALSE; goto fail; }
-        result = SIZE_PAGE_ALIGN_4K(*pcbOut) == DeviceReadDMAEx(pk->DMAAddrPhysical + pk->dataOutExtraOffset, *ppbOut, SIZE_PAGE_ALIGN_4K(*pcbOut), NULL, 0);
+        result = SIZE_PAGE_ALIGN_4K(*pcbOut) == DeviceReadDMA(pk->DMAAddrPhysical + pk->dataOutExtraOffset, SIZE_PAGE_ALIGN_4K(*pcbOut), *ppbOut, NULL);
     }
 fail:
     LocalFree(pKmdExec);
@@ -289,7 +289,7 @@ VOID ActionExecShellcode()
         printf("EXEC: Failed loading shellcode from file: '%s.ksh' ...\n", ctxMain->cfg.szShellcodeName);
         goto fail;
     }
-    result = LeechCore_WriteEx(pk->DMAAddrPhysical, pKmdExec->pbShellcode, (DWORD)pKmdExec->cbShellcode, LEECHCORE_FLAG_WRITE_RETRY | LEECHCORE_FLAG_WRITE_VERIFY);
+    result = DeviceWriteDMA_Verify(ctxMain->hLC, pk->DMAAddrPhysical, (DWORD)pKmdExec->cbShellcode, pKmdExec->pbShellcode);
     if(!result) {
         printf("EXEC: Failed writing shellcode to target memory.\n");
         goto fail;
@@ -303,7 +303,7 @@ VOID ActionExecShellcode()
     //    [0x082000, X       [ = data in (to target computer); X = max(0x100000, cb_in)
     //    [X       , buf_max [ = data out (from target computer)
     //------------------------------------------------
-    LeechCore_Write(pk->DMAAddrPhysical + 0x080000, pbZeroPage2, 0x2000);
+    LcWrite(ctxMain->hLC, pk->DMAAddrPhysical + 0x080000, 0x2000, pbZeroPage2);
     pk->dataInExtraOffset = 0x082000;
     pk->dataInExtraLength = ctxMain->cfg.cbIn;
     pk->dataInExtraLengthMax = max(0x100000, SIZE_PAGE_ALIGN_4K(ctxMain->cfg.cbIn));
@@ -315,7 +315,7 @@ VOID ActionExecShellcode()
     memset(pk->dataOut, 0, sizeof(QWORD) * 10);
     memset(pk->dataOutStr, 0, MAX_PATH);
     if(ctxMain->cfg.cbIn) {
-        result = LeechCore_Write(pk->DMAAddrPhysical + pk->dataInExtraOffset, ctxMain->cfg.pbIn, (DWORD)SIZE_PAGE_ALIGN_4K(ctxMain->cfg.cbIn));
+        result = LcWrite(ctxMain->hLC, pk->DMAAddrPhysical + pk->dataInExtraOffset, (DWORD)SIZE_PAGE_ALIGN_4K(ctxMain->cfg.cbIn), ctxMain->cfg.pbIn);
         if(!result) {
             printf("EXEC: Failed writing data to target memory.\n");
             goto fail;
@@ -352,7 +352,7 @@ VOID ActionExecShellcode()
     if(cbLength > 0) {
         // read extra output buffer
         if(!(pbBuffer = LocalAlloc(LMEM_ZEROINIT, SIZE_PAGE_ALIGN_4K(cbLength))) ||
-            !DeviceReadDMAEx(pk->DMAAddrPhysical + pk->dataOutExtraOffset, pbBuffer, SIZE_PAGE_ALIGN_4K(cbLength), NULL, 0)) {
+            !DeviceReadDMA(pk->DMAAddrPhysical + pk->dataOutExtraOffset, SIZE_PAGE_ALIGN_4K(cbLength), pbBuffer, NULL)) {
             printf("EXEC: Error reading output.\n");
             goto fail;
         }
@@ -393,8 +393,8 @@ fail:
 VOID ActionSvcExecPy()
 {
     BOOL result;
-    DWORD cb = 0;
-    PBYTE pb = NULL;
+    DWORD cbResult = 0;
+    PBYTE pbResult = NULL;
     FILE *pFile = NULL;
     if(!ctxMain->cfg.pbIn || (ctxMain->cfg.cbIn < 4)) {
         printf("AGENT-PYEXEC: Failed. Input file not valid. Please supply input file in -in option.\n");
@@ -402,12 +402,13 @@ VOID ActionSvcExecPy()
     }
     printf("AGENT-PYEXEC: Sending script to remote LeechAgent for processing.\n");
     printf("AGENT-PYEXEC: Waiting for result ...\n");
-    result = LeechCore_AgentCommand(LEECHCORE_AGENTCOMMAND_EXEC_PYTHON_INMEM, 0, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, &pb, &cb);
+    result = LcCommand(ctxMain->hLC, LC_CMD_AGENT_EXEC_PYTHON, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, &pbResult, &cbResult);
     if(!result) {
         printf("AGENT-PYEXEC: Failed.\n");
         return;
     }
-    if(pb && (cb > 0)) {
+    if(pbResult && (cbResult > 0)) {
+        cbResult -= 1;  // remove length of string null terminator.
         // write to out file
         if(ctxMain->cfg.szFileOut[0]) {
             // open output file
@@ -419,20 +420,20 @@ VOID ActionSvcExecPy()
                 printf("AGENT-PYEXEC: Error writing output to file.\n");
                 goto fail;
             }
-            if(cb != fwrite(pb, 1, cb, pFile)) {
+            if(cbResult != fwrite(pbResult, 1, cbResult, pFile)) {
                 printf("AGENT-PYEXEC: Error writing output to file.\n");
                 goto fail;
             }
-            printf("AGENT-PYEXEC: Wrote %i bytes to file %s.\n", cb, ctxMain->cfg.szFileOut);
+            printf("AGENT-PYEXEC: Wrote %i bytes to file %s.\n", cbResult, ctxMain->cfg.szFileOut);
         }
         // print to screen
         printf("AGENT-PYEXEC: Please see result below: \n================================ \n");
-        Util_AsciiFilter(pb, cb); // filter away potentially harmful chars from untrusted remote input
-        printf("%s\n", (LPSTR)pb);
+        Util_AsciiFilter(pbResult, cbResult); // filter away potentially harmful chars from untrusted remote input
+        printf("%s\n", (LPSTR)pbResult);
     }
 
 fail:
     if(pFile) { fclose(pFile); }
-    LocalFree(pb);
+    LcMemFree(pbResult);
 }
 
