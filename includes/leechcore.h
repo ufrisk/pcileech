@@ -14,7 +14,7 @@
 // (c) Ulf Frisk, 2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.0
+// Header Version: 2.1
 //
 
 #ifndef __LEECHCORE_H__
@@ -35,6 +35,7 @@ typedef ULONG64                             QWORD, *PQWORD;
 #endif /* _WIN32 */
 #ifdef LINUX
 #include <inttypes.h>
+#include <stdlib.h>
 
 #define EXPORTED_FUNCTION                   __attribute__((visibility("default")))
 typedef void                                VOID, *PVOID, *HANDLE;
@@ -43,6 +44,7 @@ typedef uint32_t                            DWORD, *PDWORD, BOOL;
 typedef uint8_t                             BYTE, *PBYTE;
 typedef char                                CHAR, *LPSTR;
 typedef const char                          *LPCSTR;
+typedef wchar_t                             WCHAR, *PWCHAR, *LPWSTR;
 #define MAX_PATH                            260
 #define _In_
 #define _In_z_
@@ -76,6 +78,7 @@ typedef const char                          *LPCSTR;
 //-----------------------------------------------------------------------------
 
 #define LC_CONFIG_VERSION                       0xc0fd0002
+#define LC_CONFIG_ERRORINFO_VERSION             0xc0fe0002
 
 #define LC_CONFIG_PRINTF_ENABLED                0x01
 #define LC_CONFIG_PRINTF_V                      0x02
@@ -99,14 +102,34 @@ typedef struct LC_CONFIG {
     CHAR szDeviceName[MAX_PATH];            // device name - such as 'fpga' or 'file'.
 } LC_CONFIG, *PLC_CONFIG;
 
+typedef struct tdLC_CONFIG_ERRORINFO {
+    DWORD dwVersion;                        // must equal LC_CONFIG_ERRORINFO_VERSION
+    DWORD cbStruct;
+    DWORD _FutureUse[16];
+    BOOL fUserInputRequest;
+    DWORD cwszUserText;
+    WCHAR wszUserText[];
+} LC_CONFIG_ERRORINFO, *PLC_CONFIG_ERRORINFO, **PPLC_CONFIG_ERRORINFO;
+
 /*
 * Create a new LeechCore device according to the supplied configuration.
+* CALLER LcMemFree: ppLcCreateErrorInfo
 * -- pLcCreateConfig
+* -- ppLcCreateErrorInfo = ptr to receive function allocated struct with error
+*       information upon function failure. This info may contain a user message
+*       requesting user action as an example. Any returned struct should be
+*       free'd by a call to LcMemFree().
 * -- return
 */
 _Success_(return != NULL)
 EXPORTED_FUNCTION HANDLE LcCreate(
     _Inout_ PLC_CONFIG pLcCreateConfig
+);
+
+_Success_(return != NULL)
+EXPORTED_FUNCTION HANDLE LcCreateEx(
+    _Inout_ PLC_CONFIG pLcCreateConfig,
+    _Out_opt_ PPLC_CONFIG_ERRORINFO ppLcCreateErrorInfo
 );
 
 /*
