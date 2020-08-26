@@ -229,3 +229,6 @@ v4.1
 * Support for v2 of the LeechCore memory acquisition library.
 * MemProcFS integration when running on Windows.
 * Support for user-defined physical memory map (-memmap option).
+
+[v4.6](https://github.com/ufrisk/pcileech/releases/tag/v4.6)
+* Support for [LiveCloudKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveCloudKd).

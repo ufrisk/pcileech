@@ -42,6 +42,7 @@ VOID usleep(_In_ DWORD us);
 #include <time.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <wchar.h>
 
 typedef void                                VOID, *PVOID;
 typedef void                                *HANDLE, **PHANDLE;

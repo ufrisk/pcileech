@@ -103,6 +103,7 @@ fail:
 _Success_(return)
 BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
 {
+    PLC_CONFIG_ERRORINFO pLcErrorInfo = NULL;
     ZeroMemory(&ctxMain->dev, sizeof(ctxMain->dev));
     ctxMain->dev.dwVersion = LC_CONFIG_VERSION;
     if(!fFailSilent) {
@@ -115,9 +116,15 @@ BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
     strcpy_s(ctxMain->dev.szDevice, MAX_PATH, szDevice);
     strcpy_s(ctxMain->dev.szRemote, MAX_PATH, ctxMain->cfg.szRemote);
     ctxMain->dev.paMax = ctxMain->cfg.qwAddrMax;
-    ctxMain->hLC = LcCreate(&ctxMain->dev);
+    ctxMain->hLC = LcCreateEx(&ctxMain->dev, &pLcErrorInfo);
     if(!ctxMain->hLC) {
+        if(pLcErrorInfo && (pLcErrorInfo->dwVersion == LC_CONFIG_ERRORINFO_VERSION)) {
+            if(pLcErrorInfo->cwszUserText) {
+                wprintf(L"MESSAGE FROM MEMORY ACQUISITION DEVICE:\n=======================================\n%s\n", pLcErrorInfo->wszUserText);
+            }
+        }
         ZeroMemory(&ctxMain->dev, sizeof(ctxMain->dev));
+        LcMemFree(pLcErrorInfo);
         return FALSE;
     }
     // enable standard verbosity levels upon success (if not already set)

@@ -243,6 +243,6 @@ VOID PCILeechFreeContext();
 // PCILeech global variables below:
 // ----------------------------------------------------------------------------
 
-PPCILEECH_CONTEXT ctxMain;
+extern PPCILEECH_CONTEXT ctxMain;
 
 #endif /* __PCILEECH_H__ */

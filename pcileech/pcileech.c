@@ -16,6 +16,8 @@
 #include "vfs.h"
 #include "vmmx.h"
 
+PPCILEECH_CONTEXT ctxMain;
+
 BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
 {
     struct ACTION {

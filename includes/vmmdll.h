@@ -1,10 +1,10 @@
 // vmmdll.h : header file to include in projects that use vmm.dll either as
-// stand anlone projects or as native plugins to vmm.dll.
+// stand-alone projects or as native plugins to vmm.dll.
 //
 // (c) Ulf Frisk, 2018-2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 3.3
+// Header Version: 3.4
 //
 
 #include <windows.h>
@@ -50,7 +50,10 @@ extern "C" {
 *              and may not be completed when initialization call is completed.
 *              This includes virtual memory compression, registry and more.
 *              Example: '-waitinitialize'
-*   -forensic = start a forensic scan of the physical memory immediately after
+*    -userinteract = allow vmm.dll to, on the console, query the user for
+*              information such as, but not limited to, leechcore device options.
+*              Default: user interaction = disabled.
+*    -forensic = start a forensic scan of the physical memory immediately after
 *              startup if possible. Allowed parameter values range from 0-4.
 *              Note! forensic mode is not available for live memory.
 *              1 = forensic mode with in-memory sqlite database.
@@ -61,10 +64,17 @@ extern "C" {
 *
 * -- argc
 * -- argv
+* -- ppLcErrorInfo = optional pointer to receive a function allocated memory of
+*              struct LC_CONFIG_ERRORINFO with extended error information upon
+*              failure. Any memory received should be free'd by caller by
+*              calling LcMemFree().
 * -- return = success/fail
 */
 _Success_(return)
 BOOL VMMDLL_Initialize(_In_ DWORD argc, _In_ LPSTR argv[]);
+
+_Success_(return)
+BOOL VMMDLL_InitializeEx(_In_ DWORD argc, _In_ LPSTR argv[], _Out_opt_ PPLC_CONFIG_ERRORINFO ppLcErrorInfo);
 
 /*
 * Close an initialized instance of VMM.DLL and clean up all allocated resources
@@ -378,6 +388,7 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
 #define VMMDLL_FLAG_NOPAGING                        0x0010  // do not try to retrieve memory from paged out memory from pagefile/compressed (even if possible)
 #define VMMDLL_FLAG_NOPAGING_IO                     0x0020  // do not try to retrieve memory from paged out memory if read would incur additional I/O (even if possible).
 #define VMMDLL_FLAG_NOCACHEPUT                      0x0100  // do not write back to the data cache upon successful read from memory acquisition device.
+#define VMMDLL_FLAG_CACHE_RECENT_ONLY               0x0200  // only fetch from the most recent active cache region when reading.
 
 /*
 * Read memory in various non-contigious locations specified by the pointers to
@@ -483,7 +494,7 @@ BOOL VMMDLL_MemVirt2Phys(_In_ DWORD dwPID, _In_ ULONG64 qwVA, _Out_ PULONG64 pqw
 #define VMMDLL_MAP_HEAP_VERSION             1
 #define VMMDLL_MAP_THREAD_VERSION           2
 #define VMMDLL_MAP_HANDLE_VERSION           1
-#define VMMDLL_MAP_NET_VERSION              1
+#define VMMDLL_MAP_NET_VERSION              2
 #define VMMDLL_MAP_PHYSMEM_VERSION          1
 #define VMMDLL_MAP_USER_VERSION             1
 
@@ -621,7 +632,7 @@ typedef struct tdVMMDLL_MAP_NETENTRY {
     } Dst;
     QWORD vaObj;
     QWORD ftTime;
-    DWORD _FutureUse1;
+    DWORD dwPoolTag;
     DWORD cwszText;                 // WCHAR count not including terminating null
     LPWSTR wszText;                 // LPWSTR pointed into VMMOB_MAP_NET.wszMultiText
     DWORD _FutureUse2[4];
@@ -665,7 +676,7 @@ typedef struct tdVMMDLL_MAP_MODULE {
     DWORD cbMultiText;
     DWORD cMap;                     // # map entries.
     VMMDLL_MAP_MODULEENTRY pMap[];  // map entries.
-} VMMDLL_MAP_MODULE, *PVMMDLL_MAP_MODULE; 
+} VMMDLL_MAP_MODULE, *PVMMDLL_MAP_MODULE;
 
 typedef struct tdVMMDLL_MAP_HEAP {
     DWORD dwVersion;
@@ -702,6 +713,7 @@ typedef struct tdVMMDLL_MAP_PHYSMEM {
     DWORD dwVersion;
     DWORD _Reserved1[5];
     DWORD cMap;                     // # map entries.
+    DWORD _Reserved2;
     VMMDLL_MAP_PHYSMEMENTRY pMap[]; // map entries.
 } VMMDLL_MAP_PHYSMEM, *PVMMDLL_MAP_PHYSMEM;
 
