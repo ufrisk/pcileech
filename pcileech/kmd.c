@@ -630,7 +630,7 @@ BOOL KMD_Win_SearchTableHalpApicRequestInterrupt(_In_ PBYTE pbPage, _In_ QWORD q
     BOOL result;
     for(i = 0; i < (0x1000 - 0x78); i += 8) {
         result =
-            ((*(PQWORD)(pbPage + i + 0x00) & ~0xfff) == qwPageVA) &&
+            ((*(PQWORD)(pbPage + i + 0x00) & 0xffffff0000000000) == 0xfffff80000000000) &&
             ((*(PQWORD)(pbPage + i + 0x10) & ~0xfff) == qwPageVA) &&
             ((*(PQWORD)(pbPage + i + 0x18) == 0x28) || (*(PQWORD)(pbPage + i + 0x18) == 0x30)) &&
             ((*(PQWORD)(pbPage + i + 0x78) & 0xffffff0000000000) == 0xfffff80000000000);
