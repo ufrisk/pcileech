@@ -363,7 +363,7 @@ _Success_(return)
 BOOL KMD_LinuxFindFunctionAddrTBL_RelativeSymTabSearch(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbStart, _In_ PKERNELSEEKER pS)
 {
     DWORD o, oFn;
-    for(o = cbStart; o < cb - 8; o += 8) {
+    for(o = cbStart; o < cb - 8; o += 4) {
         if(o + *(PDWORD)(pb + o + 4) + 4 == pS->aSeek) {
             oFn = o + *(PDWORD)(pb + o);
             if((oFn < 0x02000000) && !(oFn & 0xf) && (oFn != o)) {
@@ -455,9 +455,10 @@ BOOL KMD_Linux46KernelSeekSignature(_Out_ PSIGNATURE pSignature)
 QWORD KMD_Linux48KernelBaseSeek()
 {
     PPAGE_STATISTICS pPageStat = NULL;
-    BYTE pb[0x1000], pbCMP90[0x400], pbCMP00[0x100];
+    BYTE pb[0x1000], pbCMPcc[0x400], pbCMP90[0x400], pbCMP00[0x100];
     QWORD qwA, qwAddrMax, i;
     BOOL isAuthenticAMD, isGenuineIntel;
+    memset(pbCMPcc, 0xcc, 0x400);
     memset(pbCMP90, 0x90, 0x400);
     memset(pbCMP00, 0x00, 0x100);
     qwA = max(0x01000000, ctxMain->cfg.qwAddrMin) & 0xffffffffffe00000;
@@ -482,8 +483,8 @@ QWORD KMD_Linux48KernelBaseSeek()
         if(!isGenuineIntel || !isAuthenticAMD) {
             continue;
         }
-        // Verify that page ends with 0x400 NOPs (0x90).
-        if(!LcRead(ctxMain->hLC, qwA, 0x1000, pb) || memcmp(pb + 0xc00, pbCMP90, 0x400)) {
+        // Verify that page ends with 0x400 NOPs (0x90) or 0x400 0xCC.
+        if(!LcRead(ctxMain->hLC, qwA, 0x1000, pb) || (memcmp(pb + 0xc00, pbCMP90, 0x400) && memcmp(pb + 0xc00, pbCMPcc, 0x400))) {
             continue;
         }
         // read kernel base + 0x1000 (hypercall page?) and check that it ends with at least 0x100 0x00.
