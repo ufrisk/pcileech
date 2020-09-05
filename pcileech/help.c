@@ -132,6 +132,7 @@ VOID Help_ShowGeneral()
         "          kernel module to use, see list below for choices:                    \n" \
         "             WIN10_X64                                                         \n" \
         "             WIN10_X64_2         (Requires: FPGA & Windows)                    \n" \
+        "             WIN10_X64_3         (Requires: FPGA & Windows)                    \n" \
         "             LINUX_X64_46        (NB! Kernels 2.6.33 - 4.6)                    \n" \
         "             LINUX_X64_48        (NB! Kernels 4.8+, FPGA only)                 \n" \
         "             LINUX_X64_EFI       (NB! UEFI booted systems only)                \n" \

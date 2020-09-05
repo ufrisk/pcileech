@@ -63,6 +63,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
     ctxMain->cfg.tpAction = NA;
     ctxMain->cfg.qwAddrMax = 0;
     ctxMain->cfg.fOutFile = TRUE;
+    ctxMain->cfg.fUserInteract = TRUE;
     // fetch command line actions/options
     loop:
     while(i < argc) {
@@ -128,6 +129,10 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             continue;
         } else if(0 == _stricmp(argv[i], "-loop")) {
             ctxMain->cfg.fLoop = TRUE;
+            i++;
+            continue;
+        } else if(0 == strcmp(argv[i], "-nouserinteract")) {
+            ctxMain->cfg.fUserInteract = FALSE;
             i++;
             continue;
         } else if(i + 1 >= argc) {

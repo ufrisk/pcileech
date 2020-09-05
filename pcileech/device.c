@@ -100,6 +100,48 @@ fail:
     return fResult;
 }
 
+#ifdef _WIN32
+_Success_(return)
+BOOL DeviceOpen2_RequestUserInput()
+{
+    BOOL fResult;
+    LPSTR szProto;
+    DWORD i, cbRead = 0;
+    CHAR szInput[33] = { 0 };
+    CHAR szDevice[MAX_PATH] = { 0 };
+    HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
+    // 1: read input
+    printf("\n?> ");
+    fResult = ReadConsoleA(hStdIn, szInput, 32, &cbRead, NULL);
+    CloseHandle(hStdIn);
+    for(i = 0; i < _countof(szInput); i++) {
+        if((szInput[i] == '\r') || (szInput[i] == '\n')) { szInput[i] = 0; }
+    }
+    cbRead = (DWORD)strlen(szInput);
+    if(!cbRead) { return FALSE; }
+    // 2: clear "userinput" option and update "device" option
+    ctxMain->cfg.fUserInteract = FALSE;
+    szProto = strstr(ctxMain->cfg.szDevice, "://");
+    snprintf(
+        szDevice,
+        MAX_PATH - 1,
+        "%s%s%sid=%s",
+        ctxMain->cfg.szDevice,
+        szProto ? "" : "://",
+        szProto && szProto[3] ? "," : "",
+        szInput);
+    memcpy(ctxMain->cfg.szDevice, szDevice, MAX_PATH);
+    // 3: try re-initialize with new user input
+    return DeviceOpen();
+}
+#else /* _WIN32 */
+_Success_(return)
+BOOL DeviceOpen2_RequestUserInput()
+{
+    return FALSE;
+}
+#endif /* _WIN32 */
+
 _Success_(return)
 BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
 {
@@ -121,6 +163,10 @@ BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
         if(pLcErrorInfo && (pLcErrorInfo->dwVersion == LC_CONFIG_ERRORINFO_VERSION)) {
             if(pLcErrorInfo->cwszUserText) {
                 wprintf(L"MESSAGE FROM MEMORY ACQUISITION DEVICE:\n=======================================\n%s\n", pLcErrorInfo->wszUserText);
+            }
+            if(ctxMain->cfg.fUserInteract && pLcErrorInfo->fUserInputRequest) {
+                LcMemFree(pLcErrorInfo);
+                return DeviceOpen2_RequestUserInput();
             }
         }
         ZeroMemory(&ctxMain->dev, sizeof(ctxMain->dev));

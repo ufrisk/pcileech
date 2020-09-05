@@ -224,6 +224,9 @@
     <None Include="wx64_stage23_vmm.asm">
       <Filter>Source Files\kmd_core</Filter>
     </None>
+    <None Include="wx64_stage23_vmm3.asm">
+      <Filter>Source Files\kmd_core</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lx64_common.h">

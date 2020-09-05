@@ -99,6 +99,7 @@ typedef struct tdConfig {
     BOOL fPartialPageReadSupported;
     BOOL fAddrKMDSetByArgument;
     BOOL fLoop;
+    BOOL fUserInteract;
 } CONFIG, *PCONFIG;
 
 #define SIGNATURE_CHUNK_TP_OFFSET_FIXED     0

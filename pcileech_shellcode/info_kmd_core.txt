@@ -136,8 +136,14 @@ ml64 wx64_stage3.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main "wx64
 shellcode64.exe -o wx64_stage3.exe
 #
 #
-#=========== Windows x64 - VMM.DLL assisted technique (Memory Process File System) ===========
+#=========== Windows x64 - WIN10_X64_2 - VMM.DLL assisted technique  ===========
 #
 cl.exe /O1 /Os /Oy /FD /MT /Zp1 /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_stage3_c.c
 ml64 wx64_stage23_vmm.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main "wx64_stage3_c.obj"
 shellcode64.exe -o wx64_stage23_vmm.exe
+#
+#=========== Windows x64 - WIN10_X64_3 - VMM.DLL assisted technique  ===========
+#
+cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel wx64_stage3_c.c
+ml64 wx64_stage23_vmm3.asm /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main "wx64_stage3_c.obj"
+shellcode64.exe -o wx64_stage23_vmm3.exe
