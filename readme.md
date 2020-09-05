@@ -236,6 +236,7 @@ v4.1
 [v4.6](https://github.com/ufrisk/pcileech/releases/tag/v4.6)
 * Support for [LiveCloudKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveCloudKd).
 
-Latest:
+[v4.7](https://github.com/ufrisk/pcileech/releases/tag/v4.7)
 * Bug fixes.
-* Unlock signature updates - Win10/Linux (NB! most recent kernels on Linux not yet supported),
+* WIN10_X64_3 new stable kernel signature for Windows 10 - including Win10 2004 release.
+* Unlock signature updates - Win10/Linux (NB! most recent kernels on Linux not yet supported).
