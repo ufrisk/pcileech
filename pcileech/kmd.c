@@ -971,7 +971,7 @@ BOOL KMDOpen_WINX64_3_VMM()
     BOOL f, fResult = FALSE;
     QWORD vaHook, vaCI, vaDataPre = 0, vaExec = 0;
     DWORD i, cSections, dwHookJMP, paKMD = 0, cbShellcode = 0;
-    BYTE pbShellcode[0xc00], pbHookOriginalData[0x14], pbHook[13] = { 0 }, pbZero20[0x20] = { 0 };
+    BYTE pbShellcode[0xc00], pbShellcodeVerify[0xc00], pbHookOriginalData[0x14], pbHook[13] = { 0 }, pbZero20[0x20] = { 0 };
     PIMAGE_SECTION_HEADER pSections = NULL;
     // ------------------------------------------------------------------------
     // 1: Initialize MemProcFS/vmm.dll
@@ -1032,7 +1032,7 @@ BOOL KMDOpen_WINX64_3_VMM()
     }
     *(PQWORD)(pbShellcode + 0x018) = vaDataPre;
     memcpy(pbShellcode + 0x004, pbHookOriginalData, sizeof(pbHookOriginalData));
-    if(!VMMDLL_MemWrite(4, vaExec, pbShellcode, cbShellcode)) {
+    if(!VMMDLL_MemWrite(4, vaExec, pbShellcode, cbShellcode) || !VMMDLL_MemRead(4, vaExec, pbShellcodeVerify, cbShellcode) || memcmp(pbShellcode, pbShellcodeVerify, cbShellcode)) {
         printf("KMD: Failed MemWrite (CI.dll) #6\n");
         goto fail;
     }
