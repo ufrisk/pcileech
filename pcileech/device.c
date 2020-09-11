@@ -109,11 +109,10 @@ BOOL DeviceOpen2_RequestUserInput()
     DWORD i, cbRead = 0;
     CHAR szInput[33] = { 0 };
     CHAR szDevice[MAX_PATH] = { 0 };
-    HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
+    HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);     // must not be closed.
     // 1: read input
     printf("\n?> ");
     fResult = ReadConsoleA(hStdIn, szInput, 32, &cbRead, NULL);
-    CloseHandle(hStdIn);
     for(i = 0; i < _countof(szInput); i++) {
         if((szInput[i] == '\r') || (szInput[i] == '\n')) { szInput[i] = 0; }
     }
