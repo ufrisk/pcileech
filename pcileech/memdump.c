@@ -18,6 +18,7 @@
 
 
 typedef struct tdMEMDUMP_FILEWRITE_DATA {
+    QWORD paMin;
     QWORD pa;
     DWORD cb;
     BYTE pb[MEMDUMP_DATABUFFER_SIZE];
@@ -63,7 +64,7 @@ DWORD MemoryDump_File_ThreadProc(_In_ PMEMDUMP_FILEWRITE ctx)
             continue;
         }
         pd = &ctx->Data[ctx->iRead % MEMDUMP_NUM_BUFFER];
-        _fseeki64(ctx->hFile, pd->pa, SEEK_SET);
+        _fseeki64(ctx->hFile, pd->pa - pd->paMin, SEEK_SET);
         if(pd->cb != fwrite(pd->pb, 1, pd->cb, ctx->hFile)) {
             printf("Memory Dump: Failed. Write to file.\n");
             break;
@@ -207,6 +208,7 @@ VOID ActionMemoryDump_Native()
         pd = &pfw->Data[pfw->iWrite % MEMDUMP_NUM_BUFFER];
         pd->cb = (DWORD)min(MEMDUMP_DATABUFFER_SIZE, paMax - paCurrent);
         pd->pa = paCurrent;
+        pd->paMin = paMin;
         ZeroMemory(pd->pb, pd->cb);
         DeviceReadDMA(pd->pa, pd->cb, pd->pb, pStat);
         InterlockedIncrement64(&pfw->iWrite);
