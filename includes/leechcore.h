@@ -14,7 +14,7 @@
 // (c) Ulf Frisk, 2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.1
+// Header Version: 2.2
 //
 
 #ifndef __LEECHCORE_H__
@@ -309,6 +309,8 @@ EXPORTED_FUNCTION BOOL LcWrite(
 #define LC_OPT_CORE_VERSION_MINOR                   0x4000000600000000  // R
 #define LC_OPT_CORE_VERSION_REVISION                0x4000000700000000  // R
 #define LC_OPT_CORE_ADDR_MAX                        0x1000000800000000  // R
+#define LC_OPT_CORE_STATISTICS_CALL_COUNT           0x4000000900000000  // R [lo-dword: LC_STATISTICS_ID_*]
+#define LC_OPT_CORE_STATISTICS_CALL_TIME            0x4000000a00000000  // R [lo-dword: LC_STATISTICS_ID_*]
 
 #define LC_OPT_MEMORYINFO_VALID                     0x0200000100000000  // R
 #define LC_OPT_MEMORYINFO_FLAG_32BIT                0x0200000300000000  // R
@@ -341,6 +343,7 @@ EXPORTED_FUNCTION BOOL LcWrite(
 #define LC_OPT_FPGA_VERSION_MINOR                   0x0300008300000000  // R
 #define LC_OPT_FPGA_ALGO_TINY                       0x0300008400000000  // RW - 1/0 use tiny 128-byte/tlp read algorithm.
 #define LC_OPT_FPGA_ALGO_SYNCHRONOUS                0x0300008500000000  // RW - 1/0 use synchronous (old) read algorithm.
+#define LC_OPT_FPGA_CFGSPACE_XILINX                 0x0300008600000000  // RW - [lo-dword: register address in bytes] [bytes: 0-3: data, 4-7: byte_enable(if wr/set); top bit = cfg_mgmt_wr_rw1c_as_rw]
 
 #define LC_CMD_FPGA_WRITE_TLP                       0x0000010100000000  // R
 #define LC_CMD_FPGA_LISTEN_TLP                      0x0000010200000000  // R
