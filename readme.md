@@ -240,3 +240,6 @@ v4.1
 * Bug fixes.
 * WIN10_X64_3 new stable kernel signature for Windows 10 - including Win10 2004 release.
 * Unlock signature updates - Win10/Linux (NB! most recent kernels on Linux not yet supported).
+
+Latest:
+* Bug fixes.

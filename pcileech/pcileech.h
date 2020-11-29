@@ -74,6 +74,7 @@ typedef struct tdConfig {
     CHAR szDevice[MAX_PATH];
     CHAR szRemote[MAX_PATH];
     CHAR szMemMap[MAX_PATH];
+    CHAR szMemMapStr[2048];
     CHAR szFileOut[MAX_PATH];
     PBYTE pbIn;
     QWORD cbIn;

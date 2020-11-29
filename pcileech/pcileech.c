@@ -153,6 +153,10 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             strcpy_s(ctxMain->cfg.szRemote, MAX_PATH, argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-memmap")) {
             strcpy_s(ctxMain->cfg.szMemMap, MAX_PATH, argv[i + 1]);
+        } else if(0 == _stricmp(argv[i], "-memmap-str")) {
+            strcpy_s(ctxMain->cfg.szMemMapStr, _countof(ctxMain->cfg.szMemMapStr), argv[i + 1]);
+            i += 2;
+            continue;
         } else if(0 == strcmp(argv[i], "-out")) {
             if((0 == _stricmp(argv[i + 1], "none")) || (0 == _stricmp(argv[i + 1], "null"))) {
                 ctxMain->cfg.fOutFile = FALSE;
@@ -187,6 +191,10 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
     }
     // set dummy qwAddrMax value (if possible) to disable auto-detect in LeechCore.
     if((ctxMain->cfg.tpAction == TLP) || (ctxMain->cfg.tpAction == DISPLAY) || (ctxMain->cfg.tpAction == PAGEDISPLAY)) {
+        ctxMain->cfg.qwAddrMax = -1;
+    }
+    // disable memory auto-detect when memmap is specified
+    if(!ctxMain->cfg.qwAddrMax && (ctxMain->cfg.szMemMap[0] || ctxMain->cfg.szMemMapStr[0])) {
         ctxMain->cfg.qwAddrMax = -1;
     }
     // try correct erroneous options, if needed

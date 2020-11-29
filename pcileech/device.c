@@ -62,6 +62,7 @@ DWORD DeviceReadDMA(_In_ QWORD pa, _In_ DWORD cb, _Out_writes_(cb) PBYTE pb, _In
 
 /*
 * Set a custom user-defined or auto-generated memory map either from:
+* - command line argument
 * - file: a user defined memory map text file.
 * - auto: auto generated memory map retrieved using MemProcFS when target OS
 *         is Windows and when PCILeech is running on Windows OS.
@@ -144,6 +145,7 @@ BOOL DeviceOpen2_RequestUserInput()
 _Success_(return)
 BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
 {
+    BOOL f;
     PLC_CONFIG_ERRORINFO pLcErrorInfo = NULL;
     ZeroMemory(&ctxMain->dev, sizeof(ctxMain->dev));
     ctxMain->dev.dwVersion = LC_CONFIG_VERSION;
@@ -185,6 +187,14 @@ BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
     if(ctxMain->cfg.szMemMap[0]) {
         if(!DeviceOpen2_SetCustomMemMap()) {
             printf("PCILEECH: Invalid memory map: '%s'.\n", ctxMain->cfg.szMemMap);
+            return FALSE;
+        }
+    }
+    if(ctxMain->cfg.szMemMapStr[0]) {
+        f = LcCommand(ctxMain->hLC, LC_CMD_MEMMAP_SET, (DWORD)strlen(ctxMain->cfg.szMemMapStr), ctxMain->cfg.szMemMapStr, NULL, NULL) &&
+            LcGetOption(ctxMain->hLC, LC_OPT_CORE_ADDR_MAX, &ctxMain->dev.paMax);
+        if(!f) {
+            printf("PCILEECH: Invalid memory map given on command line option.\n");
             return FALSE;
         }
     }
