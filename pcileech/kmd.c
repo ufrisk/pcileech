@@ -848,14 +848,14 @@ BOOL KMDOpen_WINX64_2_VMM()
     //    i.e. function table in hal.dll heap. Result is address of function pointer to
     //    place hook upon.
     // ------------------------------------------------------------------------
-    if(!VMMDLL_ProcessMap_GetPte(4, NULL, &cbMemMap, FALSE) || !cbMemMap) {
-        printf("KMD: Failed vmm.dll!ProcessGetMemoryMap #1.\n");
+    if(!VMMDLL_Map_GetPte(4, NULL, &cbMemMap, FALSE) || !cbMemMap) {
+        printf("KMD: Failed vmm.dll!Map_GetPte #1.\n");
         goto fail;
     }
     pMemMap = LocalAlloc(LMEM_ZEROINIT, cbMemMap);
     if(!pMemMap) { goto fail; }
-    if(!VMMDLL_ProcessMap_GetPte(4, pMemMap, &cbMemMap, FALSE)) {
-        printf("KMD: Failed vmm.dll!ProcessGetMemoryMap #2.\n");
+    if(!VMMDLL_Map_GetPte(4, pMemMap, &cbMemMap, FALSE)) {
+        printf("KMD: Failed vmm.dll!Map_GetPte #2.\n");
         goto fail;
     }
     while(TRUE) {
