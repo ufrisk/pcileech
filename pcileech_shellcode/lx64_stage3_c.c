@@ -47,10 +47,11 @@ typedef struct tdFNLX { // VOID definitions for LINUX functions (used in main co
 	QWORD do_gettimeofday;
 	QWORD walk_system_ram_range;
 	QWORD iounmap;
-	QWORD ioremap_nocache;
+	QWORD ioremap;
     // optional values below - do not use
     QWORD ktime_get_real_ts64;      // do_gettimeofday alternative if export is missing.
-	QWORD ReservedFutureUse[21];
+	QWORD _ioremap_nocache;
+	QWORD ReservedFutureUse[20];
 } FNLX, *PFNLX;
 
 #define KMDDATA_OPERATING_SYSTEM_LINUX			0x02
@@ -247,7 +248,7 @@ VOID stage3_c_EntryPoint(PKMDDATA pk)
 			} else {
 				qwMM = (qw == 0) ?
 					m_phys_to_virt(pk->AddrKallsymsLookupName, pk->_address) :
-					SysVCall(pk->fn.ioremap_nocache, pk->_address, pk->_size);
+					SysVCall(pk->fn.ioremap, pk->_address, pk->_size);
 				if(qwMM) {
 					if(KMD_CMD_READ == pk->_op) { // READ
 						SysVCall(pk->fn.memcpy, pk->DMAAddrVirtual, qwMM, pk->_size);

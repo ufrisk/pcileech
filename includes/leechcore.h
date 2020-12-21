@@ -14,7 +14,7 @@
 // (c) Ulf Frisk, 2020
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.2
+// Header Version: 2.3
 //
 
 #ifndef __LEECHCORE_H__
@@ -353,9 +353,10 @@ EXPORTED_FUNCTION BOOL LcWrite(
 #define LC_CMD_FPGA_CFGREGDRP                       0x0000010600000000  // RW - [lo-dword: register address]
 #define LC_CMD_FPGA_CFGREGCFG_MARKWR                0x0000010700000000  // W  - write with mask [lo-dword: register address] [bytes: 0-1: data, 2-3: mask]
 #define LC_CMD_FPGA_CFGREGPCIE_MARKWR               0x0000010800000000  // W  - write with mask [lo-dword: register address] [bytes: 0-1: data, 2-3: mask]
-#define LC_CMD_FPGA_PCIECFGSPACE_WR                 0x0000010900000000  // W
 #define LC_CMD_FPGA_CFGREG_DEBUGPRINT               0x0000010a00000000  // N/A
 #define LC_CMD_FPGA_PROBE                           0x0000010b00000000  // RW
+#define LC_CMD_FPGA_CFGSPACE_SHADOW_RD              0x0000010c00000000  // R
+#define LC_CMD_FPGA_CFGSPACE_SHADOW_WR              0x0000010d00000000  // W  - [lo-dword: config space write base address]
 
 #define LC_CMD_FILE_DUMPHEADER_GET                  0x0000020100000000  // R
 

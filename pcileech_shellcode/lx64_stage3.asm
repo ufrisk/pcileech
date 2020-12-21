@@ -59,7 +59,7 @@ LookupFunctions PROC
 	PUSH r13
 	MOV r15, rcx				; address of kallsyms_lookup_name
 	MOV r14, rdx				; ptr to FNLX struct 
-	MOV r13, 11*8				; num functions * 8
+	MOV r13, 12*8				; num functions * 8
 	; ----------------------------------------------------
 	; 1: PUSH FUNCTION NAME POINTERS ON STACK
 	; ----------------------------------------------------
@@ -81,9 +81,11 @@ LookupFunctions PROC
 	PUSH rax
 	LEA rax, str_iounmap
 	PUSH rax
-	LEA rax, str_ioremap_nocache
+	LEA rax, str_ioremap
 	PUSH rax
 	LEA rax, str_ktime_get_real_ts64
+	PUSH rax
+	LEA rax, str_ioremap_nocache
 	PUSH rax
 	; ----------------------------------------------------
 	; 2: LOOKUP FUNCTION POINTERS BY NAME
@@ -97,8 +99,17 @@ LookupFunctions PROC
 	TEST r13, r13
 	JNZ lookup_loop
 	; ----------------------------------------------------
-	; 3: RESTORE NV REGISTERS AND RETURN
+	; 3: IF 'ioremap' DOES NOT EXIST FALLBACK TO 'ioremap_nocache'
 	; ----------------------------------------------------
+	MOV rax, [r14+9*8]
+	TEST rax, rax
+	JNZ lookup_finish
+	MOV rax, [r14+11*8]
+	MOV [r14+9*8], rax
+	; ----------------------------------------------------
+	; 4: RESTORE NV REGISTERS AND RETURN
+	; ----------------------------------------------------
+	lookup_finish:
 	POP r13
 	POP r14
 	POP r15
@@ -115,6 +126,7 @@ str_page_offset_base			db		'page_offset_base', 0
 str_vmemmap_base				db		'vmemmap_base', 0
 str_walk_system_ram_range		db		'walk_system_ram_range', 0
 str_iounmap						db		'iounmap', 0
+str_ioremap						db		'ioremap', 0
 str_ioremap_nocache				db		'ioremap_nocache', 0
 str_ktime_get_real_ts64			db		'ktime_get_real_ts64', 0
 

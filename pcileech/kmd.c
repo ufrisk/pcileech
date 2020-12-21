@@ -290,73 +290,42 @@ error:
 // 4.8+ version that works with 64-bit addressing, 32-bit will work too if kernel is KASLRed <4GB.
 //-------------------------------------------------------------------------------
 
-_Success_(return)
-BOOL KMD_LinuxIsAllAddrFoundSeek(_In_ PKERNELSEEKER pS, _In_ DWORD cS)
+DWORD KMD_LinuxFindFunctionAddr(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
 {
-    DWORD j;
-    for(j = 0; j < cS; j++) {
-        if(!pS[j].aSeek) {
-            return FALSE;
-        }
-    }
-    return TRUE;
-}
-
-_Success_(return)
-BOOL KMD_LinuxIsAllAddrFoundTableEntry(_In_ PKERNELSEEKER pS, _In_ DWORD cS)
-{
-    DWORD j;
-    for(j = 0; j < cS; j++) {
-        if(!pS[j].aTableEntry) {
-            return FALSE;
-        }
-    }
-    return TRUE;
-}
-
-_Success_(return)
-BOOL KMD_LinuxFindFunctionAddr(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
-{
-    DWORD o, i;
+    DWORD o, i, c = 0;
     for(o = 0; o < cb - 0x1000; o++) {
         for(i = 0; i < cS; i++) {
             if(!pS[i].aSeek && !memcmp(pb + o, pS[i].pbSeek, pS[i].cbSeek)) {
                 pS[i].aSeek = o + 1;
-                if(KMD_LinuxIsAllAddrFoundSeek(pS, cS)) {
-                    return TRUE;
-                }
+                c++;
+                if(c == cS) { return c; }
             }
         }
     }
-    return FALSE;
+    return c;
 }
 
 /*
 * Locate function addresses in symtab with absolute addressing.
 */
-_Success_(return)
-BOOL KMD_LinuxFindFunctionAddrTBL_Absolute(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
+VOID KMD_LinuxFindFunctionAddrTBL_Absolute(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
 {
     DWORD o, i;
     for(o = 0x1000; o < cb - 0x1000; o = o + 8) {
         if(((*(PQWORD)(pb + o) & 0xffffffff00000000) == 0xffffffff00000000) && ((*(PQWORD)(pb + o - 8) & 0xffffffff00000000) == 0xffffffff00000000)) { // kernel addr ptr
             for(i = 0; i < cS; i++) {
-                if(!pS[i].aTableEntry) {
+                if(pS[i].aSeek && !pS[i].aTableEntry) {
                     if((*(PQWORD)(pb + o) & 0x1fffff) == (0x1fffff & pS[i].aSeek)) { // KASLR align on 2MB boundaries (0x1fffff)
                         if((*(PQWORD)(pb + o) & ~0x1fffff) != (*(PQWORD)(pb + o - 8)  & ~0x1fffff)) { // several tables may exists - skip symbol name table)
                             pS[i].aTableEntry = o;
                             pS[i].vaSeek = *(PQWORD)(pb + o);
                             pS[i].vaFn = *(PQWORD)(pb + o - 8);
-                            if(KMD_LinuxIsAllAddrFoundTableEntry(pS, cS)) {
-                                return TRUE;
-                            }
                         }
                     }
                 }
             }
         }
     }
-    return FALSE;
 }
 
 _Success_(return)
@@ -379,11 +348,10 @@ BOOL KMD_LinuxFindFunctionAddrTBL_RelativeSymTabSearch(_In_ PBYTE pb, _In_ DWORD
 /*
 * Locate function addresses in symtab with relative addressing.
 */
-_Success_(return)
-BOOL KMD_LinuxFindFunctionAddrTBL_Relative(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
+VOID KMD_LinuxFindFunctionAddrTBL_Relative(_In_ PBYTE pb, _In_ DWORD cb, _Inout_updates_(cS) PKERNELSEEKER pS, _In_ DWORD cS)
 {
     QWORD va, vaBase = (QWORD)-1;
-    DWORD i, o;
+    DWORD i, o, c = 0;
     // 1: Locate virtual address base of kernel by just scanning for lowest value
     //    of qualifying pointer - dirty but it seems to be working ...
     for(i = 0, o = pS->aSeek & ~0xf; o < cb - 8; o += 8) {
@@ -394,23 +362,21 @@ BOOL KMD_LinuxFindFunctionAddrTBL_Relative(_In_ PBYTE pb, _In_ DWORD cb, _In_ PK
         }
     }
     if(vaBase == (QWORD)-1) {
-        return FALSE;
+        return;
     }
     // 2: Locate relative addresses of functions from symtab and fix virtual addresses
     for(i = 0; i < cS; i++) {
-        if(!KMD_LinuxFindFunctionAddrTBL_RelativeSymTabSearch(pb, cb, ((pS[0].aSeek & ~0xf) - 0x00100000), pS + i)) {
-            return FALSE;
-        }
+        if(!pS[i].aSeek || pS[i].vaSeek) { continue; }
+        if(!KMD_LinuxFindFunctionAddrTBL_RelativeSymTabSearch(pb, cb, ((pS[i].aSeek & ~0xf) - 0x00100000), pS + i)) { continue; }
         pS[i].vaSeek = vaBase + pS[i].aSeek;
         pS[i].vaFn = vaBase + pS[i].aFn;
     }
-    return TRUE;
 }
 
-_Success_(return)
-BOOL KMD_LinuxFindFunctionAddrTBL(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
+VOID KMD_LinuxFindFunctionAddrTBL(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
 {
-    return KMD_LinuxFindFunctionAddrTBL_Absolute(pb, cb, pS, cS) || KMD_LinuxFindFunctionAddrTBL_Relative(pb, cb, pS, cS);
+    KMD_LinuxFindFunctionAddrTBL_Absolute(pb, cb, pS, cS);
+    KMD_LinuxFindFunctionAddrTBL_Relative(pb, cb, pS, cS);
 }
 
 #define CONFIG_LINUX_SEEK_BUFFER_SIZE       0x01000000
@@ -418,7 +384,7 @@ BOOL KMD_LinuxFindFunctionAddrTBL(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEK
 _Success_(return)
 BOOL KMD_Linux46KernelSeekSignature(_Out_ PSIGNATURE pSignature)
 {
-    BOOL result;
+    BOOL result = FALSE;
     KERNELSEEKER ks[2] = {
         { .pbSeek = (PBYTE)"\0kallsyms_lookup_name",.cbSeek = 22 },
         { .pbSeek = (PBYTE)"\0vfs_read",.cbSeek = 10 }
@@ -434,18 +400,19 @@ BOOL KMD_Linux46KernelSeekSignature(_Out_ PSIGNATURE pSignature)
             DeviceReadDMA(dwKernelBase, 0x01000000, pb, NULL);
         } else {
             memmove(pb, pb + 0x00200000, CONFIG_LINUX_SEEK_BUFFER_SIZE - 0x00200000);
-            result = DeviceReadDMA_Retry(
+            DeviceReadDMA_Retry(
                 ctxMain->hLC,
                 (QWORD)dwKernelBase + CONFIG_LINUX_SEEK_BUFFER_SIZE - 0x00200000,
                 0x00200000,
                 pb + CONFIG_LINUX_SEEK_BUFFER_SIZE - 0x00200000);
         }
-        result =
-            KMD_LinuxFindFunctionAddr(pb, CONFIG_LINUX_SEEK_BUFFER_SIZE, ks, 2) &&
+        if(2 == KMD_LinuxFindFunctionAddr(pb, CONFIG_LINUX_SEEK_BUFFER_SIZE, ks, 2)) {
             KMD_LinuxFindFunctionAddrTBL(pb, CONFIG_LINUX_SEEK_BUFFER_SIZE, ks, 2);
-        if(result) {
-            Util_CreateSignatureLinuxGeneric(dwKernelBase, ks[0].aSeek, ks[0].vaSeek, ks[0].vaFn, ks[1].aSeek, ks[1].vaSeek, ks[1].vaFn, pSignature);
-            break;
+            if(ks[0].vaFn && ks[1].vaFn) {
+                Util_CreateSignatureLinuxGeneric(dwKernelBase, ks[0].aSeek, ks[0].vaSeek, ks[0].vaFn, ks[1].aSeek, ks[1].vaSeek, ks[1].vaFn, pSignature);
+                result = TRUE;
+                break;
+            }
         }
     }
     LocalFree(pb);
@@ -487,9 +454,11 @@ QWORD KMD_Linux48KernelBaseSeek()
         if(!LcRead(ctxMain->hLC, qwA, 0x1000, pb) || (memcmp(pb + 0xc00, pbCMP90, 0x400) && memcmp(pb + 0xc00, pbCMPcc, 0x400))) {
             continue;
         }
-        // read kernel base + 0x1000 (hypercall page?) and check that it ends with at least 0x100 0x00.
+        // read kernel base +0x1000/+0x2000 (hypercall page?) and check that it ends with at least 0x100 0x00.
         if(!LcRead(ctxMain->hLC, qwA + 0x1000, 0x1000, pb) || memcmp(pb + 0xf00, pbCMP00, 0x100)) {
-            continue;
+            if(!LcRead(ctxMain->hLC, qwA + 0x2000, 0x1000, pb) || memcmp(pb + 0xf00, pbCMP00, 0x100)) {
+                continue;
+            }
         }
         PageStatClose(&pPageStat);
         return qwA;
@@ -499,6 +468,25 @@ QWORD KMD_Linux48KernelBaseSeek()
 }
 
 #define KMD_LINUX48SEEK_MAX_BYTES       0x02000000      // 32MB
+VOID KMD_Linux48KernelSeekSignature_KallsymsFromKDBGetSym(_In_reads_(KMD_LINUX48SEEK_MAX_BYTES) PBYTE pb, _In_ PKERNELSEEKER pKDBGetSym, _Inout_ PKERNELSEEKER pKallsyms)
+{
+    DWORD o, aRel;
+    // sloppy dism to find 1st CALL (guess it's to callsyms_lookup_name)
+    if(pKDBGetSym->aFn > KMD_LINUX48SEEK_MAX_BYTES - 0x1000) { return; }
+    for(o = 0; o < 0x60; o++) {
+        if(pb[pKDBGetSym->aFn + o] == 0xE8) {
+            aRel = pKDBGetSym->aFn + o + 5 + *(PDWORD)(pb + pKDBGetSym->aFn + o + 1);
+            if(aRel < KMD_LINUX48SEEK_MAX_BYTES - 0x1000) {
+                pKallsyms->aFn = aRel;
+                pKallsyms->vaFn = pKDBGetSym->vaFn - pKDBGetSym->aFn + aRel;
+                // fake copy sz info from KDBGetSym into Kallsyms; it's needed by signature creation
+                pKallsyms->aSeek = pKDBGetSym->aSeek;
+                pKallsyms->vaSeek = pKDBGetSym->vaSeek;
+            }
+        }
+    }
+}
+
 _Success_(return)
 BOOL KMD_Linux48KernelSeekSignature(_Out_ PSIGNATURE pSignature)
 {
@@ -506,9 +494,10 @@ BOOL KMD_Linux48KernelSeekSignature(_Out_ PSIGNATURE pSignature)
     PBYTE pb = NULL;
     QWORD paKernelBase;
     PPAGE_STATISTICS pPageStat = NULL;
-    KERNELSEEKER ks[2] = {
+    KERNELSEEKER ks[3] = {
         { .pbSeek = (PBYTE)"\0kallsyms_lookup_name",.cbSeek = 22 },
-        { .pbSeek = (PBYTE)"\0vfs_read",.cbSeek = 10 }
+        { .pbSeek = (PBYTE)"\0vfs_read",.cbSeek = 10 },
+        { .pbSeek = (PBYTE)"\0kdbgetsymval",.cbSeek = 14 }
     };
     if(!(pb = LocalAlloc(0, KMD_LINUX48SEEK_MAX_BYTES))) { goto fail; }
     paKernelBase = KMD_Linux48KernelBaseSeek();
@@ -517,9 +506,15 @@ BOOL KMD_Linux48KernelSeekSignature(_Out_ PSIGNATURE pSignature)
     if(!PageStatInitialize(&pPageStat, paKernelBase, paKernelBase + KMD_LINUX48SEEK_MAX_BYTES, "Verifying Linux kernel base", FALSE, FALSE)) { goto fail; }
     PageStatUpdate(pPageStat, paKernelBase, 0, 0);
     DeviceReadDMA(paKernelBase, KMD_LINUX48SEEK_MAX_BYTES, pb, pPageStat);
-    result = KMD_LinuxFindFunctionAddr(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 2) && KMD_LinuxFindFunctionAddrTBL(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 2);
-    if(result) {
+    KMD_LinuxFindFunctionAddr(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 3);
+    KMD_LinuxFindFunctionAddrTBL_Absolute(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 3);
+    KMD_LinuxFindFunctionAddrTBL_Relative(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 3);
+    if(!ks[0].vaFn && ks[2].vaFn) { // kdbgetsymval exists; but not kallsyms_lookup_name not located
+        KMD_Linux48KernelSeekSignature_KallsymsFromKDBGetSym(pb, &ks[2], &ks[0]);
+    }
+    if(ks[0].vaFn && ks[1].vaFn) {
         Util_CreateSignatureLinuxGeneric(paKernelBase, ks[0].aSeek, ks[0].vaSeek, ks[0].vaFn, ks[1].aSeek, ks[1].vaSeek, ks[1].vaFn, pSignature);
+        result = TRUE;
     }
     // fall-through
 fail:

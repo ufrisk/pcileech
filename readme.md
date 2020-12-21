@@ -239,5 +239,6 @@ v4.1
 * WIN10_X64_3 new stable kernel signature for Windows 10 - including Win10 2004 release.
 * Unlock signature updates - Win10/Linux (NB! most recent kernels on Linux not yet supported).
 
-Latest:
+[v4.8](https://github.com/ufrisk/pcileech/releases/tag/v4.8)
 * Bug fixes.
+* Better support for recent x64 Linux kernels.
