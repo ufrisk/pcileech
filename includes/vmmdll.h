@@ -1,10 +1,10 @@
 // vmmdll.h : header file to include in projects that use vmm.dll either as
 // stand-alone projects or as native plugins to vmm.dll.
 //
-// (c) Ulf Frisk, 2018-2020
+// (c) Ulf Frisk, 2018-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 3.6
+// Header Version: 3.7
 //
 
 #include <windows.h>
@@ -324,9 +324,9 @@ _Success_(return)
 BOOL VMMDLL_InitializePlugins();
 
 #define VMMDLL_PLUGIN_CONTEXT_MAGIC                 0xc0ffee663df9301c
-#define VMMDLL_PLUGIN_CONTEXT_VERSION               3
+#define VMMDLL_PLUGIN_CONTEXT_VERSION               4
 #define VMMDLL_PLUGIN_REGINFO_MAGIC                 0xc0ffee663df9301d
-#define VMMDLL_PLUGIN_REGINFO_VERSION               9
+#define VMMDLL_PLUGIN_REGINFO_VERSION               10
 
 #define VMMDLL_PLUGIN_NOTIFY_VERBOSITYCHANGE        0x01
 #define VMMDLL_PLUGIN_NOTIFY_REFRESH_FAST           0x05    // refresh fast event   - at partial process refresh.
@@ -335,6 +335,8 @@ BOOL VMMDLL_InitializePlugins();
 
 #define VMMDLL_PLUGIN_NOTIFY_FORENSIC_INIT          0x01000100
 #define VMMDLL_PLUGIN_NOTIFY_FORENSIC_INIT_COMPLETE 0x01000200
+
+typedef HANDLE                                      *PVMMDLL_PLUGIN_INTERNAL_CONTEXT;
 
 typedef struct tdVMMDLL_PLUGIN_CONTEXT {
     ULONG64 magic;
@@ -345,7 +347,7 @@ typedef struct tdVMMDLL_PLUGIN_CONTEXT {
     LPWSTR wszModule;
     LPWSTR wszPath;
     PVOID pvReserved1;
-    PVOID pvReserved2;
+    PVMMDLL_PLUGIN_INTERNAL_CONTEXT ctxM;       // optional internal module context.
 } VMMDLL_PLUGIN_CONTEXT, *PVMMDLL_PLUGIN_CONTEXT;
 
 typedef struct tdVMMDLL_PLUGIN_FORENSIC_INGEST_PHYSMEM {
@@ -366,9 +368,9 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
     HMODULE hReservedDllPython3X;   // not for general use (only used for python).
     BOOL(*pfnPluginManager_Register)(struct tdVMMDLL_PLUGIN_REGINFO *pPluginRegInfo);
     HMODULE hReservedDllPython3;    // not for general use (only used for python).
-    PVOID pvReserved2;
     // general plugin registration info to be filled out by the plugin below:
     struct {
+        PVMMDLL_PLUGIN_INTERNAL_CONTEXT ctxM;   // optional internal module context [must be cleaned by pfnClose() call].
         WCHAR wszPathName[128];
         BOOL fRootModule;
         BOOL fProcessModule;
@@ -381,12 +383,12 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
     } reg_info;
     // function plugin registration info to be filled out by the plugin below:
     struct {
-        BOOL(*pfnList)(_In_ PVMMDLL_PLUGIN_CONTEXT ctx, _Inout_ PHANDLE pFileList);
-        NTSTATUS(*pfnRead)(_In_ PVMMDLL_PLUGIN_CONTEXT ctx, _Out_writes_to_(cb, *pcbRead) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbRead,  _In_ ULONG64 cbOffset);
-        NTSTATUS(*pfnWrite)(_In_ PVMMDLL_PLUGIN_CONTEXT ctx, _In_reads_(cb) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ ULONG64 cbOffset);
-        VOID(*pfnNotify)(_In_ DWORD fEvent, _In_opt_ PVOID pvEvent, _In_opt_ DWORD cbEvent);
-        VOID(*pfnClose)();
-        BOOL(*pfnVisibleModule)(_In_ PVMMDLL_PLUGIN_CONTEXT ctx);
+        BOOL(*pfnList)(_In_ PVMMDLL_PLUGIN_CONTEXT ctxP, _Inout_ PHANDLE pFileList);
+        NTSTATUS(*pfnRead)(_In_ PVMMDLL_PLUGIN_CONTEXT ctxP, _Out_writes_to_(cb, *pcbRead) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbRead,  _In_ ULONG64 cbOffset);
+        NTSTATUS(*pfnWrite)(_In_ PVMMDLL_PLUGIN_CONTEXT ctxP, _In_reads_(cb) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ ULONG64 cbOffset);
+        VOID(*pfnNotify)(_In_ PVMMDLL_PLUGIN_CONTEXT ctxP, _In_ DWORD fEvent, _In_opt_ PVOID pvEvent, _In_opt_ DWORD cbEvent);
+        VOID(*pfnClose)(_In_ PVMMDLL_PLUGIN_CONTEXT ctxP);
+        BOOL(*pfnVisibleModule)(_In_ PVMMDLL_PLUGIN_CONTEXT ctxP);
         PVOID pvReserved[10];
     } reg_fn;
     // Optional forensic plugin functionality for forensic (more comprehensive)
@@ -416,6 +418,7 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
         DWORD _Reserved[32];
     } sysinfo;
 } VMMDLL_PLUGIN_REGINFO, *PVMMDLL_PLUGIN_REGINFO;
+
 
 
 //-----------------------------------------------------------------------------
@@ -550,7 +553,7 @@ BOOL VMMDLL_MemVirt2Phys(_In_ DWORD dwPID, _In_ ULONG64 qwVA, _Out_ PULONG64 pqw
 #define VMMDLL_MAP_NET_VERSION              2
 #define VMMDLL_MAP_PHYSMEM_VERSION          1
 #define VMMDLL_MAP_USER_VERSION             1
-#define VMMDLL_MAP_SERVICE_VERSION          1
+#define VMMDLL_MAP_SERVICE_VERSION          2
 
 // flags to check for existence in the fPage field of VMMDLL_MAP_PTEENTRY
 #define VMMDLL_MEMMAP_FLAG_PAGE_W          0x0000000000000002
@@ -793,6 +796,7 @@ typedef struct tdVMMDLL_MAP_SERVICEENTRY {
     LPWSTR wszPath;
     LPWSTR wszUserTp;
     LPWSTR wszUserAcct;
+    LPWSTR wszImagePath;
     DWORD dwPID;
     DWORD _FutureUse1;
     QWORD _FutureUse2;
