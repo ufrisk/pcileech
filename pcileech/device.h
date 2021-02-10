@@ -1,6 +1,6 @@
 // device.h : definitions related to the hardware devices.
 //
-// (c) Ulf Frisk, 2016-2020
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __DEVICE_H__

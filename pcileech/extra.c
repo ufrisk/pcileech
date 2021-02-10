@@ -1,6 +1,6 @@
 // extra.c : implementation related various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016-2020
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "extra.h"
@@ -284,4 +284,80 @@ VOID Action_TlpTxLoop()
     }
     // stop
     LcCommand(ctxMain->hLC, LC_CMD_FPGA_CFGREGPCIE_MARKWR | 0x8002, sizeof(DWORD), (PBYTE)&dwDisableTx, NULL, NULL);
+}
+
+/*
+* Read/Write to FPGA PCIe shadow configuration space.
+*/
+VOID Action_RegCfgReadWrite()
+{
+    BOOL fResult;
+    FILE *pFile = NULL;
+    PBYTE pbLcCfgSpace4096 = NULL;
+    if(ctxMain->cfg.cbIn) {
+        // WRITE mode:
+        if((ctxMain->cfg.qwAddrMin > 0x1000) || (ctxMain->cfg.qwAddrMin + ctxMain->cfg.cbIn > 0x1000)) {
+            printf("REGCFG: Write failed outside FPGA PCIe shadow configuration space (0x1000).\n");
+            return;
+        }
+        fResult = LcCommand(
+            ctxMain->hLC,
+            LC_CMD_FPGA_CFGSPACE_SHADOW_WR | ctxMain->cfg.qwAddrMin,
+            (DWORD)ctxMain->cfg.cbIn,
+            ctxMain->cfg.pbIn,
+            NULL,
+            NULL
+        );
+        if(fResult) {
+            printf("REGCFG: Write SUCCESS!\n");
+        } else {
+            printf("REGCFG: Write to FPGA PCIe shadow configuration space failed.\n");
+        }
+        return;
+    }
+    // READ mode:
+    fResult = LcCommand(
+        ctxMain->hLC,
+        LC_CMD_FPGA_CFGSPACE_SHADOW_RD,
+        0,
+        NULL,
+        &pbLcCfgSpace4096,
+        NULL
+    );
+    if(!fResult) {
+        printf("REGCFG: Read FPGA PCIe shadow configuration space failed.\n");
+        return;
+    }
+    // READ success:
+    if(ctxMain->cfg.szFileOut[0]) {
+        // open output file
+        if(!fopen_s(&pFile, ctxMain->cfg.szFileOut, "r") || pFile) {
+            printf("REGCFG: Error writing output to file. File already exists: %s\n", ctxMain->cfg.szFileOut);
+            goto fail;
+        }
+        if(fopen_s(&pFile, ctxMain->cfg.szFileOut, "wb") || !pFile) {
+            printf("REGCFG: Error writing output to file.\n");
+            goto fail;
+        }
+        if(0x1000 != fwrite(pbLcCfgSpace4096, 1, 0x1000, pFile)) {
+            printf("REGCFG: Error writing output to file.\n");
+            goto fail;
+        }
+        printf("REGCFG: Wrote %i bytes to file %s.\n", 0x1000, ctxMain->cfg.szFileOut);
+    }
+    if(ctxMain->cfg.qwAddrMin < 0x1000) {
+        // print to screen
+        printf("REGCFG: Please see result below: \n================================ \n");
+        if((ctxMain->cfg.qwAddrMin > ctxMain->cfg.qwAddrMax) || (ctxMain->cfg.qwAddrMax > 0xfff)) {
+            ctxMain->cfg.qwAddrMax = 0xfff;
+        }
+        Util_PrintHexAscii(
+            pbLcCfgSpace4096,
+            (DWORD)(ctxMain->cfg.qwAddrMax + 1),
+            (DWORD)ctxMain->cfg.qwAddrMin
+        );
+    }
+fail:
+    if(pFile) { fclose(pFile); }
+    LcMemFree(pbLcCfgSpace4096);
 }

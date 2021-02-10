@@ -1,6 +1,6 @@
 // util.c : implementation of various utility functions.
 //
-// (c) Ulf Frisk, 2016-2020
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "pcileech.h"

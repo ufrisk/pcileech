@@ -1,6 +1,6 @@
 // statistics.c : implementation of statistics related functionality.
 //
-// (c) Ulf Frisk, 2016-2020
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "statistics.h"

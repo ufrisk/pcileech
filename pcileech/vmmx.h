@@ -1,6 +1,6 @@
 // vmmx.h : definitions related to memory process file system functionality.
 //
-// (c) Ulf Frisk, 2020
+// (c) Ulf Frisk, 2020-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __VMMX_H__

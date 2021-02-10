@@ -4,7 +4,7 @@
 // (c) Ulf Frisk, 2018-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 3.7
+// Header Version: 3.8
 //
 
 #include <windows.h>
@@ -441,6 +441,7 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
 #define VMMDLL_FLAG_NOPAGING_IO                     0x0020  // do not try to retrieve memory from paged out memory if read would incur additional I/O (even if possible).
 #define VMMDLL_FLAG_NOCACHEPUT                      0x0100  // do not write back to the data cache upon successful read from memory acquisition device.
 #define VMMDLL_FLAG_CACHE_RECENT_ONLY               0x0200  // only fetch from the most recent active cache region when reading.
+#define VMMDLL_FLAG_NO_PREDICTIVE_READ              0x0400  // do not perform additional predictive page reads (default on smaller requests).
 
 /*
 * Read memory in various non-contigious locations specified by the pointers to

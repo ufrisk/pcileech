@@ -1,6 +1,6 @@
 // memdump.c : implementation related to memory dumping functionality.
 //
-// (c) Ulf Frisk, 2016-2020
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include <leechcore.h>

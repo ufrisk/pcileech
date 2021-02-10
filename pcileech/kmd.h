@@ -1,6 +1,6 @@
 // kmd.h : definitions related to operating systems kernel modules functionality.
 //
-// (c) Ulf Frisk, 2016-2020
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __KMD_H__

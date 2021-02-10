@@ -1,6 +1,6 @@
 // help.c : implementation related to displaying help texts.
 //
-// (c) Ulf Frisk, 2016-2020
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "help.h"
@@ -64,6 +64,7 @@ VOID Help_ShowGeneral()
         "   tlp                    NATIVE       [ in ]         (FPGA)                   \n" \
         "   tlploop                NATIVE       [ in ]         (FPGA)                   \n" \
         "   probe                  NATIVE       [ min, max ]   (FPGA)                   \n" \
+        "   regcfg                 NATIVE       [ in, out, min, max] (FPGA)             \n" \
         "   pslist                 NATIVE                      (Windows)                \n" \
         "   psvirt2phys            NATIVE       [ 0, 1 ]       (Windows)                \n" \
         "   agent-execpy           NATIVE       [ in, out ]    (Remote LeechAgent)      \n" \
@@ -156,7 +157,7 @@ VOID Help_ShowInfo()
 {
     printf(
         " PCILEECH INFORMATION                                                          \n" \
-        " PCILeech (c) 2016-2020 Ulf Frisk                                              \n" \
+        " PCILeech (c) 2016-2021 Ulf Frisk                                              \n" \
         " Version: " \
         VER_FILE_VERSION_STR "\n" \
         "                                                                               \n" \
@@ -172,6 +173,9 @@ VOID Help_ShowInfo()
         "   FTDI FT601 Driver - http://www.ftdichip.com/Drivers/D3XX.htm                \n" \
         "   PCIe Injector     - https://github.com/enjoy-digital/pcie_injector          \n" \
         "   Dokany            - https://github.com/dokan-dev/dokany/releases/latest     \n" \
+        " ----------------                                                              \n" \
+        "   MemProcFS is free open source software. If you find it useful please        \n" \
+        "   become a sponsor at: https://github.com/sponsors/ufrisk Thank You :)        \n" \
         " ----------------                                                              \n" \
         " Use with memory dump files, DumpIt, WinPmem in read-only mode.                \n" \
         " Use with USB3380 hardware programmed as a PCILeech device.                    \n" \
@@ -551,6 +555,24 @@ VOID Help_ShowDetailed()
             " EXAMPLEs:                                                                     \n" \
             " 1) Probe memory up to 10GB                                                    \n" \
             "    pcileech probe -max 0x280000000                                            \n");
+        break;
+    case REGCFG:
+        printf(
+            " READ OR WRITE TO FPGA PCIe SHADOW CONFIGURATION SPACE                         \n" \
+            " MODES   : NATIVE                                                              \n" \
+            " OPTIONS : -in -out -min -max                                                  \n" \
+            " A write is triggered by specifying the data to write as a hexascii string on  \n" \
+            " the -in parameter as well as the start address with the -min parameter.       \n" \
+            " A read is assumed unless write. The whole config space will be read.          \n" \
+            " It is possible to adjust on-screen output with parameters: -min and -max.     \n" \
+            " NB! The FPGA connect string: -device fpga://pcienotconnected=1                \n" \
+            " EXAMPLEs:                                                                     \n" \
+            " 1) WRITE 3 bytes starting at address: 0x231                                   \n" \
+            "    pcileech regcfg -min 0x201 -in c0fefe                                      \n" \
+            " 2) READ and only display 0x200-0x23f on-screen                                \n" \
+            "    pcileech regcfg -min 0x200 -max 0x23f                                      \n" \
+            " 2) READ to output file:                                                       \n" \
+            "    pcileech regcfg -out outputfile.bin                                        \n");
         break;
     case PSLIST:
         printf(

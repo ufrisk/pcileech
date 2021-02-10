@@ -1,6 +1,6 @@
 // extra.h : definitions related to various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016-2020
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __EXTRA_H__
@@ -44,5 +44,10 @@ VOID Action_TlpTx();
 * Transmit TLPs in a hardware-assisted loop using on-board fpga logic.
 */
 VOID Action_TlpTxLoop();
+
+/*
+* Read/Write to FPGA PCIe shadow configuration space.
+*/
+VOID Action_RegCfgReadWrite();
 
 #endif /* __EXTRA_H__ */

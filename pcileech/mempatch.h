@@ -1,6 +1,6 @@
 // mempatch.h : definitions related to memory patch / operating system unlock functionality.
 //
-// (c) Ulf Frisk, 2016-2020
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __MEMPATCH_H__

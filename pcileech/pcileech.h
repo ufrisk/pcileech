@@ -1,6 +1,6 @@
 // pcileech.h : definitions for pcileech - dump memory and unlock computers with a USB3380 device using DMA.
 //
-// (c) Ulf Frisk, 2016-2020
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 // Header Version: 4.5
@@ -54,6 +54,7 @@ typedef enum tdActionType {
     TLP,
     TLPLOOP,
     PROBE,
+    REGCFG,
     PSLIST,
     PSVIRT2PHYS,
     AGENT_EXEC_PY,

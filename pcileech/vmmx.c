@@ -1,6 +1,6 @@
 // vmmx.h : implementation of external VMM/MemProcFS functionality with linux compatible dummy functions.
 //
-// (c) Ulf Frisk, 2020
+// (c) Ulf Frisk, 2020-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifdef WIN32
