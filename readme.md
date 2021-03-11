@@ -50,8 +50,6 @@ Please find a summary of the supported hardware based memory acquisition methods
 | -----------------------------------------------------------------------| ---- | --------- | ----- | -------------------- | --------------- | ------ |
 | [AC701/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ac701_ft601) | USB3 | 150MB/s | Yes | Yes | No  |
 | [RaptorDMA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)      | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)  | USB3 | 150MB/s | Yes | Yes | No  |
-| [ScreamerM2](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)     | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)  | USB3 | 150MB/s | Yes | Yes | No  |
-| [PCIeScreamer](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)   | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/pciescreamer)| USB3 | 100MB/s | Yes | Yes | No  |
 | [SP605/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/sp605_ft601) | USB3 |  75MB/s | Yes | Yes | No  |
 | [NeTV2/UDP](https://github.com/ufrisk/LeechCore/wiki/Device_RawUDP)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/NeTV2)       | UDP  |   7MB/s | Yes | Yes | No  |
 | [USB3380-EVB](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380) | USB3380 | USB3 | 150MB/s | No  | No  | No  |
