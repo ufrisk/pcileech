@@ -59,7 +59,7 @@ LookupFunctions PROC
 	PUSH r13
 	MOV r15, rcx				; address of kallsyms_lookup_name
 	MOV r14, rdx				; ptr to FNLX struct 
-	MOV r13, 12*8				; num functions * 8
+	MOV r13, 13*8				; num functions * 8
 	; ----------------------------------------------------
 	; 1: PUSH FUNCTION NAME POINTERS ON STACK
 	; ----------------------------------------------------
@@ -86,6 +86,8 @@ LookupFunctions PROC
 	LEA rax, str_ktime_get_real_ts64
 	PUSH rax
 	LEA rax, str_ioremap_nocache
+	PUSH rax
+	LEA rax, str_getnstimeofday64
 	PUSH rax
 	; ----------------------------------------------------
 	; 2: LOOKUP FUNCTION POINTERS BY NAME
@@ -129,6 +131,7 @@ str_iounmap						db		'iounmap', 0
 str_ioremap						db		'ioremap', 0
 str_ioremap_nocache				db		'ioremap_nocache', 0
 str_ktime_get_real_ts64			db		'ktime_get_real_ts64', 0
+str_getnstimeofday64			db		'getnstimeofday64', 0
 
 ; ------------------------------------------------------------------
 ; Convert from the Windows X64 calling convention to the SystemV
