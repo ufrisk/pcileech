@@ -4,7 +4,7 @@
 // (c) Ulf Frisk, 2018-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 3.8
+// Header Version: 3.9
 //
 
 #include <windows.h>
@@ -326,7 +326,7 @@ BOOL VMMDLL_InitializePlugins();
 #define VMMDLL_PLUGIN_CONTEXT_MAGIC                 0xc0ffee663df9301c
 #define VMMDLL_PLUGIN_CONTEXT_VERSION               4
 #define VMMDLL_PLUGIN_REGINFO_MAGIC                 0xc0ffee663df9301d
-#define VMMDLL_PLUGIN_REGINFO_VERSION               10
+#define VMMDLL_PLUGIN_REGINFO_VERSION               11
 
 #define VMMDLL_PLUGIN_NOTIFY_VERBOSITYCHANGE        0x01
 #define VMMDLL_PLUGIN_NOTIFY_REFRESH_FAST           0x05    // refresh fast event   - at partial process refresh.
@@ -365,9 +365,15 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
     VMMDLL_MEMORYMODEL_TP tpMemoryModel;
     VMMDLL_SYSTEM_TP tpSystem;
     HMODULE hDLL;
-    HMODULE hReservedDllPython3X;   // not for general use (only used for python).
     BOOL(*pfnPluginManager_Register)(struct tdVMMDLL_PLUGIN_REGINFO *pPluginRegInfo);
-    HMODULE hReservedDllPython3;    // not for general use (only used for python).
+    DWORD _Reserved[32];
+    // python plugin information - not for general use
+    struct {
+        BOOL fPythonStandalone;
+        DWORD _Reserved;
+        HMODULE hReservedDllPython3;
+        HMODULE hReservedDllPython3X;
+    } python;
     // general plugin registration info to be filled out by the plugin below:
     struct {
         PVMMDLL_PLUGIN_INTERNAL_CONTEXT ctxM;   // optional internal module context [must be cleaned by pfnClose() call].
@@ -1345,13 +1351,13 @@ BOOL VMMDLL_PdbLoad(_In_ DWORD dwPID, _In_ ULONG64 vaModuleBase, _Out_writes_(MA
 * NB! not all modules may exist - initially only module "nt" is available.
 * NB! if multiple modules have the same name the 1st to be added will be used.
 * -- szModule
-* -- cbSymbolOffset
+* -- cbSymbolAddressOrOffset = symbol virtual address or symbol offset.
 * -- szSymbolName = buffer to receive symbol name upon success.
 * -- pdwSymbolDisplacement = displacement from the beginning of the symbol.
 * -- return
 */
 _Success_(return)
-BOOL VMMDLL_PdbSymbolName(_In_ LPSTR szModule, _In_ DWORD cbSymbolOffset, _Out_writes_(MAX_PATH) LPSTR szSymbolName, _Out_opt_ PDWORD pdwSymbolDisplacement);
+BOOL VMMDLL_PdbSymbolName(_In_ LPSTR szModule, _In_ QWORD cbSymbolAddressOrOffset, _Out_writes_(MAX_PATH) LPSTR szSymbolName, _Out_opt_ PDWORD pdwSymbolDisplacement);
 
 /*
 * Retrieve a symbol virtual address given a module name and a symbol name.
@@ -1460,7 +1466,7 @@ BOOL VMMDLL_WinReg_HiveWrite(_In_ ULONG64 vaCMHive, _In_ DWORD ra, _In_ PBYTE pb
 *   3) '0x<vaCMHIVE>\ROOT\Key\SubKey'
 *   4) '0x<vaCMHIVE>\ORPHAN\Key\SubKey'          (orphan key)
 * -- wszFullPathKey
-* -- dwIndex
+* -- dwIndex = sub-key index 0..N (-1 for key).
 * -- lpName
 * -- lpcchName
 * -- lpftLastWriteTime

@@ -29,6 +29,11 @@ typedef struct tdVFS_RESULT_FILEINFO {
 } VFS_RESULT_FILEINFO, *PVFS_RESULT_FILEINFO;
 
 /*
+* Unmount a mounted virtual file system.
+*/
+VOID ActionUnMount();
+
+/*
 * Mount a drive backed by PCILeech virtual file system. The mounted file system
 * will contain both a memory mapped ram files and the file system as seen from
 * the target system kernel. NB! This action requires a loaded kernel module and

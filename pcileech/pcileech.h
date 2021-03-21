@@ -216,6 +216,12 @@ typedef struct tdKMDHANDLE {
     BYTE pbPageData[4096];
 } KMDHANDLE, *PKMDHANDLE;
 
+typedef struct tdVFS_CONTEXT {
+    BOOL fInitialized;
+    WCHAR wchMountPoint;
+    BOOL(*pfnDokanUnmount)(WCHAR DriveLetter);
+} VFS_CONTEXT, *PVFS_CONTEXT;
+
 #define PCILEECH_CONTEXT_MAGIC              0xfeefd00d
 #define PCILEECH_CONTEXT_VERSION                  0x45
 
@@ -236,6 +242,7 @@ struct tdPCILEECH_CONTEXT {
     HANDLE hDevice;
     PKMDHANDLE phKMD;
     PKMDDATA pk;
+    VFS_CONTEXT vfs;
 };
 
 BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[]);

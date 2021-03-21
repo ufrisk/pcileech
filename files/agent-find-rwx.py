@@ -1,8 +1,6 @@
-for pid, procinfo in VmmPy_ProcessListInformation().items():
-    try:
-        memmap = VmmPy_ProcessGetMemoryMap(pid, True)
-        for entry in memmap:
-            if '-rwx' in entry['flags']:
-                print(str(pid) + ': ' + procinfo['name'] + ': ' + str(entry))
-    except:
-        pass
+import memprocfs
+vmm = memprocfs.Vmm()
+for process in vmm.process_list():
+    for entry in process.maps.pte():
+        if '-rwx' in entry['flags']:
+            print(str(process.pid) + ': ' + process.name + ': ' + str(entry))

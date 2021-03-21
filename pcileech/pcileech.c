@@ -227,6 +227,7 @@ VOID PCILeechConfigFixup()
 VOID PCILeechFreeContext()
 {
     if(!ctxMain) { return; }
+    ActionUnMount();
     KMDClose();
     Vmmx_Close();
     LcClose(ctxMain->hLC);

@@ -861,6 +861,17 @@ VfsCallback_Cleanup(LPCWSTR wcsFileName, PDOKAN_FILE_INFO DokanFileInfo) {
     }
 }
 
+VOID ActionUnMount()
+{
+    if(ctxMain->vfs.fInitialized) {
+        ctxMain->vfs.fInitialized = FALSE;
+        if(ctxMain->vfs.pfnDokanUnmount) {
+            ctxMain->vfs.pfnDokanUnmount(ctxMain->vfs.wchMountPoint);
+            Sleep(50);
+        }
+    }
+}
+
 VOID ActionMount()
 {
     int status;
@@ -954,8 +965,11 @@ VOID ActionMount()
     if(ctxMain->cfg.fVerbose) {
         pDokanState->Statistics.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Vfs_StatisticsThread, &pDokanState->Statistics, 0, NULL);
     }
+    ctxMain->vfs.pfnDokanUnmount = (BOOL(*)(WCHAR))GetProcAddress(hModuleDokan, "DokanUnmount");
+    ctxMain->vfs.wchMountPoint = wszMountPoint[0];
+    ctxMain->vfs.fInitialized = TRUE;
     status = fnDokanMain(pDokanOptions, pDokanOperations);
-    while(status == DOKAN_SUCCESS) {
+    while(ctxMain && ctxMain->vfs.fInitialized && (status == DOKAN_SUCCESS)) {
         printf("MOUNT: ReMounting as drive %S\n", pDokanOptions->MountPoint);
         status = fnDokanMain(pDokanOptions, pDokanOperations);
     }
@@ -977,6 +991,11 @@ fail:
 #if defined(LINUX) || defined(ANDROID)
 
 #include "vfs.h"
+
+VOID ActionUnMount()
+{
+    return;
+}
 
 VOID ActionMount()
 {
