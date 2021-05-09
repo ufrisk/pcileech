@@ -1,7 +1,7 @@
 // lx64_vfs.c : kernel code to support the PCILeech file system.
 // Compatible with Linux x64.
 //
-// (c) Ulf Frisk, 2017-2019
+// (c) Ulf Frisk, 2017-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 // compile with:
@@ -139,6 +139,7 @@ typedef struct tdFN2 {
 	QWORD vfs_read;
 	QWORD vfs_write;
 	QWORD yield;
+	QWORD printk;
 	QWORD iterate_dir_opt;
 	QWORD vfs_readdir_opt;
 	QWORD vfs_stat_opt;
@@ -148,6 +149,11 @@ typedef struct tdFN2 {
         QWORD getname;
         QWORD do_unlinkat;
     } rm;
+	QWORD kern_path_opt;
+	QWORD path_put_opt;
+	QWORD vfs_getattr_nosec_opt;
+	QWORD kernel_read;
+	QWORD kernel_write;
 } FN2, *PFN2;
 
 typedef struct tdDIR_CONTEXT {
@@ -172,6 +178,7 @@ BOOL LookupFunctions2(PKMDDATA pk, PFN2 pfn2) {
 	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 'r', 'e', 'a', 'd', 0 };
 	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 'w', 'r', 'i', 't', 'e', 0 };	
 	NAMES[i++] = (QWORD)(CHAR[]) { 'y', 'i', 'e', 'l', 'd', 0 };
+	NAMES[i++] = (QWORD)(CHAR[]) { 'p', 'r', 'i', 'n', 't', 'k', 0 };
 	if(!LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)NAMES, (QWORD)pfn2, i)) { return FALSE; }
 	// optional lookup 1#: (due to kernel version differences)
 	pfn2->iterate_dir_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'i', 't', 'e', 'r', 'a', 't', 'e', '_', 'd', 'i', 'r', 0 }));
@@ -181,11 +188,17 @@ BOOL LookupFunctions2(PKMDDATA pk, PFN2 pfn2) {
 	pfn2->vfs_stat_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 0 }));
 	pfn2->vfs_statx_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 'x', 0 }));
 	if(!pfn2->vfs_stat_opt && !pfn2->vfs_statx_opt) { return FALSE; }
+	pfn2->kern_path_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'k', 'e', 'r', 'n', '_', 'p', 'a', 't', 'h', 0 }));
+	pfn2->path_put_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'p', 'a', 't', 'h', '_', 'p', 'u', 't', 0 }));
+	pfn2->vfs_getattr_nosec_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 'g', 'e', 't', 'a', 't', 't', 'r', '_', 'n', 'o', 's', 'e', 'c', 0 }));
     // optional lookup #3
     pfn2->rm.sys_unlink = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 0 }));
     pfn2->rm.getname = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'g', 'e', 't', 'n', 'a', 'm', 'e', 0 }));
     pfn2->rm.do_unlinkat = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'd', 'o', '_', 'u', 'n', 'l', 'i', 'n', 'k', 'a', 't', 0 }));
-    if(!pfn2->rm.sys_unlink && !(pfn2->rm.getname && pfn2->rm.do_unlinkat)) { return FALSE; }
+	if(!pfn2->rm.sys_unlink && !(pfn2->rm.getname && pfn2->rm.do_unlinkat)) { return FALSE; }
+	// optional kernel vfs read/write #4:
+	pfn2->kernel_read = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'k', 'e', 'r', 'n', 'e', 'l', '_', 'r', 'e', 'a', 'd', 0 }));
+	pfn2->kernel_write = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'k', 'e', 'r', 'n', 'e', 'l', '_', 'w', 'r', 'i', 't', 'e', 0 }));
 	return TRUE;
 }
 
@@ -231,6 +244,7 @@ QWORD UnixToWindowsFiletime(QWORD tv) {
 VOID VfsList_SetSizeTime(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 {
 	QWORD i, o, p, cfi, result;
+	BYTE path[0x800];
 	CHAR sz[2 * MAX_PATH];
 	struct kstat_4_10 kstat_4_10;
 	struct kstat_4_11 kstat_4_11;
@@ -253,6 +267,14 @@ VOID VfsList_SetSizeTime(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 		sz[o + i] = 0;
 		if(pfn2->vfs_statx_opt) { // 4.11 kernels and later.
 			result = SysVCall(pfn2->vfs_statx_opt, AT_FDCWD, sz, AT_NO_AUTOMOUNT, &kstat_4_11, STATX_BASIC_STATS);
+			if(result && pfn2->kern_path_opt && pfn2->vfs_getattr_nosec_opt) {
+				// 5.12 kernels and later will fail vfs_statx - use alternative method:
+				result = SysVCall(pfn2->kern_path_opt, sz, AT_NO_AUTOMOUNT, path);
+				if(0 == result) {
+					result = SysVCall(pfn2->vfs_getattr_nosec_opt, path, &kstat_4_11, STATX_BASIC_STATS, 0);
+					if(pfn2->path_put_opt) { SysVCall(pfn2->path_put_opt, path); }
+				}
+			}
 			if(0 == result) {
 				pfi->cb = kstat_4_11.size;
 				pfi->tAccessOpt = UnixToWindowsFiletime(kstat_4_11.atime.tv_sec);
@@ -315,7 +337,7 @@ STATUS VfsRead(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 	if(hFile > 0xffffffff00000000) {
 		return STATUS_FAIL_FILE_CANNOT_OPEN;
 	}
-	pk->dataOutExtraLength = SysVCall(pfn2->vfs_read, hFile, pk->DMAAddrVirtual + pk->dataOutExtraOffset, pk->dataOutExtraLengthMax, &pop->offset);
+	pk->dataOutExtraLength = SysVCall((pfn2->kernel_read ? pfn2->kernel_read : pfn2->vfs_read), hFile, pk->DMAAddrVirtual + pk->dataOutExtraOffset, pk->dataOutExtraLengthMax, &pop->offset);
 	SysVCall(pfn2->filp_close, hFile, NULL);
 	return (pk->dataOutExtraLength <= pk->dataOutExtraLengthMax) ? STATUS_SUCCESS : STATUS_FAIL_ACTION;
 }
@@ -331,7 +353,7 @@ STATUS VfsWrite(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 	if(hFile > 0xffffffff00000000) {
 		return STATUS_FAIL_FILE_CANNOT_OPEN;
 	}
-	result = SysVCall(pfn2->vfs_write, hFile, pop->pb, pop->cb, &pop->offset);
+	result = SysVCall((pfn2->kernel_write ? pfn2->kernel_write : pfn2->vfs_write), hFile, pop->pb, pop->cb, &pop->offset);
 	SysVCall(pfn2->filp_close, hFile, NULL);
 	return result ? STATUS_FAIL_ACTION : STATUS_SUCCESS;
 }

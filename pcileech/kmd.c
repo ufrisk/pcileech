@@ -1252,7 +1252,7 @@ BOOL KMD_SubmitCommand(_In_ QWORD op)
             Exec_CallbackClose(hCallback);
             return FALSE;
         }
-        if((op != KMD_CMD_TERMINATE) && (op != KMD_CMD_MEM_INFO) && (ctxMain->pk->MAGIC != KMDDATA_MAGIC) && (ctxMain->pk->MAGIC != KMDDATA_MAGIC_PARTIAL)) {
+        if((op != KMD_CMD_TERMINATE) && (op != KMD_CMD_MEM_INFO) && (!ctxMain->pk || (ctxMain->pk->MAGIC != KMDDATA_MAGIC) && (ctxMain->pk->MAGIC != KMDDATA_MAGIC_PARTIAL))) {
             printf("PCILEECH: FAIL: KMDDATA corruption! - bit errors? Address: 0x%08x. Terminating.\n", ctxMain->phKMD->dwPageAddr32);
             LcClose(ctxMain->hLC);
             ExitProcess(0);

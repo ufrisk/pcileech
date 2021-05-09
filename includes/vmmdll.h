@@ -4,7 +4,7 @@
 // (c) Ulf Frisk, 2018-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 3.9
+// Header Version: 3.10
 //
 
 #include <windows.h>
@@ -127,6 +127,7 @@ VOID VMMDLL_MemFree(_Frees_ptr_opt_ PVOID pvMem);
 #define VMMDLL_OPT_WIN_VERSION_MAJOR                    0x20000101'00000000  // R
 #define VMMDLL_OPT_WIN_VERSION_MINOR                    0x20000102'00000000  // R
 #define VMMDLL_OPT_WIN_VERSION_BUILD                    0x20000103'00000000  // R
+#define VMMDLL_OPT_WIN_SYSTEM_UNIQUE_ID                 0x20000104'00000000  // R
 
 #define VMMDLL_OPT_FORENSIC_MODE                        0x20000201'00000000  // RW - enable/retrieve forensic mode type [0-4].
 
@@ -244,6 +245,11 @@ inline VOID VMMDLL_VfsList_AddFile(_In_ HANDLE pFileList, _In_ LPWSTR wszName, _
     ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddFile(((PVMMDLL_VFS_FILELIST)pFileList)->h, wszName, cb, pExInfo);
 }
 
+inline VOID VMMDLL_VfsList_AddFile_NOZERO(_In_ HANDLE pFileList, _In_ LPWSTR wszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo)
+{
+    if(cb) { VMMDLL_VfsList_AddFile(pFileList, wszName, cb, pExInfo); }
+}
+
 inline VOID VMMDLL_VfsList_AddDirectory(_In_ HANDLE pFileList, _In_ LPWSTR wszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo)
 {
     ((PVMMDLL_VFS_FILELIST)pFileList)->pfnAddDirectory(((PVMMDLL_VFS_FILELIST)pFileList)->h, wszName, pExInfo);
@@ -326,7 +332,8 @@ BOOL VMMDLL_InitializePlugins();
 #define VMMDLL_PLUGIN_CONTEXT_MAGIC                 0xc0ffee663df9301c
 #define VMMDLL_PLUGIN_CONTEXT_VERSION               4
 #define VMMDLL_PLUGIN_REGINFO_MAGIC                 0xc0ffee663df9301d
-#define VMMDLL_PLUGIN_REGINFO_VERSION               11
+#define VMMDLL_PLUGIN_REGINFO_VERSION               13
+#define VMMDLL_PLUGIN_FORENSIC_JSONDATA_VERSION     0xc0ee0001
 
 #define VMMDLL_PLUGIN_NOTIFY_VERBOSITYCHANGE        0x01
 #define VMMDLL_PLUGIN_NOTIFY_REFRESH_FAST           0x05    // refresh fast event   - at partial process refresh.
@@ -349,6 +356,26 @@ typedef struct tdVMMDLL_PLUGIN_CONTEXT {
     PVOID pvReserved1;
     PVMMDLL_PLUGIN_INTERNAL_CONTEXT ctxM;       // optional internal module context.
 } VMMDLL_PLUGIN_CONTEXT, *PVMMDLL_PLUGIN_CONTEXT;
+
+typedef struct tdVMMDLL_PLUGIN_FORENSIC_JSONDATA {
+    DWORD dwVersion;        // must equal VMMDLL_PLUGIN_FORENSIC_JSONDATA_VERSION
+    BOOL fVerbose;
+    LPSTR szjType;          // log type/name (json encoded)
+    DWORD i;
+    DWORD dwPID;
+    QWORD vaObj;
+    BOOL fva[2];            // log va even if zero
+    QWORD va[2];
+    BOOL fNum[2];           // log num even if zero
+    QWORD qwNum[2];
+    BOOL fHex[2];           // log hex even if zero
+    QWORD qwHex[2];
+    // str: will be prioritized in order: szj > szu > wsz.
+    LPCSTR szj[2];          // str: json encoded
+    LPCSTR szu[2];          // str: utf-8 encoded
+    LPCWSTR wsz[2];         // str: wide
+    BYTE _Reserved[0x4000+256];
+} VMMDLL_PLUGIN_FORENSIC_JSONDATA, *PVMMDLL_PLUGIN_FORENSIC_JSONDATA;
 
 typedef struct tdVMMDLL_PLUGIN_FORENSIC_INGEST_PHYSMEM {
     DWORD cMEMs;
@@ -385,7 +412,7 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
         CHAR sTimelineNameShort[6];
         CHAR _Reserved[2];
         CHAR szTimelineFileUTF8[32];
-        CHAR szTimelineFileJSON[32];
+        CHAR _Reserved2[32];
     } reg_info;
     // function plugin registration info to be filled out by the plugin below:
     struct {
@@ -402,18 +429,19 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
     // in single-threaded mode regards to the plugin itself - but 'ingest'
     // functions are called in-parallel multi-threaded between plugins.
     // Functions are called in the order of:
-    // pfnInitialize(), pfnIngest*(), pfnTimeline(), pfnFinalize()
+    // pfnInitialize(), pfnIngest*(), pfnTimeline(), pfnLogJSON(), pfnFinalize()
     struct {
-        PVOID(*pfnInitialize)();
+        PVOID(*pfnInitialize)(_In_ PVMMDLL_PLUGIN_CONTEXT ctxP);
         VOID(*pfnFinalize)(_In_opt_ PVOID ctxfc);
         VOID(*pfnTimeline)(
             _In_opt_ PVOID ctxfc,
             _In_ HANDLE hTimeline,
-            _In_ VOID(*pfnAddEntry)(_In_ HANDLE hTimeline, _In_ QWORD ft, _In_ DWORD dwAction, _In_ DWORD dwPID, _In_ QWORD qwValue, _In_ LPWSTR wszText),
+            _In_ VOID(*pfnAddEntry)(_In_ HANDLE hTimeline, _In_ QWORD ft, _In_ DWORD dwAction, _In_ DWORD dwPID, _In_ DWORD dwData32, _In_ QWORD qwData64, _In_ LPWSTR wszText),
             _In_ VOID(*pfnEntryAddBySql)(_In_ HANDLE hTimeline, _In_ DWORD cEntrySql, _In_ LPSTR *pszEntrySql));
         VOID(*pfnIngestPhysmem)(_In_opt_ PVOID ctxfc, _In_ PVMMDLL_PLUGIN_FORENSIC_INGEST_PHYSMEM pIngestPhysmem);
         VOID(*pfnIngestFinalize)(_In_opt_ PVOID ctxfc);
-        PVOID pvReserved[11];
+        PVOID pvReserved[10];
+        VOID(*pfnLogJSON)(_In_ PVMMDLL_PLUGIN_CONTEXT ctxP, _In_ VOID(*pfnLogJSON)(_In_ PVMMDLL_PLUGIN_FORENSIC_JSONDATA pData));
     } reg_fnfc;
     // Additional system information - read/only by the plugins.
     struct {

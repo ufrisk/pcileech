@@ -188,6 +188,8 @@ All sponsorships are welcome, no matter how large or small. I especially wish to
 
 Changelog:
 ==========
+<details><summary>Previous releases (click to expand):</summary>
+
 v1.0-v3.6
 * Initial release and various updates. please see individual relases for more information.
 
@@ -239,7 +241,10 @@ v4.1
 [v4.8](https://github.com/ufrisk/pcileech/releases/tag/v4.8)
 * Bug fixes.
 * Better support for recent x64 Linux kernels.
+</details>
 
-Latest:
+[v4.9](https://github.com/ufrisk/pcileech/releases/tag/v4.9)
+* Bug fixes.
 * Signature updates.
+* Better support for recent x64 Linux kernels (Ubuntu 21.04).
 * Unmount of monted driver when CTRL+C pressed.
