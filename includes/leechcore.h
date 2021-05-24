@@ -14,7 +14,7 @@
 // (c) Ulf Frisk, 2020-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.5
+// Header Version: 2.6
 //
 
 #ifndef __LEECHCORE_H__
@@ -28,23 +28,25 @@ extern "C" {
 //-----------------------------------------------------------------------------
 
 #ifdef _WIN32
-#include <Windows.h>
 
+#include <Windows.h>
 #define EXPORTED_FUNCTION                   __declspec(dllexport)
-typedef ULONG64                             QWORD, *PQWORD;
+typedef unsigned __int64                    QWORD, *PQWORD;
+
 #endif /* _WIN32 */
 #ifdef LINUX
+
 #include <inttypes.h>
 #include <stdlib.h>
-
 #define EXPORTED_FUNCTION                   __attribute__((visibility("default")))
-typedef void                                VOID, *PVOID, *HANDLE;
-typedef long long unsigned int              QWORD, *PQWORD, ULONG64;
-typedef uint32_t                            DWORD, *PDWORD, BOOL;
-typedef uint8_t                             BYTE, *PBYTE;
-typedef char                                CHAR, *LPSTR;
-typedef const char                          *LPCSTR;
-typedef wchar_t                             WCHAR, *PWCHAR, *LPWSTR;
+typedef void                                VOID, *PVOID, *HANDLE, **PHANDLE, *HMODULE;
+typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
+typedef uint64_t                            SIZE_T, *PSIZE_T, FILETIME, *PFILETIME;
+typedef uint32_t                            DWORD, *PDWORD, *LPDWORD, BOOL, *PBOOL, NTSTATUS;
+typedef uint16_t                            WORD, *PWORD;
+typedef uint8_t                             BYTE, *PBYTE, *LPBYTE, UCHAR;
+typedef char                                CHAR, *PCHAR, *LPSTR, *LPCSTR;
+typedef uint16_t                            WCHAR, *PWCHAR, *LPWSTR, *LPCWSTR;
 #define MAX_PATH                            260
 #define _In_
 #define _In_z_
@@ -52,16 +54,22 @@ typedef wchar_t                             WCHAR, *PWCHAR, *LPWSTR;
 #define _In_reads_(x)
 #define _In_reads_opt_(x)
 #define _Inout_
+#define _Inout_bytecount_(x)
+#define _Inout_opt_
+#define _Inout_updates_opt_(x)
 #define _Out_
 #define _Out_opt_
 #define _Out_writes_(x)
+#define _Out_writes_bytes_opt_(x)
 #define _Out_writes_opt_(x)
-#define _Inout_updates_opt_(x)
+#define _Out_writes_to_(x,y)
+#define _When_(x,y)
 #define _Frees_ptr_opt_
 #define _Post_ptr_invalid_
 #define _Check_return_opt_
 #define _Printf_format_string_
 #define _Success_(x)
+
 #endif /* LINUX */
 
 

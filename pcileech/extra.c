@@ -59,7 +59,12 @@ BOOL Extra_MacFVRecover_Analyze(_In_ PBYTE pb512M)
                 isFound = TRUE;
                 if(memcmp(pbLast, pb + dwCandidate, 32)) { // duplicate removal
                     memcpy(pbLast, pb + dwCandidate, 32);
+#ifdef _WIN32
                     printf("MAC_FVRECOVER: PASSWORD CANDIDATE: %S\n", (LPWSTR)(pb + dwCandidate));
+#endif /* _WIN32 */
+#ifdef LINUX
+                    printf("MAC_FVRECOVER: PASSWORD CANDIDATE (hex8): %llx\n", *(PQWORD)(pb + dwCandidate));
+#endif /* LINUX */
                 }
                 break;
             }

@@ -6,7 +6,6 @@
 //
 #include "umd.h"
 #include <stdio.h>
-#ifdef WIN32
 #include "executor.h"
 #include "util.h"
 #include <vmmdll.h>
@@ -42,7 +41,7 @@ VOID Action_UmdPsList()
             pProcInfo->magic = VMMDLL_PROCESS_INFORMATION_MAGIC;
             pProcInfo->wVersion = VMMDLL_PROCESS_INFORMATION_VERSION;
             cbProcInfo = sizeof(VMMDLL_PROCESS_INFORMATION);
-            if(VMMDLL_ProcessGetInformation(pdwPIDs[i], pProcInfo, &cbProcInfo)) {
+            if(VMMDLL_ProcessGetInformation(pdwPIDs[i], pProcInfo, (PSIZE_T)&cbProcInfo)) {
                 printf("  %6i %s %s\n", pProcInfo->dwPID, pProcInfo->win.fWow64 ? "32" : "  ", pProcInfo->szName);
             }
         }
@@ -70,7 +69,7 @@ VOID Action_UmdPsVirt2Phys()
     oProcInfo.magic = VMMDLL_PROCESS_INFORMATION_MAGIC;
     oProcInfo.wVersion = VMMDLL_PROCESS_INFORMATION_VERSION;
     cbProcInfo = sizeof(VMMDLL_PROCESS_INFORMATION);
-    if(!VMMDLL_ProcessGetInformation((DWORD)ctxMain->cfg.qwDataIn[0], &oProcInfo, &cbProcInfo)) {
+    if(!VMMDLL_ProcessGetInformation((DWORD)ctxMain->cfg.qwDataIn[0], &oProcInfo, (PSIZE_T)&cbProcInfo)) {
         printf("UMD: Failed retrieving information for PID: %lli\n", ctxMain->cfg.qwDataIn[0]);
         printf("     SYNTAX: pcileech psvirt2phys -0 <pid> -1 <virtual_address>\n");
         goto fail;
@@ -127,7 +126,7 @@ typedef struct tdUMD_EXEC_CONTEXT_LIMITED {
 VOID UmdWinExec()
 {
     BOOL result;
-    WCHAR wszModuleName[16];
+    LPSTR szModuleName;
     DWORD cbExec = 0;
     BYTE pbExec[0x500], pbPage[0x1000] = { 0 };
     DWORD i, dwPID, cSections;
@@ -164,10 +163,8 @@ VOID UmdWinExec()
         printf("UMD: EXEC: Could not retrieve process for PID: %i\n", dwPID);
         return;
     }
-    for(i = 0; i < 16; i++) {
-        wszModuleName[i] = oProcessInformation.szName[i];
-    }
-    result = VMMDLL_WinGetThunkInfoIAT(dwPID, wszModuleName, szHookModule, szHookFunction, &oThunkInfoIAT);
+    szModuleName = oProcessInformation.szName;
+    result = VMMDLL_WinGetThunkInfoIATU(dwPID, szModuleName, szHookModule, szHookFunction, &oThunkInfoIAT);
     if(!result) {
         printf("UMD: EXEC: Could not retrieve hook for %s!%s in '%s'\n", szHookModule, szHookFunction, oProcessInformation.szName);
         return;
@@ -176,24 +173,24 @@ VOID UmdWinExec()
         printf("UMD: EXEC: Could not retrieve valid hook in 64-bit process.\n");
         return;
     }
-    if(!VMMDLL_ProcessGetSections(dwPID, wszModuleName, NULL, 0, &cSections) || !cSections) {
-        printf("UMD: EXEC: Could not retrieve sections #1 for '%S'\n", wszModuleName);
+    if(!VMMDLL_ProcessGetSectionsU(dwPID, szModuleName, NULL, 0, &cSections) || !cSections) {
+        printf("UMD: EXEC: Could not retrieve sections #1 for '%s'\n", szModuleName);
         return;
     }
     pSections = (PIMAGE_SECTION_HEADER)LocalAlloc(LMEM_ZEROINIT, cSections * sizeof(IMAGE_SECTION_HEADER));
-    if(!pSections || !VMMDLL_ProcessGetSections(dwPID, wszModuleName, pSections, cSections, &cSections) || !cSections) {
-        printf("UMD: EXEC: Could not retrieve sections #2 for '%S'\n", wszModuleName);
+    if(!pSections || !VMMDLL_ProcessGetSectionsU(dwPID, szModuleName, pSections, cSections, &cSections) || !cSections) {
+        printf("UMD: EXEC: Could not retrieve sections #2 for '%s'\n", szModuleName);
         return;
     }
     for(i = 0; i < cSections; i++) {
         if(!vaCodeCave && (pSections[i].Characteristics & IMAGE_SCN_MEM_EXECUTE) && ((pSections[i].Misc.VirtualSize & 0xfff) < (0x1000 - sizeof(pbExec)))) {
-            vaCodeCave = VMMDLL_ProcessGetModuleBase(dwPID, wszModuleName) + ((pSections[i].VirtualAddress + pSections[i].Misc.VirtualSize + 0xfff) & ~0xfff) - sizeof(pbExec);
+            vaCodeCave = VMMDLL_ProcessGetModuleBaseU(dwPID, szModuleName) + ((pSections[i].VirtualAddress + pSections[i].Misc.VirtualSize + 0xfff) & ~0xfff) - sizeof(pbExec);
             if(!VMMDLL_MemReadPage(dwPID, vaCodeCave & ~0xfff, pbPage)) {
                 vaCodeCave = 0;     // read test failed!
             }
         }
         if(!vaWriteCave && (pSections[i].Characteristics & IMAGE_SCN_MEM_WRITE) && ((pSections[i].Misc.VirtualSize & 0xfff) < (0x1000 - sizeof(ctx)))) {
-            vaWriteCave += VMMDLL_ProcessGetModuleBase(dwPID, wszModuleName) + ((pSections[i].VirtualAddress + pSections[i].Misc.VirtualSize + 0xfff) & ~0xfff) - sizeof(ctx);
+            vaWriteCave += VMMDLL_ProcessGetModuleBaseU(dwPID, szModuleName) + ((pSections[i].VirtualAddress + pSections[i].Misc.VirtualSize + 0xfff) & ~0xfff) - sizeof(ctx);
             if(!VMMDLL_MemReadPage(dwPID, vaWriteCave & ~0xfff, pbPage)) {
                 vaWriteCave = 0;     // read test failed!
             }
@@ -201,10 +198,10 @@ VOID UmdWinExec()
     }
     if(!vaCodeCave || !vaWriteCave) {
         if(!vaCodeCave) {
-            printf("UMD: EXEC: Could not locate suitable code cave in '%S'\n", wszModuleName);
+            printf("UMD: EXEC: Could not locate suitable code cave in '%s'\n", szModuleName);
         }
         if(!vaWriteCave) {
-            printf("UMD: EXEC: Could not locate suitable write cave in '%S'\n", wszModuleName);
+            printf("UMD: EXEC: Could not locate suitable write cave in '%s'\n", szModuleName);
         }
         return;
     }
@@ -217,22 +214,22 @@ VOID UmdWinExec()
     *(PQWORD)(pbExec + 0x10) = oThunkInfoIAT.vaFunction;
     // prepare configuration data (goes into rw- section)
     ctx.qwDEBUG = 0;
-    ctx.fn.CloseHandle = VMMDLL_ProcessGetProcAddress(dwPID, L"kernel32.dll", "CloseHandle");
-    ctx.fn.CreatePipe = VMMDLL_ProcessGetProcAddress(dwPID, L"kernel32.dll", "CreatePipe");
-    ctx.fn.CreateProcessA = VMMDLL_ProcessGetProcAddress(dwPID, L"kernel32.dll", "CreateProcessA");
-    ctx.fn.CreateThread = VMMDLL_ProcessGetProcAddress(dwPID, L"kernel32.dll", "CreateThread");
-    ctx.fn.GetExitCodeProcess = VMMDLL_ProcessGetProcAddress(dwPID, L"kernel32.dll", "GetExitCodeProcess");
-    ctx.fn.LocalAlloc = VMMDLL_ProcessGetProcAddress(dwPID, L"kernel32.dll", "LocalAlloc");
-    ctx.fn.ReadFile = VMMDLL_ProcessGetProcAddress(dwPID, L"kernel32.dll", "ReadFile");
-    ctx.fn.Sleep = VMMDLL_ProcessGetProcAddress(dwPID, L"kernel32.dll", "Sleep");
-    ctx.fn.WriteFile = VMMDLL_ProcessGetProcAddress(dwPID, L"kernel32.dll", "WriteFile");
+    ctx.fn.CloseHandle = VMMDLL_ProcessGetProcAddressU(dwPID, "kernel32.dll", "CloseHandle");
+    ctx.fn.CreatePipe = VMMDLL_ProcessGetProcAddressU(dwPID, "kernel32.dll", "CreatePipe");
+    ctx.fn.CreateProcessA = VMMDLL_ProcessGetProcAddressU(dwPID, "kernel32.dll", "CreateProcessA");
+    ctx.fn.CreateThread = VMMDLL_ProcessGetProcAddressU(dwPID, "kernel32.dll", "CreateThread");
+    ctx.fn.GetExitCodeProcess = VMMDLL_ProcessGetProcAddressU(dwPID, "kernel32.dll", "GetExitCodeProcess");
+    ctx.fn.LocalAlloc = VMMDLL_ProcessGetProcAddressU(dwPID, "kernel32.dll", "LocalAlloc");
+    ctx.fn.ReadFile = VMMDLL_ProcessGetProcAddressU(dwPID, "kernel32.dll", "ReadFile");
+    ctx.fn.Sleep = VMMDLL_ProcessGetProcAddressU(dwPID, "kernel32.dll", "Sleep");
+    ctx.fn.WriteFile = VMMDLL_ProcessGetProcAddressU(dwPID, "kernel32.dll", "WriteFile");
     strcpy_s(ctx.szProcToStart, MAX_PATH - 1, ctxMain->cfg.szInS);
     ctx.dwFlagsCreateProcessA = (DWORD)ctxMain->cfg.qwDataIn[1];
     ctx.fEnableConsoleRedirect = ctxMain->cfg.qwDataIn[2] ? 1 : 0;
     //------------------------------------------------
     // 4: Inject & Hook
     //------------------------------------------------
-    printf("UMD: EXEC: Injecting code and configuration data into process %S\n", wszModuleName);
+    printf("UMD: EXEC: Injecting code and configuration data into process %s\n", szModuleName);
     printf("           IAT Hook : %s!%s at 0x%llx [0x%llx]\n", szHookModule, szHookFunction, oThunkInfoIAT.vaThunk, oThunkInfoIAT.vaFunction);
     VMMDLL_MemWrite(dwPID, vaWriteCave, (PBYTE)&ctx, sizeof(UMD_EXEC_CONTEXT_LIMITED));
     VMMDLL_MemWrite(dwPID, vaCodeCave, pbExec, sizeof(pbExec));
@@ -285,23 +282,3 @@ VOID ActionExecUserMode()
     }
     Vmmx_Close();
 }
-
-#endif /* WIN32 */
-#ifdef LINUX
-
-VOID Action_UmdPsList()
-{
-    printf("UMD: Not supported on Linux - require: Windows-only MemProcFS/vmm.dll\n");
-}
-
-VOID Action_UmdPsVirt2Phys()
-{
-    printf("UMD: Not supported on Linux - require: Windows-only MemProcFS/vmm.dll\n");
-}
-
-VOID ActionExecUserMode()
-{
-    printf("UMD: Not supported on Linux - require: Windows-only MemProcFS/vmm.dll\n");
-}
-
-#endif /* LINUX */

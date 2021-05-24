@@ -65,8 +65,8 @@ VOID Help_ShowGeneral()
         "   tlploop                NATIVE       [ in ]         (FPGA)                   \n" \
         "   probe                  NATIVE       [ min, max ]   (FPGA)                   \n" \
         "   regcfg                 NATIVE       [ in, out, min, max] (FPGA)             \n" \
-        "   pslist                 NATIVE                      (Windows)                \n" \
-        "   psvirt2phys            NATIVE       [ 0, 1 ]       (Windows)                \n" \
+        "   pslist                 NATIVE                                               \n" \
+        "   psvirt2phys            NATIVE       [ 0, 1 ]                                \n" \
         "   agent-execpy           NATIVE       [ in, out ]    (Remote LeechAgent)      \n" \
         " System specific commands and valid MODEs [ and options ]:                     \n" \
         "   mac_fvrecover          NATIVE                      (USB3380)                \n" \
@@ -132,10 +132,10 @@ VOID Help_ShowGeneral()
         "          ALTERNATIVELY                                                        \n" \
         "          kernel module to use, see list below for choices:                    \n" \
         "             WIN10_X64                                                         \n" \
-        "             WIN10_X64_2         (Requires: FPGA & Windows)                    \n" \
-        "             WIN10_X64_3         (Requires: FPGA & Windows)                    \n" \
+        "             WIN10_X64_2                                                       \n" \
+        "             WIN10_X64_3                                                       \n" \
         "             LINUX_X64_46        (NB! Kernels 2.6.33 - 4.6)                    \n" \
-        "             LINUX_X64_48        (NB! Kernels 4.8+, FPGA only)                 \n" \
+        "             LINUX_X64_48        (NB! Kernels 4.8+)                            \n" \
         "             LINUX_X64_EFI       (NB! UEFI booted systems only)                \n" \
         "             FREEBSD_X64                                                       \n" \
         "             MACOS                                                             \n" \
@@ -146,7 +146,7 @@ VOID Help_ShowGeneral()
         "   -sig : available patches - including operating system unlock patches:       \n");
     ShowListFiles("*.sig", 13, 0, 4);
     printf(
-        " User-Mode implants: EXPERIMENTAL! (Requires: Windows)                         \n" \
+        " User-Mode implants: EXPERIMENTAL!                                             \n" \
         "             UMD_WINX64_IAT_PSEXEC                                             \n" \
         " Kernel-mode implants:                                                         \n");
     ShowListFiles("*.ksh", 13, 0, 4);
@@ -161,7 +161,7 @@ VOID Help_ShowInfo()
         " Version: " \
         VER_FILE_VERSION_STR "\n" \
         "                                                                               \n" \
-        " License: GNU GENERAL PUBLIC LICENSE - Version 3, 29 June 2007                 \n" \
+        " License: GNU Affero General Public License v3.0                               \n" \
         " Contact information: pcileech@frizk.net                                       \n" \
         " System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \
         " Other project references:                                                     \n" \
@@ -174,7 +174,7 @@ VOID Help_ShowInfo()
         "   PCIe Injector     - https://github.com/enjoy-digital/pcie_injector          \n" \
         "   Dokany            - https://github.com/dokan-dev/dokany/releases/latest     \n" \
         " ----------------                                                              \n" \
-        "   MemProcFS is free open source software. If you find it useful please        \n" \
+        "   PCILeech is free open source software. If you find it useful please         \n" \
         "   become a sponsor at: https://github.com/sponsors/ufrisk Thank You :)        \n" \
         " ----------------                                                              \n" \
         " Use with memory dump files, DumpIt, WinPmem in read-only mode.                \n" \
@@ -578,9 +578,8 @@ VOID Help_ShowDetailed()
         printf(
             " LIST PROCESSES OF THE TARGET SYSTEM                                           \n" \
             " MODES   : NATIVE                                                              \n" \
-            " REQUIRE : Windows                                                             \n" \
             " OPTIONS :                                                                     \n" \
-            " List the process names and pids of the targeted system.                       \n" \
+            " List the process names and pids of the targeted Windows system.               \n" \
             " EXAMPLEs:                                                                     \n" \
             " 1) List devices using 'fpga' or 'usb3380' hardware device.                    \n" \
             "    pcileech pslist                                                            \n" \
@@ -591,9 +590,8 @@ VOID Help_ShowDetailed()
         printf(
             " TRANSLATE A VIRTUAL MEMORY ADDRESS INTO PHYSICAL MEMORY ADDRESS FOR GIVEN PID \n" \
             " MODES   : NATIVE                                                              \n" \
-            " REQUIRE : Windows                                                             \n" \
             " OPTIONS : -0, -1                                                              \n" \
-            " Translate a process virtual address into a physical address                   \n" \
+            " Translate a Windows process virtual address into a physical address           \n" \
             " EXAMPLEs:                                                                     \n" \
             " 1) Translate a virtual address of pid 638 into its physical address           \n" \
             "    pcileech psvirt2phys -0 638 -1 0x7ffc8b41a000                              \n");
@@ -602,7 +600,6 @@ VOID Help_ShowDetailed()
         printf(
             " EXECUTE A USER MODE SHELLCODE (EXPERIMENTAL)                                  \n" \
             " MODES   : NATIVE                                                              \n" \
-            " REQUIRE : Windows                                                             \n" \
             " OPTIONS : -0, -1 -hook -s                                                     \n" \
             " Hook a user mode application (currently supported method is hooking the import\n" \
             " address table - IAT). If the hook is successful the shellcode will be executed\n" \

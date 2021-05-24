@@ -1,10 +1,8 @@
-// vmmx.h : implementation of external VMM/MemProcFS functionality with linux compatible dummy functions.
+// vmmx.h : implementation of external memory process file system functionality.
 //
 // (c) Ulf Frisk, 2020-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-#ifdef WIN32
-
 #include <stdio.h>
 #include <vmmdll.h>
 #include "vmmx.h"
@@ -49,17 +47,3 @@ BOOL Vmmx_Initialize(_In_ BOOL fRefresh,  _In_ BOOL fMemMapAuto)
     }
     return ctxMain->fVmmInitialized;
 }
-
-#endif /* WIN32 */
-#ifdef LINUX
-
-#include "vmmx.h"
-
-#define VMMDLL_FLAG_NOCACHE                        0x0001
-
-BOOL Vmmx_Initialize(_In_ BOOL fRefresh, _In_ BOOL fMemMapAuto) { return FALSE; }
-VOID Vmmx_Close() { return; }
-BOOL Vmmx_MemReadEx(_In_ DWORD dwPID, _In_ ULONG64 qwVA, _Out_ PBYTE pb, _In_ DWORD cb, _Out_opt_ PDWORD pcbReadOpt, _In_ ULONG64 flags) { return FALSE; }
-BOOL Vmmx_MemWrite(_In_ DWORD dwPID, _In_ ULONG64 qwVA, _In_ PBYTE pb, _In_ DWORD cb) { return FALSE; }
-
-#endif /* LINUX */
