@@ -5,8 +5,6 @@ VisualStudioVersion = 16.0.28729.10
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcileech", "pcileech\pcileech.vcxproj", "{DFFA1B4C-279B-4356-ADB1-08A6F4795931}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcileech_gensig", "pcileech_gensig\pcileech_gensig.vcxproj", "{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcileech_shellcode", "pcileech_shellcode\pcileech_shellcode.vcxproj", "{5C698F13-6E9F-46F3-95FC-55376A65D8BF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{41BC2617-A896-4D63-9F5E-ED26C5A613B8}"
@@ -29,7 +27,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "USB3380Flash_installer", "u
 	ProjectSection(ProjectDependencies) = postProject
 		{DFFA1B4C-279B-4356-ADB1-08A6F4795931} = {DFFA1B4C-279B-4356-ADB1-08A6F4795931}
 		{E11BECC1-685F-41B9-A352-A6127FAB3758} = {E11BECC1-685F-41B9-A352-A6127FAB3758}
-		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065} = {C55314C6-71A0-4AE2-A4F0-E5E531A5E065}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "leechcore", "..\LeechCore\leechcore\leechcore.vcxproj", "{3476ABD2-5DEA-43E6-A676-8BE25F74535A}"
@@ -55,12 +52,6 @@ Global
 		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.ReleaseMT|x64.ActiveCfg = ReleaseMT|x64
 		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.ReleaseMT|x64.Build.0 = ReleaseMT|x64
 		{DFFA1B4C-279B-4356-ADB1-08A6F4795931}.ReleaseMT|x86.ActiveCfg = ReleaseMT|x64
-		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Debug|x64.ActiveCfg = Debug|x64
-		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Debug|x86.ActiveCfg = Debug|x64
-		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Release|x64.ActiveCfg = Release|x64
-		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.Release|x86.ActiveCfg = Release|x64
-		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.ReleaseMT|x64.ActiveCfg = ReleaseMT|x64
-		{C55314C6-71A0-4AE2-A4F0-E5E531A5E065}.ReleaseMT|x86.ActiveCfg = ReleaseMT|x64
 		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.Debug|x64.ActiveCfg = Release|x64
 		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.Debug|x86.ActiveCfg = Release|x64
 		{5C698F13-6E9F-46F3-95FC-55376A65D8BF}.Debug|x86.Build.0 = Release|x64
