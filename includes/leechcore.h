@@ -14,7 +14,7 @@
 // (c) Ulf Frisk, 2020-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.6
+// Header Version: 2.7
 //
 
 #ifndef __LEECHCORE_H__
@@ -396,7 +396,7 @@ EXPORTED_FUNCTION BOOL LcCommand(
 #define LC_OPT_FPGA_DELAY_WRITE                     0x0300000700000000  // RW - uS
 #define LC_OPT_FPGA_DELAY_READ                      0x0300000800000000  // RW - uS
 #define LC_OPT_FPGA_RETRY_ON_ERROR                  0x0300000900000000  // RW
-#define LC_OPT_FPGA_DEVICE_ID                       0x0300008000000000  // R
+#define LC_OPT_FPGA_DEVICE_ID                       0x0300008000000000  // RW - bus:dev:fn (ex: 04:00.0 == 0x0400).
 #define LC_OPT_FPGA_FPGA_ID                         0x0300008100000000  // R
 #define LC_OPT_FPGA_VERSION_MAJOR                   0x0300008200000000  // R
 #define LC_OPT_FPGA_VERSION_MINOR                   0x0300008300000000  // R
@@ -433,6 +433,14 @@ EXPORTED_FUNCTION BOOL LcCommand(
 
 #define LC_CMD_AGENT_EXEC_PYTHON                    0x8000000100000000  // RW - [lo-dword: optional timeout in ms]
 #define LC_CMD_AGENT_EXIT_PROCESS                   0x8000000200000000  //    - [lo-dword: process exit code]
+#define LC_CMD_AGENT_VFS_LIST                       0x8000000300000000  // RW
+#define LC_CMD_AGENT_VFS_READ                       0x8000000400000000  // RW
+#define LC_CMD_AGENT_VFS_WRITE                      0x8000000500000000  // RW
+#define LC_CMD_AGENT_VFS_OPT_GET                    0x8000000600000000  // RW
+#define LC_CMD_AGENT_VFS_OPT_SET                    0x8000000700000000  // RW
+
+#define LC_CMD_AGENT_VFS_REQ_VERSION                0xfeed0001
+#define LC_CMD_AGENT_VFS_RSP_VERSION                0xfeee0001
 
 #define LC_STATISTICS_VERSION                       0xe1a10002
 #define LC_STATISTICS_ID_OPEN                       0x00
@@ -444,6 +452,28 @@ EXPORTED_FUNCTION BOOL LcCommand(
 #define LC_STATISTICS_ID_SETOPTION                  0x06
 #define LC_STATISTICS_ID_COMMAND                    0x07
 #define LC_STATISTICS_ID_MAX                        0x07
+
+typedef struct tdLC_CMD_AGENT_VFS_REQ {
+    DWORD dwVersion;
+    DWORD _FutureUse;
+    CHAR uszPathFile[2*MAX_PATH];   // file path to list/read/write
+    union {
+        QWORD qwOffset;             // offset to read/write
+        QWORD fOption;              // option to get/set (qword data in *pb)
+    };
+    DWORD dwLength;                 // length to read
+    DWORD cb;
+    BYTE pb[0];
+} LC_CMD_AGENT_VFS_REQ, *PLC_CMD_AGENT_VFS_REQ;
+
+typedef struct tdLC_CMD_AGENT_VFS_RSP {
+    DWORD dwVersion;
+    DWORD dwStatus;                 // ntstatus of read/write
+    DWORD cbReadWrite;              // number of bytes read/written
+    DWORD _FutureUse[2];
+    DWORD cb;
+    BYTE pb[0];
+} LC_CMD_AGENT_VFS_RSP, *PLC_CMD_AGENT_VFS_RSP;
 
 static LPCSTR LC_STATISTICS_NAME[] = {
     "LcOpen",

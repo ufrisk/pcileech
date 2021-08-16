@@ -49,6 +49,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         {.tp = PSLIST,.sz = "pslist" },
         {.tp = PSVIRT2PHYS,.sz = "psvirt2phys" },
         {.tp = AGENT_EXEC_PY,.sz = "agent-execpy" },
+        {.tp = AGENT_FORENSIC,.sz = "agent-forensic"},
     };
     DWORD j, i = 1;
     FILE *hFile;
@@ -398,7 +399,10 @@ int main(_In_ int argc, _In_ char* argv[])
             Action_UmdPsVirt2Phys();
             break;
         case AGENT_EXEC_PY:
-            ActionSvcExecPy();
+            ActionAgentExecPy();
+            break;
+        case AGENT_FORENSIC:
+            ActionAgentForensic();
             break;
         case KMDLOAD:
             if(ctxMain->cfg.qwKMD) {

@@ -12,6 +12,7 @@
 #define EXEC_IO_CONSOLE_BUFFER_SIZE     0x800
 #define EXEC_IO_DMAOFFSET_IS            0x80000
 #define EXEC_IO_DMAOFFSET_OS            0x81000
+
 typedef struct tdEXEC_IO {
     QWORD magic;
     struct {
@@ -390,7 +391,7 @@ fail:
     if(pFile) { fclose(pFile); }
 }
 
-VOID ActionSvcExecPy()
+VOID ActionAgentExecPy()
 {
     BOOL result;
     DWORD cbResult = 0;
@@ -437,3 +438,177 @@ fail:
     LcMemFree(pbResult);
 }
 
+#ifdef _WIN32
+
+DWORD ActionAgentForensic_OutFileDirectory(_Out_writes_z_(MAX_PATH) LPSTR szFilePrefix, _In_ LPSTR szUniqueTag)
+{
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    _snprintf_s(
+        szFilePrefix,
+        MAX_PATH,
+        _TRUNCATE,
+        "%s%sforensic-%i%02i%02i-%02i%02i%02i-%s",
+        ctxMain->cfg.szFileOut[0] ? ctxMain->cfg.szFileOut : "",
+        ctxMain->cfg.szFileOut[0] ? "\\" : "",
+        st.wYear,
+        st.wMonth,
+        st.wDay,
+        st.wHour,
+        st.wMinute,
+        st.wSecond,
+        szUniqueTag);
+    return (DWORD)strlen(szFilePrefix);
+}
+
+VOID ActionAgentForensic_GetFile(_In_ LPSTR szRemoteFile, _In_ LPSTR szOutFile, _In_ QWORD qwSize)
+{
+    FILE *hFile = NULL;
+    LC_CMD_AGENT_VFS_REQ Req = { 0 };
+    PLC_CMD_AGENT_VFS_RSP pRsp = NULL;
+    HANDLE hConsole;
+    CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+    Req.dwVersion = LC_CMD_AGENT_VFS_REQ_VERSION;
+    strncpy_s(Req.uszPathFile, _countof(Req.uszPathFile), szRemoteFile, _TRUNCATE);
+    if(fopen_s(&hFile, szOutFile, "wb")) {
+        printf("AGENT-ELASTIC: failed open local file %s\n", szOutFile);
+        goto fail;
+    }
+    printf("    Local File: %s\n    Progress:     0%%", szOutFile);
+    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    GetConsoleScreenBufferInfo(hConsole, &consoleInfo);
+    consoleInfo.dwCursorPosition.X -= 4;
+    while((Req.dwLength = min(0x01000000, (DWORD)(qwSize - Req.qwOffset)))) {
+        if(!LcCommand(ctxMain->hLC, LC_CMD_AGENT_VFS_READ, sizeof(LC_CMD_AGENT_VFS_REQ), (PBYTE)&Req, (PBYTE*)&pRsp, NULL) || !pRsp || !pRsp->cb) {
+            printf("\nAGENT-FORENSIC: Failed reading remote file.\n");
+            goto fail;
+        }
+        if(pRsp->cb != fwrite(pRsp->pb, 1, pRsp->cb, hFile)) {
+            LocalFree(pRsp);
+            printf("\nAGENT-FORENSIC: failed write to local file %s\n", szOutFile);
+            break;
+        }
+        LocalFree(pRsp);
+        Req.qwOffset += Req.dwLength;
+        SetConsoleCursorPosition(hConsole, consoleInfo.dwCursorPosition);
+        printf("%3lli%%", ((Req.qwOffset * 100) / qwSize));
+    }
+    printf("\n");
+fail:
+    if(hFile) { fclose(hFile); }
+}
+
+/*
+* Retrieve forensic mode JSON data from the remote system. This is achieved by
+* starting MemProcFS as a child-process remotely and accessing its virtual file
+* system. The JSON data retrieved is compatible with ElasticSearch.
+*/
+VOID ActionAgentForensic()
+{
+    CHAR szPercent[4] = { 0 }, szRemoteFile[MAX_PATH] = { 0 }, szLocalFile[MAX_PATH] = { 0 };
+    CHAR szTag[18] = { 0 };
+    LPSTR szFile;
+    DWORD i, cPercent = 0, cbResult = 0, cchLocalFileDirectory;
+    PBYTE pbResult = NULL;
+    PLC_CMD_AGENT_VFS_REQ pReq = NULL;
+    PLC_CMD_AGENT_VFS_RSP pRsp = NULL;
+    PVMMDLL_VFS_FILELISTBLOB pVfsList;
+    HANDLE hConsole;
+    CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+    
+    // Initial setup
+    if(!(pReq = LocalAlloc(LMEM_ZEROINIT, sizeof(LC_CMD_AGENT_VFS_REQ) + 1))) { goto fail; }
+    pReq->dwVersion = LC_CMD_AGENT_VFS_REQ_VERSION;
+    strncpy_s(pReq->uszPathFile, _countof(pReq->uszPathFile), "\\forensic\\forensic_enable.txt", _TRUNCATE);
+
+    // Enable/verify forensic mode '1' - in-memory database
+    pReq->cb = 1;
+    pReq->pb[0] = '1';
+    if(!LcCommand(ctxMain->hLC, LC_CMD_AGENT_VFS_WRITE, sizeof(LC_CMD_AGENT_VFS_REQ) + 1, (PBYTE)pReq, NULL, NULL)) {
+        printf("AGENT-FORENSIC: Failed to connect to the remote system or enable memory analysis.\n");
+        goto fail;
+    }
+    pReq->cb = 0;
+    pReq->dwLength = 3;
+    if(!LcCommand(ctxMain->hLC, LC_CMD_AGENT_VFS_READ, sizeof(LC_CMD_AGENT_VFS_REQ), (PBYTE)pReq, (PBYTE*)&pRsp, NULL) || !pRsp || !pRsp->cb || pRsp->pb[0] != '1') {
+        printf("AGENT-FORENSIC: Failed start remote forensic mode memory analysis.\n");
+        goto fail;
+    }
+    LocalFree(pRsp); pRsp = NULL;
+
+    // Get Unique Tag
+    strncpy_s(pReq->uszPathFile, _countof(pReq->uszPathFile), "\\sys\\unique-tag.txt", _TRUNCATE);
+    pReq->cb = 0;
+    pReq->dwLength = 17;
+    if(!LcCommand(ctxMain->hLC, LC_CMD_AGENT_VFS_READ, sizeof(LC_CMD_AGENT_VFS_REQ), (PBYTE)pReq, (PBYTE*)&pRsp, NULL) || !pRsp || !pRsp->cb || (pRsp->cb > 17)) {
+        printf("AGENT-FORENSIC: Failed retrieving unique tag.\n");
+        goto fail;
+    }
+    memcpy(szTag, pRsp->pb, pRsp->cb);
+    LocalFree(pRsp); pRsp = NULL;
+    printf("AGENT-FORENSIC: Remote System Tag: %s\n", szTag);
+
+    // Watch for progress until 100%
+    printf("AGENT-FORENSIC: Connected. Remote forensic memory analysis:   0%%");
+    hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    GetConsoleScreenBufferInfo(hConsole, &consoleInfo);
+    consoleInfo.dwCursorPosition.X -= 4;
+    cPercent = 0;
+    strncpy_s(pReq->uszPathFile, _countof(pReq->uszPathFile), "\\forensic\\progress_percent.txt", _TRUNCATE);
+    pReq->cb = 0;
+    pReq->dwLength = 3;
+    while(cPercent != 100) {
+        Sleep(250);
+        if(!LcCommand(ctxMain->hLC, LC_CMD_AGENT_VFS_READ, sizeof(LC_CMD_AGENT_VFS_REQ), (PBYTE)pReq, (PBYTE*)&pRsp, NULL) || !pRsp) {
+            printf("\nAGENT-FORENSIC: Failed to retrieve progress percent ...\n");
+            goto fail;
+        }
+        memcpy(szPercent, pRsp->pb, min(3, pRsp->cb));
+        LocalFree(pRsp); pRsp = NULL;
+        cPercent = atoi(szPercent);
+        SetConsoleCursorPosition(hConsole, consoleInfo.dwCursorPosition);
+        printf("%3i%%", cPercent);
+    }
+
+    // Retrieve /forensic/json directory info and print file list:
+    strncpy_s(pReq->uszPathFile, _countof(pReq->uszPathFile), "\\forensic\\json", _TRUNCATE);
+    pReq->dwLength = 0;
+    if(!LcCommand(ctxMain->hLC, LC_CMD_AGENT_VFS_LIST, sizeof(LC_CMD_AGENT_VFS_REQ), (PBYTE)pReq, (PBYTE*)&pRsp, NULL) || !pRsp) {
+        printf("AGENT-FORENSIC: Failed to retrieve file info.\n");
+        goto fail;
+    }
+    pVfsList = (PVMMDLL_VFS_FILELISTBLOB)pRsp->pb;                          // sanity/security checks on remote deta done in leechcore
+    pVfsList->uszMultiText = pVfsList->uszMultiText + (QWORD)pVfsList;      // fixup relative uszMultiText offset
+    if(pVfsList->cFileEntry > 16) {
+        printf("AGENT-FORENSIC: Too many files on remote system (%i).\n", pVfsList->cFileEntry);
+        goto fail;
+    }
+    cchLocalFileDirectory = ActionAgentForensic_OutFileDirectory(szLocalFile, szTag);
+    CreateDirectoryA(szLocalFile, NULL);
+    printf("\nRemote Files:\n");
+    for(i = 0; i < pVfsList->cFileEntry; i++) {
+        if(pVfsList->FileEntry[i].cbFileSize != -1) {
+            szFile = pVfsList->uszMultiText + pVfsList->FileEntry[i].ouszName;
+            printf("  %s\t\t[%lli MB]\n", szFile, pVfsList->FileEntry[i].cbFileSize / (1024 * 1024));
+            if(!strcmp(szFile, "general.json") || !strcmp(szFile, "registry.json") || !strcmp(szFile, "timeline.json")) {
+                _snprintf_s(szRemoteFile, _countof(szRemoteFile), _TRUNCATE, "\\forensic\\json\\%s", szFile);
+                _snprintf_s(szLocalFile + cchLocalFileDirectory, _countof(szLocalFile) - cchLocalFileDirectory, _TRUNCATE, "\\%s", szFile);
+                ActionAgentForensic_GetFile(szRemoteFile, szLocalFile, pVfsList->FileEntry[i].cbFileSize);
+            }
+        }
+    }
+    printf("Completed!\n\n");
+fail:
+    LocalFree(pReq);
+    LocalFree(pRsp);
+}
+
+#endif /* _WIN32 */
+#ifdef LINUX
+
+VOID ActionAgentForensic()
+{
+    printf("Command 'agent-elastic' is only supported on Windows.\n");
+}
+
+#endif /* LINUX */

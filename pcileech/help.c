@@ -68,6 +68,7 @@ VOID Help_ShowGeneral()
         "   pslist                 NATIVE                                               \n" \
         "   psvirt2phys            NATIVE       [ 0, 1 ]                                \n" \
         "   agent-execpy           NATIVE       [ in, out ]    (Remote LeechAgent)      \n" \
+        "   agent-forensic         NATIVE       [ out ]        (Remote LeechAgent)      \n" \
         " System specific commands and valid MODEs [ and options ]:                     \n" \
         "   mac_fvrecover          NATIVE                      (USB3380)                \n" \
         "   mac_fvrecover2         NATIVE                      (USB3380)                \n" \
@@ -83,8 +84,8 @@ VOID Help_ShowGeneral()
         "          LeechCore library at: https://github.com/ufrisk/LeechCore            \n" \
         "          Affects all modes and commands.                                      \n" \
         "          Common valid options: USB3380, FPGA, DumpIt, <memory-dump-file-name> \n" \
-        "   -remote: Connect to a remote system LeechSvc to acquire remote memory. This \n" \
-        "          is a Windows-only feature. Specify remote host and remote user to    \n" \
+        "   -remote: Connect to a remote system LeechAgent to acquire remote memory.    \n" \
+        "          This is a Windows-only feature. Specify remote host + remote user to \n" \
         "          authenticate (or insecure if no authenciation). Kerberos-secure conn.\n" \
         "          Example: rpc://<remote-user-spn_or_insecure>:<remote_host>           \n" \
         "   -min : memory min address, valid range: 0x0 .. 0xffffffffffffffff           \n" \
@@ -615,16 +616,31 @@ VOID Help_ShowDetailed()
         printf(
             " EXECUTE A PYTHON SCRIPT ON A REMOTE HOST RUNNING LeechAgent                   \n" \
             " MODES   : NATIVE                                                              \n" \
-            " REQUIRE : Windows/Remote LeechSvc                                             \n" \
+            " REQUIRE : Windows/Remote LeechAgent                                           \n" \
             " OPTIONS : -in, -out                                                           \n" \
             " Execute a Python script contained in the -in parameter on a remote host having\n" \
             " the LeechAgent installed.    The script will be executed in an embedded Python\n" \
             "  and the MemProcFS/LeechCore python APIs will be available and initialized.   \n" \
-            " Outout will be displayed on screen unless -out parameter is specified.        \n" \
+            " Output will be displayed on screen unless -out parameter is specified.        \n" \
             " EXAMPLE:                                                                      \n" \
             " 1) Execute the script 'myscript.py' on the remote host test1.contoso.com using\n" \
             "    physical memory acquired from WinPmem:                                     \n" \
             "    pcileech.exe agent-execpy -in myscript.py -device pmem                     \n" \
+            "                 -remote rpc://test1$@contoso.com:test1.contoso.com            \n" \
+        );
+        break;
+    case AGENT_FORENSIC:
+        printf(
+            " RUN MemProcFS ON REMOTE HOST RUNNING LeechAgent AND RETRIEVE RESULT           \n" \
+            " MODES   : NATIVE                                                              \n" \
+            " REQUIRE : Windows/Remote LeechAgent                                           \n" \
+            " OPTIONS : -out                                                                \n" \
+            " Start the MemProcFS memory analysis on the remote host. Results in the form of\n" \
+            " ElasticSearch compatible JSON files are retrieved and saved locally. Result is\n" \
+            " saved in working directory unless a _DIRECTORY_ is specified in -out parameter\n" \
+            " EXAMPLE:                                                                      \n" \
+            " 1) Run memory analysis on remote host using WinPmem and save result in c:\\temp\n" \
+            "    pcileech.exe agent-forensic -out c:\temp -device pmem                      \n" \
             "                 -remote rpc://test1$@contoso.com:test1.contoso.com            \n" \
         );
         break;

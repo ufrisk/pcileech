@@ -57,6 +57,11 @@ VOID ActionExecShellcode();
 /*
 * Try execute python code on a remote host in the context of the LeechSvc.
 */
-VOID ActionSvcExecPy();
+VOID ActionAgentExecPy();
+
+/*
+* Retrieve remote elasticsearch forensic information.
+*/
+VOID ActionAgentForensic();
 
 #endif /* __EXECUTOR_H__ */

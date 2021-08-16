@@ -7,7 +7,7 @@
 // (c) Ulf Frisk, 2018-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 4.0
+// Header Version: 4.2
 //
 
 #include "leechcore.h"
@@ -306,6 +306,7 @@ typedef struct _SERVICE_STATUS {
 
 #define VMMDLL_VFS_FILELIST_EXINFO_VERSION          1
 #define VMMDLL_VFS_FILELIST_VERSION                 2
+#define VMMDLL_VFS_FILELISTBLOB_VERSION             0xf88f0001
 
 typedef struct tdVMMDLL_VFS_FILELIST_EXINFO {
     DWORD dwVersion;
@@ -331,8 +332,24 @@ typedef struct tdVMMDLL_VFS_FILELIST2 {
     HANDLE h;
 } VMMDLL_VFS_FILELIST2, *PVMMDLL_VFS_FILELIST2;
 
+typedef struct tdVMMDLL_VFS_FILELISTBLOB_ENTRY {
+    ULONG64 ouszName;                       // byte offset to string from VMMDLL_VFS_FILELISTBLOB.uszMultiText
+    ULONG64 cbFileSize;                     // -1 == directory
+    VMMDLL_VFS_FILELIST_EXINFO ExInfo;      // optional ExInfo
+} VMMDLL_VFS_FILELISTBLOB_ENTRY, *PVMMDLL_VFS_FILELISTBLOB_ENTRY;
+
+typedef struct tdVMMDLL_VFS_FILELISTBLOB {
+    DWORD dwVersion;                        // VMMDLL_VFS_FILELISTBLOB_VERSION
+    DWORD cbStruct;
+    DWORD cFileEntry;
+    DWORD cbMultiText;
+    LPSTR uszMultiText;
+    DWORD _FutureUse[8];
+    VMMDLL_VFS_FILELISTBLOB_ENTRY FileEntry[0];
+} VMMDLL_VFS_FILELISTBLOB, *PVMMDLL_VFS_FILELISTBLOB;
+
 /*
-* Helper functions for callbacks into the VMM_VFS_FILELIST structure.
+* Helper functions for callbacks into the VMM_VFS_FILELIST2 structure.
 */
 EXPORTED_FUNCTION
 VOID VMMDLL_VfsList_AddFile(_In_ HANDLE pFileList, _In_ LPSTR uszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
@@ -354,6 +371,15 @@ EXPORTED_FUNCTION BOOL VMMDLL_VfsList_IsHandleValid(_In_ HANDLE pFileList);
 EXPORTED_FUNCTION
 _Success_(return) BOOL VMMDLL_VfsListU(_In_ LPSTR  uszPath, _Inout_ PVMMDLL_VFS_FILELIST2 pFileList);
 _Success_(return) BOOL VMMDLL_VfsListW(_In_ LPWSTR wszPath, _Inout_ PVMMDLL_VFS_FILELIST2 pFileList);
+
+/*
+* List a directory of files in MemProcFS and return a VMMDLL_VFS_FILELISTBLOB.
+* CALLER FREE: VMMDLL_MemFree(return)
+* -- uszPath
+* -- return
+*/
+EXPORTED_FUNCTION
+_Success_(return != NULL) PVMMDLL_VFS_FILELISTBLOB VMMDLL_VfsListBlobU(_In_ LPSTR uszPath);
 
 /*
 * Read select parts of a file in MemProcFS.

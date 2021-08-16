@@ -66,12 +66,13 @@ Please find a summary of the supported software based memory acquisition methods
 | [RAW physical memory dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)         | File             | No  | No  | Yes | No  |
 | [Full Microsoft Crash Dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)        | File             | No  | No  | Yes | No  |
 | [Full ELF Core Dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)               | File             | No  | No  | Yes | No  |
+| [VMware](https://github.com/ufrisk/LeechCore/wiki/Device_VMWare)                         | Live&nbsp;Memory | Yes | Yes | No  | No  |
 | [VMware memory save file](https://github.com/ufrisk/LeechCore/wiki/Device_File)          | File             | No  | No  | Yes | No  |
 | [TotalMeltdown](https://github.com/ufrisk/LeechCore/wiki/Device_Totalmeltdown)           | CVE-2018-1038    | Yes | Yes | No  | No  |
 | [DumpIt /LIVEKD](https://github.com/ufrisk/LeechCore/wiki/Device_DumpIt)                 | Live&nbsp;Memory | Yes | No  | No  | No  |
 | [WinPMEM](https://github.com/ufrisk/LeechCore/wiki/Device_WinPMEM)                       | Live&nbsp;Memory | Yes | No  | No  | No  |
 | [LiveKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveKd)                         | Live&nbsp;Memory | Yes | No  | No  | No  |
-| [LiveCloudKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveCloudKd)               | Live&nbsp;Memory | Yes | No  | No  | Yes |
+| [LiveCloudKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveCloudKd)               | Live&nbsp;Memory | Yes | Yes | No  | Yes |
 | [Hyper-V Saved State](https://github.com/ufrisk/LeechCore/wiki/Device_HyperV_SavedState) | File             | No  | No  | No  | Yes |
 | [LeechAgent*](https://github.com/ufrisk/LeechCore/wiki/Device_Remote)                    | Remote           |     |     | No  | No  |
 
@@ -239,9 +240,15 @@ v4.1
 * Signature updates.
 * Better support for recent x64 Linux kernels (Ubuntu 21.04).
 * Unmount of monted driver when CTRL+C pressed.
-</details>
 
 [v4.10](https://github.com/ufrisk/pcileech/releases/tag/v4.10)
 * Linux support for Windows 10 built-in signatures (dependency on MemProcFS v4.0).
 * Separate releases for Windows and Linux.
 * General cleanup.
+</details>
+
+[v4.11](https://github.com/ufrisk/pcileech/releases/tag/v4.11)
+* Support for VMWare Workstation/Player live VM memory.
+* Support for remote memory analysis with LeechAgent `agent-forensic` command.
+  * Runs MemProcFS forensic mode remotely.
+  * Retrieves ElasticSearch compatible JSON data.

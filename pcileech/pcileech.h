@@ -58,6 +58,7 @@ typedef enum tdActionType {
     PSLIST,
     PSVIRT2PHYS,
     AGENT_EXEC_PY,
+    AGENT_FORENSIC,
     EXTERNAL_COMMAND_MODULE
 } ACTION_TYPE;
 
