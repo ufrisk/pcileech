@@ -252,3 +252,6 @@ v4.1
 * Support for remote memory analysis with LeechAgent `agent-forensic` command.
   * Runs MemProcFS forensic mode remotely.
   * Retrieves ElasticSearch compatible JSON data.
+
+[v4.12](https://github.com/ufrisk/pcileech/releases/tag/v4.12)
+* 32-bit support (pcileech binary).

@@ -106,7 +106,7 @@ VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
     ps->i.fIsFirstPrintCompleted = TRUE;
 }
 
-VOID _PageStatThreadLoop(_In_ PPAGE_STATISTICS ps)
+VOID WINAPI _PageStatThreadLoop(_In_ PPAGE_STATISTICS ps)
 {
     while(!ps->i.fThreadExit) {
         Sleep(100);

@@ -164,9 +164,9 @@ BOOL VfsCache_DirectoryGetDirectory(_Out_ PVFS_RESULT_FILEINFO *ppfi, _Out_ PQWO
             continue;
         }
         *pcfi = pds->CacheDirectory[i].cfi;
-        *ppfi = (PVFS_RESULT_FILEINFO)LocalAlloc(0, *pcfi * sizeof(VFS_RESULT_FILEINFO));
+        *ppfi = (PVFS_RESULT_FILEINFO)LocalAlloc(0, (SIZE_T)(*pcfi * sizeof(VFS_RESULT_FILEINFO)));
         if(!*ppfi) { goto fail; }
-        memcpy(*ppfi, pds->CacheDirectory[i].pfi, *pcfi * sizeof(VFS_RESULT_FILEINFO));
+        memcpy(*ppfi, pds->CacheDirectory[i].pfi, (SIZE_T)(*pcfi * sizeof(VFS_RESULT_FILEINFO)));
         LeaveCriticalSection(&pds->LockCache);
         pds->Statistics.cLISTDIR.hit++;
         return TRUE;
@@ -185,13 +185,13 @@ VOID VfsCache_DirectoryPut(_In_ LPCWSTR wcsDirectoryName, _In_ PVFS_RESULT_FILEI
     cd->qwExpireTickCount64 = 0;
     LocalFree(cd->pfi);
     cd->pfi = NULL;
-    cd->pfi = (PVFS_RESULT_FILEINFO)LocalAlloc(0, cfi * sizeof(VFS_RESULT_FILEINFO));
+    cd->pfi = (PVFS_RESULT_FILEINFO)LocalAlloc(0, (SIZE_T)(cfi * sizeof(VFS_RESULT_FILEINFO)));
     if(!cd->pfi) {
         LeaveCriticalSection(&pds->LockCache);
         return;
     }
     cd->qwExpireTickCount64 = GetTickCount64() + qwCacheValidMs;
-    memcpy(cd->pfi, pfi, cfi * sizeof(VFS_RESULT_FILEINFO));
+    memcpy(cd->pfi, pfi, (SIZE_T)(cfi * sizeof(VFS_RESULT_FILEINFO)));
     cd->cfi = cfi;
     wcscpy_s(cd->wszDirectoryName, MAX_PATH, wcsDirectoryName);
     pds->CacheDirectoryIndex = (pds->CacheDirectoryIndex + 1) % CACHE_DIRECTORY_ENTRIES;
@@ -323,7 +323,7 @@ VOID VfsCache_FilePut(_In_ LPCWSTR wcsFileName, _In_ QWORD cbOffset, _In_ PBYTE 
     pds->CacheFile[pds->CacheFileIndex].cb = cb;
     pds->CacheFile[pds->CacheFileIndex].cbOffset = cbOffset;
     wcscpy_s(pds->CacheFile[pds->CacheFileIndex].wszFileName, MAX_PATH, wcsFileName);
-    memcpy(pds->CacheFile[pds->CacheFileIndex].pb, pb, cb);
+    memcpy(pds->CacheFile[pds->CacheFileIndex].pb, pb, (SIZE_T)cb);
     pds->CacheFileIndex = (pds->CacheFileIndex + 1) % CACHE_FILE_ENTRIES;
     LeaveCriticalSection(&pds->LockCache);
 }
@@ -526,7 +526,7 @@ VOID Vfs_StatisticsShowUpdate(_In_ PVFS_STATISTICS s)
     }
 }
 
-VOID Vfs_StatisticsThread(_In_ PVFS_STATISTICS s)
+VOID WINAPI Vfs_StatisticsThread(_In_ PVFS_STATISTICS s)
 {
     while(!s->fThreadExit) {
         Sleep(100);
@@ -880,7 +880,7 @@ VOID ActionMount()
     PDOKAN_OPTIONS pDokanOptions = NULL;
     PDOKAN_OPERATIONS pDokanOperations = NULL;
     WCHAR wszMountPoint[] = { 'K', ':', '\\', 0 };
-    int(*fnDokanMain)(PDOKAN_OPTIONS, PDOKAN_OPERATIONS);
+    int(WINAPI *fnDokanMain)(PDOKAN_OPTIONS, PDOKAN_OPERATIONS);
     // sanity checks
     if(!ctxMain->phKMD && (PCILEECH_DEVICE_EQUALS("usb3380") || (ctxMain->cfg.qwAddrMax > 0x0000040000000000) || (ctxMain->cfg.qwAddrMax < 0x00400000))) {
         printf(
@@ -895,7 +895,7 @@ VOID ActionMount()
     if(!ctxMain->phKMD) { printf("MOUNT: INFO: FILES folder not mounted. (No kernel module loaded).\n"); }
     // allocate
     hModuleDokan = LoadLibraryExA("dokan1.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
-    fnDokanMain = (int(*)(PDOKAN_OPTIONS, PDOKAN_OPERATIONS))GetProcAddress(hModuleDokan, "DokanMain");
+    fnDokanMain = (int(WINAPI *)(PDOKAN_OPTIONS, PDOKAN_OPERATIONS))GetProcAddress(hModuleDokan, "DokanMain");
     if(!hModuleDokan || !fnDokanMain) {
         printf("MOUNT: Failed. The required DOKANY file system library is not installed. \n");
         printf("Please download from : https://github.com/dokan-dev/dokany/releases/latest\n");
@@ -965,7 +965,7 @@ VOID ActionMount()
     if(ctxMain->cfg.fVerbose) {
         pDokanState->Statistics.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Vfs_StatisticsThread, &pDokanState->Statistics, 0, NULL);
     }
-    ctxMain->vfs.pfnDokanUnmount = (BOOL(*)(WCHAR))GetProcAddress(hModuleDokan, "DokanUnmount");
+    ctxMain->vfs.pfnDokanUnmount = (BOOL(WINAPI *)(WCHAR))GetProcAddress(hModuleDokan, "DokanUnmount");
     ctxMain->vfs.wchMountPoint = wszMountPoint[0];
     ctxMain->vfs.fInitialized = TRUE;
     status = fnDokanMain(pDokanOptions, pDokanOperations);

@@ -14,7 +14,7 @@
 // (c) Ulf Frisk, 2020-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.7
+// Header Version: 2.8
 //
 
 #ifndef __LEECHCORE_H__
@@ -41,7 +41,8 @@ typedef unsigned __int64                    QWORD, *PQWORD;
 #define EXPORTED_FUNCTION                   __attribute__((visibility("default")))
 typedef void                                VOID, *PVOID, *HANDLE, **PHANDLE, *HMODULE;
 typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
-typedef uint64_t                            SIZE_T, *PSIZE_T, FILETIME, *PFILETIME;
+typedef size_t                              SIZE_T, *PSIZE_T;
+typedef uint64_t                            FILETIME, *PFILETIME;
 typedef uint32_t                            DWORD, *PDWORD, *LPDWORD, BOOL, *PBOOL, NTSTATUS;
 typedef uint16_t                            WORD, *PWORD;
 typedef uint8_t                             BYTE, *PBYTE, *LPBYTE, UCHAR;
@@ -169,7 +170,10 @@ typedef struct tdMEM_SCATTER {
     DWORD version;                          // MEM_SCATTER_VERSION
     BOOL f;                                 // TRUE = success data in pb, FALSE = fail or not yet read.
     QWORD qwA;                              // address of memory to read
-    PBYTE pb;                               // buffer to hold memory contents
+    union {
+        PBYTE pb;                           // buffer to hold memory contents
+        QWORD _Filler;
+    };
     DWORD cb;                               // size of buffer to hold memory contents.
     DWORD iStack;                           // internal stack pointer
     QWORD vStack[MEM_SCATTER_STACK_SIZE];   // internal stack

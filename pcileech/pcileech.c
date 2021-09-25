@@ -167,7 +167,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             }
         } else if(0 == strcmp(argv[i], "-in")) {
             ctxMain->cfg.cbIn = max(0x40000, 0x1000 + Util_GetFileSize(argv[i + 1]));
-            ctxMain->cfg.pbIn = LocalAlloc(LMEM_ZEROINIT, ctxMain->cfg.cbIn);
+            ctxMain->cfg.pbIn = LocalAlloc(LMEM_ZEROINIT, (SIZE_T)ctxMain->cfg.cbIn);
             if(!ctxMain->cfg.pbIn) { return FALSE; }
             if(!Util_ParseHexFileBuiltin(argv[i + 1], ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, (PDWORD)&ctxMain->cfg.cbIn)) { return FALSE; }
         } else if(0 == strcmp(argv[i], "-s")) {
@@ -242,7 +242,7 @@ VOID PCILeechFreeContext()
 * Call the free context functionality in a separate thread (in case it gets stuck).
 * -- pv
 */
-VOID PCILeechCtrlHandler_TryShutdownThread(PVOID pv)
+VOID WINAPI PCILeechCtrlHandler_TryShutdownThread(PVOID pv)
 {
 	__try {
 		PCILeechFreeContext();

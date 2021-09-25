@@ -13,6 +13,7 @@
 typedef unsigned __int64                    QWORD, *PQWORD;
 #endif /* _WIN32 */
 #ifdef LINUX
+#define WINAPI
 typedef uint16_t                            WORD, *PWORD, USHORT, *PUSHORT;
 typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
 #endif /* LINUX */
@@ -138,10 +139,16 @@ typedef struct tdKmdExec {
     DWORD dwMagic;
     BYTE pbChecksumSHA256[32];
     QWORD qwVersion;
-    LPSTR szOutFormatPrintf;
+    union {
+        LPSTR szOutFormatPrintf;
+        QWORD _Filler2;
+    };
     QWORD cbShellcode;
-    PBYTE pbShellcode;
-    QWORD filler[4];
+    union {
+        PBYTE pbShellcode;
+        QWORD _Filler3;
+    };
+    QWORD _Filler4[4];
 } KMDEXEC, *PKMDEXEC;
 #pragma pack(pop) /* RE-ENABLE STRUCT PADDINGS */
 
@@ -195,7 +202,7 @@ typedef struct tdKMDDATA {
     QWORD dataOutExtraLengthMax;    // [0x210] maximum length of extra out-data.
     QWORD dataOutConsoleBuffer;     // [0x218] physical address of 1-page console buffer.
     QWORD dataOut[28];              // [0x220]
-    PVOID fn[32];                   // [0x300] used by shellcode to store function pointers.
+    QWORD fn[32];                   // [0x300] used by shellcode to store function pointers.
     CHAR dataInStr[MAX_PATH];       // [0x400] string in-data
     CHAR ReservedFutureUse2[252];
     CHAR dataOutStr[MAX_PATH];      // [0x600] string out-data
@@ -220,7 +227,7 @@ typedef struct tdKMDHANDLE {
 typedef struct tdVFS_CONTEXT {
     BOOL fInitialized;
     WCHAR wchMountPoint;
-    BOOL(*pfnDokanUnmount)(WCHAR DriveLetter);
+    BOOL(WINAPI *pfnDokanUnmount)(WCHAR DriveLetter);
 } VFS_CONTEXT, *PVFS_CONTEXT;
 
 #define PCILEECH_CONTEXT_MAGIC              0xfeefd00d

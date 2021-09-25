@@ -55,7 +55,7 @@ VOID MemoryDump_SetOutFileName()
     }
 }
 
-DWORD MemoryDump_File_ThreadProc(_In_ PMEMDUMP_FILEWRITE ctx)
+DWORD WINAPI MemoryDump_File_ThreadProc(_In_ PMEMDUMP_FILEWRITE ctx)
 {
     PMEMDUMP_FILEWRITE_DATA pd;
     while(ctx->fValid) {

@@ -51,7 +51,7 @@ typedef struct tdEXEC_HANDLE {
 
 // input buffer to targeted console (outgoing info)
 // read from this console and send to targeted console
-DWORD ConsoleRedirect_ThreadConsoleInput(PCONSOLEREDIR_THREADDATA pd)
+DWORD WINAPI ConsoleRedirect_ThreadConsoleInput(PCONSOLEREDIR_THREADDATA pd)
 {
     DWORD cbWrite, cbModulo, cbModuloAck;
     while(!pd->fTerminateThread) {
@@ -73,7 +73,7 @@ DWORD ConsoleRedirect_ThreadConsoleInput(PCONSOLEREDIR_THREADDATA pd)
     return 0;
 }
 
-DWORD ConsoleRedirect_ThreadConsoleOutput(PCONSOLEREDIR_THREADDATA pd)
+DWORD WINAPI ConsoleRedirect_ThreadConsoleOutput(PCONSOLEREDIR_THREADDATA pd)
 {
     while(!pd->fTerminateThread) {
         *(pd->pInfoIS->con.pb + (pd->pInfoIS->con.cbRead % EXEC_IO_CONSOLE_BUFFER_SIZE)) = (BYTE)getchar();
@@ -149,7 +149,7 @@ VOID Exec_Callback(_Inout_ PHANDLE phCallback)
         // core initialize
         ph = *phCallback = LocalAlloc(LMEM_ZEROINIT, sizeof(EXEC_HANDLE));
         if(!ph) { return; }
-        ph->pbDMA = LocalAlloc(LMEM_ZEROINIT, ctxMain->pk->dataOutExtraLengthMax);
+        ph->pbDMA = LocalAlloc(LMEM_ZEROINIT, (SIZE_T)ctxMain->pk->dataOutExtraLengthMax);
         if(!ph->pbDMA) { LocalFree(ph); *phCallback = NULL; return; }
         ph->is.magic = EXEC_IO_MAGIC;
         // open output file
@@ -177,7 +177,7 @@ VOID Exec_Callback(_Inout_ PHANDLE phCallback)
     cbLength = 0;
     result =
         DeviceReadDMA(ctxMain->pk->DMAAddrPhysical + ctxMain->pk->dataOutExtraOffset, (DWORD)SIZE_PAGE_ALIGN_4K(ctxMain->pk->dataOutExtraLength), ph->pbDMA, NULL) &&
-        (cbLength = fwrite(ph->pbDMA, 1, ctxMain->pk->dataOutExtraLength, ph->pFileOutput)) &&
+        (cbLength = fwrite(ph->pbDMA, 1, (SIZE_T)ctxMain->pk->dataOutExtraLength, ph->pFileOutput)) &&
         (ctxMain->pk->dataOutExtraLength == cbLength);
     ph->qwFileWritten += cbLength;
     ph->fError = !result;
@@ -227,8 +227,8 @@ BOOL Exec_ExecSilent(_In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbI
     //    [Y , X       [ = data in (to target computer)
     //    [X , buf_max [ = data out (from target computer)
     //------------------------------------------------
-    memcpy(pbBuffer, pKmdExec->pbShellcode, pKmdExec->cbShellcode);
-    memcpy(pbBuffer + SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode), pbIn, cbIn);
+    memcpy(pbBuffer, pKmdExec->pbShellcode, (SIZE_T)pKmdExec->cbShellcode);
+    memcpy(pbBuffer + SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode), pbIn, (SIZE_T)cbIn);
     result = DeviceWriteDMA_Retry(ctxMain->hLC, pk->DMAAddrPhysical, cbBuffer, pbBuffer);
     if(!result) { goto fail; }
     pk->dataInExtraOffset = SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode);

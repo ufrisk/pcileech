@@ -7,7 +7,7 @@
 // (c) Ulf Frisk, 2018-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 4.2
+// Header Version: 4.3
 //
 
 #include "leechcore.h"
@@ -34,7 +34,8 @@ typedef unsigned __int64                    QWORD, *PQWORD;
 #define EXPORTED_FUNCTION                   __attribute__((visibility("default")))
 typedef void                                VOID, *PVOID, *HANDLE, **PHANDLE, *HMODULE;
 typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
-typedef uint64_t                            SIZE_T, *PSIZE_T, FILETIME, *PFILETIME;
+typedef size_t                              SIZE_T, *PSIZE_T;
+typedef uint64_t                            FILETIME, *PFILETIME;
 typedef uint32_t                            DWORD, *PDWORD, *LPDWORD, BOOL, *PBOOL, NTSTATUS;
 typedef uint16_t                            WORD, *PWORD;
 typedef uint8_t                             BYTE, *PBYTE, *LPBYTE, UCHAR;
@@ -343,7 +344,10 @@ typedef struct tdVMMDLL_VFS_FILELISTBLOB {
     DWORD cbStruct;
     DWORD cFileEntry;
     DWORD cbMultiText;
-    LPSTR uszMultiText;
+    union {
+        LPSTR uszMultiText;
+        QWORD _Reserved;
+    };
     DWORD _FutureUse[8];
     VMMDLL_VFS_FILELISTBLOB_ENTRY FileEntry[0];
 } VMMDLL_VFS_FILELISTBLOB, *PVMMDLL_VFS_FILELISTBLOB;
@@ -892,7 +896,7 @@ typedef struct tdVMMDLL_MAP_HANDLEENTRY {
     DWORD dwPID;
     DWORD dwPoolTag;
     DWORD _FutureUse[5];
-    union { LPSTR  uszType; LPWSTR wszType; };              // U/W dependant
+    union { LPSTR  uszType; LPWSTR wszType; QWORD _Pad1; }; // U/W dependant
 } VMMDLL_MAP_HANDLEENTRY, *PVMMDLL_MAP_HANDLEENTRY;
 
 typedef struct tdVMMDLL_MAP_NETENTRY {
@@ -940,12 +944,12 @@ typedef struct tdVMMDLL_MAP_SERVICEENTRY {
     DWORD dwOrdinal;
     DWORD dwStartType;
     SERVICE_STATUS ServiceStatus;
-    union { LPSTR  uszServiceName; LPWSTR wszServiceName; };// U/W dependant
-    union { LPSTR  uszDisplayName; LPWSTR wszDisplayName; };// U/W dependant
-    union { LPSTR  uszPath; LPWSTR wszPath; };              // U/W dependant
-    union { LPSTR  uszUserTp; LPWSTR wszUserTp; };          // U/W dependant
-    union { LPSTR  uszUserAcct; LPWSTR wszUserAcct; };      // U/W dependant
-    union { LPSTR  uszImagePath; LPWSTR wszImagePath; };    // U/W dependant
+    union { LPSTR  uszServiceName; LPWSTR wszServiceName; QWORD _Reserved1; };  // U/W dependant
+    union { LPSTR  uszDisplayName; LPWSTR wszDisplayName; QWORD _Reserved2; };  // U/W dependant
+    union { LPSTR  uszPath;        LPWSTR wszPath;        QWORD _Reserved3; };  // U/W dependant
+    union { LPSTR  uszUserTp;      LPWSTR wszUserTp;      QWORD _Reserved4; };  // U/W dependant
+    union { LPSTR  uszUserAcct;    LPWSTR wszUserAcct;    QWORD _Reserved5; };  // U/W dependant
+    union { LPSTR  uszImagePath;   LPWSTR wszImagePath;   QWORD _Reserved6; };  // U/W dependant
     DWORD dwPID;
     DWORD _FutureUse1;
     QWORD _FutureUse2;
