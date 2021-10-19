@@ -86,7 +86,7 @@ BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension,
 * -- szPath = buffer to receive the full path result.
 * -- szFileName = a file name in the current directory.
 */
-VOID Util_GetFileInDirectory(_Out_ CHAR szPath[MAX_PATH], _In_ LPSTR szFileName);
+VOID Util_GetFileInDirectory(_Out_writes_(MAX_PATH) LPSTR szPath, _In_ LPSTR szFileName);
 
 /*
 * Create a SHA256 hash

@@ -255,3 +255,6 @@ v4.1
 
 [v4.12](https://github.com/ufrisk/pcileech/releases/tag/v4.12)
 * 32-bit support (pcileech binary).
+
+Latest:
+* Bug fixes.

@@ -7,7 +7,7 @@
 // (c) Ulf Frisk, 2018-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 4.3
+// Header Version: 4.3.3
 //
 
 #include "leechcore.h"
@@ -1145,14 +1145,14 @@ _Success_(return) BOOL VMMDLL_Map_GetModuleW(_In_ DWORD dwPID, _Out_writes_bytes
 * If pcbModuleMapEntry is set to NULL the pModuleMapEntry is assumed to be of
 * size sizeof(VMMDLL_MAP_MODULEENTRY) and data without names will be copied.
 * -- dwPID
-* -- [uw]szModuleName
+* -- [uw]szModuleName = module name (or ""/NULL for 1st module entry).
 * -- pModuleMapEntry = buffer of minimum byte length *pcbModuleMapEntry or NULL.
 * -- pcbModuleMapEntry = pointer to byte count of pModuleMapEntry buffer or NULL.
 * -- return = success/fail.
 */
 EXPORTED_FUNCTION
-_Success_(return) BOOL VMMDLL_Map_GetModuleFromNameU(_In_ DWORD dwPID, _In_ LPSTR  uszModuleName, _Out_writes_bytes_opt_(*pcbModuleMapEntry) PVMMDLL_MAP_MODULEENTRY pModuleMapEntry, _Inout_opt_ PDWORD pcbModuleMapEntry);
-_Success_(return) BOOL VMMDLL_Map_GetModuleFromNameW(_In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _Out_writes_bytes_opt_(*pcbModuleMapEntry) PVMMDLL_MAP_MODULEENTRY pModuleMapEntry, _Inout_opt_ PDWORD pcbModuleMapEntry);
+_Success_(return) BOOL VMMDLL_Map_GetModuleFromNameU(_In_ DWORD dwPID, _In_opt_ LPSTR  uszModuleName, _Out_writes_bytes_opt_(*pcbModuleMapEntry) PVMMDLL_MAP_MODULEENTRY pModuleMapEntry, _Inout_opt_ PDWORD pcbModuleMapEntry);
+_Success_(return) BOOL VMMDLL_Map_GetModuleFromNameW(_In_ DWORD dwPID, _In_opt_ LPWSTR wszModuleName, _Out_writes_bytes_opt_(*pcbModuleMapEntry) PVMMDLL_MAP_MODULEENTRY pModuleMapEntry, _Inout_opt_ PDWORD pcbModuleMapEntry);
 
 /*
 * Retrieve the unloaded modules (.dll/.sys) for the specified process. If

@@ -461,6 +461,7 @@ fail:
 VOID Util_GetFileInDirectory(_Out_writes_(MAX_PATH) LPSTR szPath, _In_ LPSTR szFileName)
 {
     SIZE_T i, cchFileName = strlen(szFileName);
+    ZeroMemory(szPath, MAX_PATH);
     GetModuleFileNameA(NULL, (LPSTR)szPath, (DWORD)(MAX_PATH - cchFileName - 4));
     for(i = strlen(szPath) - 1; i > 0; i--) {
         if(szPath[i] == '/' || szPath[i] == '\\') {

@@ -14,7 +14,7 @@
 // (c) Ulf Frisk, 2020-2021
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.8
+// Header Version: 2.9.1
 //
 
 #ifndef __LEECHCORE_H__
@@ -434,6 +434,7 @@ EXPORTED_FUNCTION BOOL LcCommand(
 #define LC_CMD_MEMMAP_GET                           0x4000020000000000  // R  - MEMMAP as LPSTR
 #define LC_CMD_MEMMAP_SET                           0x4000030000000000  // W  - MEMMAP as LPSTR
 #define LC_CMD_MEMMAP_GET_STRUCT                    0x4000040000000000  // R  - MEMMAP as LC_MEMMAP_ENTRY[]
+#define LC_CMD_MEMMAP_SET_STRUCT                    0x4000050000000000  // W  - MEMMAP as LC_MEMMAP_ENTRY[]
 
 #define LC_CMD_AGENT_EXEC_PYTHON                    0x8000000100000000  // RW - [lo-dword: optional timeout in ms]
 #define LC_CMD_AGENT_EXIT_PROCESS                   0x8000000200000000  //    - [lo-dword: process exit code]
