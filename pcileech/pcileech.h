@@ -1,6 +1,6 @@
 // pcileech.h : definitions for pcileech - dump memory and unlock computers with a USB3380 device using DMA.
 //
-// (c) Ulf Frisk, 2016-2021
+// (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 // Header Version: 4.5
@@ -82,6 +82,7 @@ typedef struct tdConfig {
     PBYTE pbIn;
     QWORD cbIn;
     CHAR szInS[MAX_PATH];
+    CHAR szMount[MAX_PATH];
     QWORD qwDataIn[10];
     ACTION_TYPE tpAction;
     CHAR szSignatureName[MAX_PATH];
@@ -251,6 +252,8 @@ struct tdPCILEECH_CONTEXT {
     PKMDHANDLE phKMD;
     PKMDDATA pk;
     VFS_CONTEXT vfs;
+    DWORD argc;
+    char** argv;
 };
 
 BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[]);

@@ -37,6 +37,7 @@
     <ClInclude Include="kmd.h" />
     <ClInclude Include="memdump.h" />
     <ClInclude Include="mempatch.h" />
+    <ClInclude Include="ob\ob.h" />
     <ClInclude Include="oscompatibility.h" />
     <ClInclude Include="pcileech.h" />
     <ClInclude Include="shellcode.h" />
@@ -48,6 +49,7 @@
     <ClInclude Include="vmmx.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="charutil.c" />
     <ClCompile Include="device.c" />
     <ClCompile Include="executor.c" />
     <ClCompile Include="extra.c" />
@@ -55,12 +57,17 @@
     <ClCompile Include="kmd.c" />
     <ClCompile Include="memdump.c" />
     <ClCompile Include="mempatch.c" />
+    <ClCompile Include="ob\ob_cachemap.c" />
+    <ClCompile Include="ob\ob_core.c" />
+    <ClCompile Include="ob\ob_map.c" />
+    <ClCompile Include="ob\ob_set.c" />
     <ClCompile Include="oscompatibility.c" />
     <ClCompile Include="pcileech.c" />
     <ClCompile Include="statistics.c" />
     <ClCompile Include="umd.c" />
     <ClCompile Include="util.c" />
     <ClCompile Include="vfs.c" />
+    <ClCompile Include="vfslist.c" />
     <ClCompile Include="vmmx.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

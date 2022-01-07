@@ -1,6 +1,6 @@
 // executor.c : implementation related 'code execution' and 'console redirect' functionality.
 //
-// (c) Ulf Frisk, 2016-2021
+// (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "executor.h"
@@ -88,6 +88,7 @@ DWORD WINAPI ConsoleRedirect_ThreadConsoleOutput(PCONSOLEREDIR_THREADDATA pd)
 BOOL Exec_ConsoleRedirect_Initialize(_In_ QWORD ConsoleBufferAddr_InputStream, _In_ QWORD ConsoleBufferAddr_OutputStream, _In_ DWORD dwPID, _Inout_ PCONSOLEREDIR_THREADDATA pd)
 {
     BOOL result;
+    UNREFERENCED_PARAMETER(ConsoleBufferAddr_InputStream);
     pd->pInfoIS = (PEXEC_IO)pd->pbDataISConsoleBuffer;
     pd->pInfoOS = (PEXEC_IO)pd->pbDataOSConsoleBuffer;
     // read initial buffer and check validity
@@ -213,6 +214,7 @@ BOOL Exec_ExecSilent(_In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbI
     //------------------------------------------------
     // 1: Setup and initial validity checks.
     //------------------------------------------------
+    if(pcbOut) { *pcbOut = 0; }
     if(!ctxMain->phKMD) { goto fail; }
     result = Util_LoadKmdExecShellcode(szShellcodeName, &pKmdExec);
     if(!result) { goto fail; }

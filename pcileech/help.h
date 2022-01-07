@@ -1,6 +1,6 @@
 // help.h : definitions related to displaying help texts.
 //
-// (c) Ulf Frisk, 2016-2021
+// (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __HELP_H__

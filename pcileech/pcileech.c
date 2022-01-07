@@ -1,6 +1,6 @@
 // pcileech.c : implementation of core pcileech functionality.
 //
-// (c) Ulf Frisk, 2016-2021
+// (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "pcileech.h"
@@ -16,7 +16,7 @@
 #include "vfs.h"
 #include "vmmx.h"
 
-PPCILEECH_CONTEXT ctxMain;
+PPCILEECH_CONTEXT ctxMain = NULL;
 
 BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
 {
@@ -62,6 +62,8 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
     ctxMain->version = PCILEECH_CONTEXT_VERSION;
     if(argc < 2) { return FALSE; }
     // set defaults
+    ctxMain->argc = argc;
+    ctxMain->argv = argv;
     ctxMain->cfg.tpAction = NA;
     ctxMain->cfg.qwAddrMax = 0;
     ctxMain->cfg.fOutFile = TRUE;
@@ -172,6 +174,8 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             if(!Util_ParseHexFileBuiltin(argv[i + 1], ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, (PDWORD)&ctxMain->cfg.cbIn)) { return FALSE; }
         } else if(0 == strcmp(argv[i], "-s")) {
             strcpy_s(ctxMain->cfg.szInS, MAX_PATH, argv[i + 1]);
+        } else if(0 == strcmp(argv[i], "-mount")) {
+            strcpy_s(ctxMain->cfg.szMount, MAX_PATH, argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-sig")) {
             strcpy_s(ctxMain->cfg.szSignatureName, MAX_PATH, argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-hook")) {
@@ -431,11 +435,11 @@ int main(_In_ int argc, _In_ char* argv[])
             printf("Failed. Not yet implemented.\n");
             break;
     }
-    if(ctxMain->phKMD && (ctxMain->cfg.tpAction != KMDLOAD) && !ctxMain->cfg.fAddrKMDSetByArgument) {
+    if(ctxMain && ctxMain->phKMD && (ctxMain->cfg.tpAction != KMDLOAD) && !ctxMain->cfg.fAddrKMDSetByArgument) {
         KMDUnload();
         printf("KMD: Hopefully unloaded.\n");
     }
-    if(ctxMain->cfg.dwListenTlpTimeMs) {
+    if(ctxMain && ctxMain->cfg.dwListenTlpTimeMs) {
         LcCommand(ctxMain->hLC, LC_CMD_FPGA_LISTEN_TLP, sizeof(DWORD), (PBYTE)&ctxMain->cfg.dwListenTlpTimeMs, NULL, NULL);
     }
     PCILeechFreeContext();

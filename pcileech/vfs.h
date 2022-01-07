@@ -1,6 +1,6 @@
 // vfs.h : definitions related to virtual file system support.
 //
-// (c) Ulf Frisk, 2017-2021
+// (c) Ulf Frisk, 2017-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __VFS_H__

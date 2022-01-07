@@ -1,6 +1,6 @@
 // oscompatibility.c : pcileech windows/linux compatibility layer.
 //
-// (c) Ulf Frisk, 2017-2021
+// (c) Ulf Frisk, 2017-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 
@@ -24,6 +24,9 @@ VOID usleep(_In_ DWORD us)
 #ifdef LINUX
 
 #include "oscompatibility.h"
+#include <stdatomic.h>
+#include <sys/syscall.h>
+#include <linux/futex.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -83,6 +86,10 @@ HANDLE CreateThread(
     PINTERNAL_HANDLE ph;
     pthread_t thread;
     int status;
+    UNREFERENCED_PARAMETER(lpThreadAttributes);
+    UNREFERENCED_PARAMETER(dwStackSize);
+    UNREFERENCED_PARAMETER(dwCreationFlags);
+    UNREFERENCED_PARAMETER(lpThreadId);
     status = pthread_create(&thread, NULL, lpStartAddress, lpParameter);
     if(status) { return NULL;}
     ph = malloc(sizeof(INTERNAL_HANDLE));
@@ -160,6 +167,7 @@ HMODULE LoadLibraryA(LPSTR lpFileName)
 BOOL FreeLibrary(_In_ HMODULE hLibModule)
 {
     dlclose(hLibModule);
+    return TRUE;
 }
 
 FARPROC GetProcAddress(HMODULE hModule, LPSTR lpProcName)
@@ -227,6 +235,83 @@ BOOL _kbhit()
     terminal_disable_raw_mode();
     tcflush(0, TCIFLUSH);
     return byteswaiting > 0;
+}
+
+
+
+// ----------------------------------------------------------------------------
+// SRWLock functionality below:
+// ----------------------------------------------------------------------------
+
+static int futex(uint32_t* uaddr, int futex_op, uint32_t val, const struct timespec* timeout, uint32_t* uaddr2, uint32_t val3)
+{
+    return syscall(SYS_futex, uaddr, futex_op, val, timeout, uaddr2, val3);
+}
+
+VOID InitializeSRWLock(PSRWLOCK SRWLock)
+{
+    ZeroMemory(SRWLock, sizeof(SRWLOCK));
+}
+
+BOOL AcquireSRWLockExclusive_Try(_Inout_ PSRWLOCK SRWLock)
+{
+    DWORD dwZero = 0;
+    __sync_fetch_and_add_4(&SRWLock->c, 1);
+    if(atomic_compare_exchange_strong(&SRWLock->xchg, &dwZero, 1)) {
+        return TRUE;
+    }
+    __sync_sub_and_fetch_4(&SRWLock->c, 1);
+    return FALSE;
+}
+
+VOID AcquireSRWLockExclusive(_Inout_ PSRWLOCK SRWLock)
+{
+    DWORD dwZero;
+    __sync_fetch_and_add_4(&SRWLock->c, 1);
+    while(TRUE) {
+        dwZero = 0;
+        if(atomic_compare_exchange_strong(&SRWLock->xchg, &dwZero, 1)) {
+            return;
+        }
+        futex(&SRWLock->xchg, FUTEX_WAIT, 1, NULL, NULL, 0);
+    }
+}
+
+_Success_(return)
+BOOL AcquireSRWLockExclusive_Timeout(_Inout_ PSRWLOCK SRWLock, _In_ DWORD dwMilliseconds)
+{
+    DWORD dwZero;
+    struct timespec ts;
+    __sync_fetch_and_add_4(&SRWLock->c, 1);
+    while(TRUE) {
+        dwZero = 0;
+        if(atomic_compare_exchange_strong(&SRWLock->xchg, &dwZero, 1)) {
+            return TRUE;
+        }
+        if((dwMilliseconds != 0) && (dwMilliseconds != 0xffffffff)) {
+            ts.tv_sec = dwMilliseconds / 1000;
+            ts.tv_nsec = (dwMilliseconds % 1000) * 1000 * 1000;
+            if((-1 == futex(&SRWLock->xchg, FUTEX_WAIT, 1, &ts, NULL, 0)) && (errno != EAGAIN)) {
+                __sync_sub_and_fetch_4(&SRWLock->c, 1);
+                return FALSE;
+            }
+        } else {
+            if((-1 == futex(&SRWLock->xchg, FUTEX_WAIT, 1, NULL, NULL, 0)) && (errno != EAGAIN)) {
+                __sync_sub_and_fetch_4(&SRWLock->c, 1);
+                return FALSE;
+            }
+        }
+    }
+}
+
+VOID ReleaseSRWLockExclusive(_Inout_ PSRWLOCK SRWLock)
+{
+    DWORD dwOne = 1;
+    if(atomic_compare_exchange_strong(&SRWLock->xchg, &dwOne, 0)) {
+        if(__sync_sub_and_fetch_4(&SRWLock->c, 1)) {
+            futex(&SRWLock->xchg, FUTEX_WAKE, 1, NULL, NULL, 0);
+        }
+    }
 }
 
 #endif /* LINUX */

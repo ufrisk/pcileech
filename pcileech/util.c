@@ -1,6 +1,6 @@
 // util.c : implementation of various utility functions.
 //
-// (c) Ulf Frisk, 2016-2021
+// (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "pcileech.h"
@@ -16,7 +16,7 @@
 #define PT_FLAG_HELPER_X    0x0000000000000001
 
 _Success_(return)
-BOOL Util_PageTable_Helper(_In_ QWORD qwVA, _In_ QWORD qwPgLvl, _In_ QWORD qwPgTblPA, _In_ QWORD qwTestMask, _In_ QWORD qwTestValue, _In_ QWORD fMode, _Out_ PQWORD pqwPTE, _Out_opt_ PQWORD pqwPTEPA, _Out_ PQWORD pqwPgLvl)
+BOOL Util_PageTable_Helper(_In_ QWORD qwVA, _In_ QWORD qwPgLvl, _In_ QWORD qwPgTblPA, _In_ QWORD qwTestMask, _In_ QWORD qwTestValue, _In_ QWORD fMode, _Out_ PQWORD pqwPTE, _Out_ PQWORD pqwPTEPA, _Out_ PQWORD pqwPgLvl)
 {
     BOOL result;
     BYTE pb[4096];
@@ -48,7 +48,7 @@ BOOL Util_PageTable_ReadPTE(_In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_ 
     return Util_PageTable_Helper(qwAddressLinear, 4, qwCR3, PT_VALID_MASK, PT_VALID_VALUE, 0, pqwPTE, pqPTEAddrPhys, &ptePgLvl);
 }
 
-BOOL Util_PageTable_SetMode(_In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX)
+BOOL Util_PageTable_SetModeX(_In_ QWORD qwCR3, _In_ QWORD qwAddressLinear)
 {
     QWORD pte, pteVA, ptePgLvl;
     return Util_PageTable_Helper(qwAddressLinear, 4, qwCR3, 0, 0, PT_FLAG_HELPER_X, &pte, &pteVA, &ptePgLvl);
@@ -73,7 +73,7 @@ BOOL Util_PageTable_FindSignatureBase_IsPageTableDataValid(_In_ QWORD qwPageTabl
 }
 
 _Success_(return)
-BOOL Util_PageTable_FindSignatureBase_CachedReadMEM(_In_ QWORD qwAddr, _Out_writes_(0x1000) PBYTE pbPage, _Inout_updates_bytes_(0x01000000) PBYTE pbCache)
+BOOL Util_PageTable_FindSignatureBase_CachedReadMEM(_In_ QWORD qwAddr, _Out_writes_(0x1000) PBYTE pbPage, _Inout_updates_bytes_opt_(0x01000000) PBYTE pbCache)
 {
     BOOL result;
     if(pbCache) {
@@ -336,6 +336,7 @@ BOOL Util_PageTable_FindMappedAddress(_In_ QWORD qwCR3, _In_ QWORD qwAddrPhys, _
 BOOL Util_HexAsciiToBinary(_In_ LPSTR sz, _Out_ PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcb)
 {
     SIZE_T i, csz = strlen(sz);
+    ZeroMemory(pb, cb);
     *pcb = (DWORD)(csz >> 1);
     if((csz % 2) || (cb < *pcb)) { return FALSE; }
     for(i = 0; i < *pcb; i++) {
@@ -770,7 +771,7 @@ BOOL Util_FillHexAscii(_In_opt_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOff
 
 VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset)
 {
-    DWORD szMax;
+    DWORD szMax = 0;
     LPSTR sz;
     if(cb > 0x10000) {
         printf("Large output. Only displaying first 65kB.\n");
@@ -792,7 +793,7 @@ VOID Util_PrintHexAscii(_In_ PBYTE pb, _In_ DWORD cb, _In_ DWORD cbInitialOffset
 VOID Util_AsciiFilter(_In_reads_(cb) PBYTE pb, _In_ DWORD cb)
 {
     DWORD i;
-    CHAR ch;
+    BYTE ch;
     for(i = 0; i < cb; i++) {
         ch = pb[i];
         if(0xff & UTIL_PRINTABLE_CHARACTERS_MAP[ch]) { continue; }
@@ -826,7 +827,8 @@ VOID Util_GetPathExe(_Out_writes_(MAX_PATH) PCHAR szPath)
     GetModuleFileNameA(NULL, szPath, MAX_PATH - 4);
 #endif /* _WIN32 */
 #ifdef LINUX
-    readlink("/proc/self/exe", szPath, MAX_PATH - 4);
+    i = readlink("/proc/self/exe", szPath, MAX_PATH - 4);
+    if(i == (SIZE_T)-1) { return; }
 #endif /* LINUX */
     for(i = strlen(szPath) - 1; i > 0; i--) {
         if(szPath[i] == '/' || szPath[i] == '\\') {

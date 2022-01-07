@@ -1,6 +1,6 @@
 // util.h : definitions of various utility functions.
 //
-// (c) Ulf Frisk, 2016-2021
+// (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __UTIL_H__
@@ -23,10 +23,9 @@ BOOL Util_PageTable_ReadPTE( _In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _Out_
 * Change the mode of the mapped address to executable.
 * -- qwCR3
 * -- qwAddressLinear
-* -- fSetX = TRUE if virtual address should be executable.
 * -- return
 */
-BOOL Util_PageTable_SetMode(_In_ QWORD qwCR3, _In_ QWORD qwAddressLinear, _In_ BOOL fSetX);
+BOOL Util_PageTable_SetModeX(_In_ QWORD qwCR3, _In_ QWORD qwAddressLinear);
 
 /*
 * Find a module base given a page signature. Please note that this is a best

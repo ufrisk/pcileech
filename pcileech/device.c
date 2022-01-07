@@ -1,6 +1,6 @@
 // device.c : implementation related to hardware devices.
 //
-// (c) Ulf Frisk, 2016-2021
+// (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include <leechcore.h>
@@ -161,6 +161,7 @@ BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
     ctxMain->dev.paMax = ctxMain->cfg.qwAddrMax;
     ctxMain->hLC = LcCreateEx(&ctxMain->dev, &pLcErrorInfo);
     if(!ctxMain->hLC) {
+#ifdef _WIN32
         if(pLcErrorInfo && (pLcErrorInfo->dwVersion == LC_CONFIG_ERRORINFO_VERSION)) {
             if(pLcErrorInfo->cwszUserText) {
                 wprintf(L"MESSAGE FROM MEMORY ACQUISITION DEVICE:\n=======================================\n%s\n", pLcErrorInfo->wszUserText);
@@ -170,6 +171,7 @@ BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
                 return DeviceOpen2_RequestUserInput();
             }
         }
+#endif /* _WIN32 */
         ZeroMemory(&ctxMain->dev, sizeof(ctxMain->dev));
         LcMemFree(pLcErrorInfo);
         return FALSE;

@@ -16,6 +16,12 @@
     <Filter Include="Header Files\includes">
       <UniqueIdentifier>{b5332eb1-5727-4efd-84e5-83cda653c431}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\ob">
+      <UniqueIdentifier>{95661a3c-2e91-40f9-8af4-abcf2f03eb52}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ob">
+      <UniqueIdentifier>{db37c203-79b1-4412-9064-840ab38c29fd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile">
@@ -91,6 +97,9 @@
     <ClInclude Include="vmmx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ob\ob.h">
+      <Filter>Header Files\ob</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="device.c">
@@ -133,6 +142,24 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="vmmx.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ob\ob_cachemap.c">
+      <Filter>Source Files\ob</Filter>
+    </ClCompile>
+    <ClCompile Include="ob\ob_core.c">
+      <Filter>Source Files\ob</Filter>
+    </ClCompile>
+    <ClCompile Include="ob\ob_map.c">
+      <Filter>Source Files\ob</Filter>
+    </ClCompile>
+    <ClCompile Include="ob\ob_set.c">
+      <Filter>Source Files\ob</Filter>
+    </ClCompile>
+    <ClCompile Include="charutil.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vfslist.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

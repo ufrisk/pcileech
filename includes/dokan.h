@@ -55,10 +55,10 @@ extern "C" {
  */
 /** @{ */
 
-/** The current Dokan version (ver 1.2.0). \ref DOKAN_OPTIONS.Version */
-#define DOKAN_VERSION 140
-/** Minimum Dokan version (ver 1.1.0) accepted. */
-#define DOKAN_MINIMUM_COMPATIBLE_VERSION 110
+/** The current Dokan version (200 means ver 2.0.0). \ref DOKAN_OPTIONS.Version */
+#define DOKAN_VERSION 200
+/** Minimum Dokan version (ver 2.0.0) accepted. */
+#define DOKAN_MINIMUM_COMPATIBLE_VERSION 200
 /** Driver file name including the DOKAN_MAJOR_API_VERSION */
 #define DOKAN_DRIVER_NAME L"dokan" DOKAN_MAJOR_API_VERSION L".sys"
 /** Network provider name including the DOKAN_MAJOR_API_VERSION */
@@ -76,44 +76,54 @@ extern "C" {
 /** Enable ouput debug message */
 #define DOKAN_OPTION_DEBUG 1
 /** Enable ouput debug message to stderr */
-#define DOKAN_OPTION_STDERR 2
+#define DOKAN_OPTION_STDERR (1 << 1)
 /**
  * Enable the use of alternate stream paths in the form
  * <file-name>:<stream-name>. If this is not specified then the driver will
  * fail any attempt to access a path with a colon.
  */
-#define DOKAN_OPTION_ALT_STREAM 4
+#define DOKAN_OPTION_ALT_STREAM (1 << 2)
 /** Enable mount drive as write-protected */
-#define DOKAN_OPTION_WRITE_PROTECT 8
+#define DOKAN_OPTION_WRITE_PROTECT (1 << 3)
 /** Use network drive - Dokan network provider needs to be installed */
-#define DOKAN_OPTION_NETWORK 16
-/** Use removable drive */
-#define DOKAN_OPTION_REMOVABLE 32
-/** Use mount manager */
-#define DOKAN_OPTION_MOUNT_MANAGER 64
+#define DOKAN_OPTION_NETWORK (1 << 4)
+/**
+ * Use removable drive
+ * Be aware that on some environments, the userland application will be denied
+ * to communicate with the drive which will result in a unwanted unmount.
+ * \see <a href="https://github.com/dokan-dev/dokany/issues/843">Issue #843</a>
+ */
+#define DOKAN_OPTION_REMOVABLE (1 << 5)
+/**
+ * Use Windows Mount Manager.
+ * This option is highly recommended to use for better system integration
+ *
+ * If a drive letter is used but is busy, Mount manager will assign one for us and 
+ * \ref DOKAN_OPERATIONS.Mounted parameters will contain the new mount point.
+ */
+#define DOKAN_OPTION_MOUNT_MANAGER (1 << 6)
 /** Mount the drive on current session only */
-#define DOKAN_OPTION_CURRENT_SESSION 128
+#define DOKAN_OPTION_CURRENT_SESSION (1 << 7)
 /** Enable Lockfile/Unlockfile operations. Otherwise Dokan will take care of it */
-#define DOKAN_OPTION_FILELOCK_USER_MODE 256
+#define DOKAN_OPTION_FILELOCK_USER_MODE (1 << 8)
 /**
- * Whether DokanNotifyXXX functions should be enabled, which requires this
- * library to maintain a special handle while the file system is mounted.
- * Without this flag, the functions always return FALSE if invoked.
+ * Enable Case sensitive path.
+ * By default all path are case insensitive.
+ * For case sensitive: \dir\File & \diR\file are different files
+ * but for case insensitive they are the same.
  */
-#define DOKAN_OPTION_ENABLE_NOTIFICATION_API 512
+#define DOKAN_OPTION_CASE_SENSITIVE (1 << 9)
+/** Allows unmounting of network drive via explorer */
+#define DOKAN_OPTION_ENABLE_UNMOUNT_NETWORK_DRIVE (1 << 10)
 /**
- * Whether to disable any oplock support on the volume.
- * Regular range locks are enabled regardless.
+ * Forward the kernel driver global and volume logs to the userland.
+ * Can be very slow if single thread is enabled.
  */
-#define DOKAN_OPTION_DISABLE_OPLOCKS 1024
-/**
- * The advantage of the FCB GC approach is that it prevents filter drivers (Anti-virus)
- * from exponentially slowing down procedures like zip file extraction due to
- * repeatedly rebuilding state that they attach to the FCB header.
- */
-#define DOKAN_OPTION_ENABLE_FCB_GARBAGE_COLLECTION 2048
+#define DOKAN_OPTION_DISPATCH_DRIVER_LOGS (1 << 11)
 
 /** @} */
+
+typedef VOID *DOKAN_HANDLE, **PDOKAN_HANDLE;
 
 /**
  * \struct DOKAN_OPTIONS
@@ -123,8 +133,8 @@ extern "C" {
 typedef struct _DOKAN_OPTIONS {
   /** Version of the Dokan features requested without dots (version "123" is equal to Dokan version 1.2.3). */
   USHORT Version;
-  /** Number of threads to be used by Dokan library internally. More threads will handle more events at the same time. */
-  USHORT ThreadCount;
+  /** Only use a single thread to process events. This is highly not recommended as can easily create a bottleneck. */
+  BOOLEAN SingleThread;
   /** Features enabled for the mount. See \ref DOKAN_OPTION. */
   ULONG Options;
   /** FileSystem can store anything here. */
@@ -140,12 +150,17 @@ typedef struct _DOKAN_OPTIONS {
    * Max timeout in milliseconds of each request before Dokan gives up to wait events to complete.
    * A timeout request is a sign that the userland implementation is no longer able to properly manage requests in time.
    * The driver will therefore unmount the device when a timeout trigger in order to keep the system stable.
+   * The default timeout value is 15 seconds.
    */
   ULONG Timeout;
   /** Allocation Unit Size of the volume. This will affect the file size. */
   ULONG AllocationUnitSize;
   /** Sector Size of the volume. This will affect the file size. */
   ULONG SectorSize;
+  /** Length of the optional VolumeSecurityDescriptor provided. Set 0 will disable the option. */
+  ULONG VolumeSecurityDescriptorLength;
+  /** Optional Volume Security descriptor. See <a href="https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-initializesecuritydescriptor">InitializeSecurityDescriptor</a> */
+  CHAR VolumeSecurityDescriptor[VOLUME_SECURITY_DESCRIPTOR_MAX_SIZE];
 } DOKAN_OPTIONS, *PDOKAN_OPTIONS;
 
 /**
@@ -161,8 +176,14 @@ typedef struct _DOKAN_FILE_INFO {
   ULONG64 Context;
   /** Reserved. Used internally by Dokan library. Never modify. */
   ULONG64 DokanContext;
-  /** A pointer to DOKAN_OPTIONS which was passed to DokanMain. */
+  /** A pointer to DOKAN_OPTIONS which was passed to \ref DokanMain or \ref DokanCreateFileSystem. */
   PDOKAN_OPTIONS DokanOptions;
+  /**
+   * Reserved. Used internally by Dokan library. Never modify.
+   * If the processing for the event requires extra data to be associated with it
+   * then a pointer to that data can be placed here
+   */
+  PVOID ProcessingContext;
   /**
    * Process ID for the thread that originally requested a given I/O operation.
    */
@@ -184,6 +205,10 @@ typedef struct _DOKAN_FILE_INFO {
   UCHAR WriteToEndOfFile;
 } DOKAN_FILE_INFO, *PDOKAN_FILE_INFO;
 
+#define DOKAN_EXCEPTION_NOT_INITIALIZED 0x0f0ff0ff
+#define DOKAN_EXCEPTION_INITIALIZATION_FAILED 0x0fbadbad
+#define DOKAN_EXCEPTION_SHUTDOWN_FAILED 0x0fbadf00
+
 /**
  * \brief FillFindData Used to add an entry in FindFiles operation
  * \return 1 if buffer is full, otherwise 0 (currently it never returns 1)
@@ -192,10 +217,9 @@ typedef int(WINAPI *PFillFindData)(PWIN32_FIND_DATAW, PDOKAN_FILE_INFO);
 
 /**
  * \brief FillFindStreamData Used to add an entry in FindStreams
- * \return 1 if buffer is full, otherwise 0 (currently it never returns 1)
+ * \return FALSE if the buffer is full, otherwise TRUE
  */
-typedef int(WINAPI *PFillFindStreamData)(PWIN32_FIND_STREAM_DATA,
-                                         PDOKAN_FILE_INFO);
+typedef BOOL(WINAPI *PFillFindStreamData)(PWIN32_FIND_STREAM_DATA, PVOID);
 
 // clang-format off
 
@@ -260,6 +284,8 @@ typedef struct _DOKAN_OPERATIONS {
   * Cleanup request before \ref CloseFile is called.
   *
   * When DOKAN_FILE_INFO.DeleteOnClose is \c TRUE, the file in Cleanup must be deleted.
+  * The function cannot fail therefore the filesystem need to ensure ahead
+  * that a the delete can safely happen during Cleanup. 
   * See DeleteFile documentation for explanation.
   *
   * \param FileName File path requested by the Kernel on the FileSystem.
@@ -375,7 +401,11 @@ typedef struct _DOKAN_OPERATIONS {
   * \brief FindFilesWithPattern Dokan API callback
   *
   * Same as \ref DOKAN_OPERATIONS.FindFiles but with a search pattern.\n
-  * The search pattern is a Windows MS-DOS-style expression. See \ref DokanIsNameInExpression .
+  * The search pattern is a Windows MS-DOS-style expression.
+  * It can contain wild cards and extended characters or none of them. See \ref DokanIsNameInExpression.
+  *
+  * If the function is not implemented, \ref DOKAN_OPERATIONS.FindFiles
+  * will be called instead and the result will be filtered internally by the library.
   *
   * \param PathName Path requested by the Kernel on the FileSystem.
   * \param SearchPattern Search pattern.
@@ -592,6 +622,10 @@ typedef struct _DOKAN_OPERATIONS {
   * Before these methods are called, \ref ZwCreateFile may not be called.
   * (ditto \ref CloseFile and \ref Cleanup)
   *
+  * VolumeName length can be anything that fit in the provided buffer.
+  * But some Windows component expect it to be no longer than 32 characters
+  * that why it is recommended to set a value under this limit.
+  *
   * FileSystemName could be anything up to 10 characters.
   * But Windows check few feature availability based on file system name.
   * For this, it is recommended to set NTFS or FAT here.
@@ -626,11 +660,15 @@ typedef struct _DOKAN_OPERATIONS {
   *
   * Called when Dokan successfully mounts the volume.
   *
+  * If \ref DOKAN_OPTION_MOUNT_MANAGER is enabled and the drive letter requested is busy,
+  * the MountPoint can contain a different drive letter that the mount manager assigned us.
+  *
+  * \param MountPoint The mount point assign to the instance.
   * \param DokanFileInfo Information about the file or directory.
   * \return \c STATUS_SUCCESS on success or NTSTATUS appropriate to the request result.
   * \see Unmounted
   */
-  NTSTATUS(DOKAN_CALLBACK *Mounted)(PDOKAN_FILE_INFO DokanFileInfo);
+  NTSTATUS(DOKAN_CALLBACK *Mounted)(LPCWSTR MountPoint, PDOKAN_FILE_INFO DokanFileInfo);
 
   /**
   * \brief Unmounted Dokan API callback
@@ -699,11 +737,13 @@ typedef struct _DOKAN_OPERATIONS {
   * \since Supported since version 0.8.0. The version must be specified in \ref DOKAN_OPTIONS.Version.
   * \param FileName File path requested by the Kernel on the FileSystem.
   * \param FillFindStreamData Callback that has to be called with PWIN32_FIND_STREAM_DATA that contain stream information.
+  * \param FindStreamContext Context for the event to pass to the callback FillFindStreamData.
   * \param DokanFileInfo Information about the file or directory.
   * \return \c STATUS_SUCCESS on success or NTSTATUS appropriate to the request result.
   */
   NTSTATUS(DOKAN_CALLBACK *FindStreams)(LPCWSTR FileName,
     PFillFindStreamData FillFindStreamData,
+    PVOID FindStreamContext,
     PDOKAN_FILE_INFO DokanFileInfo);
 
 } DOKAN_OPERATIONS, *PDOKAN_OPERATIONS;
@@ -712,7 +752,7 @@ typedef struct _DOKAN_OPERATIONS {
 
 /**
  * \defgroup DokanMainResult DokanMainResult
- * \brief \ref DokanMain returns error codes
+ * \brief \ref DokanMain \ref DokanCreateFileSystem returns error codes
  */
 /** @{ */
 
@@ -751,10 +791,28 @@ typedef struct _DOKAN_OPERATIONS {
 /** @{ */
 
 /**
+ * \brief Initialize all required Dokan internal resources.
+ *
+ * This needs to be called only once before trying to use \ref DokanMain or \ref DokanCreateFileSystem for the first time.
+ * Otherwise both will fail and raise an exception.
+ */
+VOID DOKANAPI DokanInit();
+
+/**
+ * \brief Release all allocated resources by \ref DokanInit when they are no longer needed.
+ *
+ * This should be called when the application no longer expects to create a new FileSystem with
+ * \ref DokanMain or \ref DokanCreateFileSystem and after all devices are unmount.
+ */
+VOID DOKANAPI DokanShutdown();
+
+/**
  * \brief Mount a new Dokan Volume.
  *
  * This function block until the device is unmounted.
  * If the mount fails, it will directly return a \ref DokanMainResult error.
+ * 
+ * See \ref DokanCreateFileSystem to create mount Dokan Volume asynchronously.
  *
  * \param DokanOptions a \ref DOKAN_OPTIONS that describe the mount.
  * \param DokanOperations Instance of \ref DOKAN_OPERATIONS that will be called for each request made by the kernel.
@@ -762,6 +820,51 @@ typedef struct _DOKAN_OPERATIONS {
  */
 int DOKANAPI DokanMain(PDOKAN_OPTIONS DokanOptions,
                        PDOKAN_OPERATIONS DokanOperations);
+
+/**
+ * \brief Mount a new Dokan Volume.
+ *
+ * It is mandatory to have called \ref DokanInit previously to use this API.
+ * 
+ * This function returns directly on device mount or on failure.
+ * See \ref DokanMainResult for possible errors.
+ * 
+ * \ref DokanWaitForFileSystemClosed can be used to wait until the device is unmount.
+ *
+ * \param DokanOptions a \ref DOKAN_OPTIONS that describe the mount.
+ * \param DokanOperations Instance of \ref DOKAN_OPERATIONS that will be called for each request made by the kernel.
+ * \param DokanInstance Dokan mount instance context that can be used for related instance calls like \ref DokanIsFileSystemRunning .
+ * \return \ref DokanMainResult status.
+ */
+int DOKANAPI DokanCreateFileSystem(_In_ PDOKAN_OPTIONS DokanOptions,
+                                   _In_ PDOKAN_OPERATIONS DokanOperations,
+                                   _Out_ DOKAN_HANDLE *DokanInstance);
+
+/**
+ * \brief Check if the FileSystem is still running or not.
+ *
+ * \param DokanInstance The dokan mount context created by \ref DokanCreateFileSystem .
+ * \return Whether the FileSystem is still running or not.
+ */
+BOOL DOKANAPI DokanIsFileSystemRunning(_In_ DOKAN_HANDLE DokanInstance);
+
+/**
+ * \brief Wait until the FileSystem is unmount.
+ *
+ * \param DokanInstance The dokan mount context created by \ref DokanCreateFileSystem .
+ * \return See <a href="https://docs.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject">WaitForSingleObject</a> for a description of return values.
+ */
+DWORD DOKANAPI DokanWaitForFileSystemClosed(_In_ DOKAN_HANDLE DokanInstance,
+                                            _In_ DWORD dwMilliseconds);
+
+/**
+ * \brief Unmount the Dokan instance.
+ * 
+ * Unmount and wait until all resources of the \c DokanInstance are released.
+ * 
+ * \param DokanInstance The dokan mount context created by \ref DokanCreateFileSystem .
+ */
+VOID DOKANAPI DokanCloseHandle(_In_ DOKAN_HANDLE DokanInstance);
 
 /**
  * \brief Unmount a Dokan device from a driver letter.
@@ -826,7 +929,7 @@ BOOL DOKANAPI DokanResetTimeout(ULONG Timeout, PDOKAN_FILE_INFO DokanFileInfo);
 /**
  * \brief Get the handle to Access Token.
  *
- * This method needs be called in <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858(v=vs.85).aspx">CreateFile</a> callback.
+ * This method needs be called in \ref DOKAN_OPERATIONS.ZwCreateFile callback.
  * The caller must call <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ms724211(v=vs.85).aspx">CloseHandle</a>
  * for the returned handle.
  *
@@ -842,20 +945,20 @@ HANDLE DOKANAPI DokanOpenRequestorToken(PDOKAN_FILE_INFO DokanFileInfo);
  *
  * \param uncOnly Get only instances that have UNC Name.
  * \param nbRead Number of instances successfully retrieved.
- * \return Allocate array of DOKAN_CONTROL.
+ * \return Allocate array of DOKAN_MOUNT_POINT_INFO.
  */
-PDOKAN_CONTROL DOKANAPI DokanGetMountPointList(BOOL uncOnly, PULONG nbRead);
+PDOKAN_MOUNT_POINT_INFO DOKANAPI DokanGetMountPointList(BOOL uncOnly, PULONG nbRead);
 
 /**
  * \brief Release Mount point list resources from \ref DokanGetMountPointList.
  *
- * After \ref DokanGetMountPointList call you will receive a dynamically allocated array of DOKAN_CONTROL.
+ * After \ref DokanGetMountPointList call you will receive a dynamically allocated array of DOKAN_MOUNT_POINT_INFO.
  * This array needs to be released when no longer needed by calling this function.
  *
- * \param list Allocated array of DOKAN_CONTROL from \ref DokanGetMountPointList.
+ * \param list Allocated array of DOKAN_MOUNT_POINT_INFO from \ref DokanGetMountPointList.
  * \return Nothing.
  */
-VOID DOKANAPI DokanReleaseMountPointList(PDOKAN_CONTROL list);
+VOID DOKANAPI DokanReleaseMountPointList(PDOKAN_MOUNT_POINT_INFO list);
 
 /**
  * \brief Convert \ref DOKAN_OPERATIONS.ZwCreateFile parameters to <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858(v=vs.85).aspx">CreateFile</a> parameters.
@@ -873,7 +976,7 @@ VOID DOKANAPI DokanReleaseMountPointList(PDOKAN_CONTROL list);
  * \param outCreationDisposition New <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858(v=vs.85).aspx">CreateFile</a> dwCreationDisposition.
  * \see <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858(v=vs.85).aspx">CreateFile function (MSDN)</a>
  */
-void DOKANAPI DokanMapKernelToUserCreateFileFlags(
+VOID DOKANAPI DokanMapKernelToUserCreateFileFlags(
     ACCESS_MASK DesiredAccess, ULONG FileAttributes, ULONG CreateOptions,
     ULONG CreateDisposition, ACCESS_MASK *outDesiredAccess,
     DWORD *outFileAttributesAndFlags, DWORD *outCreationDisposition);
@@ -901,49 +1004,60 @@ void DOKANAPI DokanMapKernelToUserCreateFileFlags(
 /**
  * \brief Notify dokan that a file or a directory has been created.
  *
+ * \param DokanInstance The dokan mount context created by \ref DokanCreateFileSystem .
  * \param FilePath Absolute path to the file or directory, including the mount-point of the file system.
  * \param IsDirectory Indicates if the path is a directory.
  * \return \c TRUE if notification succeeded.
  */
-BOOL DOKANAPI DokanNotifyCreate(LPCWSTR FilePath, BOOL IsDirectory);
+BOOL DOKANAPI DokanNotifyCreate(_In_ DOKAN_HANDLE DokanInstance,
+                                _In_ LPCWSTR FilePath, _In_ BOOL IsDirectory);
 
 /**
  * \brief Notify dokan that a file or a directory has been deleted.
  *
+ * \param DokanInstance The dokan mount context created by \ref DokanCreateFileSystem .
  * \param FilePath Absolute path to the file or directory, including the mount-point of the file system.
  * \param IsDirectory Indicates if the path was a directory.
  * \return \c TRUE if notification succeeded.
  */
-BOOL DOKANAPI DokanNotifyDelete(LPCWSTR FilePath, BOOL IsDirectory);
+BOOL DOKANAPI DokanNotifyDelete(_In_ DOKAN_HANDLE DokanInstance,
+                                _In_ LPCWSTR FilePath, _In_ BOOL IsDirectory);
 
 /**
  * \brief Notify dokan that file or directory attributes have changed.
  *
+ * \param DokanInstance The dokan mount context created by \ref DokanCreateFileSystem .
  * \param FilePath Absolute path to the file or directory, including the mount-point of the file system.
  * \return \c TRUE if notification succeeded.
  */
-BOOL DOKANAPI DokanNotifyUpdate(LPCWSTR FilePath);
+BOOL DOKANAPI DokanNotifyUpdate(_In_ DOKAN_HANDLE DokanInstance,
+                                _In_ LPCWSTR FilePath);
 
 /**
  * \brief Notify dokan that file or directory extended attributes have changed.
  *
+ * \param DokanInstance The dokan mount context created by \ref DokanCreateFileSystem .
  * \param FilePath Absolute path to the file or directory, including the mount-point of the file system.
  * \return \c TRUE if notification succeeded.
  */
-BOOL DOKANAPI DokanNotifyXAttrUpdate(LPCWSTR FilePath);
+BOOL DOKANAPI DokanNotifyXAttrUpdate(_In_ DOKAN_HANDLE DokanInstance,
+                                     _In_ LPCWSTR FilePath);
 
 /**
  * \brief Notify dokan that a file or a directory has been renamed. This method
  *  supports in-place rename for file/directory within the same parent.
  *
+ * \param DokanInstance The dokan mount context created by \ref DokanCreateFileSystem .
  * \param OldPath Old, absolute path to the file or directory, including the mount-point of the file system.
  * \param NewPath New, absolute path to the file or directory, including the mount-point of the file system.
  * \param IsDirectory Indicates if the path is a directory.
  * \param IsInSameDirectory Indicates if the file or directory have the same parent directory.
  * \return \c TRUE if notification succeeded.
  */
-BOOL DOKANAPI DokanNotifyRename(LPCWSTR OldPath, LPCWSTR NewPath,
-                                BOOL IsDirectory, BOOL IsInSameDirectory);
+BOOL DOKANAPI DokanNotifyRename(_In_ DOKAN_HANDLE DokanInstance,
+                                _In_ LPCWSTR OldPath, _In_ LPCWSTR NewPath,
+                                _In_ BOOL IsDirectory,
+                                _In_ BOOL IsInSameDirectory);
 
 /**@}*/
 

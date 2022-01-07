@@ -1,6 +1,6 @@
 // memdump.h : definitions related to memory dumping functionality.
 //
-// (c) Ulf Frisk, 2016-2021
+// (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __MEMDUMP_H__

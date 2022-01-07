@@ -1,6 +1,6 @@
 // help.c : implementation related to displaying help texts.
 //
-// (c) Ulf Frisk, 2016-2021
+// (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "help.h"
@@ -53,7 +53,7 @@ VOID Help_ShowGeneral()
         "   [implant]                     KMD   [ in, out, s, 0..9 ]                    \n" \
         "   kmdload                NATIVE       [ pt, cr3 ]                             \n" \
         "   kmdexit                       KMD                                           \n" \
-        "   mount                  NATIVE,KMD   [ s, cr3 ]     (Windows)                \n" \
+        "   mount                  NATIVE,KMD   [ mount, cr3 ]                          \n" \
         "   display                NATIVE,KMD   [ min, max ]                            \n" \
         "   pagedisplay            NATIVE,KMD   [ min ]                                 \n" \
         "   pt_phys2virt           NATIVE,KMD   [ cr3, 0 ]                              \n" \
@@ -117,6 +117,9 @@ VOID Help_ShowGeneral()
         "          Examples: -in 0102030405060708090a0b0c0d0e0f or -in firmware.bin     \n" \
         "   -s   : string input value.                                                  \n" \
         "          Example: -s \"\\\\??\\C:\\Windows\\System32\\cmd.exe\"               \n" \
+        "   -mount : custom mount drive (Windows) or mount path (Linux)                 \n" \
+        "          Only used in conjunction with the mount command.                     \n" \
+        "          Examples: (Windows) -mount Q         (Linux) -mount /mnt/pcileech    \n" \
         "   -0..9: QWORD input value. Example: -0 0xff , -3 0x7fffffff00001000 or -2 13 \n" \
         "          default: 0                                                           \n" \
         "   -pt  : trigger KMD insertion by automatic page table hijack.                \n" \
@@ -340,11 +343,11 @@ VOID Help_ShowDetailed()
         printf(
             " MOUNT TARGET LIVE RAM AND FILE SYSTEM AS 'NETWORK DRIVE'.                     \n" \
             " MODES   : KMD                                                                 \n" \
-            " REQUIRE : Windows/Dokany                                                      \n" \
-            " OPTIONS : -s                                                                  \n" \
+            " REQUIRE : Windows/Dokany or Linux/FUSE                                        \n" \
+            " OPTIONS : -mount                                                              \n" \
             " Mount the target system live ram and file system as the drive letter specified\n" \
-            " in the -s option. If the -s option is not specified PCILeech will try to mount\n" \
-            " the target file system as the K: drive letter.                                \n" \
+            " in the -mount option.  If the -mount option is not specified PCILeech will try\n" \
+            " to mount the target file system as the K: drive letter.                       \n" \
             " File system comes with two main functionalities, mount target system files if \n" \
             " hardware device is used, and mount memory process file system (in read-only   \n" \
             " mode when dump file is used, in read-write mode when hardware device is used).\n" \
@@ -367,7 +370,7 @@ VOID Help_ShowDetailed()
             " 1) Mount file system and live RAM of target as the default K: drive letter.   \n" \
             "    pcileech mount -kmd 0x7fffe000                                             \n" \
             " 2) Mount file system and live RAM of target as X: drive letter.               \n" \
-            "    pcileech mount -kmd 0x7fffe000 -s X                                        \n" \
+            "    pcileech mount -kmd 0x7fffe000 -mount X                                    \n" \
             " 3) Mount live ram and proc file system only using FPGA hardware.              \n" \
             "    pcileech mount -max 0x21e5fffff                                            \n" \
             " 4) Mount live ram and 'proc' file system by specifying a specific CR3/PML4.   \n" \

