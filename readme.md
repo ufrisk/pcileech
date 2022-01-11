@@ -65,20 +65,20 @@ Please find a summary of the supported hardware based memory acquisition methods
 
 Please find a summary of the supported software based memory acquisition methods listed below. Please note that the LeechService only provides a network connection to a remote LeechCore library. It's possible to use both hardware and software based memory acquisition once connected.
 
-| Device                                                                 | Type | Interface | Speed | 64-bit memory access | PCIe TLP access | Plugin | Project<br>Sponsor |
-| -----------------------------------------------------------------------| ---- | --------- | ----- | -------------------- | --------------- | ------ | ------------------ |
-| [Enigma X1](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)      | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/EnigmaX1)     | USB-C | 180MB/s | Yes | Yes | No  | 💖 |
-| [PCIeScreamerR04](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)| [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB-C | 150MB/s | Yes | Yes | No  | 💖 |
-| [ScreamerM2](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)     | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB3  | 150MB/s | Yes | Yes | No  | 💖 |
-| [AC701/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ac701_ft601)  | USB3  | 150MB/s | Yes | Yes | No  |    |
-| [PCIeScreamer](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)   | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/pciescreamer) | USB3  | 100MB/s | Yes | Yes | No  |    |
-| [SP605/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/sp605_ft601)  | USB3  |  75MB/s | Yes | Yes | No  |    |
-| [Acorn/FT2232H](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)  | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/acorn_ft2232h)| USB2  |  25MB/s | Yes | Yes | No  |    |
-| [NeTV2/UDP](https://github.com/ufrisk/LeechCore/wiki/Device_RawUDP)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/NeTV2)        | UDP   |   7MB/s | Yes | Yes | No  |    |
-| [USB3380-EVB](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380) | USB3380 | USB3 | 150MB/s | No  | No  | No  |    |
-| [PP3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)      | USB3380 | USB3 | 150MB/s | No  | No  | No  |    |
-| [SP605/TCP](https://github.com/ufrisk/LeechCore/wiki/Device_SP605TCP)  | FPGA    | TCP  | 100kB/s | Yes | Yes | Yes |    |
-| [DMA patched HP iLO](https://github.com/ufrisk/LeechCore/wiki/Device_RawTCP) | BMC | TCP |  1MB/s | Yes | No  | Yes |    |
+| Device                     | Type             | Volatile | Write | Linux Support | Plugin |
+| -------------------------- | ---------------- | -------- | ----- | ------------- | ------ |
+| [RAW physical memory dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)         | File             | No  | No  | Yes | No  |
+| [Full Microsoft Crash Dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)        | File             | No  | No  | Yes | No  |
+| [Full ELF Core Dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)               | File             | No  | No  | Yes | No  |
+| [VMware](https://github.com/ufrisk/LeechCore/wiki/Device_VMWare)                         | Live&nbsp;Memory | Yes | Yes | No  | No  |
+| [VMware memory save file](https://github.com/ufrisk/LeechCore/wiki/Device_File)          | File             | No  | No  | Yes | No  |
+| [TotalMeltdown](https://github.com/ufrisk/LeechCore/wiki/Device_Totalmeltdown)           | CVE-2018-1038    | Yes | Yes | No  | No  |
+| [DumpIt /LIVEKD](https://github.com/ufrisk/LeechCore/wiki/Device_DumpIt)                 | Live&nbsp;Memory | Yes | No  | No  | No  |
+| [WinPMEM](https://github.com/ufrisk/LeechCore/wiki/Device_WinPMEM)                       | Live&nbsp;Memory | Yes | No  | No  | No  |
+| [LiveKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveKd)                         | Live&nbsp;Memory | Yes | No  | No  | No  |
+| [LiveCloudKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveCloudKd)               | Live&nbsp;Memory | Yes | Yes | No  | Yes |
+| [Hyper-V Saved State](https://github.com/ufrisk/LeechCore/wiki/Device_HyperV_SavedState) | File             | No  | No  | No  | Yes |
+| [LeechAgent*](https://github.com/ufrisk/LeechCore/wiki/Device_Remote)                    | Remote           |     |     | No  | No  |
 
 Installing PCILeech:
 ====================
