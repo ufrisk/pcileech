@@ -273,5 +273,5 @@ v4.1
 
 [v4.14](https://github.com/ufrisk/pcileech/releases/tag/v4.14)
 * Process Virtual Memory support (Windows only).
- - Commands: search, patch, write, display, pagedisplay
- - Example:  pcileech patch -pid 732 -sig unlock_win10x64.sig
+  - Commands: search, patch, write, display, pagedisplay
+  - Example:  pcileech patch -pid 732 -sig unlock_win10x64.sig
