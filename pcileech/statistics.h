@@ -6,32 +6,41 @@
 #ifndef __STATISTICS_H__
 #define __STATISTICS_H__
 #include "pcileech.h"
+#include <vmmdll.h>
 
 #define PAGE_STATISTICS_MEM_MAP_MAX_ENTRY    2048
 
-typedef struct tdPageStatistics {
+typedef struct tdSTATISTICS_INTERNAL {
+    BOOL fUpdate;
+    BOOL fThreadExit;
+    BOOL fMemMap;
+    BOOL fIsFirstPrintCompleted;
+    HANDLE hThread;
+    WORD wConsoleCursorPosition;
+    QWORD qwTickCountStart;
+    QWORD MemMapIdx;
+    QWORD MemMapPrintIdx;
+    struct {
+        QWORD qwAddrBase;
+        DWORD cPages;
+    } MemMap[PAGE_STATISTICS_MEM_MAP_MAX_ENTRY];
+} STATISTICS_INTERNAL, *PSTATISTICS_INTERNAL;
+
+typedef struct tdPAGE_STATISTICS {
     QWORD qwAddr;
     QWORD cPageTotal;
     QWORD cPageSuccess;
     QWORD cPageFail;
     BOOL fKMD;
     LPSTR szAction;
-    struct _InternalUseOnly {
-        BOOL fUpdate;
-        BOOL fThreadExit;
-        BOOL fMemMap;
-        BOOL fIsFirstPrintCompleted;
-        HANDLE hThread;
-        WORD wConsoleCursorPosition;
-        QWORD qwTickCountStart;
-        QWORD MemMapIdx;
-        QWORD MemMapPrintIdx;
-        struct {
-            QWORD qwAddrBase;
-            DWORD cPages;
-        } MemMap[PAGE_STATISTICS_MEM_MAP_MAX_ENTRY];
-    } i;
+    STATISTICS_INTERNAL i;
 } PAGE_STATISTICS, *PPAGE_STATISTICS;
+
+typedef struct tdSTATISTICS_SEARCH {
+    LPSTR szAction;
+    PVMMDLL_MEM_SEARCH_CONTEXT ctxs;
+    STATISTICS_INTERNAL i;
+} STATISTICS_SEARCH, *PSTATISTICS_SEARCH;
 
 /*
 * Initialize the page statistics. This will also start displaying the page statistics
@@ -65,5 +74,23 @@ VOID PageStatClose(_In_opt_ PPAGE_STATISTICS *ppPageStat);
 * -- cPageFailAdd = number of pages that failed.
 */
 VOID PageStatUpdate(_In_opt_ PPAGE_STATISTICS pPageStat, _In_ QWORD qwAddr, _In_ QWORD cPageSuccessAdd, _In_ QWORD cPageFailAdd);
+
+/*
+* Initialize the search statistics. This will also start displaying the search
+* statistics on the screen asynchronously. Call StatSearchClose() to stop.
+* -- ppStatSearch
+* -- ctxs
+* -- dwPID
+* -- szAction
+* -- return
+*/
+_Success_(return)
+BOOL StatSearchInitialize(_Inout_ PSTATISTICS_SEARCH *ppStatSearch, _In_ PVMMDLL_MEM_SEARCH_CONTEXT ctxs, _In_ LPSTR szAction);
+
+/*
+* Do one last update of the on-screen page statistics.
+* -- ppStatSearch = ptr to the PSTATISTICS_SEARCH struct to close and free.
+*/
+VOID StatSearchClose(_In_opt_ PSTATISTICS_SEARCH *ppStatSearch);
 
 #endif /* __STATISTICS_H__ */

@@ -216,13 +216,13 @@ NTSTATUS VfsReadMemory(_In_ BOOL fKMD, _Out_writes_to_(cb, *pcbRead) PBYTE pb, _
     }
     *pcbRead = (DWORD)min(cb, cbMaxMemorySize - cbOffset);
     if(fKMD) {
-        qwCfgAddrMaxOrig = ctxMain->cfg.qwAddrMax;    // TODO: REMOVE UGLY HACK WITH ADDRMAX...
+        qwCfgAddrMaxOrig = ctxMain->cfg.paAddrMax;    // TODO: REMOVE UGLY HACK WITH ADDRMAX...
         EnterCriticalSection(&g_vfs->Lock);
         if(!DeviceReadMEM(cbOffset, *pcbRead, pb, TRUE)) {
             ZeroMemory(pb, *pcbRead);
         }
         LeaveCriticalSection(&g_vfs->Lock);
-        ctxMain->cfg.qwAddrMax = qwCfgAddrMaxOrig;
+        ctxMain->cfg.paAddrMax = qwCfgAddrMaxOrig;
     } else {
         cbRead2 = DeviceReadDMA(cbOffset, *pcbRead, pb, NULL);
         if(cbRead2 < *pcbRead) {
@@ -466,7 +466,7 @@ VOID ActionMount()
     int(WINAPI *pfnDokanMain)(PDOKAN_OPTIONS, PDOKAN_OPERATIONS);
     VOID(WINAPI *pfnDokanShutdown)();
     // sanity checks
-    if(!ctxMain->phKMD && (PCILEECH_DEVICE_EQUALS("usb3380") || (ctxMain->cfg.qwAddrMax > 0x0000040000000000) || (ctxMain->cfg.qwAddrMax < 0x00400000))) {
+    if(!ctxMain->phKMD && (PCILEECH_DEVICE_EQUALS("usb3380") || (ctxMain->cfg.paAddrMax > 0x0000040000000000) || (ctxMain->cfg.paAddrMax < 0x00400000))) {
         printf(
             "MOUNT: Failed. Please see below for possible reasons:               \n" \
             "   - Mounting file system requires an active kernel module (KMD).   \n" \
@@ -496,7 +496,7 @@ VOID ActionMount()
     }
     // set global state
     pVfsState->cbKmd = ctxMain->phKMD ? (ctxMain->phKMD->pPhysicalMap[ctxMain->phKMD->cPhysicalMap - 1].BaseAddress + ctxMain->phKMD->pPhysicalMap[ctxMain->phKMD->cPhysicalMap - 1].NumberOfBytes) : 0;
-    pVfsState->cbNative = PCILEECH_DEVICE_EQUALS("usb3380") ? 0 : (ctxMain->phKMD ? pVfsState->cbKmd : ctxMain->cfg.qwAddrMax);
+    pVfsState->cbNative = PCILEECH_DEVICE_EQUALS("usb3380") ? 0 : (ctxMain->phKMD ? pVfsState->cbKmd : ctxMain->cfg.paAddrMax);
     pVfsState->DokanNtStatusFromWin32 = (NTSTATUS(*)(DWORD))GetProcAddress(hModuleDokan, "DokanNtStatusFromWin32");
     pVfsState->PCILeechOperatingSystem = ctxMain->phKMD ? ctxMain->pk->OperatingSystem : 0;
     if(pVfsState->PCILeechOperatingSystem == KMDDATA_OPERATING_SYSTEM_WINDOWS) {
@@ -590,7 +590,7 @@ fail:
 
 static int vfs_getattr(const char* uszPathFull, struct stat *st)
 {
-    DWORD i;
+    DWORD i = 0;
     CHAR c = 0, uszPathCopy[3 * MAX_PATH] = { 0 };
     CHAR uszPath[3 * MAX_PATH];
     LPSTR uszFile;
@@ -644,7 +644,7 @@ static void vfs_readdir_cb(_In_ PVFS_ENTRY pVfsEntry, _In_opt_ preaddir_cb_ctx c
 
 static int vfs_readdir(const char* uszPath, void* buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
-    DWORD i;
+    DWORD i = 0;
     CHAR c = 0, uszPathCopy[3 * MAX_PATH] = { 0 };
     UNREFERENCED_PARAMETER(offset);
     UNREFERENCED_PARAMETER(fi);
@@ -728,7 +728,7 @@ void vfs_initialize_and_mount_displayinfo()
         goto fail;
     }
     pVfsState->cbKmd = ctxMain->phKMD ? (ctxMain->phKMD->pPhysicalMap[ctxMain->phKMD->cPhysicalMap - 1].BaseAddress + ctxMain->phKMD->pPhysicalMap[ctxMain->phKMD->cPhysicalMap - 1].NumberOfBytes) : 0;
-    pVfsState->cbNative = PCILEECH_DEVICE_EQUALS("usb3380") ? 0 : (ctxMain->phKMD ? pVfsState->cbKmd : ctxMain->cfg.qwAddrMax);
+    pVfsState->cbNative = PCILEECH_DEVICE_EQUALS("usb3380") ? 0 : (ctxMain->phKMD ? pVfsState->cbKmd : ctxMain->cfg.paAddrMax);
     pVfsState->PCILeechOperatingSystem = ctxMain->phKMD ? ctxMain->pk->OperatingSystem : 0;
     if(pVfsState->PCILeechOperatingSystem == KMDDATA_OPERATING_SYSTEM_WINDOWS) {
         strcpy_s(pVfsState->szNameVfsShellcode, 32, "DEFAULT_WINX64_VFS_KSH");

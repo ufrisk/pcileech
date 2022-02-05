@@ -43,9 +43,15 @@ VOID ActionMemoryTestReadWrite();
 VOID ActionMemoryPageDisplay();
 
 /*
-* Print out a maximum of 16kB (0x10000) memory limited by the min and max
-* parameters in pCfg. By default 0x100 bytes are displayed.
+* Print out a maximum of 16kB (0x10000) physical memory limited by the
+* paMin and paMax parameters in pCfg. By default 0x100 bytes are displayed.
 */
-VOID ActionMemoryDisplay();
+VOID ActionMemoryDisplayPhysical();
+
+/*
+* Print out a maximum of 16kB (0x10000) virtual memory limited by the
+* vaMin and vaMax parameters in pCfg. By default 0x100 bytes are displayed.
+*/
+VOID ActionMemoryDisplayVirtual();
 
 #endif /* __MEMDUMP_H__ */

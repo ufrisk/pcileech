@@ -8,6 +8,8 @@
 #include "device.h"
 #include "statistics.h"
 #include "util.h"
+#include "vmmx.h"
+#include <vmmdll.h>
 #ifdef WIN32
 #include <io.h>
 #endif /* WIN32 */
@@ -44,8 +46,8 @@ VOID MemoryDump_SetOutFileName()
             MAX_PATH,
             _TRUNCATE,
             "pcileech-%llx-%llx-%i%02i%02i-%02i%02i%02i.raw",
-            ctxMain->cfg.qwAddrMin,
-            ctxMain->cfg.qwAddrMax,
+            ctxMain->cfg.paAddrMin,
+            ctxMain->cfg.paAddrMax,
             st.wYear,
             st.wMonth,
             st.wDay,
@@ -146,8 +148,8 @@ VOID ActionMemoryDump_KMD_USB3380()
     PMEMDUMP_FILEWRITE pfw = NULL;
     PPAGE_STATISTICS pStat = NULL;
     // 1: Initialize result file, buffers and statistics:
-    paMin = ctxMain->cfg.qwAddrMin & ~0xfff;
-    paMax = (ctxMain->cfg.qwAddrMax + 1) & ~0xfff;
+    paMin = ctxMain->cfg.paAddrMin & ~0xfff;
+    paMax = (ctxMain->cfg.paAddrMax + 1) & ~0xfff;
     if(!(pfw = MemoryDump_File_Initialize(FALSE))) { return; }
     PageStatInitialize(&pStat, paMin, paMax, "Dumping Memory", ctxMain->phKMD ? TRUE : FALSE, ctxMain->cfg.fVerbose);
     // 2: Dump memory in 16MB blocks:
@@ -192,8 +194,8 @@ VOID ActionMemoryDump_Native()
     PMEMDUMP_FILEWRITE pfw = NULL;
     PPAGE_STATISTICS pStat = NULL;
     // 1: Initialize result file, buffers and statistics:
-    paMin = ctxMain->cfg.qwAddrMin & ~0xfff;
-    paMax = (ctxMain->cfg.qwAddrMax + 1) & ~0xfff;
+    paMin = ctxMain->cfg.paAddrMin & ~0xfff;
+    paMax = (ctxMain->cfg.paAddrMax + 1) & ~0xfff;
     fSaferDump = PCILEECH_DEVICE_EQUALS("fpga") && (paMin == 0) && (paMax > MEMDUMP_4GB);
     if(!(pfw = MemoryDump_File_Initialize(fSaferDump))) { return; }
     PageStatInitialize(&pStat, paMin, paMax, "Dumping Memory", FALSE, ctxMain->cfg.fVerbose);
@@ -249,12 +251,12 @@ VOID ActionMemoryProbe()
     PPAGE_STATISTICS pPageStat = NULL;
     PBYTE pbProbeResultMap = NULL;
     DWORD cbProbeResultMap;
-    ctxMain->cfg.qwAddrMin &= ~0xfff;
-    ctxMain->cfg.qwAddrMax = (ctxMain->cfg.qwAddrMax + 1) & ~0xfff;
-    pa = ctxMain->cfg.qwAddrMin;
-    PageStatInitialize(&pPageStat, ctxMain->cfg.qwAddrMin, ctxMain->cfg.qwAddrMax, "Probing Memory", FALSE, TRUE);
-    while(pa < ctxMain->cfg.qwAddrMax) {
-        cPages = (DWORD)min(MEMORY_PROBE_PAGES_PER_SWEEP, (ctxMain->cfg.qwAddrMax - pa) / 0x1000);
+    ctxMain->cfg.paAddrMin &= ~0xfff;
+    ctxMain->cfg.paAddrMax = (ctxMain->cfg.paAddrMax + 1) & ~0xfff;
+    pa = ctxMain->cfg.paAddrMin;
+    PageStatInitialize(&pPageStat, ctxMain->cfg.paAddrMin, ctxMain->cfg.paAddrMax, "Probing Memory", FALSE, TRUE);
+    while(pa < ctxMain->cfg.paAddrMax) {
+        cPages = (DWORD)min(MEMORY_PROBE_PAGES_PER_SWEEP, (ctxMain->cfg.paAddrMax - pa) / 0x1000);
         if(!LcCommand(ctxMain->hLC, LC_CMD_FPGA_PROBE | cPages, sizeof(QWORD), (PBYTE)&pa, &pbProbeResultMap, &cbProbeResultMap) || (cPages > cbProbeResultMap)) {
             PageStatClose(&pPageStat);
             printf("Memory Probe: Failed. Unsupported device or other failure.\n");
@@ -269,18 +271,18 @@ VOID ActionMemoryProbe()
     printf("Memory Probe: Completed.\n");
 }
 
-VOID ActionMemoryDisplay()
+VOID ActionMemoryDisplayPhysical()
 {
     QWORD qwAddrBase, qwAddrOffset, qwSize, qwSize_4kAlign;
     PBYTE pb;
     // allocate and calculate values
     pb = LocalAlloc(0, 0x10000);
     if(!pb) { return; }
-    qwAddrBase = ctxMain->cfg.qwAddrMin & 0x0fffffffffffff000;
-    qwAddrOffset = ctxMain->cfg.qwAddrMin & 0xff0;
-    qwSize_4kAlign = SIZE_PAGE_ALIGN_4K(ctxMain->cfg.qwAddrMax) - qwAddrBase;
-    qwSize = ((ctxMain->cfg.qwAddrMax + 0xf) & 0x0fffffffffffffff0) - (qwAddrBase + qwAddrOffset);
-    if(qwSize_4kAlign > 0x10000 || (ctxMain->cfg.qwAddrMax == ctxMain->dev.paMax)) {
+    qwAddrBase = ctxMain->cfg.paAddrMin & 0x0fffffffffffff000;
+    qwAddrOffset = ctxMain->cfg.paAddrMin & 0xff0;
+    qwSize_4kAlign = SIZE_PAGE_ALIGN_4K(ctxMain->cfg.paAddrMax) - qwAddrBase;
+    qwSize = ((ctxMain->cfg.paAddrMax + 0xf) & 0x0fffffffffffffff0) - (qwAddrBase + qwAddrOffset);
+    if(qwSize_4kAlign > 0x10000 || (ctxMain->cfg.paAddrMax == ctxMain->dev.paMax)) {
         qwSize = 0x100;
         qwSize_4kAlign = (qwAddrOffset <= 0xf00) ? 0x1000 : 0x2000;
     }
@@ -295,17 +297,57 @@ VOID ActionMemoryDisplay()
     LocalFree(pb);
 }
 
+VOID ActionMemoryDisplayVirtual()
+{
+    QWORD qwAddrBase, qwAddrOffset, qwSize, qwSize_4kAlign;
+    PBYTE pb;
+    // allocate and calculate values
+    pb = LocalAlloc(0, 0x10000);
+    if(!pb) { return; }
+    qwAddrBase = ctxMain->cfg.vaAddrMin & 0x0fffffffffffff000;
+    qwAddrOffset = ctxMain->cfg.vaAddrMin & 0xff0;
+    qwSize_4kAlign = SIZE_PAGE_ALIGN_4K(ctxMain->cfg.vaAddrMax) - qwAddrBase;
+    qwSize = ((ctxMain->cfg.vaAddrMax + 0xf) & 0x0fffffffffffffff0) - (qwAddrBase + qwAddrOffset);
+    if(qwSize_4kAlign > 0x10000 || (ctxMain->cfg.vaAddrMax == ctxMain->dev.paMax)) {
+        qwSize = 0x100;
+        qwSize_4kAlign = (qwAddrOffset <= 0xf00) ? 0x1000 : 0x2000;
+    }
+    // initialize vmm/memprocfs
+    if(!Vmmx_Initialize(FALSE, FALSE)) {
+        printf("Memory Display: Failed. Unable to initialize virtual memory.\n");
+        LocalFree(pb);
+        return;
+    }
+    // read memory and display output
+    if(!VMMDLL_MemRead(ctxMain->cfg.dwPID, qwAddrBase, pb, (DWORD)qwSize_4kAlign)) {
+        printf("Memory Display: Failed reading memory at address: 0x%016llX.\n", qwAddrBase);
+        LocalFree(pb);
+        return;
+    }
+    printf("Memory Display: Contents for address: 0x%016llX\n", qwAddrBase);
+    Util_PrintHexAscii(pb, (DWORD)(qwSize + qwAddrOffset), (DWORD)qwAddrOffset);
+    LocalFree(pb);
+}
+
 VOID ActionMemoryPageDisplay()
 {
-    ctxMain->cfg.qwAddrMin = ctxMain->cfg.qwAddrMin & 0x0fffffffffffff000;
-    ctxMain->cfg.qwAddrMax = ctxMain->cfg.qwAddrMin + 0x1000;
-    ActionMemoryDisplay();
+    if(ctxMain->cfg.dwPID) {
+        // virtual memory (Windows only):
+        ctxMain->cfg.vaAddrMin = ctxMain->cfg.vaAddrMin & 0x0fffffffffffff000;
+        ctxMain->cfg.vaAddrMax = ctxMain->cfg.vaAddrMin + 0x1000;
+        ActionMemoryDisplayVirtual();
+    } else {
+        // physical memory
+        ctxMain->cfg.paAddrMin = ctxMain->cfg.paAddrMin & 0x0fffffffffffff000;
+        ctxMain->cfg.paAddrMax = ctxMain->cfg.paAddrMin + 0x1000;
+        ActionMemoryDisplayPhysical();
+    }
 }
 
 VOID ActionMemoryTestReadWrite()
 {
     BYTE pb1[4096], pb2[4096], pb3[4096];
-    DWORD dwAddrPci32 = (DWORD)(ctxMain->cfg.qwAddrMin & 0xfffff000);
+    DWORD dwAddrPci32 = (DWORD)(ctxMain->cfg.paAddrMin & 0xfffff000);
     DWORD i, dwOffset, dwRuns = 1000;
     BOOL r1, r2;
     if(ctxMain->phKMD) {
@@ -357,12 +399,28 @@ VOID ActionMemoryWrite()
     if(ctxMain->cfg.fLoop) {
         printf("Memory Write: Starting loop write. Press CTRL+C to abort.\n");
     }
-    do {
-        result = DeviceWriteMEM(ctxMain->cfg.qwAddrMin, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, FALSE);
-        if(!result) {
-            printf("Memory Write: Failed. Write failed (partial memory may be written).\n");
+    if(ctxMain->cfg.dwPID) {
+        // virtual memory (Windows only):
+        if(!Vmmx_Initialize(FALSE, FALSE)) {
+            printf("Memory Write: Failed. Unable to initialize virtual memory.\n");
             return;
         }
-    } while(ctxMain->cfg.fLoop);
+        do {
+            result = VMMDLL_MemWrite(ctxMain->cfg.dwPID, ctxMain->cfg.vaAddrMin, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn);
+            if(!result) {
+                printf("Memory Write: Failed. Write failed (partial memory may be written).\n");
+                return;
+            }
+        } while(ctxMain->cfg.fLoop);
+    } else {
+        // physical memory:
+        do {
+            result = DeviceWriteMEM(ctxMain->cfg.paAddrMin, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, FALSE);
+            if(!result) {
+                printf("Memory Write: Failed. Write failed (partial memory may be written).\n");
+                return;
+            }
+        } while(ctxMain->cfg.fLoop);
+    }
     printf("Memory Write: Successful.\n");
 }

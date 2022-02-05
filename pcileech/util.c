@@ -423,7 +423,7 @@ BOOL Util_ParseSignatureLine(_In_ PSTR szLine, _In_ DWORD cSignatureChunks, _Out
 }
 
 _Success_(return)
-BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension, _Out_ PSIGNATURE pSignatures, _In_ PDWORD cSignatures, _In_ DWORD cSignatureChunks)
+BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension, _Out_ PSIGNATURE pSignatures, _Inout_ PDWORD cSignatures, _In_ DWORD cSignatureChunks)
 {
     PBYTE pbFile;
     DWORD cbFile = 0, cSignatureIdx = 0;
@@ -626,15 +626,15 @@ VOID Util_Read1M(_Out_writes_(0x00100000) PBYTE pbBuffer1M, _In_ QWORD qwBaseAdd
     QWORD o, p;
     // try read 1M in 128k chunks
     for(o = 0; o < 0x00100000; o += 0x00020000) {
-        if((qwBaseAddress + o + 0x00020000 <= ctxMain->cfg.qwAddrMax) && DeviceReadMEM(qwBaseAddress + o, 0x00020000, pbBuffer1M + o, FALSE)) {
+        if((qwBaseAddress + o + 0x00020000 <= ctxMain->cfg.paAddrMax) && DeviceReadMEM(qwBaseAddress + o, 0x00020000, pbBuffer1M + o, FALSE)) {
             PageStatUpdate(pPageStat, qwBaseAddress + o + 0x00020000, 32, 0);
         } else {
             // try read 128k in 4k (page) chunks
             for(p = 0; p < 0x00020000; p += 0x1000) {
-                if(!(qwBaseAddress + o + p + 0x1000 <= ctxMain->cfg.qwAddrMax)) {
+                if(!(qwBaseAddress + o + p + 0x1000 <= ctxMain->cfg.paAddrMax)) {
                     return;
                 }
-                if((qwBaseAddress + o + p + 0x1000 <= ctxMain->cfg.qwAddrMax) && DeviceReadMEM(qwBaseAddress + o + p, 0x1000, pbBuffer1M + o + p, FALSE)) {
+                if((qwBaseAddress + o + p + 0x1000 <= ctxMain->cfg.paAddrMax) && DeviceReadMEM(qwBaseAddress + o + p, 0x1000, pbBuffer1M + o + p, FALSE)) {
                     PageStatUpdate(pPageStat, qwBaseAddress + o + p + 0x1000, 1, 0);
                 } else {
                     PageStatUpdate(pPageStat, qwBaseAddress + o + p + 0x1000, 0, 1);
@@ -649,13 +649,13 @@ BOOL Util_Read16M(_Out_writes_(0x01000000) PBYTE pbBuffer16M, _In_ QWORD qwBaseA
 {
     BOOL isSuccess[4] = { FALSE, FALSE, FALSE, FALSE };
     QWORD i, o, qwOffset, cbRead;
-    if(qwBaseAddress >= ctxMain->cfg.qwAddrMax) { return FALSE; }
+    if(qwBaseAddress >= ctxMain->cfg.paAddrMax) { return FALSE; }
     if(!ctxMain->phKMD) { // Native DMA
-        cbRead = min(0x01000000, ctxMain->cfg.qwAddrMax - qwBaseAddress);
+        cbRead = min(0x01000000, ctxMain->cfg.paAddrMax - qwBaseAddress);
         return 0 != DeviceReadDMA(qwBaseAddress, (DWORD)cbRead, pbBuffer16M, pPageStat);
     }
     // try read 16M
-    if((qwBaseAddress + 0x01000000 <= ctxMain->cfg.qwAddrMax) && DeviceReadMEM(qwBaseAddress, 0x01000000, pbBuffer16M, FALSE)) {
+    if((qwBaseAddress + 0x01000000 <= ctxMain->cfg.paAddrMax) && DeviceReadMEM(qwBaseAddress, 0x01000000, pbBuffer16M, FALSE)) {
         PageStatUpdate(pPageStat, qwBaseAddress + 0x01000000, 4096, 0);
         return TRUE;
     }
@@ -663,7 +663,7 @@ BOOL Util_Read16M(_Out_writes_(0x01000000) PBYTE pbBuffer16M, _In_ QWORD qwBaseA
     memset(pbBuffer16M, 0, 0x01000000);
     for(i = 0; i < 4; i++) {
         o = 0x00400000 * i;
-        isSuccess[i] = (qwBaseAddress + o + 0x00400000 <= ctxMain->cfg.qwAddrMax) && DeviceReadMEM(qwBaseAddress + o, 0x00400000, pbBuffer16M + o, FALSE);
+        isSuccess[i] = (qwBaseAddress + o + 0x00400000 <= ctxMain->cfg.paAddrMax) && DeviceReadMEM(qwBaseAddress + o, 0x00400000, pbBuffer16M + o, FALSE);
     }
     // try read failed chunks.
     for(i = 0; i < 4; i++) {

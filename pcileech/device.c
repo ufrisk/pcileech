@@ -158,7 +158,7 @@ BOOL DeviceOpen2(_In_ LPSTR szDevice, _In_ BOOL fFailSilent)
     }
     strcpy_s(ctxMain->dev.szDevice, MAX_PATH, szDevice);
     strcpy_s(ctxMain->dev.szRemote, MAX_PATH, ctxMain->cfg.szRemote);
-    ctxMain->dev.paMax = ctxMain->cfg.qwAddrMax;
+    ctxMain->dev.paMax = ctxMain->cfg.paAddrMax;
     ctxMain->hLC = LcCreateEx(&ctxMain->dev, &pLcErrorInfo);
     if(!ctxMain->hLC) {
 #ifdef _WIN32

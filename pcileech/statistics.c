@@ -168,3 +168,97 @@ VOID PageStatUpdate(_In_opt_ PPAGE_STATISTICS pPageStat, _In_ QWORD qwAddr, _In_
     }
     pPageStat->i.fUpdate = TRUE;
 }
+
+//-----------------------------------------------------------------------------
+// SEARCH STATISTICS BELOW:
+//-----------------------------------------------------------------------------
+
+VOID StatSearch_ShowUpdate(_Inout_ PSTATISTICS_SEARCH ps)
+{
+    QWORD qwTickCountElapsed = max(1, GetTickCount64() - ps->i.qwTickCountStart);
+    QWORD qwSpeed = (ps->ctxs->cbReadTotal / 1024) / qwTickCountElapsed;
+    HANDLE hConsole;
+    CONSOLE_SCREEN_BUFFER_INFO consoleInfo;
+    if(ps->i.fIsFirstPrintCompleted) {
+#ifdef WIN32
+        hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        GetConsoleScreenBufferInfo(hConsole, &consoleInfo);
+        consoleInfo.dwCursorPosition.Y -= 8;
+        SetConsoleCursorPosition(hConsole, consoleInfo.dwCursorPosition);
+#endif /* WIN32 */
+#ifdef LINUX
+        printf("\033[8A"); // move cursor up 8 positions
+#endif /* LINUX */
+    }
+    printf(
+        " Current Action:  %s                    \n" \
+        " PID:             %i                    \n" \
+        " Min Address:     0x%llx                \n" \
+        " Current Address: 0x%llx                \n" \
+        " Max Address:     0x%llx                \n" \
+        " MB Read:         %llu                  \n" \
+        " MB/s:            %llu                  \n" \
+        " Search hits:     %i                    \n",
+        ps->szAction,
+        ctxMain->cfg.dwPID,
+        ps->ctxs->vaMin,
+        ps->ctxs->vaCurrent,
+        ps->ctxs->vaMax,
+        ps->ctxs->cbReadTotal / (1024 * 1204),
+        qwSpeed,
+        ps->ctxs->cResult
+    );
+    ps->i.fIsFirstPrintCompleted = TRUE;
+}
+
+VOID WINAPI StatSearch_ThreadLoop(_In_ PSTATISTICS_SEARCH ps)
+{
+    while(!ps->i.fThreadExit) {
+        Sleep(100);
+        StatSearch_ShowUpdate(ps);
+    }
+    ExitThread(0);
+}
+
+/*
+* Initialize the search statistics. This will also start displaying the search
+* statistics on the screen asynchronously. Call StatSearchClose() to stop.
+* -- ppStatSearch
+* -- ctxs
+* -- szAction
+* -- return
+*/
+_Success_(return)
+BOOL StatSearchInitialize(_Inout_ PSTATISTICS_SEARCH *ppStatSearch, _In_ PVMMDLL_MEM_SEARCH_CONTEXT ctxs, _In_ LPSTR szAction)
+{
+    PSTATISTICS_SEARCH ps;
+    ps = *ppStatSearch = LocalAlloc(LMEM_ZEROINIT, sizeof(STATISTICS_SEARCH));
+    if(!ps) { return FALSE; }
+    ps->ctxs = ctxs;
+    ps->szAction = szAction;
+    ps->i.qwTickCountStart = GetTickCount64();
+    ps->i.hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)StatSearch_ThreadLoop, ps, 0, NULL);
+    return TRUE;
+}
+
+/*
+* Do one last update of the on-screen page statistics.
+* -- ppStatSearch = ptr to the PSTATISTICS_SEARCH struct to close and free.
+*/
+VOID StatSearchClose(_In_opt_ PSTATISTICS_SEARCH *ppStatSearch)
+{
+    BOOL status;
+    DWORD dwExitCode;
+    if(!ppStatSearch || !*ppStatSearch) { return; }
+    (*ppStatSearch)->i.fUpdate = TRUE;
+    (*ppStatSearch)->i.fThreadExit = TRUE;
+    while((status = GetExitCodeThread((*ppStatSearch)->i.hThread, &dwExitCode)) && STILL_ACTIVE == dwExitCode) {
+        SwitchToThread();
+    }
+    if(!status) {
+        Sleep(200);
+    }
+    CloseHandle((*ppStatSearch)->i.hThread);
+    LocalFree(*ppStatSearch);
+    *ppStatSearch = NULL;
+}

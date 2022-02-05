@@ -11,6 +11,13 @@
 * Patch the memory of the target system. Alternatively search the memory of the
 * target system. This includes the unlock operating system functionality.
 */
-VOID ActionPatchAndSearch();
+VOID ActionPatchAndSearchPhysical();
+
+/*
+* Patch the virtual memory of a target system process (Windows only).
+* Alternatively search the memory of the target system process.
+* This includes the unlock operating system functionality.
+*/
+VOID ActionPatchAndSearchVirtual();
 
 #endif /* __MEMPATCH_H__ */

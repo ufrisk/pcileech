@@ -77,7 +77,7 @@ BOOL Util_PageTable_Virtual2Physical(_In_ QWORD qwCR3, _In_ QWORD qwVA, _Out_ PQ
 * -- return
 */
 _Success_(return)
-BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension, _Out_ PSIGNATURE pSignatures, _In_ PDWORD cSignatures, _In_ DWORD cSignatureChunks);
+BOOL Util_LoadSignatures(_In_ LPSTR szSignatureName, _In_ LPSTR szFileExtension, _Out_ PSIGNATURE pSignatures, _Inout_ PDWORD cSignatures, _In_ DWORD cSignatureChunks);
 
 /*
 * Retrieve the full file path to the file name specified. Path is relative to

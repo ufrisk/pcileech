@@ -6,6 +6,8 @@
 #include "mempatch.h"
 #include "device.h"
 #include "util.h"
+#include "vmmx.h"
+#include <vmmdll.h>
 
 _Success_(return)
 BOOL Patch_CmpChunk(_In_ PBYTE pbPage, _In_ PSIGNATURE_CHUNK pChunk, _In_opt_ DWORD dwRelBase, _Out_opt_ PDWORD pdwOffset)
@@ -67,7 +69,7 @@ BOOL Patch_FindAndPatch(_Inout_ PBYTE pbPage, _In_ PSIGNATURE pSignatures, _In_ 
 
 #define MAX_NUM_PATCH_LOCATIONS        0x100
 
-VOID ActionPatchAndSearch()
+VOID ActionPatchAndSearchPhysical()
 {
     PSIGNATURE pSignatures;
     DWORD dwoPatch, cbPatch, cSignatures = CONFIG_MAX_SIGNATURES;
@@ -80,8 +82,8 @@ VOID ActionPatchAndSearch()
     // initialize / allocate memory
     if(!(pSignatures = LocalAlloc(LMEM_ZEROINIT, cSignatures * sizeof(SIGNATURE)))) { goto cleanup; }
     if(!(pbBuffer16M = LocalAlloc(0, 0x01000000))) { goto cleanup; }
-    qwAddrBase = ctxMain->cfg.qwAddrMin;
-    if(ctxMain->cfg.qwAddrMax < qwAddrBase + 0xfff) {
+    qwAddrBase = ctxMain->cfg.paAddrMin;
+    if(ctxMain->cfg.paAddrMax < qwAddrBase + 0xfff) {
         printf("%s: Failed. Zero or negative memory range specified.\n", szAction);
         goto cleanup;
     }
@@ -104,8 +106,8 @@ VOID ActionPatchAndSearch()
         }
     }
     // loop patch / unlock
-    PageStatInitialize(&pPageStat, qwAddrBase, ctxMain->cfg.qwAddrMax, isModePatch ? "Patching" : "Searching", ctxMain->phKMD ? TRUE : FALSE, ctxMain->cfg.fVerbose);
-    for(; qwAddrBase < ctxMain->cfg.qwAddrMax; qwAddrBase += 0x01000000) {
+    PageStatInitialize(&pPageStat, qwAddrBase, ctxMain->cfg.paAddrMax, isModePatch ? "Patching" : "Searching", ctxMain->phKMD ? TRUE : FALSE, ctxMain->cfg.fVerbose);
+    for(; qwAddrBase < ctxMain->cfg.paAddrMax; qwAddrBase += 0x01000000) {
         result = Util_Read16M(pbBuffer16M, qwAddrBase, pPageStat);
         if(!result && !ctxMain->cfg.fForceRW && !ctxMain->phKMD && PCILEECH_DEVICE_EQUALS("usb3380")) {
             // terminate if 16MB cannot be read from the USB3380 device.
@@ -113,7 +115,7 @@ VOID ActionPatchAndSearch()
             printf("%s: Failed. Cannot dump any sequential data in 16MB - terminating.\n", szAction);
             goto cleanup;
         }
-        for(qwoPages = 0; (qwoPages < 0x01000000) && (qwAddrBase + qwoPages < ctxMain->cfg.qwAddrMax); qwoPages += 0x1000) {
+        for(qwoPages = 0; (qwoPages < 0x01000000) && (qwAddrBase + qwoPages < ctxMain->cfg.paAddrMax); qwoPages += 0x1000) {
             result = Patch_FindAndPatch(pbBuffer16M + qwoPages, pSignatures, cSignatures, &dwoPatch, &cbPatch);
             if(!result) {
                 continue;
@@ -152,4 +154,123 @@ cleanup:
     }
     LocalFree(pSignatures);
     LocalFree(pbBuffer16M);
+}
+
+
+typedef struct tdSEARCH_INTERNAL_CONTEXT {
+    DWORD dwPID;
+    BOOL isModePatch;
+    DWORD cSignatures;
+    PSIGNATURE pSignatures;
+    LPSTR szAction;
+    DWORD cPatchList;
+    QWORD qwPatchList[MAX_NUM_PATCH_LOCATIONS];
+} SEARCH_INTERNAL_CONTEXT, *PSEARCH_INTERNAL_CONTEXT;
+
+/*
+* Virtual memory search callback function.
+* -- return: continue_search(TRUE), abort_search(FALSE).
+*/
+BOOL ActionPatchAndSearchVirtual_ResultCB(_In_ PVMMDLL_MEM_SEARCH_CONTEXT ctxs, _In_ QWORD va, _In_ DWORD iSearch)
+{
+    PSEARCH_INTERNAL_CONTEXT ctxi = (PSEARCH_INTERNAL_CONTEXT)ctxs->pvUserPtrOpt;
+    BYTE pbPage[0x1000];
+    BOOL result;
+    QWORD vaPage;
+    DWORD dwoPatch, cbPatch;
+    // 1: fetch page
+    vaPage = va & ~0xfff;
+    if(!VMMDLL_MemRead(ctxi->dwPID, vaPage, pbPage, 0x1000)) {
+        return TRUE;
+    }
+    // 2: patch / unlock (using same methodology as in physical layer)
+    result = Patch_FindAndPatch(pbPage, ctxi->pSignatures + iSearch, 1, &dwoPatch, &cbPatch);
+    if(!result) {
+        return TRUE;
+    }
+    if(ctxi->isModePatch) {
+        result = VMMDLL_MemWrite(ctxi->dwPID, vaPage + dwoPatch, ctxi->pSignatures[iSearch].chunk[2].pb, ctxi->pSignatures[iSearch].chunk[2].cb);
+    }
+    if(result) {
+        if(ctxi->cPatchList == MAX_NUM_PATCH_LOCATIONS) {
+            printf("%s: Failed. More than %i signatures found. Location: 0x%llx\n", ctxi->szAction, MAX_NUM_PATCH_LOCATIONS, vaPage + dwoPatch);
+            return FALSE;
+        }
+        if(ctxi->cPatchList && (ctxi->qwPatchList[ctxi->cPatchList - 1] == vaPage + dwoPatch)) {
+            return TRUE;    // skip if already registered (multiple finds in same page)
+        }
+        ctxi->qwPatchList[ctxi->cPatchList] = vaPage + dwoPatch;
+        ctxi->cPatchList++;
+        ctxs->cResult++;
+    } else {
+        printf("%s: Failed. Write memory failed. Location: 0x%llx\n", ctxi->szAction, vaPage + dwoPatch);
+        return FALSE;
+    }
+    return ctxMain->cfg.fPatchAll;
+}
+
+VOID ActionPatchAndSearchVirtual()
+{
+    DWORD i;
+    BOOL result;
+    PSTATISTICS_SEARCH pStat = NULL;
+    SEARCH_INTERNAL_CONTEXT ctxi = { 0 };
+    VMMDLL_MEM_SEARCH_CONTEXT ctxs = { 0 };
+
+
+    // initialize ctxi (internal context) & allocate memory
+    ctxi.dwPID = ctxMain->cfg.dwPID;
+    ctxi.isModePatch = (ctxMain->cfg.tpAction == PATCH);
+    ctxi.szAction = ctxi.isModePatch ? "Patch" : "Search";
+    ctxi.cSignatures = CONFIG_MAX_SIGNATURES;
+    if(!(ctxi.pSignatures = LocalAlloc(LMEM_ZEROINIT, ctxi.cSignatures * sizeof(SIGNATURE)))) { goto cleanup; }
+
+    // load and verify signatures
+    if(ctxMain->cfg.cbIn) {
+        Util_CreateSignatureSearchAll(ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn, ctxi.pSignatures);
+        ctxi.cSignatures = 1;
+    } else {
+        result = Util_LoadSignatures(ctxMain->cfg.szSignatureName, ".sig", ctxi.pSignatures, &ctxi.cSignatures, 3);
+        if(!result || !ctxi.cSignatures) {
+            printf("%s: Failed. Failed to load signature.\n", ctxi.szAction);
+            goto cleanup;
+        }
+    }
+    if(ctxi.isModePatch) {
+        for(i = 0; i < ctxi.cSignatures; i++) {
+            if(ctxi.pSignatures[i].chunk[2].cb == 0 || ctxi.pSignatures[i].chunk[2].cb > 4096 || ctxi.pSignatures[i].chunk[2].tpOffset == SIGNATURE_CHUNK_TP_OFFSET_ANY) {
+                printf("%s: Failed. Invalid patch signature.\n", ctxi.szAction);
+            }
+        }
+    }
+
+    // initialize VMM/MemProcFS
+    if(!Vmmx_Initialize(TRUE, FALSE)) { goto cleanup; }
+
+    // initialize ctxs (search context)
+    ctxs.dwVersion = VMMDLL_MEM_SEARCH_VERSION;
+    ctxs.cSearch = ctxi.cSignatures;
+    ctxs.vaMin = ctxMain->cfg.vaAddrMin;
+    ctxs.vaMax = ctxMain->cfg.vaAddrMax;
+    for(i = 0; i < ctxi.cSignatures; i++) {
+        ctxs.search[i].cb = min(ctxi.pSignatures[i].chunk[0].cb, sizeof(ctxs.search[i].pb));
+        memcpy(ctxs.search[i].pb, ctxi.pSignatures[i].chunk[0].pb, ctxs.search[i].cb);
+    }
+    ctxs.pvUserPtrOpt = &ctxi;
+    ctxs.pfnResultOptCB = ActionPatchAndSearchVirtual_ResultCB;
+    
+    // perform search
+    StatSearchInitialize(&pStat, &ctxs, ctxi.szAction);
+    VMMDLL_MemSearch(ctxi.dwPID, &ctxs, NULL, NULL);
+    StatSearchClose(&pStat);
+cleanup:
+    if(ctxi.cPatchList) {
+        printf("%s: Successful. Locations:\n", ctxi.szAction);
+        for(i = 0; i < ctxi.cPatchList; i++) {
+            printf(" 0x%llx\n", ctxi.qwPatchList[i]);
+        }
+    } else {
+        printf("%s: Failed. No signature found.\n", ctxi.szAction);
+    }
+    LocalFree(ctxi.pSignatures);
 }

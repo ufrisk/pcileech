@@ -7,7 +7,7 @@
 // (c) Ulf Frisk, 2018-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 4.5
+// Header Version: 4.7.2
 //
 
 #include "leechcore.h"
@@ -29,6 +29,7 @@ typedef unsigned __int64                    QWORD, *PQWORD;
 #ifdef LINUX
 
 #include <inttypes.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #undef EXPORTED_FUNCTION
 #define EXPORTED_FUNCTION                   __attribute__((visibility("default")))
@@ -448,7 +449,7 @@ EXPORTED_FUNCTION _Success_(return)
 BOOL VMMDLL_InitializePlugins();
 
 #define VMMDLL_PLUGIN_CONTEXT_MAGIC                 0xc0ffee663df9301c
-#define VMMDLL_PLUGIN_CONTEXT_VERSION               4
+#define VMMDLL_PLUGIN_CONTEXT_VERSION               5
 #define VMMDLL_PLUGIN_REGINFO_MAGIC                 0xc0ffee663df9301d
 #define VMMDLL_PLUGIN_REGINFO_VERSION               13
 #define VMMDLL_PLUGIN_FORENSIC_JSONDATA_VERSION     0xc0ee0001
@@ -461,7 +462,11 @@ BOOL VMMDLL_InitializePlugins();
 #define VMMDLL_PLUGIN_NOTIFY_FORENSIC_INIT          0x01000100
 #define VMMDLL_PLUGIN_NOTIFY_FORENSIC_INIT_COMPLETE 0x01000200
 
+typedef DWORD                                       VMMDLL_MODULE_ID;
 typedef HANDLE                                      *PVMMDLL_PLUGIN_INTERNAL_CONTEXT;
+
+#define VMMDLL_MID_MAIN                             ((VMMDLL_MODULE_ID)0x80000001)
+#define VMMDLL_MID_PYTHON                           ((VMMDLL_MODULE_ID)0x80000002)
 
 typedef struct tdVMMDLL_PLUGIN_CONTEXT {
     ULONG64 magic;
@@ -473,6 +478,7 @@ typedef struct tdVMMDLL_PLUGIN_CONTEXT {
     LPSTR uszPath;
     PVOID pvReserved1;
     PVMMDLL_PLUGIN_INTERNAL_CONTEXT ctxM;       // optional internal module context.
+    VMMDLL_MODULE_ID MID;
 } VMMDLL_PLUGIN_CONTEXT, *PVMMDLL_PLUGIN_CONTEXT;
 
 typedef struct tdVMMDLL_PLUGIN_FORENSIC_JSONDATA {
@@ -569,6 +575,58 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
         DWORD _Reserved[32];
     } sysinfo;
 } VMMDLL_PLUGIN_REGINFO, *PVMMDLL_PLUGIN_REGINFO;
+
+
+
+//-----------------------------------------------------------------------------
+// VMM LOG FUNCTIONALITY BELOW:
+// It's possible for external code (primarily external plugins) to make use of
+// the MemProcFS logging system.
+// ----------------------------------------------------------------------------
+
+typedef enum tdVMMDLL_LOGLEVEL {
+    VMMDLL_LOGLEVEL_CRITICAL = 1,  // critical stopping error
+    VMMDLL_LOGLEVEL_WARNING  = 2,  // severe warning error
+    VMMDLL_LOGLEVEL_INFO     = 3,  // normal/info message
+    VMMDLL_LOGLEVEL_VERBOSE  = 4,  // verbose message (visible with -v)
+    VMMDLL_LOGLEVEL_DEBUG    = 5,  // debug message (visible with -vv)
+    VMMDLL_LOGLEVEL_TRACE    = 6,  // trace message
+    VMMDLL_LOGLEVEL_NONE     = 7,  // do not use!
+} VMMDLL_LOGLEVEL;
+
+/*
+* Log a message using the internal MemProcFS vmm logging system. Log messages
+* will be displayed/suppressed depending on current logging configuration.
+* -- MID = module id supplied by plugin context PVMMDLL_PLUGIN_CONTEXT or
+*          id given by VMMDLL_MID_*.
+* -- dwLogLevel
+* -- uszFormat
+* -- ...
+*/
+EXPORTED_FUNCTION
+VOID VMMDLL_Log(
+    _In_opt_ VMMDLL_MODULE_ID MID,
+    _In_ VMMDLL_LOGLEVEL dwLogLevel,
+    _In_z_ _Printf_format_string_ LPSTR uszFormat,
+    ...
+);
+
+/*
+* Log a message using the internal MemProcFS vmm logging system. Log messages
+* will be displayed/suppressed depending on current logging configuration.
+* -- MID = module id supplied by plugin context PVMMDLL_PLUGIN_CONTEXT or
+*          id given by VMMDLL_MID_*.
+* -- dwLogLevel
+* -- uszFormat
+* -- arglist
+*/
+EXPORTED_FUNCTION
+VOID VMMDLL_LogEx(
+    _In_opt_ VMMDLL_MODULE_ID MID,
+    _In_ VMMDLL_LOGLEVEL dwLogLevel,
+    _In_z_ _Printf_format_string_ LPSTR uszFormat,
+    va_list arglist
+);
 
 
 
@@ -800,17 +858,20 @@ VOID VMMDLL_Scatter_CloseHandle(_In_opt_ _Post_ptr_invalid_ VMMDLL_SCATTER_HANDL
 #define VMMDLL_MAP_HEAP_VERSION             2
 #define VMMDLL_MAP_THREAD_VERSION           3
 #define VMMDLL_MAP_HANDLE_VERSION           2
-#define VMMDLL_MAP_POOL_VERSION             1
+#define VMMDLL_MAP_POOL_VERSION             2
 #define VMMDLL_MAP_NET_VERSION              3
 #define VMMDLL_MAP_PHYSMEM_VERSION          2
 #define VMMDLL_MAP_USER_VERSION             2
 #define VMMDLL_MAP_SERVICE_VERSION          3
 
 // flags to check for existence in the fPage field of VMMDLL_MAP_PTEENTRY
-#define VMMDLL_MEMMAP_FLAG_PAGE_W          0x0000000000000002
-#define VMMDLL_MEMMAP_FLAG_PAGE_NS         0x0000000000000004
-#define VMMDLL_MEMMAP_FLAG_PAGE_NX         0x8000000000000000
-#define VMMDLL_MEMMAP_FLAG_PAGE_MASK       0x8000000000000006
+#define VMMDLL_MEMMAP_FLAG_PAGE_W           0x0000000000000002
+#define VMMDLL_MEMMAP_FLAG_PAGE_NS          0x0000000000000004
+#define VMMDLL_MEMMAP_FLAG_PAGE_NX          0x8000000000000000
+#define VMMDLL_MEMMAP_FLAG_PAGE_MASK        0x8000000000000006
+
+#define VMMDLL_POOLMAP_FLAG_ALL             0
+#define VMMDLL_POOLMAP_FLAG_BIG             1
 
 typedef enum tdVMMDLL_PTE_TP {
     VMMDLL_PTE_TP_NA = 0,
@@ -1191,7 +1252,8 @@ typedef struct tdVMMDLL_MAP_HANDLE {
 
 typedef struct tdVMMDLL_MAP_POOL {
     DWORD dwVersion;
-    DWORD _Reserved1[7];
+    DWORD _Reserved1[6];
+    DWORD cbTotal;                  // # bytes to represent this pool map object
     PDWORD piTag2Map;               // dword map array (size: cMap): tag index to map index.
     PVMMDLL_MAP_POOLENTRYTAG pTag;  // tag entries.
     DWORD cTag;                     // # tag entries.
@@ -1406,6 +1468,19 @@ EXPORTED_FUNCTION
 _Success_(return) BOOL VMMDLL_Map_GetPool(_Out_writes_bytes_opt_(*pcbPoolMap) PVMMDLL_MAP_POOL pPoolMap, _Inout_ PDWORD pcbPoolMap);
 
 /*
+* Retrieve the pool map - consisting of kernel allocated pool entries.
+* The pool map pMap is sorted by allocation virtual address.
+* The pool map pTag is sorted by pool tag.
+* NB! The pool map may contain both false negatives/positives.
+* CALLER VMMDLL_MemFree: *ppPoolMap
+* -- ppPoolMap = ptr to receive result on success. must be free'd with VMMDLL_MemFree().
+* -- flags = VMMDLL_POOLMAP_FLAG*
+* -- return = success/fail.
+*/
+EXPORTED_FUNCTION
+_Success_(return) BOOL VMMDLL_Map_GetPoolEx(_Out_ PVMMDLL_MAP_POOL* ppPoolMap, _In_ DWORD flags);
+
+/*
 * Retrieve the network connection map - consisting of active network connections,
 * listening sockets and other networking functionality.
 * -- pNetMap = buffer of minimum byte length *pcbNetMap or NULL.
@@ -1438,6 +1513,70 @@ _Success_(return) BOOL VMMDLL_Map_GetUsersW(_Out_writes_bytes_opt_(*pcbUserMap) 
 EXPORTED_FUNCTION
 _Success_(return) BOOL VMMDLL_Map_GetServicesU(_Out_writes_bytes_opt_(*pcbServiceMap) PVMMDLL_MAP_SERVICE pServiceMap, _Inout_ PDWORD pcbServiceMap);
 _Success_(return) BOOL VMMDLL_Map_GetServicesW(_Out_writes_bytes_opt_(*pcbServiceMap) PVMMDLL_MAP_SERVICE pServiceMap, _Inout_ PDWORD pcbServiceMap);
+
+
+
+//-----------------------------------------------------------------------------
+// MEMORY SEARCH FUNCTIONALITY:
+//-----------------------------------------------------------------------------
+
+#define VMMDLL_MEM_SEARCH_VERSION           0xfe3e0002
+#define VMMDLL_MEM_SEARCH_MAX               16
+
+typedef struct tdVMMDLL_MEM_SEARCH_CONTEXT_SEARCHENTRY {
+    DWORD cbAlign;              // byte-align at 2^x - 0, 1, 2, 4, 8, 16, .. bytes.
+    DWORD cb;                   // number of bytes to search (1-32).
+    BYTE pb[32];
+    BYTE pbSkipMask[32];        // skip bitmask '0' = match, '1' = wildcard.
+} VMMDLL_MEM_SEARCH_CONTEXT_SEARCHENTRY, *PVMMDLL_MEM_SEARCH_CONTEXT_SEARCHENTRY;
+
+/*
+* Context to populate and use in the VMMDLL_MemSearch() function.
+*/
+typedef struct tdVMMDLL_MEM_SEARCH_CONTEXT {
+    DWORD dwVersion;
+    DWORD _Filler[2];
+    BOOL fAbortRequested;       // may be set by caller to abort processing prematurely.
+    DWORD cMaxResult;           // # max result entries. '0' = 1 entry. max 0x10000 entries.
+    DWORD cSearch;              // number of valid search entries
+    VMMDLL_MEM_SEARCH_CONTEXT_SEARCHENTRY search[VMMDLL_MEM_SEARCH_MAX];
+    QWORD vaMin;                // min address to search (page-aligned).
+    QWORD vaMax;                // max address to search (page-aligned), if 0 max memory is assumed.
+    QWORD vaCurrent;            // current address (may be read by caller).
+    DWORD _Filler2;
+    DWORD cResult;              // number of search hits.
+    QWORD cbReadTotal;          // total number of bytes read.
+    PVOID pvUserPtrOpt;         // optional pointer set by caller (used for context passing to callbacks)
+    // optional result callback function.
+    // use of callback function disable ordinary result in ppObAddressResult.
+    // return = continue search(TRUE), abort search(FALSE).
+    BOOL(*pfnResultOptCB)(_In_ struct tdVMMDLL_MEM_SEARCH_CONTEXT *ctx, _In_ QWORD va, _In_ DWORD iSearch);
+    // non-recommended features:
+    QWORD ReadFlags;            // read flags as in VMMDLL_FLAG_*
+    BOOL fForcePTE;             // force PTE method for virtual address reads.
+    BOOL fForceVAD;             // force VAD method for virtual address reads.
+    // optional filter callback function for virtual address reads:
+    // for ranges inbetween vaMin:vaMax callback with pte or vad entry.
+    // return: read from range(TRUE), do not read from range(FALSE).
+    BOOL(*pfnFilterOptCB)(_In_ struct tdVMMDLL_MEM_SEARCH_CONTEXT *ctx, _In_opt_ PVMMDLL_MAP_PTEENTRY pePte, _In_opt_ PVMMDLL_MAP_VADENTRY peVad);
+} VMMDLL_MEM_SEARCH_CONTEXT, *PVMMDLL_MEM_SEARCH_CONTEXT;
+
+/*
+* Search for binary data in an address space specified by the supplied context.
+* For more information about the different search parameters please see the
+* struct definition: VMMDLL_MEM_SEARCH_CONTEXT
+* Search may take a long time. It's not recommended to run this interactively.
+* To cancel a search prematurely set the fAbortRequested flag in the context
+* and wait a short while.
+* CALLER FREE: VMMDLL_MemFree(*ppva)
+* -- dwPID
+* -- ctx
+* -- ppva = pointer to receive addresses found. Free'd with VMMDLL_MemFree().
+* -- pcva = pointer to receive number of addresses in ppva. not bytes!
+* -- return
+*/
+EXPORTED_FUNCTION _Success_(return)
+BOOL VMMDLL_MemSearch(_In_ DWORD dwPID, _Inout_ PVMMDLL_MEM_SEARCH_CONTEXT ctx, _Out_opt_ PQWORD *ppva, _Out_opt_ PDWORD pcva);
 
 
 

@@ -46,33 +46,33 @@ VOID Help_ShowGeneral()
         " General syntax: pcileech <command> [-<optionname1> <optionvalue1>] ...        \n" \
         " VALID COMMANDS           MODEs        [ OPTIONS ]    (REQUIREMENTS)           \n" \
         "   info                   NATIVE,KMD                                           \n" \
-        "   dump                   NATIVE,KMD   [ min, max, out ]                       \n" \
-        "   patch                  NATIVE,KMD   [ min, max, sig, all ]                  \n" \
-        "   write                  NATIVE,KMD   [ min, in ]                             \n" \
-        "   search                 NATIVE,KMD   [ min, max, sig, in, all ]              \n" \
-        "   [implant]                     KMD   [ in, out, s, 0..9 ]                    \n" \
-        "   kmdload                NATIVE       [ pt, cr3 ]                             \n" \
+        "   dump                   NATIVE,KMD [ min, max, out ]                         \n" \
+        "   patch                  NATIVE,KMD [ min, max, sig, all, pid,vamin,vamax ]   \n" \
+        "   write                  NATIVE,KMD [ min, in ]                               \n" \
+        "   search                 NATIVE,KMD [ min, max, sig, in, all, pid,vamin,vamax]\n" \
+        "   [implant]                     KMD [ in, out, s, 0..9 ]                      \n" \
+        "   kmdload                NATIVE     [ pt, cr3 ]                               \n" \
         "   kmdexit                       KMD                                           \n" \
-        "   mount                  NATIVE,KMD   [ mount, cr3 ]                          \n" \
-        "   display                NATIVE,KMD   [ min, max ]                            \n" \
-        "   pagedisplay            NATIVE,KMD   [ min ]                                 \n" \
-        "   pt_phys2virt           NATIVE,KMD   [ cr3, 0 ]                              \n" \
-        "   pt_virt2phys           NATIVE,KMD   [ cr3, 0 ]                              \n" \
-        "   testmemread            NATIVE       [ min ]                                 \n" \
-        "   testmemreadwrite       NATIVE       [ min ]                                 \n" \
+        "   mount                  NATIVE,KMD [ mount, cr3 ]                            \n" \
+        "   display                NATIVE,KMD [ min, max, pid,vamin,vamax ]             \n" \
+        "   pagedisplay            NATIVE,KMD [ min, pid,vamin,vamax ]                  \n" \
+        "   pt_phys2virt           NATIVE,KMD [ cr3, 0 ]                                \n" \
+        "   pt_virt2phys           NATIVE,KMD [ cr3, 0 ]                                \n" \
+        "   testmemread            NATIVE     [ min ]                                   \n" \
+        "   testmemreadwrite       NATIVE     [ min ]                                   \n" \
         " Device specific commands and valid MODEs [ and options ] (and device):        \n" \
-        "   tlp                    NATIVE       [ in ]         (FPGA)                   \n" \
-        "   tlploop                NATIVE       [ in ]         (FPGA)                   \n" \
-        "   probe                  NATIVE       [ min, max ]   (FPGA)                   \n" \
-        "   regcfg                 NATIVE       [ in, out, min, max] (FPGA)             \n" \
+        "   tlp                    NATIVE     [ in ]         (FPGA)                     \n" \
+        "   tlploop                NATIVE     [ in ]         (FPGA)                     \n" \
+        "   probe                  NATIVE     [ min, max ]   (FPGA)                     \n" \
+        "   regcfg                 NATIVE     [ in, out, min, max] (FPGA)               \n" \
         "   pslist                 NATIVE                                               \n" \
-        "   psvirt2phys            NATIVE       [ 0, 1 ]                                \n" \
-        "   agent-execpy           NATIVE       [ in, out ]    (Remote LeechAgent)      \n" \
-        "   agent-forensic         NATIVE       [ out ]        (Remote LeechAgent)      \n" \
+        "   psvirt2phys            NATIVE     [ 0, 1 ]                                  \n" \
+        "   agent-execpy           NATIVE     [ in, out ]    (Remote LeechAgent)        \n" \
+        "   agent-forensic         NATIVE     [ out ]        (Remote LeechAgent)        \n" \
         " System specific commands and valid MODEs [ and options ]:                     \n" \
-        "   mac_fvrecover          NATIVE                      (USB3380)                \n" \
-        "   mac_fvrecover2         NATIVE                      (USB3380)                \n" \
-        "   mac_disablevtd         NATIVE                      (USB3380)                \n" \
+        "   mac_fvrecover          NATIVE                    (USB3380)                  \n" \
+        "   mac_fvrecover2         NATIVE                    (USB3380)                  \n" \
+        "   mac_disablevtd         NATIVE                    (USB3380)                  \n" \
         " External plugin commands:                                                     \n");
     ShowListFiles("leechp_*"PCILEECH_LIBRARY_FILETYPE, 3, 7, (DWORD)strlen(PCILEECH_LIBRARY_FILETYPE));
     printf(
@@ -97,6 +97,12 @@ VOID Help_ShowGeneral()
         "          No output file will be created if parameter is set to none or null.  \n" \
         "   -all : search all memory for signature - do not stop at first occurrence.   \n" \
         "          Option has no value. Example: -all                                   \n" \
+        "   -pid : windows process id for virtual address mode for select commands.     \n" \
+        "          Option has no default value. Example: -pid 4                         \n" \
+        "   -vamin: virtual memory min address for select commands. Require -pid option.\n" \
+        "          default: 0. Example: -vamin 0x10000                                  \n" \
+        "   -vamax: virtual memory max address for select commands. Require -pid option.\n" \
+        "          default: 0xffffffffffffffff. Example: -vamax 0x7fffffffffff          \n" \
         "   -v   : verbose option. Additional information is displayed in the output.   \n" \
         "          Affects all modes and commands. Option has no value. Example: -v     \n" \
         "   -vv  : extra verbose option. More detailed additional information is shown  \n" \
@@ -161,13 +167,13 @@ VOID Help_ShowInfo()
 {
     printf(
         " PCILEECH INFORMATION                                                          \n" \
-        " PCILeech (c) 2016-2021 Ulf Frisk                                              \n" \
+        " PCILeech (c) 2016-2022 Ulf Frisk                                              \n" \
         " Version: " \
         VER_FILE_VERSION_STR "\n" \
         "                                                                               \n" \
         " License: GNU Affero General Public License v3.0                               \n" \
         " Contact information: pcileech@frizk.net                                       \n" \
-        " System requirements: 64-bit Windows 7, 10 or Linux.                           \n" \
+        " System requirements: 64-bit Windows 10, 11 or Linux.                          \n" \
         " Other project references:                                                     \n" \
         "   PCILeech          - https://github.com/ufrisk/pcileech                      \n" \
         "   PCILeech-FPGA     - https://github.com/ufrisk/pcileech-fpga                 \n" \
@@ -277,7 +283,7 @@ VOID Help_ShowDetailed()
         printf(
             " WRITE DATA TO TARGET SYSTEM MEMORY.                                           \n" \
             " MODES   : NATIVE, KMD                                                         \n" \
-            " OPTIONS : -min, -in, -force                                                   \n" \
+            " OPTIONS : -min, -in, -force, -pid, -vamin, -vamax                             \n" \
             " WRITE will write contents specified in the -in option to the memory address   \n" \
             " specified by the -min option. The memory address may be unaligned. It is also \n" \
             " possible to try to write to non-accessible memory - such as PCIe memory mapped\n" \
@@ -290,13 +296,15 @@ VOID Help_ShowDetailed()
             " 2) write contents in the file replace.bin to the address 0x140000000          \n" \
             "    pcileech write -min 0x140000000 -in replace.bin -kmd 0x7fffe000            \n" \
             " 3) write the bytes 11223344 to the protected address 0xfffe0008               \n" \
-            "    pcileech write -min 0xfffe0008 -in 11223344 -force                         \n");
+            "    pcileech write -min 0xfffe0008 -in 11223344 -force                         \n" \
+            " 4) write the bytes 33445566 to the virtual address 7fef9c00000 (pid 1240)     \n" \
+            "    pcileech write -pid 1240 -vamin 7fef9c00000 -in 33445566                   \n");
         break;
     case PATCH:
         printf(
             " PATCH THE MEMORY OF THE TARGET SYSTEM.                                        \n" \
             " MODES   : NATIVE, KMD                                                         \n" \
-            " OPTIONS : -min, -max, -sig, -all, -force                                      \n" \
+            " OPTIONS : -min, -max, -sig, -all, -force, -pid, -vamin, -vamax                \n" \
             " Patch loads one or several signatures from the .sig file specified in the -sig\n" \
             " option. The -sig option should be specified without file extension. The memory\n" \
             " is scanned until the first signature match is made. The memory is then patched\n" \
@@ -310,14 +318,16 @@ VOID Help_ShowDetailed()
             "    pcileech patch -sig unlock_win10x64                                        \n" \
             " 2) patch the memory with the unlock_win10x64 signature (kmd loaded)           \n" \
             "    pcileech patch -sig unlock_win10x64 -kmd 0x7fffe000                        \n" \
-            " 3) patch all occurences with the patch_test signature                         \n" \
+            " 3) patch the memory with the unlock_win10x64 targeting pid 344 (winlogon.exe) \n" \
+            "    pcileech patch -sig unlock_win10x64 -pid 344                               \n" \
+            " 4) patch all occurences with the patch_test signature                         \n" \
             "    pcileech patch -sig patch_test -kmd 0x7fffe000 -all                        \n");
         break;
     case SEARCH:
         printf(
             " SEARCH THE MEMORY OF THE TARGET SYSTEM FOR THE GIVEN SIGNATURE.               \n" \
             " MODES   : NATIVE, KMD                                                         \n" \
-            " OPTIONS : -min, -max, -sig, -in, -all, -force                                 \n" \
+            " OPTIONS : -min, -max, -sig, -in, -all, -force, -pid, -vamin, -vamax           \n" \
             " Search the memory for signatures specified in the -sig or -in options. If the \n" \
             " -sig option is specified signatures are loaded from the signature file and are\n" \
             " search for at their fixed page offsets. If the signature is specified with the\n" \
@@ -334,9 +344,11 @@ VOID Help_ShowDetailed()
             "    pcileech search -sig unlock_win10x64 -all                                  \n" \
             " 3) search for all unlock_win10x64 locations by using a kernel module.         \n" \
             "    pcileech search -sig unlock_win10x64 -all -kmd 0x7fffe000                  \n" \
-            " 3) search for all locations that contain the pattern 444d4152.                \n" \
+            " 4) search for all unlock_win10x64 targeting pid 344 (winlogon.exe)            \n" \
+            "    pcileech search -sig unlock_win10x64 -all -pid 344                         \n" \
+            " 5) search for all locations that contain the pattern 444d4152.                \n" \
             "    pcileech search -in 444d4152 -all -kmd 0x7fffe000                          \n" \
-            " 4) search for the first location containing the pattern in the file pat.bin.  \n" \
+            " 6) search for the first location containing the pattern in the file pat.bin.  \n" \
             "    pcileech search -in pat.bin -all -kmd 0x7fffe000                           \n");
         break;
     case MOUNT:
@@ -381,7 +393,7 @@ VOID Help_ShowDetailed()
         printf(
             " DISPLAY MEMORY ON SCREEN.                                                     \n" \
             " MODES   : NATIVE, KMD                                                         \n" \
-            " OPTIONS : -min, -max (optional)                                               \n" \
+            " OPTIONS : -min, -max (optional), -pid, -vamin, -vamax                         \n" \
             " The memory contents between min and max is shown on screen.                   \n" \
             " Use the -min option to specify the memory location.                           \n" \
             " EXAMPLES:      (example kernel module is loaded at address 0x7fffe000)        \n" \
@@ -390,13 +402,15 @@ VOID Help_ShowDetailed()
             " 2) display memory between 0x1000 and 0x2fff.                                  \n" \
             "    pcileech display -min 0x1000 -max 0x2fff                                   \n" \
             " 3) display memory starting at physical address 0x140000000 (5GB).             \n" \
-            "    pcileech display -min 0x140000000 -kmd 0x7fffe000                          \n");
+            "    pcileech display -min 0x140000000 -kmd 0x7fffe000                          \n" \
+            " 4) display memory starting at virtual address 0x7fefd360000 in pid 1240       \n" \
+            "    pcileech display -pid 1240 -vamin 0x7fefd360000                            \n");
         break;
     case PAGEDISPLAY:
         printf(
             " DISPLAY A MEMORY PAGE ON SCREEN.                                              \n" \
-            " MODES   : NATIVE, KMD                                                            \n" \
-            " OPTIONS : -min                                                                \n" \
+            " MODES   : NATIVE, KMD                                                         \n" \
+            " OPTIONS : -min, -pid, -vamin, -vamax                                          \n" \
             " The memory contents of a single page (4096 bytes) is shown on screen. Use the \n" \
             " -min option to specify the memory location. If the -min option is not aligned \n" \
             " the specified memory address will be truncated. It is also possible to force  \n" \
@@ -407,7 +421,9 @@ VOID Help_ShowDetailed()
             " 2) display the normally restricted page at physical address 0xf0000.          \n" \
             "    pcileech pagedisplay -min 0xf0000 -force                                   \n" \
             " 3) display the page at address 0x140000000 (5GB).                             \n" \
-            "    pcileech pagedisplay -min 0x140000000 -kmd 0x7fffe000                      \n");
+            "    pcileech pagedisplay -min 0x140000000 -kmd 0x7fffe000                      \n" \
+            " 4) display the page at virtual address 0x7fefd360000 in pid 1240              \n" \
+            "    pcileech pagedisplay -pid 1240 -vamin 0x7fefd360000                        \n");
         break;
     case TESTMEMREAD:
     case TESTMEMREADWRITE:

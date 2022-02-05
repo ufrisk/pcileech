@@ -272,7 +272,7 @@ POB_DATA _ObSet_GetAll(_In_ POB_SET pvs)
 {
     DWORD iValue;
     POB_DATA pObData;
-    if(!(pObData = Ob_Alloc(OB_TAG_CORE_DATA, 0, sizeof(OB_DATA) + (pvs->c - 1) * sizeof(QWORD), NULL, NULL))) { return NULL; }
+    if(!(pObData = Ob_Alloc(OB_TAG_CORE_DATA, 0, sizeof(OB) + (pvs->c - 1) * sizeof(QWORD), NULL, NULL))) { return NULL; }
     for(iValue = pvs->c - 1; iValue; iValue--) {
         pObData->pqw[iValue - 1] = _ObSet_GetValueFromIndex(pvs, iValue);
     }

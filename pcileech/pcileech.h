@@ -3,7 +3,7 @@
 // (c) Ulf Frisk, 2016-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 4.5
+// Header Version: 4.14
 //
 #ifndef __PCILEECH_H__
 #define __PCILEECH_H__
@@ -69,11 +69,11 @@ typedef struct tdCONFIG_OPTION {
 } CONFIG_OPTION;
 
 typedef struct tdConfig {
-    QWORD qwAddrMin;
-    QWORD qwAddrMax;
-    QWORD qwCR3;
-    QWORD qwEFI_IBI_SYST;
-    QWORD qwKMD;
+    QWORD paAddrMin;
+    QWORD paAddrMax;
+    QWORD paCR3;
+    QWORD paEFI_IBI_SYST;
+    QWORD paKMD;
     CHAR szDevice[MAX_PATH];
     CHAR szRemote[MAX_PATH];
     CHAR szMemMap[MAX_PATH];
@@ -91,6 +91,10 @@ typedef struct tdConfig {
     CHAR szHook[MAX_PATH];
     DWORD dwListenTlpTimeMs;
     CHAR szExternalCommandModule[MAX_PATH];
+    // virtual address options
+    DWORD dwPID;
+    QWORD vaAddrMin;
+    QWORD vaAddrMax;
     // flags below
     BOOL fPageTableScan;
     BOOL fPatchAll;

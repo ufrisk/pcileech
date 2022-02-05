@@ -79,7 +79,7 @@ _Success_(return)
 BOOL KMD_FindSignature1(_Inout_ PSIGNATURE pSignatures, _In_ DWORD cSignatures, _Out_ PDWORD pdwSignatureMatchIdx)
 {
     BOOL result = FALSE;
-    QWORD i, qwAddrMax, qwAddrCurrent = max(0x100000, ctxMain->cfg.qwAddrMin);
+    QWORD i, qwAddrMax, qwAddrCurrent = max(0x100000, ctxMain->cfg.paAddrMin);
     PBYTE pbBuffer8M = NULL;
     PPAGE_STATISTICS pPageStat = NULL;
     // special case (fixed memory location && zero signature byte length)
@@ -93,7 +93,7 @@ BOOL KMD_FindSignature1(_Inout_ PSIGNATURE pSignatures, _In_ DWORD cSignatures, 
     // initialize / allocate memory / load signatures
     if(!(pbBuffer8M = LocalAlloc(0, 0x800000))) { goto cleanup; }
     // loop kmd-find
-    qwAddrMax = min(ctxMain->cfg.qwAddrMax, ctxMain->dev.paMax);
+    qwAddrMax = min(ctxMain->cfg.paAddrMax, ctxMain->dev.paMax);
     if(!PageStatInitialize(&pPageStat, qwAddrCurrent, qwAddrMax, "Searching for KMD location", FALSE, FALSE)) { goto cleanup; }
     while(qwAddrCurrent < qwAddrMax) {
         pPageStat->qwAddr = qwAddrCurrent;
@@ -124,25 +124,25 @@ BOOL KMD_FindSignature_EfiRuntimeServices(_Out_ PQWORD pqwAddrPhys)
     PBYTE pbBuffer16M = NULL;
     if(!(pbBuffer16M = LocalAlloc(0, 0x01000000))) { goto cleanup; }
     // Option 1: User-supplied efibase option (= base of EFI RUNTIME SERVICES table (RUNTSERV)).
-    if(ctxMain->cfg.qwEFI_IBI_SYST) { // technically not EFI_IBI_SYST table but we use this user-supplied option anyway here.
+    if(ctxMain->cfg.paEFI_IBI_SYST) { // technically not EFI_IBI_SYST table but we use this user-supplied option anyway here.
         result =
-            ((ctxMain->cfg.qwEFI_IBI_SYST & 0xfff) > 0x18) &&
-            ((ctxMain->cfg.qwEFI_IBI_SYST & 0xfff) < (0x1000 - 0x88)) &&
-            DeviceReadMEM(ctxMain->cfg.qwEFI_IBI_SYST & ~0xfff, 0x1000, pbBuffer16M, TRUE) &&
-            IS_SIGNATURE_EFI_RUNTIME_SERVICES(pbBuffer16M + (ctxMain->cfg.qwEFI_IBI_SYST & 0xfff));
+            ((ctxMain->cfg.paEFI_IBI_SYST & 0xfff) > 0x18) &&
+            ((ctxMain->cfg.paEFI_IBI_SYST & 0xfff) < (0x1000 - 0x88)) &&
+            DeviceReadMEM(ctxMain->cfg.paEFI_IBI_SYST & ~0xfff, 0x1000, pbBuffer16M, TRUE) &&
+            IS_SIGNATURE_EFI_RUNTIME_SERVICES(pbBuffer16M + (ctxMain->cfg.paEFI_IBI_SYST & 0xfff));
         LocalFree(pbBuffer16M);
-        *pqwAddrPhys = ctxMain->cfg.qwEFI_IBI_SYST;
+        *pqwAddrPhys = ctxMain->cfg.paEFI_IBI_SYST;
         return result;
     }
     // Option 2: Scan for EFI RUNTIME SERVICES table (RUNTSERV).
-    ctxMain->cfg.qwAddrMin &= ~0xfff;
-    ctxMain->cfg.qwAddrMax = (ctxMain->cfg.qwAddrMax + 1) & ~0xfff;
-    if(ctxMain->cfg.qwAddrMax == 0) {
-        ctxMain->cfg.qwAddrMax = 0x100000000;
+    ctxMain->cfg.paAddrMin &= ~0xfff;
+    ctxMain->cfg.paAddrMax = (ctxMain->cfg.paAddrMax + 1) & ~0xfff;
+    if(ctxMain->cfg.paAddrMax == 0) {
+        ctxMain->cfg.paAddrMax = 0x100000000;
     }
-    qwCurrentAddress = ctxMain->cfg.qwAddrMin;
-    if(!PageStatInitialize(&pPageStat, ctxMain->cfg.qwAddrMin, ctxMain->cfg.qwAddrMax, "Searching for EFI Runtime Services", ctxMain->phKMD ? TRUE : FALSE, ctxMain->cfg.fVerbose)) { goto cleanup; }
-    while(qwCurrentAddress < ctxMain->cfg.qwAddrMax) {
+    qwCurrentAddress = ctxMain->cfg.paAddrMin;
+    if(!PageStatInitialize(&pPageStat, ctxMain->cfg.paAddrMin, ctxMain->cfg.paAddrMax, "Searching for EFI Runtime Services", ctxMain->phKMD ? TRUE : FALSE, ctxMain->cfg.fVerbose)) { goto cleanup; }
+    while(qwCurrentAddress < ctxMain->cfg.paAddrMax) {
         result = Util_Read16M(pbBuffer16M, qwCurrentAddress, pPageStat);
         if(!result && !ctxMain->cfg.fForceRW && !ctxMain->phKMD) {
             goto cleanup;
@@ -428,7 +428,7 @@ QWORD KMD_Linux48KernelBaseSeek()
     memset(pbCMPcc, 0xcc, 0x400);
     memset(pbCMP90, 0x90, 0x400);
     memset(pbCMP00, 0x00, 0x100);
-    qwA = max(0x01000000, ctxMain->cfg.qwAddrMin) & 0xffffffffffe00000;
+    qwA = max(0x01000000, ctxMain->cfg.paAddrMin) & 0xffffffffffe00000;
     qwAddrMax = max(0x01000000, (ctxMain->dev.paMax - 0x01000000) & 0xffffffffffe00000);
     if(!PageStatInitialize(&pPageStat, qwA, qwAddrMax, "Scanning for Linux kernel base", FALSE, FALSE)) { return 0; }
     // Linux kernel uses 2MB pages. Base of kernel is assumed to have AuthenticAMD and GenuineIntel strings
@@ -651,8 +651,8 @@ BOOL KMDOpen_UEFI_FindEfiBase()
     printf("KMD: Searching for EFI BASE (no -efibase parameter supplied).\n");
     // initialize & allocate memory
     if(!(pb = LocalAlloc(0, 0x00100000))) { goto fail; }
-    dwAddrCurrent = SIZE_PAGE_ALIGN_4K(ctxMain->cfg.qwAddrMin);
-    dwAddrMax = max(0xffffffff, SIZE_PAGE_ALIGN_4K(ctxMain->cfg.qwAddrMax) - 1);
+    dwAddrCurrent = SIZE_PAGE_ALIGN_4K(ctxMain->cfg.paAddrMin);
+    dwAddrMax = max(0xffffffff, SIZE_PAGE_ALIGN_4K(ctxMain->cfg.paAddrMax) - 1);
     if(!PageStatInitialize(&pPageStat, dwAddrCurrent, dwAddrMax, "Searching for EFI BASE", FALSE, FALSE)) { goto fail; }
     // loop EFI BASE (IBI SYST) find
     while(dwAddrCurrent <= dwAddrMax - 0x100000) {
@@ -663,7 +663,7 @@ BOOL KMDOpen_UEFI_FindEfiBase()
                 qwAddr_RUNTSERV = *(PQWORD)(pb + o + 0x58);
                 if((qwAddr_BOOTSERV & 0xffffffff00000007) || (qwAddr_RUNTSERV & 0xffffffff00000007)) { continue; }
                 if(!(qwAddr_BOOTSERV & 0xfffffff8) || !(qwAddr_RUNTSERV & 0xfffffff8)) { continue; }
-                ctxMain->cfg.qwEFI_IBI_SYST = dwAddrCurrent + o;
+                ctxMain->cfg.paEFI_IBI_SYST = dwAddrCurrent + o;
                 pPageStat->szAction = "Waiting for KMD to activate";
                 PageStatClose(&pPageStat);
                 LocalFree(pb);
@@ -692,21 +692,21 @@ BOOL KMDOpen_UEFI(_In_ BYTE bOffsetHookBootServices)
     //------------------------------------------------
     // 1: Fetch IBI_SYST and BOOTSERV tables
     //------------------------------------------------
-    if(!ctxMain->cfg.qwEFI_IBI_SYST) {
+    if(!ctxMain->cfg.paEFI_IBI_SYST) {
         result = KMDOpen_UEFI_FindEfiBase();
         if(!result) {
             printf("KMD: Failed. EFI system table not found.\n");
             return FALSE;
         }
     }
-    result = DeviceReadDMA_Retry(ctxMain->hLC, ctxMain->cfg.qwEFI_IBI_SYST & ~0xfff, 0x2000, pb);
-    result = result && (0x5453595320494249 == *(PQWORD)(pb + (ctxMain->cfg.qwEFI_IBI_SYST & 0xfff)));
-    qwAddrEFI_BOOTSERV = *(PQWORD)(pb + (ctxMain->cfg.qwEFI_IBI_SYST & 0xfff) + 0x60);
-    qwAddrEFI_RUNTSERV = *(PQWORD)(pb + (ctxMain->cfg.qwEFI_IBI_SYST & 0xfff) + 0x58);
+    result = DeviceReadDMA_Retry(ctxMain->hLC, ctxMain->cfg.paEFI_IBI_SYST & ~0xfff, 0x2000, pb);
+    result = result && (0x5453595320494249 == *(PQWORD)(pb + (ctxMain->cfg.paEFI_IBI_SYST & 0xfff)));
+    qwAddrEFI_BOOTSERV = *(PQWORD)(pb + (ctxMain->cfg.paEFI_IBI_SYST & 0xfff) + 0x60);
+    qwAddrEFI_RUNTSERV = *(PQWORD)(pb + (ctxMain->cfg.paEFI_IBI_SYST & 0xfff) + 0x58);
     result = result && qwAddrEFI_RUNTSERV && (0 == (qwAddrEFI_RUNTSERV & 0xffffffff00000007));
     result = result && qwAddrEFI_BOOTSERV && (0 == (qwAddrEFI_BOOTSERV & 0xffffffff00000007));
     if(!result) {
-        printf("KMD: Failed. Error reading or interpreting memory #1 at: 0x%llx\n", ctxMain->cfg.qwEFI_IBI_SYST);
+        printf("KMD: Failed. Error reading or interpreting memory #1 at: 0x%llx\n", ctxMain->cfg.paEFI_IBI_SYST);
         return FALSE;
     }
     result = LcRead(ctxMain->hLC, qwAddrEFI_BOOTSERV & ~0xfff, 0x2000, pb);
@@ -714,7 +714,7 @@ BOOL KMDOpen_UEFI(_In_ BYTE bOffsetHookBootServices)
     qwAddrHookedFunction = *(PQWORD)(pb + (qwAddrEFI_BOOTSERV & 0xfff) + bOffsetHookBootServices);
     result = result && qwAddrHookedFunction && (0 == (qwAddrHookedFunction & 0xffffffff00000000));
     if(!result) {
-        printf("KMD: Failed. Error reading or interpreting memory #2 at: 0x%llx :: 0x%llx\n", ctxMain->cfg.qwEFI_IBI_SYST, qwAddrEFI_BOOTSERV);
+        printf("KMD: Failed. Error reading or interpreting memory #2 at: 0x%llx :: 0x%llx\n", ctxMain->cfg.paEFI_IBI_SYST, qwAddrEFI_BOOTSERV);
         return FALSE;
     }
     //------------------------------------------------
@@ -722,14 +722,14 @@ BOOL KMDOpen_UEFI(_In_ BYTE bOffsetHookBootServices)
     //------------------------------------------------
     memset(pb, 0, 0x2000);
     Util_ParseHexFileBuiltin("DEFAULT_UEFI_X64", pb + 0x1000, 0x1000, &cb);
-    *(PDWORD)(pb + 0x1004) = (DWORD)ctxMain->cfg.qwEFI_IBI_SYST;
+    *(PDWORD)(pb + 0x1004) = (DWORD)ctxMain->cfg.paEFI_IBI_SYST;
     *(PDWORD)(pb + 0x1008) = (DWORD)(qwAddrEFI_BOOTSERV + bOffsetHookBootServices);
     *(PDWORD)(pb + 0x100C) = (DWORD)qwAddrHookedFunction;
     //------------------------------------------------
     // 3: Patch
     //------------------------------------------------
     if(ctxMain->cfg.fVerbose) {
-        printf("INFO: IBI SYST:   0x%08x\n", (DWORD)ctxMain->cfg.qwEFI_IBI_SYST);
+        printf("INFO: IBI SYST:   0x%08x\n", (DWORD)ctxMain->cfg.paEFI_IBI_SYST);
         printf("INFO: BOOTSERV:   0x%08x\n", (DWORD)qwAddrEFI_BOOTSERV);
     }
     result = DeviceWriteDMA_Retry(ctxMain->hLC, qwAddrKMDDATA, 0x2000, pb);
@@ -939,7 +939,7 @@ success_kmd_load:
         KMDClose();
         goto fail;
     }
-    ctxMain->cfg.qwKMD = ctxMain->phKMD->dwPageAddr32;
+    ctxMain->cfg.paKMD = ctxMain->phKMD->dwPageAddr32;
     if(ctxMain->pk->MAGIC != KMDDATA_MAGIC) {
         ctxMain->pk->MAGIC = KMDDATA_MAGIC;
         LcWrite(ctxMain->hLC, ctxMain->phKMD->dwPageAddr32, sizeof(QWORD), ctxMain->phKMD->pbPageData);
@@ -1082,7 +1082,7 @@ BOOL KMDOpen_WINX64_3_VMM()
         KMDClose();
         goto fail_hookrestore;
     }
-    ctxMain->cfg.qwKMD = ctxMain->phKMD->dwPageAddr32;
+    ctxMain->cfg.paKMD = ctxMain->phKMD->dwPageAddr32;
     if(ctxMain->pk->MAGIC != KMDDATA_MAGIC) {
         ctxMain->pk->MAGIC = KMDDATA_MAGIC;
         LcWrite(ctxMain->hLC, ctxMain->phKMD->dwPageAddr32, sizeof(QWORD), ctxMain->phKMD->pbPageData);
@@ -1285,8 +1285,8 @@ BOOL KMD_GetPhysicalMemoryMap()
     qwMaxMemoryAddress = ctxMain->phKMD->pPhysicalMap[ctxMain->phKMD->cPhysicalMap - 1].BaseAddress;
     qwMaxMemoryAddress += ctxMain->phKMD->pPhysicalMap[ctxMain->phKMD->cPhysicalMap - 1].NumberOfBytes;
     if(qwMaxMemoryAddress > 0x0000ffffffffffff) { return FALSE; }
-    if((ctxMain->cfg.qwAddrMax == 0) || (ctxMain->cfg.qwAddrMax > qwMaxMemoryAddress)) {
-        ctxMain->cfg.qwAddrMax = qwMaxMemoryAddress - 1;
+    if((ctxMain->cfg.paAddrMax == 0) || (ctxMain->cfg.paAddrMax > qwMaxMemoryAddress)) {
+        ctxMain->cfg.paAddrMax = qwMaxMemoryAddress - 1;
     }
     if(ctxMain->cfg.fVerbose) {
         KMD_PhysicalMemoryMapDisplay(ctxMain->phKMD);
@@ -1322,7 +1322,7 @@ BOOL KMD_SetupStage3(_In_ DWORD dwPhysicalAddress, _In_ PBYTE pbStage3, _In_ DWO
         KMDClose();
         return FALSE;
     }
-    ctxMain->cfg.qwKMD = ctxMain->phKMD->dwPageAddr32;
+    ctxMain->cfg.paKMD = ctxMain->phKMD->dwPageAddr32;
     if(ctxMain->pk->MAGIC != KMDDATA_MAGIC) {
         ctxMain->pk->MAGIC = KMDDATA_MAGIC;
         LcWrite(ctxMain->hLC, ctxMain->phKMD->dwPageAddr32, sizeof(QWORD), ctxMain->phKMD->pbPageData);
@@ -1525,7 +1525,7 @@ fail:
 _Success_(return)
 BOOL KMDOpen_PageTableHijack()
 {
-    QWORD qwCR3 = ctxMain->cfg.qwCR3;
+    QWORD qwCR3 = ctxMain->cfg.paCR3;
     QWORD qwModuleBase;
     PSIGNATURE pSignature, pSignatures = NULL;
     DWORD cSignatures = CONFIG_MAX_SIGNATURES;
@@ -1670,7 +1670,7 @@ BOOL KMDOpen_LoadExisting()
     //------------------------------------------------
     ctxMain->phKMD = (PKMDHANDLE)LocalAlloc(LMEM_ZEROINIT, sizeof(KMDHANDLE));
     if(!ctxMain->phKMD) { return FALSE; }
-    ctxMain->phKMD->dwPageAddr32 = (DWORD)ctxMain->cfg.qwKMD;
+    ctxMain->phKMD->dwPageAddr32 = (DWORD)ctxMain->cfg.paKMD;
     ctxMain->pk = ctxMain->phKMD->pk = (PKMDDATA)ctxMain->phKMD->pbPageData;
     if(!DeviceReadDMA_Retry(ctxMain->hLC, ctxMain->phKMD->dwPageAddr32, 4096, ctxMain->phKMD->pbPageData)) {
         printf("KMD: Failed. Read failed @ address: 0x%08x\n", ctxMain->phKMD->dwPageAddr32);
@@ -1699,9 +1699,9 @@ fail:
 _Success_(return)
 BOOL KMDOpen()
 {
-    if(ctxMain->cfg.qwKMD) {
+    if(ctxMain->cfg.paKMD) {
         return KMDOpen_LoadExisting();
-    } else if(ctxMain->cfg.qwCR3 || ctxMain->cfg.fPageTableScan) {
+    } else if(ctxMain->cfg.paCR3 || ctxMain->cfg.fPageTableScan) {
         return KMDOpen_PageTableHijack();
     } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "WIN10_X64")) {
         return KMDOpen_HalHijack();

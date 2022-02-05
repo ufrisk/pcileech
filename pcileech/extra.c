@@ -185,7 +185,7 @@ VOID Action_PT_Phys2Virt()
     BOOL result;
     QWORD qwVA, qwPTE, qwPDE, qwPDPTE, qwPML4E;
     printf("PT_PHYS2VIRT: searching ... (this may take some time).\n");
-    result = Util_PageTable_FindMappedAddress(ctxMain->cfg.qwCR3, ctxMain->cfg.qwDataIn[0], &qwVA, &qwPTE, &qwPDE, &qwPDPTE, &qwPML4E);
+    result = Util_PageTable_FindMappedAddress(ctxMain->cfg.paCR3, ctxMain->cfg.qwDataIn[0], &qwVA, &qwPTE, &qwPDE, &qwPDPTE, &qwPML4E);
     if(result) {
         printf("PT_PHYS2VIRT: finished.\n");
         printf("          0x00000000FFFFFFFF\n");
@@ -204,7 +204,7 @@ VOID Action_PT_Virt2Phys()
 {
     BOOL result;
     QWORD qwPA, qwPageBase, qwPageSize;
-    result = Util_PageTable_Virtual2Physical(ctxMain->cfg.qwCR3, ctxMain->cfg.qwDataIn[0], &qwPA, &qwPageBase, &qwPageSize);
+    result = Util_PageTable_Virtual2Physical(ctxMain->cfg.paCR3, ctxMain->cfg.qwDataIn[0], &qwPA, &qwPageBase, &qwPageSize);
     if(result) {
         printf("PT_VIRT2PHYS: Successful.\n");
         printf("               0x00000000FFFFFFFF\n");
@@ -212,7 +212,7 @@ VOID Action_PT_Virt2Phys()
         printf("   PA:         0x%016llx\n", qwPA);
         printf("   PG SIZE:    0x%016llx\n", qwPageSize);
         printf("   PG BASE PA: 0x%016llx\n", qwPageBase);
-        printf("   CR3/PML4:   0x%016llx\n", ctxMain->cfg.qwCR3);
+        printf("   CR3/PML4:   0x%016llx\n", ctxMain->cfg.paCR3);
     } else {
         printf("PT_VIRT2PHYS: Failed.\n");
     }
@@ -301,13 +301,13 @@ VOID Action_RegCfgReadWrite()
     PBYTE pbLcCfgSpace4096 = NULL;
     if(ctxMain->cfg.cbIn) {
         // WRITE mode:
-        if((ctxMain->cfg.qwAddrMin > 0x1000) || (ctxMain->cfg.qwAddrMin + ctxMain->cfg.cbIn > 0x1000)) {
+        if((ctxMain->cfg.paAddrMin > 0x1000) || (ctxMain->cfg.paAddrMin + ctxMain->cfg.cbIn > 0x1000)) {
             printf("REGCFG: Write failed outside FPGA PCIe shadow configuration space (0x1000).\n");
             return;
         }
         fResult = LcCommand(
             ctxMain->hLC,
-            LC_CMD_FPGA_CFGSPACE_SHADOW_WR | ctxMain->cfg.qwAddrMin,
+            LC_CMD_FPGA_CFGSPACE_SHADOW_WR | ctxMain->cfg.paAddrMin,
             (DWORD)ctxMain->cfg.cbIn,
             ctxMain->cfg.pbIn,
             NULL,
@@ -350,16 +350,16 @@ VOID Action_RegCfgReadWrite()
         }
         printf("REGCFG: Wrote %i bytes to file %s.\n", 0x1000, ctxMain->cfg.szFileOut);
     }
-    if(ctxMain->cfg.qwAddrMin < 0x1000) {
+    if(ctxMain->cfg.paAddrMin < 0x1000) {
         // print to screen
         printf("REGCFG: Please see result below: \n================================ \n");
-        if((ctxMain->cfg.qwAddrMin > ctxMain->cfg.qwAddrMax) || (ctxMain->cfg.qwAddrMax > 0xfff)) {
-            ctxMain->cfg.qwAddrMax = 0xfff;
+        if((ctxMain->cfg.paAddrMin > ctxMain->cfg.paAddrMax) || (ctxMain->cfg.paAddrMax > 0xfff)) {
+            ctxMain->cfg.paAddrMax = 0xfff;
         }
         Util_PrintHexAscii(
             pbLcCfgSpace4096,
-            (DWORD)(ctxMain->cfg.qwAddrMax + 1),
-            (DWORD)ctxMain->cfg.qwAddrMin
+            (DWORD)(ctxMain->cfg.paAddrMax + 1),
+            (DWORD)ctxMain->cfg.paAddrMin
         );
     }
 fail:

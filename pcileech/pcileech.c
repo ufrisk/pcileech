@@ -65,7 +65,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
     ctxMain->argc = argc;
     ctxMain->argv = argv;
     ctxMain->cfg.tpAction = NA;
-    ctxMain->cfg.qwAddrMax = 0;
+    ctxMain->cfg.paAddrMax = 0;
     ctxMain->cfg.fOutFile = TRUE;
     ctxMain->cfg.fUserInteract = TRUE;
     // fetch command line actions/options
@@ -142,13 +142,19 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         } else if(i + 1 >= argc) {
             return FALSE;
         } else if(0 == strcmp(argv[i], "-min")) {
-            ctxMain->cfg.qwAddrMin = Util_GetNumeric(argv[i + 1]);
+            ctxMain->cfg.paAddrMin = Util_GetNumeric(argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-max")) {
-            ctxMain->cfg.qwAddrMax = Util_GetNumeric(argv[i + 1]);
+            ctxMain->cfg.paAddrMax = Util_GetNumeric(argv[i + 1]);
+        } else if(0 == strcmp(argv[i], "-pid")) {
+            ctxMain->cfg.dwPID = (DWORD)Util_GetNumeric(argv[i + 1]);
+        } else if(0 == strcmp(argv[i], "-vamin")) {
+            ctxMain->cfg.vaAddrMin = Util_GetNumeric(argv[i + 1]);
+        } else if(0 == strcmp(argv[i], "-vamax")) {
+            ctxMain->cfg.vaAddrMax = Util_GetNumeric(argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-cr3")) {
-            ctxMain->cfg.qwCR3 = Util_GetNumeric(argv[i + 1]);
+            ctxMain->cfg.paCR3 = Util_GetNumeric(argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-efibase")) {
-            ctxMain->cfg.qwEFI_IBI_SYST = Util_GetNumeric(argv[i + 1]);
+            ctxMain->cfg.paEFI_IBI_SYST = Util_GetNumeric(argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-tlpwait")) {
             ctxMain->cfg.dwListenTlpTimeMs = (DWORD)(1000 * Util_GetNumeric(argv[i + 1]));
         } else if((0 == strcmp(argv[i], "-device")) || (0 == strcmp(argv[i], "-z"))) {
@@ -181,8 +187,8 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         } else if(0 == strcmp(argv[i], "-hook")) {
             strcpy_s(ctxMain->cfg.szHook, MAX_PATH, argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-kmd")) {
-            ctxMain->cfg.qwKMD = strtoull(argv[i + 1], NULL, 16);
-            if(ctxMain->cfg.qwKMD < 0x1000) {
+            ctxMain->cfg.paKMD = strtoull(argv[i + 1], NULL, 16);
+            if(ctxMain->cfg.paKMD < 0x1000) {
                 strcpy_s(ctxMain->cfg.szKMDName, MAX_PATH, argv[i + 1]);
             } else {
                 ctxMain->cfg.fAddrKMDSetByArgument = TRUE;
@@ -197,15 +203,19 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
     }
     // set dummy qwAddrMax value (if possible) to disable auto-detect in LeechCore.
     if((ctxMain->cfg.tpAction == TLP) || (ctxMain->cfg.tpAction == DISPLAY) || (ctxMain->cfg.tpAction == PAGEDISPLAY)) {
-        ctxMain->cfg.qwAddrMax = -1;
+        ctxMain->cfg.paAddrMax = -1;
     }
     // disable memory auto-detect when memmap is specified
-    if(!ctxMain->cfg.qwAddrMax && (ctxMain->cfg.szMemMap[0] || ctxMain->cfg.szMemMapStr[0])) {
-        ctxMain->cfg.qwAddrMax = -1;
+    if(!ctxMain->cfg.paAddrMax && (ctxMain->cfg.szMemMap[0] || ctxMain->cfg.szMemMapStr[0])) {
+        ctxMain->cfg.paAddrMax = -1;
     }
     // try correct erroneous options, if needed
     if(ctxMain->cfg.tpAction == NA) {
         return FALSE;
+    }
+    // set vamax
+    if(!ctxMain->cfg.vaAddrMax) {
+        ctxMain->cfg.vaAddrMax = (QWORD)-1;
     }
     return TRUE;
 }
@@ -214,19 +224,19 @@ VOID PCILeechConfigFixup()
 {
     QWORD qw;
     // no kmd -> max address == max address that device support
-    if(!ctxMain->cfg.szKMDName[0] && !ctxMain->cfg.qwKMD) {
-        if(ctxMain->cfg.qwAddrMax == 0 || ctxMain->cfg.qwAddrMax > ctxMain->dev.paMax) {
-            ctxMain->cfg.qwAddrMax = ctxMain->dev.paMax;
+    if(!ctxMain->cfg.szKMDName[0] && !ctxMain->cfg.paKMD) {
+        if(ctxMain->cfg.paAddrMax == 0 || ctxMain->cfg.paAddrMax > ctxMain->dev.paMax) {
+            ctxMain->cfg.paAddrMax = ctxMain->dev.paMax;
         }
     }
     // fixup addresses
-    if(ctxMain->cfg.qwAddrMin > ctxMain->cfg.qwAddrMax) {
-        qw = ctxMain->cfg.qwAddrMin;
-        ctxMain->cfg.qwAddrMin = ctxMain->cfg.qwAddrMax;
-        ctxMain->cfg.qwAddrMax = qw;
+    if(ctxMain->cfg.paAddrMin > ctxMain->cfg.paAddrMax) {
+        qw = ctxMain->cfg.paAddrMin;
+        ctxMain->cfg.paAddrMin = ctxMain->cfg.paAddrMax;
+        ctxMain->cfg.paAddrMax = qw;
     }
-    ctxMain->cfg.qwCR3 &= ~0xfff;
-    ctxMain->cfg.qwKMD &= ~0xfff;
+    ctxMain->cfg.paCR3 &= ~0xfff;
+    ctxMain->cfg.paKMD &= ~0xfff;
 }
 
 VOID PCILeechFreeContext()
@@ -329,7 +339,7 @@ int main(_In_ int argc, _In_ char* argv[])
         return 1;
     }
     PCILeechConfigFixup(); // post device config adjustments
-    if(ctxMain->cfg.szKMDName[0] || ctxMain->cfg.qwKMD) {
+    if(ctxMain->cfg.szKMDName[0] || ctxMain->cfg.paKMD) {
         result = KMDOpen();
         if(!result) {
             printf("PCILEECH: Failed to load kernel module.\n");
@@ -337,8 +347,8 @@ int main(_In_ int argc, _In_ char* argv[])
             return 1;
         }
     }
-    if(ctxMain->cfg.qwAddrMax == 0) {
-        LcGetOption(ctxMain->hLC, LC_OPT_CORE_ADDR_MAX, &ctxMain->cfg.qwAddrMax);
+    if(ctxMain->cfg.paAddrMax == 0) {
+        LcGetOption(ctxMain->hLC, LC_OPT_CORE_ADDR_MAX, &ctxMain->cfg.paAddrMax);
     }
     // enable ctrl+c event handler if remote (to circumvent blocking thread)
 	PCILeechCtrlHandlerInitialize();
@@ -351,16 +361,22 @@ int main(_In_ int argc, _In_ char* argv[])
             ActionMemoryWrite();
             break;
         case DISPLAY:
-            ActionMemoryDisplay();
+            if(ctxMain->cfg.dwPID) {
+                ActionMemoryDisplayVirtual();
+            } else {
+                ActionMemoryDisplayPhysical();
+            }
             break;
         case PAGEDISPLAY:
             ActionMemoryPageDisplay();
             break;
         case PATCH:
-            ActionPatchAndSearch();
-            break;
         case SEARCH:
-            ActionPatchAndSearch();
+            if(ctxMain->cfg.dwPID) {
+                ActionPatchAndSearchVirtual();
+            } else {
+                ActionPatchAndSearchPhysical();
+            }
             break;
         case EXEC_KMD:
             ActionExecShellcode();
@@ -409,8 +425,8 @@ int main(_In_ int argc, _In_ char* argv[])
             ActionAgentForensic();
             break;
         case KMDLOAD:
-            if(ctxMain->cfg.qwKMD) {
-                printf("KMD: Successfully loaded at address: 0x%08x\n", (DWORD)ctxMain->cfg.qwKMD);
+            if(ctxMain->cfg.paKMD) {
+                printf("KMD: Successfully loaded at address: 0x%08x\n", (DWORD)ctxMain->cfg.paKMD);
             } else {
                 printf("KMD: Failed. Please supply valid -kmd and optionally -cr3 parameters.\n");
             }
