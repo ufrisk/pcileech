@@ -46,20 +46,21 @@ PCILeech supports both hardware based and software based memory acqusition metho
 
 Please find a summary of the supported hardware based memory acquisition methods listed below. All hardware based memory acquisition methods are supported on both Windows and Linux. The FPGA based methods however sports a slight performance penalty on Linux and will max out at approx: 90MB/s compared to 150MB/s on Windows.
 
-| Device                                                                 | Type | Interface | Speed | 64-bit memory access | PCIe TLP access | Plugin | Project<br>Sponsor |
-| -----------------------------------------------------------------------| ---- | --------- | ----- | -------------------- | --------------- | ------ | ------------------ |
-| [Enigma X1](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)      | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/EnigmaX1)     | USB-C | 180MB/s | Yes | Yes | No  | 💖 |
-| [PCIeScreamerR04](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)| [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB-C | 150MB/s | Yes | Yes | No  | 💖 |
-| [ScreamerM2](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)     | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB3  | 150MB/s | Yes | Yes | No  | 💖 |
-| [AC701/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ac701_ft601)  | USB3  | 150MB/s | Yes | Yes | No  |    |
-| [PCIeScreamer](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)   | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/pciescreamer) | USB3  | 100MB/s | Yes | Yes | No  |    |
-| [SP605/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/sp605_ft601)  | USB3  |  75MB/s | Yes | Yes | No  |    |
-| [Acorn/FT2232H](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)  | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/acorn_ft2232h)| USB2  |  25MB/s | Yes | Yes | No  |    |
-| [NeTV2/UDP](https://github.com/ufrisk/LeechCore/wiki/Device_RawUDP)    | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/NeTV2)        | UDP   |   7MB/s | Yes | Yes | No  |    |
-| [USB3380-EVB](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380) | USB3380 | USB3 | 150MB/s | No  | No  | No  |    |
-| [PP3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)      | USB3380 | USB3 | 150MB/s | No  | No  | No  |    |
-| [SP605/TCP](https://github.com/ufrisk/LeechCore/wiki/Device_SP605TCP)  | FPGA    | TCP  | 100kB/s | Yes | Yes | Yes |    |
-| [DMA patched HP iLO](https://github.com/ufrisk/LeechCore/wiki/Device_RawTCP) | BMC | TCP |  1MB/s | Yes | No  | Yes |    |
+| Device                                                                         | Type | Interface | Speed | 64-bit memory access | PCIe TLP access | Plugin | Project<br>Sponsor |
+| -------------------------------------------------------------------------------| ---- | --------- | ----- | -------------------- | --------------- | ------ | ------------------ |
+| [Screamer PCIe Squirrel](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA) | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/PCIeSquirrel) | USB-C | 150MB/s | Yes | Yes | No  | 💖 |
+| [Enigma X1](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)              | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/EnigmaX1)     | USB-C | 180MB/s | Yes | Yes | No  | 💖 |
+| [PCIeScreamerR04](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)        | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB-C | 150MB/s | Yes | Yes | No  | 💖 |
+| [ScreamerM2](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)             | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB3  | 150MB/s | Yes | Yes | No  | 💖 |
+| [AC701/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)            | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ac701_ft601)  | USB3  | 150MB/s | Yes | Yes | No  |    |
+| [PCIeScreamer](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)           | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/pciescreamer) | USB3  | 100MB/s | Yes | Yes | No  |    |
+| [SP605/FT601](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)            | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/sp605_ft601)  | USB3  |  75MB/s | Yes | Yes | No  |    |
+| [Acorn/FT2232H](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/acorn_ft2232h)| USB2  |  25MB/s | Yes | Yes | No  |    |
+| [NeTV2/UDP](https://github.com/ufrisk/LeechCore/wiki/Device_RawUDP)            | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/NeTV2)        | UDP   |   7MB/s | Yes | Yes | No  |    |
+| [USB3380-EVB](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)         | USB3380 | USB3 | 150MB/s | No  | No  | No  |    |
+| [PP3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)              | USB3380 | USB3 | 150MB/s | No  | No  | No  |    |
+| [SP605/TCP](https://github.com/ufrisk/LeechCore/wiki/Device_SP605TCP)          | FPGA    | TCP  | 100kB/s | Yes | Yes | Yes |    |
+| [DMA patched HP iLO](https://github.com/ufrisk/LeechCore/wiki/Device_RawTCP)   | BMC | TCP |  1MB/s | Yes | No  | Yes |     |    |
 
 ### Software based memory aqusition methods:
 
