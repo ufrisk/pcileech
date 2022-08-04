@@ -238,6 +238,8 @@ typedef struct tdVFS_CONTEXT {
 #define PCILEECH_CONTEXT_MAGIC              0xfeefd00d
 #define PCILEECH_CONTEXT_VERSION                  0x45
 
+typedef struct tdVMM_HANDLE *VMM_HANDLE;
+
 /*
 * The main PCILeech context as found in the ctxMain global variable.
 * Any external command module using this struct or any of its sub-
@@ -251,13 +253,13 @@ struct tdPCILEECH_CONTEXT {
     CONFIG cfg;
     HANDLE hLC;
     LC_CONFIG dev;
-    BOOL fVmmInitialized;
     HANDLE hDevice;
     PKMDHANDLE phKMD;
     PKMDDATA pk;
     VFS_CONTEXT vfs;
     DWORD argc;
     char** argv;
+    VMM_HANDLE hVMM;
 };
 
 BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[]);

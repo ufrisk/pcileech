@@ -276,3 +276,6 @@ v4.1
 * Process Virtual Memory support (Windows only).
   - Commands: search, patch, write, display, pagedisplay
   - Example:  pcileech patch -pid 732 -sig unlock_win10x64.sig
+
+[v4.15](https://github.com/ufrisk/pcileech/releases/tag/v4.15)
+* Support for MemProcFS v5.0

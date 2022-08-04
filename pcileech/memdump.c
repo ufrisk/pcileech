@@ -319,7 +319,7 @@ VOID ActionMemoryDisplayVirtual()
         return;
     }
     // read memory and display output
-    if(!VMMDLL_MemRead(ctxMain->cfg.dwPID, qwAddrBase, pb, (DWORD)qwSize_4kAlign)) {
+    if(!VMMDLL_MemRead(ctxMain->hVMM, ctxMain->cfg.dwPID, qwAddrBase, pb, (DWORD)qwSize_4kAlign)) {
         printf("Memory Display: Failed reading memory at address: 0x%016llX.\n", qwAddrBase);
         LocalFree(pb);
         return;
@@ -406,7 +406,7 @@ VOID ActionMemoryWrite()
             return;
         }
         do {
-            result = VMMDLL_MemWrite(ctxMain->cfg.dwPID, ctxMain->cfg.vaAddrMin, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn);
+            result = VMMDLL_MemWrite(ctxMain->hVMM, ctxMain->cfg.dwPID, ctxMain->cfg.vaAddrMin, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn);
             if(!result) {
                 printf("Memory Write: Failed. Write failed (partial memory may be written).\n");
                 return;

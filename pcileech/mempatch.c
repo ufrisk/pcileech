@@ -180,7 +180,7 @@ BOOL ActionPatchAndSearchVirtual_ResultCB(_In_ PVMMDLL_MEM_SEARCH_CONTEXT ctxs, 
     DWORD dwoPatch, cbPatch;
     // 1: fetch page
     vaPage = va & ~0xfff;
-    if(!VMMDLL_MemRead(ctxi->dwPID, vaPage, pbPage, 0x1000)) {
+    if(!VMMDLL_MemRead(ctxMain->hVMM, ctxi->dwPID, vaPage, pbPage, 0x1000)) {
         return TRUE;
     }
     // 2: patch / unlock (using same methodology as in physical layer)
@@ -189,7 +189,7 @@ BOOL ActionPatchAndSearchVirtual_ResultCB(_In_ PVMMDLL_MEM_SEARCH_CONTEXT ctxs, 
         return TRUE;
     }
     if(ctxi->isModePatch) {
-        result = VMMDLL_MemWrite(ctxi->dwPID, vaPage + dwoPatch, ctxi->pSignatures[iSearch].chunk[2].pb, ctxi->pSignatures[iSearch].chunk[2].cb);
+        result = VMMDLL_MemWrite(ctxMain->hVMM, ctxi->dwPID, vaPage + dwoPatch, ctxi->pSignatures[iSearch].chunk[2].pb, ctxi->pSignatures[iSearch].chunk[2].cb);
     }
     if(result) {
         if(ctxi->cPatchList == MAX_NUM_PATCH_LOCATIONS) {
@@ -261,7 +261,7 @@ VOID ActionPatchAndSearchVirtual()
     
     // perform search
     StatSearchInitialize(&pStat, &ctxs, ctxi.szAction);
-    VMMDLL_MemSearch(ctxi.dwPID, &ctxs, NULL, NULL);
+    VMMDLL_MemSearch(ctxMain->hVMM, ctxi.dwPID, &ctxs, NULL, NULL);
     StatSearchClose(&pStat);
 cleanup:
     if(ctxi.cPatchList) {

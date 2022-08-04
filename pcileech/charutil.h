@@ -166,12 +166,12 @@ BOOL CharUtil_WtoJ(
 * -- fUpper
 * -- return
 */
-DWORD CharUtil_Hash32U(_In_ LPCSTR usz, _In_ BOOL fUpper);
-DWORD CharUtil_Hash32A(_In_ LPCSTR sz, _In_ BOOL fUpper);
-DWORD CharUtil_Hash32W(_In_ LPCWSTR wsz, _In_ BOOL fUpper);
-QWORD CharUtil_Hash64U(_In_ LPCSTR usz, _In_ BOOL fUpper);
-QWORD CharUtil_Hash64A(_In_ LPCSTR sz, _In_ BOOL fUpper);
-QWORD CharUtil_Hash64W(_In_ LPCWSTR wsz, _In_ BOOL fUpper);
+DWORD CharUtil_Hash32U(_In_opt_ LPCSTR usz, _In_ BOOL fUpper);
+DWORD CharUtil_Hash32A(_In_opt_ LPCSTR sz, _In_ BOOL fUpper);
+DWORD CharUtil_Hash32W(_In_opt_ LPCWSTR wsz, _In_ BOOL fUpper);
+QWORD CharUtil_Hash64U(_In_opt_ LPCSTR usz, _In_ BOOL fUpper);
+QWORD CharUtil_Hash64A(_In_opt_ LPCSTR sz, _In_ BOOL fUpper);
+QWORD CharUtil_Hash64W(_In_opt_ LPCWSTR wsz, _In_ BOOL fUpper);
 
 /*
 * Hash a name string in a way that is supported by the file system.
@@ -220,6 +220,7 @@ DWORD CharUtil_FixFsNameU(
 * characters with '_'. Also optionally add a suffix between 1-9 and fix
 * upper-case letters. One of [usz, sz, wsz] must be valid.
 * -- uszOut
+* -- cbuDst
 * -- usz
 * -- sz
 * -- wsz
@@ -231,7 +232,8 @@ DWORD CharUtil_FixFsNameU(
 */
 _Success_(return != 0)
 DWORD CharUtil_FixFsName(
-    _Out_writes_(2*MAX_PATH) LPSTR uszOut,
+    _Out_writes_(cbuDst) LPSTR uszOut,
+    _In_ DWORD cbuDst,
     _In_opt_ LPCSTR usz,
     _In_opt_ LPCSTR sz,
     _In_opt_ LPCWSTR wsz,

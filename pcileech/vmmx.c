@@ -13,8 +13,8 @@
 */
 VOID Vmmx_Close()
 {
-    VMMDLL_Close();
-    ctxMain->fVmmInitialized = FALSE;
+    VMMDLL_Close(ctxMain->hVMM);
+    ctxMain->hVMM = NULL;
 }
 
 /*
@@ -32,7 +32,7 @@ BOOL Vmmx_Initialize(_In_ BOOL fRefresh,  _In_ BOOL fMemMapAuto)
     DWORD cParams = 3;
     LPSTR szParams[] = { "", "-device", "existing", "", "", "" };
 
-    if(!ctxMain->fVmmInitialized) {
+    if(!ctxMain->hVMM) {
         if(fRefresh) {
             szParams[cParams++] = "-norefresh";
         }
@@ -40,10 +40,10 @@ BOOL Vmmx_Initialize(_In_ BOOL fRefresh,  _In_ BOOL fMemMapAuto)
             szParams[cParams++] = "-memmap";
             szParams[cParams++] = "auto";
         }
-        ctxMain->fVmmInitialized = VMMDLL_Initialize(cParams, szParams);
-        if(!ctxMain->fVmmInitialized) {
+        ctxMain->hVMM = VMMDLL_Initialize(cParams, szParams);
+        if(!ctxMain->hVMM) {
             printf("MemProcFS: Failed to initialize memory process file system in call to vmm.dll!VMMDLL_Initialize\n");
         }
     }
-    return ctxMain->fVmmInitialized;
+    return ctxMain->hVMM != NULL;
 }

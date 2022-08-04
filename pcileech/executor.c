@@ -93,7 +93,7 @@ BOOL Exec_ConsoleRedirect_Initialize(_In_ QWORD ConsoleBufferAddr_InputStream, _
     pd->pInfoOS = (PEXEC_IO)pd->pbDataOSConsoleBuffer;
     // read initial buffer and check validity
     result = dwPID ?
-        VMMDLL_MemReadEx(dwPID, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, NULL, VMMDLL_FLAG_NOCACHE) :
+        VMMDLL_MemReadEx(ctxMain->hVMM, dwPID, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, NULL, VMMDLL_FLAG_NOCACHE) :
         DeviceReadMEM(ConsoleBufferAddr_OutputStream, 0x1000, pd->pbDataOSConsoleBuffer, FALSE);
     if(!result || (pd->pInfoOS->magic != EXEC_IO_MAGIC)) {
         return FALSE;
@@ -124,14 +124,14 @@ VOID Exec_ConsoleRedirect(_In_ QWORD ConsoleBufferAddr_InputStream, _In_ QWORD C
     while(TRUE) {
         SwitchToThread();
         result = dwPID ?
-            VMMDLL_MemReadEx(dwPID, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, NULL, VMMDLL_FLAG_NOCACHE) :
+            VMMDLL_MemReadEx(ctxMain->hVMM, dwPID, ConsoleBufferAddr_OutputStream, pd->pbDataOSConsoleBuffer, 0x1000, NULL, VMMDLL_FLAG_NOCACHE) :
             DeviceReadMEM(ConsoleBufferAddr_OutputStream, 0x1000, pd->pbDataOSConsoleBuffer, FALSE);
         if(!result || pd->pInfoOS->magic != EXEC_IO_MAGIC) {
             printf("\nCONSOLE_REDIRECT: Error: Address 0x%016llX does not\ncontain a valid console buffer.\n", ConsoleBufferAddr_OutputStream);
             goto fail;
         }
         if(dwPID) {
-            VMMDLL_MemWrite(dwPID, ConsoleBufferAddr_InputStream, pd->pbDataISConsoleBuffer, 0x1000);
+            VMMDLL_MemWrite(ctxMain->hVMM, dwPID, ConsoleBufferAddr_InputStream, pd->pbDataISConsoleBuffer, 0x1000);
         } else {
             DeviceWriteMEM(ConsoleBufferAddr_InputStream, 0x1000, pd->pbDataISConsoleBuffer, FALSE);
         }
