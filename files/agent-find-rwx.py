@@ -35,7 +35,7 @@ print(lc)
 # 
 #
 import memprocfs
-vmm = memprocfs.Vmm()
+vmm = memprocfs.Vmm(['-device', 'existingremote'])
 for process in vmm.process_list():
     for entry in process.maps.pte():
         if '-rwx' in entry['flags']:
