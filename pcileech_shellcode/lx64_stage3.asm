@@ -59,7 +59,7 @@ LookupFunctions PROC
 	PUSH r13
 	MOV r15, rcx				; address of kallsyms_lookup_name
 	MOV r14, rdx				; ptr to FNLX struct 
-	MOV r13, 13*8				; num functions * 8
+	MOV r13, 14*8				; num functions * 8
 	; ----------------------------------------------------
 	; 1: PUSH FUNCTION NAME POINTERS ON STACK
 	; ----------------------------------------------------
@@ -89,6 +89,8 @@ LookupFunctions PROC
 	PUSH rax
 	LEA rax, str_getnstimeofday64
 	PUSH rax
+	LEA rax, str_alloc_pages
+	PUSH rax
 	; ----------------------------------------------------
 	; 2: LOOKUP FUNCTION POINTERS BY NAME
 	; ----------------------------------------------------
@@ -105,13 +107,22 @@ LookupFunctions PROC
 	; ----------------------------------------------------
 	MOV rax, [r14+9*8]
 	TEST rax, rax
-	JNZ lookup_finish
+	JNZ lookup_finish_ioremap
 	MOV rax, [r14+11*8]
 	MOV [r14+9*8], rax
+	lookup_finish_ioremap:
 	; ----------------------------------------------------
-	; 4: RESTORE NV REGISTERS AND RETURN
+	; 4: IF 'alloc_pages_current' DOES NOT EXIST FALLBACK TO 'alloc_pages'
 	; ----------------------------------------------------
-	lookup_finish:
+	MOV rax, [r14+1*8]
+	TEST rax, rax
+	JNZ lookup_finish_alloc_pages
+	MOV rax, [r14+13*8]
+	MOV [r14+1*8], rax
+	lookup_finish_alloc_pages:
+	; ----------------------------------------------------
+	; 5: RESTORE NV REGISTERS AND RETURN
+	; ----------------------------------------------------
 	POP r13
 	POP r14
 	POP r15
@@ -132,6 +143,7 @@ str_ioremap						db		'ioremap', 0
 str_ioremap_nocache				db		'ioremap_nocache', 0
 str_ktime_get_real_ts64			db		'ktime_get_real_ts64', 0
 str_getnstimeofday64			db		'getnstimeofday64', 0
+str_alloc_pages					db		'alloc_pages', 0
 
 ; ------------------------------------------------------------------
 ; Convert from the Windows X64 calling convention to the SystemV

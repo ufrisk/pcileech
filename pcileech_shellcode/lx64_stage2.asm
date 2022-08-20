@@ -99,7 +99,12 @@ setup PROC
 	LEA rdi, str_alloc_pages_current
 	CALL r14
 	TEST rax, rax
+	JNZ alloc_pages_ok
+	LEA rdi, str_alloc_pages
+	CALL r14
+	TEST rax, rax
 	JZ error
+    alloc_pages_ok:
 	MOV rdi, 14h
 	MOV rsi, 2h
 	CALL rax
@@ -289,6 +294,7 @@ lx64_stage3_pre ENDP
 str_kthread_create			db 'kthread_create', 0
 str_kthread_create_on_node	db 'kthread_create_on_node', 0
 str_alloc_pages_current		db 'alloc_pages_current', 0
+str_alloc_pages				db 'alloc_pages', 0
 str_set_memory_x			db 'set_memory_x', 0
 str_wake_up_process			db 'wake_up_process', 0
 str_page_offset_base		db 'page_offset_base', 0

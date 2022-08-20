@@ -52,7 +52,8 @@ typedef struct tdFNLX { // VOID definitions for LINUX functions (used in main co
     QWORD ktime_get_real_ts64;      // do_gettimeofday alternative if export is missing.
 	QWORD _ioremap_nocache;
 	QWORD getnstimeofday64;			// do_gettimeofday alternative if export is missing.
-	QWORD ReservedFutureUse[19];
+	QWORD alloc_pages;
+	QWORD ReservedFutureUse[18];
 } FNLX, *PFNLX;
 
 #define KMDDATA_OPERATING_SYSTEM_LINUX			0x02

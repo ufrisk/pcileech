@@ -139,7 +139,6 @@ typedef struct tdFN2 {
 	QWORD vfs_read;
 	QWORD vfs_write;
 	QWORD yield;
-	QWORD printk;
 	QWORD iterate_dir_opt;
 	QWORD vfs_readdir_opt;
 	QWORD vfs_stat_opt;
@@ -147,6 +146,7 @@ typedef struct tdFN2 {
     struct {
         QWORD sys_unlink;
         QWORD getname;
+		QWORD getname_kernel;
         QWORD do_unlinkat;
     } rm;
 	QWORD kern_path_opt;
@@ -178,7 +178,6 @@ BOOL LookupFunctions2(PKMDDATA pk, PFN2 pfn2) {
 	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 'r', 'e', 'a', 'd', 0 };
 	NAMES[i++] = (QWORD)(CHAR[]) { 'v', 'f', 's', '_', 'w', 'r', 'i', 't', 'e', 0 };	
 	NAMES[i++] = (QWORD)(CHAR[]) { 'y', 'i', 'e', 'l', 'd', 0 };
-	NAMES[i++] = (QWORD)(CHAR[]) { 'p', 'r', 'i', 'n', 't', 'k', 0 };
 	if(!LookupFunctions(pk->AddrKallsymsLookupName, (QWORD)NAMES, (QWORD)pfn2, i)) { return FALSE; }
 	// optional lookup 1#: (due to kernel version differences)
 	pfn2->iterate_dir_opt = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'i', 't', 'e', 'r', 'a', 't', 'e', '_', 'd', 'i', 'r', 0 }));
@@ -194,6 +193,7 @@ BOOL LookupFunctions2(PKMDDATA pk, PFN2 pfn2) {
     // optional lookup #3
     pfn2->rm.sys_unlink = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'v', 'f', 's', '_', 's', 't', 'a', 't', 0 }));
     pfn2->rm.getname = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'g', 'e', 't', 'n', 'a', 'm', 'e', 0 }));
+	pfn2->rm.getname_kernel = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'g', 'e', 't', 'n', 'a', 'm', 'e', '_', 'k', 'e', 'r', 'n', 'e', 'l', 0 }));
     pfn2->rm.do_unlinkat = LOOKUP_FUNCTION(pk, ((CHAR[]) { 'd', 'o', '_', 'u', 'n', 'l', 'i', 'n', 'k', 'a', 't', 0 }));
 	if(!pfn2->rm.sys_unlink && !(pfn2->rm.getname && pfn2->rm.do_unlinkat)) { return FALSE; }
 	// optional kernel vfs read/write #4:
@@ -323,10 +323,16 @@ STATUS VfsList(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 STATUS VfsDelete(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 {
 	UNREFERENCED_PARAMETER(pk);
-	QWORD result;
-    result = pfn2->rm.sys_unlink ?
-        SysVCall(pfn2->rm.sys_unlink, pop->szFileName) :
-        SysVCall(pfn2->rm.do_unlinkat, AT_FDCWD, SysVCall(pfn2->rm.getname, pop->szFileName));
+	QWORD ptr, result = 1;
+	if(pfn2->rm.sys_unlink) {
+		result = SysVCall(pfn2->rm.sys_unlink, pop->szFileName);
+	} else if(pfn2->rm.getname_kernel && pfn2->rm.do_unlinkat) {
+		ptr = SysVCall(pfn2->rm.getname_kernel, pop->szFileName);
+		result = SysVCall(pfn2->rm.do_unlinkat, AT_FDCWD, ptr);
+	} else if(pfn2->rm.getname && pfn2->rm.do_unlinkat) {
+		ptr = SysVCall(pfn2->rm.getname, pop->szFileName);
+		result = SysVCall(pfn2->rm.do_unlinkat, AT_FDCWD, ptr);
+	}
 	return result ? STATUS_FAIL_ACTION : STATUS_SUCCESS;
 }
 

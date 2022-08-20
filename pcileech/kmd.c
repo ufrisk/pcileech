@@ -295,7 +295,7 @@ DWORD KMD_LinuxFindFunctionAddr(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER
     DWORD o, i, c = 0;
     for(o = 0; o < cb - 0x1000; o++) {
         for(i = 0; i < cS; i++) {
-            if(!pS[i].aSeek && !memcmp(pb + o, pS[i].pbSeek, pS[i].cbSeek)) {
+            if(!pS[i].aSeek && !memcmp(pb + o, pS[i].pbSeek, pS[i].cbSeek) && pb[o + pS[i].cbSeek]) {
                 pS[i].aSeek = o + 1;
                 c++;
                 if(c == cS) { return c; }
