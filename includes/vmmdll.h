@@ -17,7 +17,7 @@
 // (c) Ulf Frisk, 2018-2022
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 5.0
+// Header Version: 5.2
 //
 
 #include "leechcore.h"
@@ -77,7 +77,8 @@ typedef uint16_t                            WCHAR, *PWCHAR, *LPWSTR, *LPCWSTR;
 
 #endif /* LINUX */
 
-typedef struct tdVMM_HANDLE *VMM_HANDLE;
+typedef struct tdVMM_HANDLE     *VMM_HANDLE;
+typedef struct tdVMMVM_HANDLE   *VMMVM_HANDLE;
 
 
 
@@ -214,6 +215,7 @@ VOID VMMDLL_MemFree(_Frees_ptr_opt_ PVOID pvMem);
 
 #define VMMDLL_OPT_FORENSIC_MODE                        0x2000020100000000  // RW - enable/retrieve forensic mode type [0-4].
 
+// REFRESH OPTIONS:
 #define VMMDLL_OPT_REFRESH_ALL                          0x2001ffff00000000  // W - refresh all caches
 #define VMMDLL_OPT_REFRESH_FREQ_MEM                     0x2001100000000000  // W - refresh memory cache (excl. TLB) [fully]
 #define VMMDLL_OPT_REFRESH_FREQ_MEM_PARTIAL             0x2001000200000000  // W - refresh memory cache (excl. TLB) [partial 33%/call]
@@ -222,6 +224,9 @@ VOID VMMDLL_MemFree(_Frees_ptr_opt_ PVOID pvMem);
 #define VMMDLL_OPT_REFRESH_FREQ_FAST                    0x2001040000000000  // W - refresh fast frequency - incl. partial process refresh
 #define VMMDLL_OPT_REFRESH_FREQ_MEDIUM                  0x2001000100000000  // W - refresh medium frequency - incl. full process refresh
 #define VMMDLL_OPT_REFRESH_FREQ_SLOW                    0x2001001000000000  // W - refresh slow frequency.
+
+// PROCESS OPTIONS: [LO-DWORD: Process PID]
+#define VMMDLL_OPT_PROCESS_DTB                          0x2002000100000000  // W - force set process directory table base.
 
 static LPCSTR VMMDLL_MEMORYMODEL_TOSTRING[4] = { "N/A", "X86", "X86PAE", "X64" };
 
@@ -233,6 +238,7 @@ typedef enum tdVMMDLL_MEMORYMODEL_TP {
 } VMMDLL_MEMORYMODEL_TP;
 
 typedef enum tdVMMDLL_SYSTEM_TP {
+    VMMDLL_SYSTEM_UNKNOWN_PHYSICAL = 0,
     VMMDLL_SYSTEM_UNKNOWN_X64   = 1,
     VMMDLL_SYSTEM_WINDOWS_X64   = 2,
     VMMDLL_SYSTEM_UNKNOWN_X86   = 3,
@@ -488,6 +494,7 @@ BOOL VMMDLL_InitializePlugins(_In_ VMM_HANDLE hVMM);
 
 #define VMMDLL_PLUGIN_NOTIFY_FORENSIC_INIT          0x01000100
 #define VMMDLL_PLUGIN_NOTIFY_FORENSIC_INIT_COMPLETE 0x01000200
+#define VMMDLL_PLUGIN_NOTIFY_VM_ATTACH_DETACH       0x01000400
 
 typedef DWORD                                       VMMDLL_MODULE_ID;
 typedef HANDLE                                      *PVMMDLL_PLUGIN_INTERNAL_CONTEXT;
@@ -931,12 +938,12 @@ BOOL VMMDLL_Scatter_Read(_In_ VMMDLL_SCATTER_HANDLE hS, _In_ QWORD va, _In_ DWOR
 /*
 * Clear/Reset the handle for use in another subsequent read scatter operation.
 * -- hS = the scatter handle to clear for reuse.
-* -- dwPID
+* -- dwPID = optional PID change.
 * -- flags
 * -- return
 */
 EXPORTED_FUNCTION _Success_(return)
-BOOL VMMDLL_Scatter_Clear(_In_ VMMDLL_SCATTER_HANDLE hS, _In_ DWORD dwPID, _In_ DWORD flags);
+BOOL VMMDLL_Scatter_Clear(_In_ VMMDLL_SCATTER_HANDLE hS, _In_opt_ DWORD dwPID, _In_ DWORD flags);
 
 /*
 * Close the scatter handle and free the resources it uses.
@@ -969,6 +976,7 @@ VOID VMMDLL_Scatter_CloseHandle(_In_opt_ _Post_ptr_invalid_ VMMDLL_SCATTER_HANDL
 #define VMMDLL_MAP_NET_VERSION              3
 #define VMMDLL_MAP_PHYSMEM_VERSION          2
 #define VMMDLL_MAP_USER_VERSION             2
+#define VMMDLL_MAP_VM_VERSION               1
 #define VMMDLL_MAP_SERVICE_VERSION          3
 
 // flags to check for existence in the fPage field of VMMDLL_MAP_PTEENTRY
@@ -1293,6 +1301,25 @@ typedef struct tdVMMDLL_MAP_USERENTRY {
     DWORD _FutureUse2[2];
 } VMMDLL_MAP_USERENTRY, *PVMMDLL_MAP_USERENTRY;
 
+typedef enum tdVMMDLL_VM_TP {
+    VMMDLL_VM_TP_UNKNOWN = 0,
+    VMMDLL_VM_TP_HV = 1
+} VMMDLL_VM_TP;
+
+typedef struct tdVMMDLL_MAP_VMENTRY {
+    VMMVM_HANDLE hVM;
+    union { LPSTR  uszName; LPWSTR wszName; };              // U/W dependant
+    QWORD gpaMax;
+    VMMDLL_VM_TP tp;
+    BOOL fActive;
+    BOOL fReadOnly;
+    BOOL fPhysicalOnly;
+    DWORD dwPartitionID;
+    DWORD dwVersionBuild;
+    VMMDLL_SYSTEM_TP tpSystem;
+    DWORD dwParentVmmMountID;
+} VMMDLL_MAP_VMENTRY, *PVMMDLL_MAP_VMENTRY;
+
 typedef struct tdVMMDLL_MAP_SERVICEENTRY {
     QWORD vaObj;
     DWORD dwOrdinal;
@@ -1447,6 +1474,15 @@ typedef struct tdVMMDLL_MAP_USER {
     DWORD cMap;                     // # map entries.
     VMMDLL_MAP_USERENTRY pMap[];    // map entries.
 } VMMDLL_MAP_USER, *PVMMDLL_MAP_USER;
+
+typedef struct tdVMMDLL_MAP_VM {
+    DWORD dwVersion;
+    DWORD _Reserved1[5];
+    PBYTE pbMultiText;              // multi-wstr pointed into by VMMDLL_MAP_VMENTRY.wszText
+    DWORD cbMultiText;
+    DWORD cMap;                     // # map entries.
+    VMMDLL_MAP_VMENTRY pMap[];      // map entries.
+} VMMDLL_MAP_VM, *PVMMDLL_MAP_VM;
 
 typedef struct tdVMMDLL_MAP_SERVICE {
     DWORD dwVersion;
@@ -1660,6 +1696,18 @@ _Success_(return) BOOL VMMDLL_Map_GetNetW(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MA
 EXPORTED_FUNCTION
 _Success_(return) BOOL VMMDLL_Map_GetUsersU(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_USER *ppUserMap);
 _Success_(return) BOOL VMMDLL_Map_GetUsersW(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_USER *ppUserMap);
+
+/*
+* Retrieve a map of detected child virtual machines (VMs).
+* NB! May fail if called shortly after vmm init unless option: -waitinitialize
+* CALLER FREE: VMMDLL_MemFree(*ppVmMap)
+* -- hVMM
+* -- ppVmMap = ptr to receive result on success. must be free'd with VMMDLL_MemFree().
+* -- return = success/fail.
+*/
+EXPORTED_FUNCTION
+_Success_(return) BOOL VMMDLL_Map_GetVMU(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_VM *ppVmMap);
+_Success_(return) BOOL VMMDLL_Map_GetVMW(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_VM *ppVmMap);
 
 /*
 * Retrieve the services currently known by the service control manager (SCM).
@@ -1931,6 +1979,22 @@ BOOL VMMDLL_ProcessGetInformation(
     _In_ DWORD dwPID,
     _Inout_opt_ PVMMDLL_PROCESS_INFORMATION pProcessInformation,
     _In_ PSIZE_T pcbProcessInformation
+);
+
+/*
+* Retrieve various information from all processes (including terminated).
+* CALLER FREE : VMMDLL_MemFree(*ppProcessInformationAll)
+* -- hVMM
+* -- ptr to receive result array of pcProcessInformation items on success.
+*    Must be free'd with VMMDLL_MemFree().
+* -- ptr to DWORD to receive number of items processes on success.
+* -- return = success/fail.
+*/
+EXPORTED_FUNCTION _Success_(return)
+BOOL VMMDLL_ProcessGetInformationAll(
+    _In_ VMM_HANDLE hVMM,
+    _Out_ PVMMDLL_PROCESS_INFORMATION *ppProcessInformationAll,
+    _Out_ PDWORD pcProcessInformation
 );
 
 #define VMMDLL_PROCESS_INFORMATION_OPT_STRING_PATH_KERNEL           1
@@ -2369,6 +2433,95 @@ typedef struct tdVMMDLL_WIN_THUNKINFO_IAT {
 EXPORTED_FUNCTION
 _Success_(return) BOOL VMMDLL_WinGetThunkInfoIATU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPSTR  uszModuleName, _In_ LPSTR szImportModuleName, _In_ LPSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT);
 _Success_(return) BOOL VMMDLL_WinGetThunkInfoIATW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_ LPSTR szImportModuleName, _In_ LPSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT);
+
+
+
+//-----------------------------------------------------------------------------
+// VMM VM FUNCTIONALITY BELOW:
+//-----------------------------------------------------------------------------
+
+/*
+* Retrieve a VMM handle given a VM handle.
+* This is not allowed on physical memory only VMs.
+* This VMM handle should be closed by calling VMMDLL_Close().
+* -- hVMM
+* -- hVM
+* -- return
+*/
+EXPORTED_FUNCTION _Success_(return != NULL)
+VMM_HANDLE VMMDLL_VmGetVmmHandle(_In_ VMM_HANDLE hVMM, _In_ VMMVM_HANDLE hVM);
+
+/*
+* Initialize a scatter handle which is used to efficiently read/write memory in
+* virtual machines (VMs).
+* CALLER CLOSE: VMMDLL_Scatter_CloseHandle(return)
+* -- hVMM
+* -- hVM = virtual machine handle; acquired from VMMDLL_Map_GetVM*)
+* -- flags = optional flags as given by VMMDLL_FLAG_*
+* -- return = handle to be used in VMMDLL_Scatter_* functions.
+*/
+EXPORTED_FUNCTION _Success_(return != NULL)
+VMMDLL_SCATTER_HANDLE VMMDLL_VmScatterInitialize(_In_ VMM_HANDLE hVMM, _In_ VMMVM_HANDLE hVM);
+
+/*
+* Read virtual machine (VM) guest physical address (GPA) memory.
+* -- hVMM
+* -- hVM = virtual machine handle.
+* -- qwGPA
+* -- pb
+* -- cb
+* -- return = success/fail (depending if all requested bytes are read or not).
+*/
+EXPORTED_FUNCTION _Success_(return)
+BOOL VMMDLL_VmMemRead(_In_ VMM_HANDLE hVMM, _In_ VMMVM_HANDLE hVM, _In_ ULONG64 qwGPA, _Out_writes_(cb) PBYTE pb, _In_ DWORD cb);
+
+/*
+* Write virtual machine (VM) guest physical address (GPA) memory.
+* -- hVMM
+* -- hVM = virtual machine handle.
+* -- qwGPA
+* -- pb
+* -- cb
+* -- return = TRUE on success, FALSE on partial or zero write.
+*/
+EXPORTED_FUNCTION _Success_(return)
+BOOL VMMDLL_VmMemWrite(_In_ VMM_HANDLE hVMM, _In_ VMMVM_HANDLE hVM, _In_ ULONG64 qwGPA, _In_reads_(cb) PBYTE pb, _In_ DWORD cb);
+
+/*
+* Scatter read virtual machine (VM) guest physical address (GPA) memory.
+* Non contiguous 4096-byte pages. Not cached.
+* -- hVmm
+* -- hVM = virtual machine handle.
+* -- ppMEMsGPA
+* -- cpMEMsGPA
+* -- flags = (reserved future use).
+* -- return = the number of successfully read items.
+*/
+EXPORTED_FUNCTION
+DWORD VMMDLL_VmMemReadScatter(_In_ VMM_HANDLE hVMM, _In_ VMMVM_HANDLE hVM, _Inout_ PPMEM_SCATTER ppMEMsGPA, _In_ DWORD cpMEMsGPA, _In_ DWORD flags);
+
+/*
+* Scatter write virtual machine (VM) guest physical address (GPA) memory.
+* Non contiguous 4096-byte pages. Not cached.
+* -- hVmm
+* -- hVM = virtual machine handle.
+* -- ppMEMsGPA
+* -- cpMEMsGPA
+* -- return = the number of hopefully successfully written items.
+*/
+EXPORTED_FUNCTION
+DWORD VMMDLL_VmMemWriteScatter(_In_ VMM_HANDLE hVMM, _In_ VMMVM_HANDLE hVM, _Inout_ PPMEM_SCATTER ppMEMsGPA, _In_ DWORD cpMEMsGPA);
+
+/*
+* Translate a virtual machine (VM) guest physical address (GPA) to a physical address (PA).
+* -- hVMM
+* -- hVM
+* -- qwGPA
+* -- pqwPA
+* -- return = success/fail.
+*/
+EXPORTED_FUNCTION _Success_(return)
+BOOL VMMDLL_VmMemGPA2Phys(_In_ VMM_HANDLE hVMM, _In_ VMMVM_HANDLE hVM, _In_ ULONG64 qwGPA, _Out_ PULONG64 pqwPA);
 
 
 

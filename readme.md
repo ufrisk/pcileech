@@ -49,6 +49,7 @@ Please find a summary of the supported hardware based memory acquisition methods
 | Device                                                                         | Type | Interface | Speed | 64-bit memory access | PCIe TLP access | Plugin | Project<br>Sponsor |
 | -------------------------------------------------------------------------------| ---- | --------- | ----- | -------------------- | --------------- | ------ | ------------------ |
 | [Screamer PCIe Squirrel](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA) | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/PCIeSquirrel) | USB-C | 190MB/s | Yes | Yes | No  | 💖 |
+| [LeetDMA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)                | [FPGA](https://github.com/ufrisk/pcileech-fpga)                          | USB-C | 190MB/s | Yes | Yes | No  | 💖 |
 | [Enigma X1](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)              | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/EnigmaX1)     | USB-C | 200MB/s | Yes | Yes | No  | 💖 |
 | [PCIeScreamerR04](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)        | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB-C | 190MB/s | Yes | Yes | No  | 💖 |
 | [ScreamerM2](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)             | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/ScreamerM2)   | USB3  | 190MB/s | Yes | Yes | No  | 💖 |

@@ -374,6 +374,8 @@ extern "C" {
 #define LC_OPT_CORE_ADDR_MAX                        0x1000000800000000  // R
 #define LC_OPT_CORE_STATISTICS_CALL_COUNT           0x4000000900000000  // R [lo-dword: LC_STATISTICS_ID_*]
 #define LC_OPT_CORE_STATISTICS_CALL_TIME            0x4000000a00000000  // R [lo-dword: LC_STATISTICS_ID_*]
+#define LC_OPT_CORE_VOLATILE                        0x1000000b00000000  // R
+#define LC_OPT_CORE_READONLY                        0x1000000c00000000  // R
 
 #define LC_OPT_MEMORYINFO_VALID                     0x0200000100000000  // R
 #define LC_OPT_MEMORYINFO_FLAG_32BIT                0x0200000300000000  // R
