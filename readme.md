@@ -151,7 +151,8 @@ Patch virtual process memory of pid 432 (lsass.exe in this example).
 
 Limitations/Known Issues:
 =========================
-* Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10 with Virtualization based security features enabled does not work fully - this is however not the default setting in Windows 10 or Linux.
+* Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10/11 with Virtualization based security features enabled does not work fully.
+* Recent Windows and Linux versions block DMA by default.
 * Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
 * File system mount support only exists for Windows (Linux version is planned).
 * Remote connectivity support only exists for Windows.
