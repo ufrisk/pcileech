@@ -35,3 +35,19 @@
 #
 # signature for Windows 10 x64 [NtlmShared.dll (2019-12-07)/10.0.19041.1]
 426,48FF155320,435,0F84BAFAFFFF,435,0F85
+#
+# signature for Windows 10 x64 [NtlmShared.dll (2022-08-04)/10.0.19041.1889]
+4B6,48FF15C31F,4C5,0F84BAFAFFFF,4C5,0F85
+#
+# signature for Windows Server2022 x64 [NtlmShared.dll (2022-08-04)/10.0.20348.887]
+A6E,48FF15B328,A7D,0F84B2FAFFFF,A7D,0F85
+#
+# signature for Windows 11 x64 [NtlmShared.dll (2021-06-05)/10.0.22000.1]
+F8B,488BCB48FF,F9D,0F84B2FAFFFF,F9D,0F85
+#
+# signature for Windows 11 x64 [NtlmShared.dll (2022-08-04)/10.0.22000.856]
+00B,488BCB48FF,01D,0F84B2FAFFFF,01D,0F85
+#
+# signature for Windows 11 x64 [NtlmShared.dll (2022-08-05)/10.0.22621.382]
+# signature for Windows 11 x64 [NtlmShared.dll (2022-09-27)/10.0.22621.608]
+FBD,48FF153C23,FCC,0F85C4FAFFFF,FCC,0F85

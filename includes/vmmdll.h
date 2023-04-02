@@ -186,6 +186,7 @@ VOID VMMDLL_MemFree(_Frees_ptr_opt_ PVOID pvMem);
 #define VMMDLL_OPT_CORE_VERBOSE_EXTRA                   0x4000000300000000  // RW
 #define VMMDLL_OPT_CORE_VERBOSE_EXTRA_TLP               0x4000000400000000  // RW
 #define VMMDLL_OPT_CORE_MAX_NATIVE_ADDRESS              0x4000000800000000  // R
+#define VMMDLL_OPT_CORE_LEECHCORE_HANDLE                0x4000001000000000  // R - underlying leechcore handle (do not close).
 
 #define VMMDLL_OPT_CORE_SYSTEM                          0x2000000100000000  // R
 #define VMMDLL_OPT_CORE_MEMORYMODEL                     0x2000000200000000  // R

