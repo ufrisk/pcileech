@@ -50,4 +50,9 @@ VOID Action_TlpTxLoop();
 */
 VOID Action_RegCfgReadWrite();
 
+/*
+* Register a callback that will implement read/write support of PCIe BARs.
+*/
+VOID Extra_BarReadWriteInitialize();
+
 #endif /* __EXTRA_H__ */

@@ -25,6 +25,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         LPSTR sz;
     } ACTION;
     const struct ACTION ACTIONS[] = {
+        {.tp = NONE,.sz = "none"},
         {.tp = INFO,.sz = "info"},
         {.tp = DUMP,.sz = "dump" },
         {.tp = WRITE,.sz = "write" },
@@ -109,6 +110,14 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             continue;
         } else if(0 == strcmp(argv[i], "-all")) {
             ctxMain->cfg.fPatchAll = TRUE;
+            i++;
+            continue;
+        } else if(0 == _stricmp(argv[i], "-bar-ro")) {
+            ctxMain->cfg.fBarZeroReadOnly = TRUE;
+            i++;
+            continue;
+        } else if(0 == _stricmp(argv[i], "-bar-rw")) {
+            ctxMain->cfg.fBarZeroReadWrite = TRUE;
             i++;
             continue;
         } else if(0 == strcmp(argv[i], "-force")) {
@@ -338,6 +347,15 @@ int main(_In_ int argc, _In_ char* argv[])
         PCILeechFreeContext();
         return 1;
     }
+    if(ctxMain->cfg.fBarZeroReadWrite) {
+        // pcileech implementation of a zero read/write PCIe BAR.
+        Extra_BarReadWriteInitialize();
+    } else if(ctxMain->cfg.fBarZeroReadOnly) {
+        // use leechcore implementation of a zero read-only PCIe BAR.
+        if(!LcCommand(ctxMain->hLC, LC_CMD_FPGA_BAR_FUNCTION_CALLBACK, 0, (PBYTE)LC_BAR_FUNCTION_CALLBACK_ZEROBAR, NULL, NULL)) {
+            printf("BAR: Error registering callback function and enabling BAR TLP processing.\n");
+        }
+    }
     PCILeechConfigFixup(); // post device config adjustments
     if(ctxMain->cfg.szKMDName[0] || ctxMain->cfg.paKMD) {
         result = KMDOpen();
@@ -354,6 +372,8 @@ int main(_In_ int argc, _In_ char* argv[])
 	PCILeechCtrlHandlerInitialize();
     // main dispatcher
     switch(ctxMain->cfg.tpAction) {
+        case NONE:
+            break;
         case DUMP:
             ActionMemoryDump();
             break;
@@ -456,7 +476,10 @@ int main(_In_ int argc, _In_ char* argv[])
         printf("KMD: Hopefully unloaded.\n");
     }
     if(ctxMain && ctxMain->cfg.dwListenTlpTimeMs) {
-        LcCommand(ctxMain->hLC, LC_CMD_FPGA_LISTEN_TLP, sizeof(DWORD), (PBYTE)&ctxMain->cfg.dwListenTlpTimeMs, NULL, NULL);
+        Sleep(50);
+        LcCommand(ctxMain->hLC, LC_CMD_FPGA_TLP_FUNCTION_CALLBACK, 0, (PBYTE)LC_TLP_FUNCTION_CALLBACK_DUMMY, NULL, NULL);
+        Sleep(ctxMain->cfg.dwListenTlpTimeMs);
+        LcCommand(ctxMain->hLC, LC_CMD_FPGA_TLP_FUNCTION_CALLBACK, 0, (PBYTE)LC_TLP_FUNCTION_CALLBACK_DISABLE, NULL, NULL);
     }
     PCILeechFreeContext();
 #ifdef LINUX

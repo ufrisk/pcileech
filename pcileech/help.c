@@ -45,6 +45,7 @@ VOID Help_ShowGeneral()
         " For detailed help about a specific command type:  pcileech <command> -help    \n" \
         " General syntax: pcileech <command> [-<optionname1> <optionvalue1>] ...        \n" \
         " VALID COMMANDS           MODEs        [ OPTIONS ]    (REQUIREMENTS)           \n" \
+        "   none                   NATIVE,KMD                                           \n" \
         "   info                   NATIVE,KMD                                           \n" \
         "   dump                   NATIVE,KMD [ min, max, out ]                         \n" \
         "   patch                  NATIVE,KMD [ min, max, sig, all, pid,vamin,vamax ]   \n" \
@@ -114,6 +115,12 @@ VOID Help_ShowGeneral()
         "          Option has no value. Example: -force                                 \n" \
         "   -tlpwait: Wait in seconds while listening for PCIe TLPs.                    \n" \
         "          Wait occurs after any other actions have been completed.             \n" \
+        "   -bar-ro: Add PCIe BAR support (read-only) in the background.                \n" \
+        "          Combine with command 'none' and option '-tlpwait'.                   \n" \
+        "          Option has no value. Example: -bar-ro                                \n" \
+        "   -bar-rw: Add PCIe BAR support (read/write) in the background.               \n" \
+        "          Combine with command 'none' and option '-tlpwait'.                   \n" \
+        "          Option has no value. Example: -bar-rw                                \n" \
         "   -help: show help about the selected command or implant and then exit        \n" \
         "          without running the command. Affects all modes and commands.         \n" \
         "          Option has no value. Example: -help                                  \n" \
@@ -661,6 +668,18 @@ VOID Help_ShowDetailed()
             " 1) Run memory analysis on remote host using WinPmem and save result in c:\\temp\n" \
             "    pcileech.exe agent-forensic -out c:\temp -device pmem                      \n" \
             "                 -remote rpc://test1$@contoso.com:test1.contoso.com            \n" \
+        );
+        break;
+    case NONE:
+        printf(
+            " PERFORM NO ACTION AT ALL - 'NONE' ACTION                                      \n" \
+            " MODES   : NATIVE, KMD                                                         \n" \
+            " OPTIONS : -tlpwait -bar-ro -bar-rw                                            \n" \
+            " Perform no action at all. This may be useful when just listening for incoming \n" \
+            " TLPs or when implemeting the PCIe BARs in software (e.g. for testing).        \n" \
+            " EXAMPLES:      (example kernel module is loaded at address 0x7fffe000)        \n" \
+            " 1) listen for TLPs and implement PCIe BAR support in read/write mode.         \n" \
+            "    pcileech none -device fpga -vvv -tlpwait 10000 -bar-rw                     \n" \
         );
         break;
     case EXEC_KMD:

@@ -33,6 +33,7 @@ typedef struct tdPCILEECH_CONTEXT        PCILEECH_CONTEXT, *PPCILEECH_CONTEXT;
 
 typedef enum tdActionType {
     NA,
+    NONE,
     INFO,
     DUMP,
     WRITE,
@@ -109,6 +110,8 @@ typedef struct tdConfig {
     BOOL fAddrKMDSetByArgument;
     BOOL fLoop;
     BOOL fUserInteract;
+    BOOL fBarZeroReadOnly;
+    BOOL fBarZeroReadWrite;
 } CONFIG, *PCONFIG;
 
 #define SIGNATURE_CHUNK_TP_OFFSET_FIXED     0

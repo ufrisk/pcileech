@@ -271,6 +271,58 @@ VOID ActionMemoryProbe()
     printf("Memory Probe: Completed.\n");
 }
 
+VOID ActionMemoryDisplayPhysical2()
+{
+    QWORD qwAddrBase, qwAddrOffset, qwSize, qwSize_4kAlign, i;
+    PBYTE pb, pb2;
+    printf("here!\n");
+    // allocate and calculate values
+    pb = LocalAlloc(0, 0x10000);
+    pb2 = LocalAlloc(0, 0x10000);
+    if(!pb || !pb2) { return; }
+    qwAddrBase = ctxMain->cfg.paAddrMin & 0x0fffffffffffff000;
+    qwAddrOffset = ctxMain->cfg.paAddrMin & 0xff0;
+    qwSize_4kAlign = SIZE_PAGE_ALIGN_4K(ctxMain->cfg.paAddrMax) - qwAddrBase;
+    qwSize = ((ctxMain->cfg.paAddrMax + 0xf) & 0x0fffffffffffffff0) - (qwAddrBase + qwAddrOffset);
+    if(qwSize_4kAlign > 0x10000 || (ctxMain->cfg.paAddrMax == ctxMain->dev.paMax)) {
+        qwSize = 0x100;
+        qwSize_4kAlign = (qwAddrOffset <= 0xf00) ? 0x1000 : 0x2000;
+    }
+    if(!DeviceReadMEM(qwAddrBase, (DWORD)qwSize_4kAlign, pb, TRUE)) {
+        printf("Memory Display: Failed reading memory at address: 0x%016llX.\n", qwAddrBase);
+        LocalFree(pb);
+        return;
+    }
+
+    BYTE pbx[1];
+    MEM_SCATTER Scatter = { 0 };
+    Scatter.pb = pbx;
+    Scatter.cb = 1;
+    Scatter.version = MEM_SCATTER_VERSION;
+    PMEM_SCATTER pMEM = &Scatter;
+
+    // read memory and display output
+    for(i = 0; i < qwSize_4kAlign; i += 1) {
+        ZeroMemory(pbx, sizeof(pbx));
+        Scatter.f = FALSE;
+        Scatter.qwA = qwAddrBase + i;
+        LcReadScatter(ctxMain->hLC, 1, &pMEM);
+        memcpy(pb2 + i, pbx, 1);
+    }
+
+
+    /*if(memcmp(pb, pb2, qwSize_4kAlign)) {
+        printf("Memory Display: BAD DIFF MEMORY\n");
+        LocalFree(pb);
+        return;
+    }*/
+    printf("Memory Display: Contents for address: 0x%016llX\n", qwAddrBase);
+    Util_PrintHexAscii(pb, (DWORD)(qwSize + qwAddrOffset), (DWORD)qwAddrOffset);
+    printf("---------\n");
+    Util_PrintHexAscii(pb2, (DWORD)(qwSize + qwAddrOffset), (DWORD)qwAddrOffset);
+    LocalFree(pb);
+}
+
 VOID ActionMemoryDisplayPhysical()
 {
     QWORD qwAddrBase, qwAddrOffset, qwSize, qwSize_4kAlign;
@@ -295,6 +347,7 @@ VOID ActionMemoryDisplayPhysical()
     printf("Memory Display: Contents for address: 0x%016llX\n", qwAddrBase);
     Util_PrintHexAscii(pb, (DWORD)(qwSize + qwAddrOffset), (DWORD)qwAddrOffset);
     LocalFree(pb);
+    ActionMemoryDisplayPhysical2();
 }
 
 VOID ActionMemoryDisplayVirtual()

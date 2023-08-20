@@ -218,6 +218,15 @@ VOID Action_PT_Virt2Phys()
     }
 }
 
+/*
+* Dummy callback to receive TLPs from LeechCore.
+* This is required to keep TLP receiver thread in LeechCore running.
+*/
+VOID Action_TlpTx_DummyCB(_In_opt_ PVOID ctx, _In_ DWORD cbTlp, _In_ PBYTE pbTlp, _In_opt_ DWORD cbInfo, _In_opt_ LPSTR szInfo)
+{
+    ;
+}
+
 VOID Action_TlpTx()
 {
     DWORD dwListenTlpMs = 100;
@@ -230,16 +239,17 @@ VOID Action_TlpTx()
         return;
     }
     printf("TLP: Transmitting PCIe TLP.%s\n", ctxMain->cfg.fVerboseExtra ? "" : " (use -vvv option for detailed info).");
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_TLP_FUNCTION_CALLBACK, 0, (PBYTE)LC_TLP_FUNCTION_CALLBACK_DUMMY, NULL, NULL);
     if(ctxMain->cfg.fLoop) {
         printf("TLP: Starting loop TLP transmit. Press CTRL+C to abort.\n");
         while(TRUE) {
-            LcCommand(ctxMain->hLC, LC_CMD_FPGA_WRITE_TLP, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, NULL, NULL);
-            LcCommand(ctxMain->hLC, LC_CMD_FPGA_LISTEN_TLP, sizeof(DWORD), (PBYTE)&dwListenTlpMs, NULL, NULL);
+            LcCommand(ctxMain->hLC, LC_CMD_FPGA_TLP_WRITE_SINGLE, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, NULL, NULL);
         }
         return;
     }
-    LcCommand(ctxMain->hLC, LC_CMD_FPGA_WRITE_TLP, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, NULL, NULL);
-    LcCommand(ctxMain->hLC, LC_CMD_FPGA_LISTEN_TLP, sizeof(DWORD), (PBYTE)&dwListenTlpMs, NULL, NULL);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_TLP_WRITE_SINGLE, (DWORD)ctxMain->cfg.cbIn, ctxMain->cfg.pbIn, NULL, NULL);
+    Sleep(dwListenTlpMs);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_TLP_FUNCTION_CALLBACK, 0, (PBYTE)LC_TLP_FUNCTION_CALLBACK_DISABLE, NULL, NULL);
 }
 
 VOID Action_TlpTxLoop()
@@ -265,6 +275,8 @@ VOID Action_TlpTxLoop()
         printf("Action_TlpTxLoop: FPGA version not supported (bitstream v4.2 or later required).\n");
         return;
     }
+    // start background reader thread (to print out any received TLPs):
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_TLP_FUNCTION_CALLBACK, 0, (PBYTE)LC_TLP_FUNCTION_CALLBACK_DUMMY, NULL, NULL);
     printf("TLP: Transmitting PCIe LOOP TLPs. Press any key to stop.%s\n", ctxMain->cfg.fVerboseExtra ? "" : " (use -vvv option for detailed info).");
     // tx each 64 clk [66MHz - 15ns clk] (15ns * 64 -> ~1uS)
     LcCommand(ctxMain->hLC, LC_CMD_FPGA_CFGREGPCIE | 0x801e, sizeof(WORD), (PBYTE)&wTxSleep, NULL, NULL);
@@ -285,10 +297,11 @@ VOID Action_TlpTxLoop()
     LcCommand(ctxMain->hLC, LC_CMD_FPGA_CFGREGPCIE_MARKWR | 0x8002, sizeof(DWORD), (PBYTE)&dwEnableTx, NULL, NULL);
     // wait for keypress to stop
     while(!_kbhit()) {
-        LcCommand(ctxMain->hLC, LC_CMD_FPGA_LISTEN_TLP, sizeof(DWORD), (PBYTE)&dwListenTlpMs, NULL, NULL);
+        ;
     }
     // stop
     LcCommand(ctxMain->hLC, LC_CMD_FPGA_CFGREGPCIE_MARKWR | 0x8002, sizeof(DWORD), (PBYTE)&dwDisableTx, NULL, NULL);
+    LcCommand(ctxMain->hLC, LC_CMD_FPGA_TLP_FUNCTION_CALLBACK, 0, (PBYTE)LC_TLP_FUNCTION_CALLBACK_DISABLE, NULL, NULL);
 }
 
 /*
@@ -365,4 +378,61 @@ VOID Action_RegCfgReadWrite()
 fail:
     if(pFile) { fclose(pFile); }
     LcMemFree(pbLcCfgSpace4096);
+}
+
+
+
+//-----------------------------------------------------------------------------
+// PCIe BAR read/write functionality (with callback) below:
+//-----------------------------------------------------------------------------
+static PBYTE pbBarBuffer[6] = { NULL, NULL, NULL, NULL, NULL, NULL };
+
+/*
+* Callback function to be called when a PCIe BAR read/write is requested from the host system.
+*/
+VOID Extra_BarReadWriteCallback(_Inout_ PLC_BAR_REQUEST pBarRequest)
+{
+    PBYTE pb = pbBarBuffer[pBarRequest->pBar->iBar];
+    if(pBarRequest->fWrite && pb) {
+        memcpy(pb + pBarRequest->oData, pBarRequest->pbData, pBarRequest->cbData);
+        return;
+    }
+    if(pBarRequest->fRead && pb) {
+        memcpy(pBarRequest->pbData, pb + pBarRequest->oData, pBarRequest->cbData);
+        pBarRequest->fReadReply = TRUE;
+        return;
+    }
+}
+
+/*
+* Register a callback that will implement read/write support of PCIe BARs.
+*/
+VOID Extra_BarReadWriteInitialize()
+{
+    DWORD i;
+    LC_BAR Bar[6] = { 0 };
+    PBYTE pbBarInfoBuffer = NULL;
+    // 1: retrieve BAR info from the FPGA using the LC_CMD_FPGA_BAR_INFO command, copy and free memory.
+    if(!LcCommand(ctxMain->hLC, LC_CMD_FPGA_BAR_INFO, 0, NULL, &pbBarInfoBuffer, NULL) || !pbBarInfoBuffer) {
+        printf("BAR: Error reading BAR info.\n");
+        return;
+    }
+    memcpy(Bar, pbBarInfoBuffer, 6 * sizeof(LC_BAR));
+    LcMemFree(pbBarInfoBuffer);
+    pbBarInfoBuffer = NULL;
+    // 2: allocate memory for BARs (if sane buffer sizes):
+    for(i = 0; i < 6; i++) {
+        if(Bar[i].fValid && Bar[i].cb < 128*1024*1024) {
+            pbBarBuffer[i] = LocalAlloc(LMEM_ZEROINIT, Bar[i].cb);
+            if(!pbBarBuffer[i]) {
+                printf("BAR: Error allocating memory for BAR %i.\n", i);
+                return;
+            }
+        }
+    }
+    // 3: register callback function for BAR read/write requests:
+    if(!LcCommand(ctxMain->hLC, LC_CMD_FPGA_BAR_FUNCTION_CALLBACK, 0, (PBYTE)Extra_BarReadWriteCallback, NULL, NULL)) {
+        printf("BAR: Error registering callback function and enabling BAR TLP processing.\n");
+        return;
+    }
 }

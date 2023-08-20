@@ -282,5 +282,7 @@ v4.1
 [v4.15](https://github.com/ufrisk/pcileech/releases/tag/v4.15)
 * Support for MemProcFS v5.0
 
-Latest:
+[v4.16](https://github.com/ufrisk/pcileech/releases/tag/v4.16)
 * FPGA performance improvements.
+* Command `none` added.
+* Options `-bar-ro` and `-bar-rw` added.
