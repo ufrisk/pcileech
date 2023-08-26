@@ -286,3 +286,6 @@ v4.1
 * FPGA performance improvements.
 * Command `none` added.
 * Options `-bar-ro` and `-bar-rw` added.
+
+Latest:
+* I/O BAR support.

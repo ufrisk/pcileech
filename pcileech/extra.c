@@ -392,10 +392,35 @@ static PBYTE pbBarBuffer[6] = { NULL, NULL, NULL, NULL, NULL, NULL };
 */
 VOID Extra_BarReadWriteCallback(_Inout_ PLC_BAR_REQUEST pBarRequest)
 {
+    DWORD i;
     PBYTE pb = pbBarBuffer[pBarRequest->pBar->iBar];
     if(pBarRequest->fWrite && pb) {
-        memcpy(pb + pBarRequest->oData, pBarRequest->pbData, pBarRequest->cbData);
-        return;
+        if((pBarRequest->bFirstBE == 0xf) && (pBarRequest->bLastBE == 0xf)) {
+            // full write:
+            memcpy(pb + pBarRequest->oData, pBarRequest->pbData, pBarRequest->cbData);
+            return;
+        } else {
+            // partial write:
+            // first byte enable:
+            for(i = 0; i < 4; i++) {
+                if((pBarRequest->bFirstBE >> i) & 1) {
+                    pb[pBarRequest->oData + i] = pBarRequest->pbData[i];
+                }
+            }
+            // middle bytes:
+            if(pBarRequest->cbData > 8) {
+                memcpy(pb + pBarRequest->oData + 4, pBarRequest->pbData + 4, pBarRequest->cbData - 8);
+            }
+            // last byte enable:
+            if(pBarRequest->cbData > 4) {
+                for(i = 0; i < 4; i++) {
+                    if((pBarRequest->bLastBE >> i) & 1) {
+                        pb[pBarRequest->oData + pBarRequest->cbData - 4 + i] = pBarRequest->pbData[pBarRequest->cbData - 4 + i];
+                    }
+                }
+            }
+            return;
+        }
     }
     if(pBarRequest->fRead && pb) {
         memcpy(pBarRequest->pbData, pb + pBarRequest->oData, pBarRequest->cbData);
