@@ -630,7 +630,7 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
     // Optional forensic plugin functionality for forensic (more comprehensive)
     // analysis of various data. Functions are optional.
     // Functions are called in the below order and way.
-    // 1: pfnInitialize()            - single-threaded.
+    // 1: pfnInitialize()            - multi-threaded (between plugins).
     // 2: (multiple types see below) - multi-threaded (between plugins).
     //    pfnLogCSV()
     //    pfnLogJSON()

@@ -424,7 +424,7 @@ QWORD KMD_Linux48KernelBaseSeek()
     PPAGE_STATISTICS pPageStat = NULL;
     BYTE pb[0x1000], pbCMPcc[0x400], pbCMP90[0x400], pbCMP00[0x100];
     QWORD qwA, qwAddrMax, i;
-    BOOL isAuthenticAMD, isGenuineIntel;
+    BOOL isAuthenticAMD, isGenuineIntel, isOK;
     memset(pbCMPcc, 0xcc, 0x400);
     memset(pbCMP90, 0x90, 0x400);
     memset(pbCMP00, 0x00, 0x100);
@@ -454,17 +454,15 @@ QWORD KMD_Linux48KernelBaseSeek()
         if(!LcRead(ctxMain->hLC, qwA, 0x1000, pb) || (memcmp(pb + 0xc00, pbCMP90, 0x400) && memcmp(pb + 0xc00, pbCMPcc, 0x400))) {
             continue;
         }
-        // read kernel base +0x1000/+0x2000 (hypercall page?) and check that it ends with at least 0x100 0x00.
-        // alternatively that it ends with a number of (0x90+0xC3)NOP+RET
-        if(!LcRead(ctxMain->hLC, qwA + 0x1000, 0x1000, pb) || memcmp(pb + 0xf00, pbCMP00, 0x100)) {
-            if(!LcRead(ctxMain->hLC, qwA + 0x2000, 0x1000, pb) || memcmp(pb + 0xf00, pbCMP00, 0x100)) {
-                if(memcmp(pb + 0xfe0, pbCMP90, 0x1f)) {
-                    continue;
-                }
-            }
+        // read kernel base +0x1000/+0x2000 (hypercall page?) and check that it ends/contains:
+        isOK = (LcRead(ctxMain->hLC, qwA + 0x1000, 0x1000, pb) && !memcmp(pb + 0xf00, pbCMP00, 0x100));             // at least 0x100 0x00
+        isOK = isOK || (LcRead(ctxMain->hLC, qwA + 0x2000, 0x1000, pb) && !memcmp(pb + 0xf00, pbCMP00, 0x100));     // at least 0x100 0x00
+        isOK = isOK || !memcmp(pb + 0xfe0, pbCMP90, 0x1f);                                                          // ends with a number of (0x90+0xC3)NOP+RET
+        isOK = isOK || ((pb[0xfe0] == 0xc3) && !memcmp(pb + 0xfe1, pbCMPcc, 0x1f));                                 // ends with a number of (0xCC+0xC3)INT3+RET
+        if(isOK) {
+            PageStatClose(&pPageStat);
+            return qwA;
         }
-        PageStatClose(&pPageStat);
-        return qwA;
     }
     PageStatClose(&pPageStat);
     return 0;

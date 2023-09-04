@@ -289,3 +289,4 @@ v4.1
 
 Latest:
 * I/O BAR support.
+* Linux KMD signature update (LINUX_X64_48) to support kernel 5.15.
