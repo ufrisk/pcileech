@@ -423,7 +423,7 @@ QWORD KMD_Linux48KernelBaseSeek()
 {
     PPAGE_STATISTICS pPageStat = NULL;
     BYTE pb[0x1000], pbCMPcc[0x400], pbCMP90[0x400], pbCMP00[0x100];
-    QWORD qwA, qwAddrMax, i;
+    QWORD qwA, qwAddrMax, i, paKernelBaseLowQuality = 0;
     BOOL isAuthenticAMD, isGenuineIntel, isOK;
     memset(pbCMPcc, 0xcc, 0x400);
     memset(pbCMP90, 0x90, 0x400);
@@ -450,6 +450,8 @@ QWORD KMD_Linux48KernelBaseSeek()
         if(!isGenuineIntel || !isAuthenticAMD) {
             continue;
         }
+        // This is a low-quality candidate, save in case we don't find a better one.
+        paKernelBaseLowQuality = qwA;
         // Verify that page ends with 0x400 NOPs (0x90) or 0x400 0xCC.
         if(!LcRead(ctxMain->hLC, qwA, 0x1000, pb) || (memcmp(pb + 0xc00, pbCMP90, 0x400) && memcmp(pb + 0xc00, pbCMPcc, 0x400))) {
             continue;
@@ -465,10 +467,10 @@ QWORD KMD_Linux48KernelBaseSeek()
         }
     }
     PageStatClose(&pPageStat);
-    return 0;
+    return paKernelBaseLowQuality;
 }
 
-#define KMD_LINUX48SEEK_MAX_BYTES       0x02000000      // 32MB
+#define KMD_LINUX48SEEK_MAX_BYTES       0x03000000      // 48MB
 VOID KMD_Linux48KernelSeekSignature_KallsymsFromKDBGetSym(_In_reads_(KMD_LINUX48SEEK_MAX_BYTES) PBYTE pb, _In_ PKERNELSEEKER pKDBGetSym, _Inout_ PKERNELSEEKER pKallsyms)
 {
     DWORD o, aRel;
@@ -495,10 +497,11 @@ BOOL KMD_Linux48KernelSeekSignature(_Out_ PSIGNATURE pSignature)
     PBYTE pb = NULL;
     QWORD paKernelBase;
     PPAGE_STATISTICS pPageStat = NULL;
-    KERNELSEEKER ks[3] = {
-        { .pbSeek = (PBYTE)"\0kallsyms_lookup_name",.cbSeek = 22 },
-        { .pbSeek = (PBYTE)"\0vfs_read",.cbSeek = 10 },
-        { .pbSeek = (PBYTE)"\0kdbgetsymval",.cbSeek = 14 }
+    KERNELSEEKER ks[4] = {
+        { .pbSeek = (PBYTE)"\0kallsyms_lookup_name",.cbSeek = 22 },     // kallsyms_lookup_name
+        { .pbSeek = (PBYTE)"\0vfs_read",.cbSeek = 10 },                 // primary hook site
+        { .pbSeek = (PBYTE)"\0kdbgetsymval",.cbSeek = 14 },             // fallback kallsyms_lookup_name
+        { .pbSeek = (PBYTE)"\0vfs_getattr_nosec",.cbSeek = 19 },        // fallback hook site
     };
     if(!(pb = LocalAlloc(0, KMD_LINUX48SEEK_MAX_BYTES))) { goto fail; }
     paKernelBase = KMD_Linux48KernelBaseSeek();
@@ -507,11 +510,14 @@ BOOL KMD_Linux48KernelSeekSignature(_Out_ PSIGNATURE pSignature)
     if(!PageStatInitialize(&pPageStat, paKernelBase, paKernelBase + KMD_LINUX48SEEK_MAX_BYTES, "Verifying Linux kernel base", FALSE, FALSE)) { goto fail; }
     PageStatUpdate(pPageStat, paKernelBase, 0, 0);
     DeviceReadDMA(paKernelBase, KMD_LINUX48SEEK_MAX_BYTES, pb, pPageStat);
-    KMD_LinuxFindFunctionAddr(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 3);
-    KMD_LinuxFindFunctionAddrTBL_Absolute(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 3);
-    KMD_LinuxFindFunctionAddrTBL_Relative(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 3);
+    KMD_LinuxFindFunctionAddr(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 4);
+    KMD_LinuxFindFunctionAddrTBL_Absolute(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 4);
+    KMD_LinuxFindFunctionAddrTBL_Relative(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 4);
     if(!ks[0].vaFn && ks[2].vaFn) { // kdbgetsymval exists; but not kallsyms_lookup_name not located
         KMD_Linux48KernelSeekSignature_KallsymsFromKDBGetSym(pb, &ks[2], &ks[0]);
+    }
+    if(!ks[1].vaFn && ks[3].vaFn) {
+        memcpy(&ks[1], &ks[3], sizeof(KERNELSEEKER));
     }
     if(ks[0].vaFn && ks[1].vaFn) {
         Util_CreateSignatureLinuxGeneric(paKernelBase, ks[0].aSeek, ks[0].vaSeek, ks[0].vaFn, ks[1].aSeek, ks[1].vaSeek, ks[1].vaFn, pSignature);

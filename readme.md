@@ -289,4 +289,5 @@ v4.1
 
 Latest:
 * I/O BAR support.
-* Linux KMD signature update (LINUX_X64_48) to support kernel 5.15.
+* Linux KMD signature update (LINUX_X64_48) to support latest Ubuntu kernels.
+* New linux kernel module: lx64_exec_root.
