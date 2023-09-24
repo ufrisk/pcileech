@@ -147,6 +147,9 @@
     <ClCompile Include="wx64_umd_exec_c.c">
       <Filter>Source Files\umd_exec</Filter>
     </ClCompile>
+    <ClCompile Include="lx64_exec_root.c">
+      <Filter>Source Files\exec</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="lx64_common_a.asm">

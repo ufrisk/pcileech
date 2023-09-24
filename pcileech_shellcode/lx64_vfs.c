@@ -124,7 +124,7 @@ struct kstat_4_11 {
 	struct timespec ctime;
 	struct timespec btime;
 	QWORD	blocks;
-	QWORD	_pcileech_dummy_extra[2];
+	QWORD	_pcileech_dummy_extra[4];
 };
 
 //-----------------------------------------------------------------------------
@@ -208,11 +208,15 @@ static int VfsList_CallbackIterateDir(PDIR_CONTEXT_EXTENDED ctx, const char *nam
 	UNREFERENCED_PARAMETER(pos);
 	QWORD i;
 	PVFS_RESULT_FILEINFO pfi;
+	// note: function signature of filldir_t signature changed from returning int
+	// to returning bool in kernel 6.1. set_memory_rox was added in kernel 6.2 -
+	// since this is close enough use it. For kernel 6.2 iterate will fail after
+	// first item, but it's a small enough issue to ignore for now.
+	int retval = ctx->pk->fnlx.set_memory_rox ? 1 : 0;
 	if(ctx->pk->dataOutExtraLength + sizeof(VFS_RESULT_FILEINFO) > ctx->pk->dataOutExtraLengthMax) {
-		return 0;
+		return retval;
 	}
 	pfi = (PVFS_RESULT_FILEINFO)(ctx->pk->DMAAddrVirtual + ctx->pk->dataOutExtraOffset + ctx->pk->dataOutExtraLength);
-	SysVCall(ctx->fn->memset, pfi, 0, sizeof(VFS_RESULT_FILEINFO));
 	switch(d_type) {
 		case DT_REG:
 			pfi->flags = VFS_FLAGS_FILE_NORMAL;
@@ -227,11 +231,12 @@ static int VfsList_CallbackIterateDir(PDIR_CONTEXT_EXTENDED ctx, const char *nam
 			pfi->flags = VFS_FLAGS_FILE_OTHER;
 			break;
 	}
-	for(i = 0; i < len && i < MAX_PATH - 1; i++) {
+	for(i = 0; (i < len) && (i < MAX_PATH - 1); i++) {
 		pfi->wszFileName[i] = name[i];
 	}
+	pfi->wszFileName[i] = 0;
 	ctx->pk->dataOutExtraLength += sizeof(VFS_RESULT_FILEINFO);
-	return 0;
+	return retval;
 }
 
 QWORD UnixToWindowsFiletime(QWORD tv) {
@@ -254,8 +259,10 @@ VOID VfsList_SetSizeTime(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 		if(0 == pop->szFileName[o]) { break; }
 		sz[o] = pop->szFileName[o];
 	}
-	sz[o] = '/';
-	o++;
+	if(o && (sz[o - 1] != '/')) {
+		sz[o] = '/';
+		o++;
+	}
 	pk->dataOut[2] = cfi;
 	for(p = 0; p < cfi; p++) {
 		pfi = (PVFS_RESULT_FILEINFO)(pk->DMAAddrVirtual + pk->dataOutExtraOffset + p * sizeof(VFS_RESULT_FILEINFO));
@@ -266,14 +273,17 @@ VOID VfsList_SetSizeTime(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 		}
 		sz[o + i] = 0;
 		if(pfn2->vfs_statx_opt) { // 4.11 kernels and later.
-			result = SysVCall(pfn2->vfs_statx_opt, AT_FDCWD, sz, AT_NO_AUTOMOUNT, &kstat_4_11, STATX_BASIC_STATS);
-			if(result && pfn2->kern_path_opt && pfn2->vfs_getattr_nosec_opt) {
-				// 5.12 kernels and later will fail vfs_statx - use alternative method:
+			result = 1;
+			// 5.12 kernels and later will fail vfs_statx - use alternative method first:
+			if(pfn2->kern_path_opt && pfn2->vfs_getattr_nosec_opt) {
 				result = SysVCall(pfn2->kern_path_opt, sz, AT_NO_AUTOMOUNT, path);
 				if(0 == result) {
 					result = SysVCall(pfn2->vfs_getattr_nosec_opt, path, &kstat_4_11, STATX_BASIC_STATS, 0);
 					if(pfn2->path_put_opt) { SysVCall(pfn2->path_put_opt, path); }
 				}
+			} else {
+				// This will fail on kernel 5.18 and later due to signature change of vfs_statx
+				result = SysVCall(pfn2->vfs_statx_opt, AT_FDCWD, sz, AT_NO_AUTOMOUNT, &kstat_4_11, STATX_BASIC_STATS);
 			}
 			if(0 == result) {
 				pfi->cb = kstat_4_11.size;
@@ -281,7 +291,7 @@ VOID VfsList_SetSizeTime(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 				pfi->tCreateOpt = UnixToWindowsFiletime(kstat_4_11.ctime.tv_sec);
 				pfi->tModifyOpt = UnixToWindowsFiletime(kstat_4_11.mtime.tv_sec);
 			}
-		} else { // 4.10 kernels and earlier.
+		} else if(pfn2->vfs_stat_opt) { // 4.10 kernels and earlier.
 			result = SysVCall(pfn2->vfs_stat_opt, sz, &kstat_4_10);
 			if(0 == result) {
 				pfi->cb = kstat_4_10.size;
@@ -304,6 +314,7 @@ STATUS VfsList(PKMDDATA pk, PFN2 pfn2, PVFS_OPERATION pop)
 	}
 	WinCallSetFunction((QWORD)VfsList_CallbackIterateDir);
 	dce.ctx.actor = (QWORD)WinCall;
+	dce.ctx.pos = 0;
 	dce.fn = pfn2;
 	dce.pk = pk;
 	dce.pop = pop;

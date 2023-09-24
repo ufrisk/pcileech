@@ -4,7 +4,7 @@
 // cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel lx64_common.c
 // cl.exe /O1 /Os /Oy /FD /MT /GS- /J /GR- /FAcs /W4 /Zl /c /TC /kernel lx64_exec_root.c
 // ml64 lx64_common_a.asm /Felx64_exec_root.exe /link /NODEFAULTLIB /RELEASE /MACHINE:X64 /entry:main lx64_exec_root.obj lx64_common.obj
-// shellcode64.exe -o lx64_exec_root.exe "EXECUTE A COMMAND AS ROOT                                      \nLINUX X64 EDITION                                              \n===============================================================\nExecute a program as root.                                     \nREQUIRED OPTIONS:                                              \n  -s : command to execute including parameters                 \n         Example: '-s touch /tmp/testfile.txt'                 \n===== EXECUTION ATTEMPT DETAILED RESULT INFORMATION ===========\nEXECUTE AS ROOT RESULT: %s\nRESULT CODE   : 0x%08X\n==============================================================="
+// shellcode64.exe -o lx64_exec_root.exe "EXECUTE A COMMAND AS ROOT                                      \nLINUX X64 EDITION                                              \n===============================================================\nExecute a program as root.                                     \nREQUIRED OPTIONS:                                              \n  -s : command to execute including parameters                 \n         Example: '-s touch /tmp/testfile.txt'                 \n  -1   : run flag - set to non zero to execute command.        \n===== EXECUTION ATTEMPT DETAILED RESULT INFORMATION ===========\nEXECUTE AS ROOT RESULT: %s\nRESULT CODE   : 0x%08X\n==============================================================="
 //
 
 #include "lx64_common.h"
@@ -32,6 +32,11 @@ VOID c_EntryPoint(PKMDDATA pk)
     CHAR e1[] = { 'T', 'E', 'R', 'M', '=', 'l', 'i', 'n', 'u', 'x', 0 };
     CHAR e2[] = { 'P', 'A', 'T', 'H', '=', '/', 'b', 'i', 'n', ':', '/', 's', 'b', 'i', 'n', ':', '/', 'u', 's', 'r', '/', 'b', 'i', 'n', ':', '/', 'u', 's', 'r', '/', 's', 'b', 'i', 'n', 0 };
     char* envp[4] = { e0, e1, e2, NULL };
+
+	if(!pk->dataIn[1]) {
+		pk->dataOut[0] = STATUS_FAIL_INPPARAMS_BAD;
+		return;
+	}
 
     if (!LookupFunctions2(pk, &fn2)) {
         pk->dataOut[0] = STATUS_FAIL_FUNCTION_LOOKUP;

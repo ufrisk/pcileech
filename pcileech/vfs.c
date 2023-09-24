@@ -71,6 +71,7 @@ static PVFS_GLOBAL_STATE g_vfs = NULL;
 _Success_(return)
 BOOL VfsInitOperation(_Out_ PVFS_OPERATION pop, _In_ QWORD qwOperation, _In_ LPSTR uszPath)
 {
+    DWORD o;
     ZeroMemory(pop, sizeof(VFS_OPERATION));
     pop->magic = VFS_OP_MAGIC;
     pop->op = qwOperation;
@@ -85,7 +86,9 @@ BOOL VfsInitOperation(_Out_ PVFS_OPERATION pop, _In_ QWORD qwOperation, _In_ LPS
             return TRUE;
         }
     } else {
-        CharUtil_UtoU(uszPath, -1, (PBYTE)pop->szFileName, (DWORD)sizeof(pop->szFileName), NULL, NULL, CHARUTIL_FLAG_STR_BUFONLY | CHARUTIL_FLAG_TRUNCATE_ONFAIL_NULLSTR);
+        pop->szFileName[0] = '/';
+        o = (uszPath[0] == '\\') ? 0 : 1;
+        CharUtil_UtoU(uszPath, -1, (PBYTE)pop->szFileName + o, (DWORD)sizeof(pop->szFileName) - o, NULL, NULL, CHARUTIL_FLAG_STR_BUFONLY | CHARUTIL_FLAG_TRUNCATE_ONFAIL_NULLSTR);
         CharUtil_ReplaceAllA(pop->szFileName, '\\', '/');
         return TRUE;
     }

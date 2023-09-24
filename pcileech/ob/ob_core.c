@@ -14,7 +14,7 @@
 // - such as decreasing reference count of sub-objects contained in the object
 // that is to be deallocated.
 //
-// (c) Ulf Frisk, 2018-2022
+// (c) Ulf Frisk, 2018-2023
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "ob.h"
@@ -26,6 +26,7 @@
 
 /*
 * Allocate a new object manager memory object.
+* -- H = an optional handle to embed as OB.H in the header.
 * -- tag = tag of the object to be allocated.
 * -- uFlags = flags as given by LocalAlloc.
 * -- uBytes = bytes of object (_including_ object headers).
@@ -34,17 +35,19 @@
 * -- pfnRef_1 = optional callback for when object reach refcount = 1 (excl. initial).
 * -- return = allocated object on success, with refcount = 1, - NULL on fail.
 */
-PVOID Ob_Alloc(_In_ DWORD tag, _In_ UINT uFlags, _In_ SIZE_T uBytes, _In_opt_ VOID(*pfnRef_0)(_In_ PVOID pOb), _In_opt_ VOID(*pfnRef_1)(_In_ PVOID pOb))
+PVOID Ob_AllocEx(_In_opt_ VMM_HANDLE H, _In_ DWORD tag, _In_ UINT uFlags, _In_ SIZE_T uBytes, _In_opt_ OB_CLEANUP_CB pfnRef_0, _In_opt_ OB_CLEANUP_CB pfnRef_1)
 {
     POB pOb;
     if((uBytes > 0x40000000) || (uBytes < sizeof(OB))) { return NULL; }
     pOb = (POB)LocalAlloc(uFlags, uBytes + OB_DEBUG_FOOTER_SIZE);
     if(!pOb) { return NULL; }
-    pOb->_magic = OB_HEADER_MAGIC;
+    pOb->_magic1 = OB_HEADER_MAGIC;
+    pOb->_magic2 = OB_HEADER_MAGIC;
     pOb->_count = 1;
     pOb->_tag = tag;
     pOb->_pfnRef_0 = pfnRef_0;
     pOb->_pfnRef_1 = pfnRef_1;
+    pOb->H = H;
     pOb->cbData = (DWORD)uBytes - sizeof(OB);
 #ifdef OB_DEBUG
     DWORD i, cb = sizeof(OB) + pOb->cbData;
@@ -65,7 +68,7 @@ PVOID Ob_XINCREF(_In_opt_ PVOID pObIn)
 {
     POB pOb = (POB)pObIn;
     if(pOb) {
-        if(pOb->_magic == OB_HEADER_MAGIC) {
+        if((pOb->_magic2 == OB_HEADER_MAGIC) && (pOb->_magic1 == OB_HEADER_MAGIC)) {
             InterlockedIncrement(&pOb->_count);
             return (POB)pOb;
         } else {
@@ -86,7 +89,7 @@ PVOID Ob_XDECREF(_In_opt_ PVOID pObIn)
     POB pOb = (POB)pObIn;
     DWORD c;
     if(pOb) {
-        if(pOb->_magic == OB_HEADER_MAGIC) {
+        if((pOb->_magic2 == OB_HEADER_MAGIC) && (pOb->_magic1 == OB_HEADER_MAGIC)) {
             c = InterlockedDecrement(&pOb->_count);
 #ifdef OB_DEBUG
             DWORD i, cb = sizeof(OB) + pOb->cbData;
@@ -99,7 +102,11 @@ PVOID Ob_XDECREF(_In_opt_ PVOID pObIn)
 #endif /* OB_DEBUG */
             if(c == 0) {
                 if(pOb->_pfnRef_0) { pOb->_pfnRef_0(pOb); }
-                pOb->_magic = 0;
+                pOb->_magic1 = 0;
+                pOb->_magic2 = 0;
+#ifdef OB_DEBUG_MEMZERO
+                ZeroMemory(pOb, sizeof(OB) + pOb->cbData);
+#endif /* OB_DEBUG_MEMZERO */
                 LocalFree(pOb);
             } else if((c == 1) && pOb->_pfnRef_1) {
                 pOb->_pfnRef_1(pOb);
@@ -115,16 +122,18 @@ PVOID Ob_XDECREF(_In_opt_ PVOID pObIn)
 }
 
 /*
-* Decrease the reference count of a object manager object. If the reference
-* count reaches zero the object will be cleaned up.
+* Decrease the reference count of a object manager object.
+* If the reference count reaches zero the object will be cleaned up.
 * Also set the incoming pointer to NULL.
 * -- ppOb
 */
 VOID Ob_XDECREF_NULL(_In_opt_ PVOID *ppOb)
 {
+    POB pOb;
     if(ppOb) {
-        Ob_DECREF(*ppOb);
+        pOb = (POB)*ppOb;
         *ppOb = NULL;
+        Ob_DECREF(pOb);
     }
 }
 
@@ -137,7 +146,7 @@ VOID Ob_XDECREF_NULL(_In_opt_ PVOID *ppOb)
 BOOL Ob_VALID_TAG(_In_ PVOID pObIn, _In_ DWORD tag)
 {
     POB pOb = (POB)pObIn;
-    return pOb && (pOb->_magic == OB_HEADER_MAGIC) && (pOb->_tag = tag);
+    return pOb && (pOb->_magic2 == OB_HEADER_MAGIC) && (pOb->_magic1 == OB_HEADER_MAGIC) && (pOb->_tag = tag);
 }
 
 /*
@@ -145,15 +154,16 @@ BOOL Ob_VALID_TAG(_In_ PVOID pObIn, _In_ DWORD tag)
 * to the number of bytes in the data buffer supplied to this function.
 * May also be created with Ob_Alloc with size: sizeof(OB_HDR) + length of data.
 * CALLER DECREF: return
+* -- H
 * -- pb
 * -- cb
 * -- return
 */
 _Success_(return != NULL)
-POB_DATA ObData_New(_In_ PBYTE pb, _In_ DWORD cb)
+POB_DATA ObData_New(_In_opt_ VMM_HANDLE H, _In_ PBYTE pb, _In_ DWORD cb)
 {
     POB_DATA pObData = NULL;
-    if((pObData = Ob_Alloc(OB_TAG_CORE_DATA, 0, sizeof(OB) + cb, NULL, NULL))) {
+    if((pObData = Ob_AllocEx(H, OB_TAG_CORE_DATA, 0, sizeof(OB) + cb, NULL, NULL))) {
         memcpy(pObData->pb, pb, cb);
     }
     return pObData;

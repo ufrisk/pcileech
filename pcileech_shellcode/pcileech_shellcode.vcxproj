@@ -52,6 +52,7 @@
     <ClCompile Include="fbsdx64_filepull.c" />
     <ClCompile Include="fbsdx64_stage3_c.c" />
     <ClCompile Include="lx64_common.c" />
+    <ClCompile Include="lx64_exec_root.c" />
     <ClCompile Include="lx64_filedelete.c" />
     <ClCompile Include="lx64_filepull.c" />
     <ClCompile Include="lx64_filepush.c" />

@@ -10,12 +10,12 @@
 // The map (ObCacheMap) is thread safe.
 // The ObCacheMap is an object manager object and must be DECREF'ed when required.
 //
-// (c) Ulf Frisk, 2020-2022
+// (c) Ulf Frisk, 2020-2023
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "ob.h"
 
-#define OB_CACHEMAP_IS_VALID(p)     (p && (p->ObHdr._magic == OB_HEADER_MAGIC) && (p->ObHdr._tag == OB_TAG_CORE_CACHEMAP))
+#define OB_CACHEMAP_IS_VALID(p)     (p && (p->ObHdr._magic2 == OB_HEADER_MAGIC) && (p->ObHdr._magic1 == OB_HEADER_MAGIC) && (p->ObHdr._tag == OB_TAG_CORE_CACHEMAP))
 
 #define OB_CACHEMAP_CALL_SYNCHRONIZED_IMPLEMENTATION_WRITE(pcm, RetTp, RetValFail, fn) { \
     if(!OB_CACHEMAP_IS_VALID(pcm)) { return RetValFail; }                                \
@@ -42,9 +42,8 @@ typedef struct tdOB_CACHEMAP {
     BOOL fObjectsLocalFree;
     POB_MAP pm;
     POB_CACHEMAPENTRY AgeListHead;
-    BOOL(*pfnValidEntry)(_Inout_ PQWORD qwData, _In_ QWORD qwKey, _In_ PVOID pvObject);
+    OB_CACHEMAP_VALIDENTRY_PFN_CB pfnValidEntry;
 } OB_CACHEMAP, *POB_CACHEMAP;
-
 
 _Success_(return)
 BOOL _ObCacheMap_Clear(_In_ POB_CACHEMAP pcm)
@@ -108,7 +107,7 @@ PVOID _ObCacheMap_GetByKey(_In_ POB_CACHEMAP pcm, _In_ QWORD qwKey)
 {
     POB_CACHEMAPENTRY pe;
     if(!(pe = ObMap_GetByKey(pcm->pm, qwKey))) { return NULL; }
-    if(pcm->pfnValidEntry && !pcm->pfnValidEntry(&pe->qwContext, qwKey, pe->pvObject)) {
+    if(pcm->pfnValidEntry && !pcm->pfnValidEntry(pcm->ObHdr.H, &pe->qwContext, qwKey, pe->pvObject)) {
         // invalid - remove object from map and return NULL
         _ObCacheMap_RemoveByKey(pcm, qwKey, TRUE);
         return NULL;
@@ -228,25 +227,26 @@ VOID _ObCacheMap_ObCloseCallback(_In_ POB_CACHEMAP pObCacheMap)
 * operations on cached objects.
 * The ObCacheMap is an object manager object and must be DECREF'ed when required.
 * CALLER DECREF: return
+* -- H
 * -- cMaxEntries = max entries in the cache, if more entries are added the
 *       least recently accessed item will be removed from the cache map.
 * -- pfnValidEntry = optional validation callback function.
 * -- flags = defined by OB_CACHEMAP_FLAGS_*
 * -- return
 */
-POB_CACHEMAP ObCacheMap_New(_In_ DWORD cMaxEntries, _In_opt_ BOOL(*pfnValidEntry)(_Inout_ PQWORD qwContext, _In_ QWORD qwKey, _In_ PVOID pvObject), _In_ QWORD flags)
+POB_CACHEMAP ObCacheMap_New(_In_opt_ VMM_HANDLE H, _In_ DWORD cMaxEntries, _In_opt_ OB_CACHEMAP_VALIDENTRY_PFN_CB pfnValidEntry, _In_ QWORD flags)
 {
     POB_CACHEMAP pObCacheMap;
     if(!cMaxEntries) { return NULL; }
     if((flags & OB_MAP_FLAGS_OBJECT_OB) && (flags & OB_MAP_FLAGS_OBJECT_LOCALFREE)) { return NULL; }
-    pObCacheMap = Ob_Alloc(OB_TAG_CORE_CACHEMAP, LMEM_ZEROINIT, sizeof(OB_CACHEMAP), (OB_CLEANUP_CB)_ObCacheMap_ObCloseCallback, NULL);
+    pObCacheMap = Ob_AllocEx(H, OB_TAG_CORE_CACHEMAP, LMEM_ZEROINIT, sizeof(OB_CACHEMAP), (OB_CLEANUP_CB)_ObCacheMap_ObCloseCallback, NULL);
     if(!pObCacheMap) { return NULL; }
     InitializeSRWLock(&pObCacheMap->LockSRW);
     pObCacheMap->cMax = cMaxEntries;
     pObCacheMap->pfnValidEntry = pfnValidEntry;
     pObCacheMap->fObjectsOb = (flags & OB_CACHEMAP_FLAGS_OBJECT_OB) ? TRUE : FALSE;
     pObCacheMap->fObjectsLocalFree = (flags & OB_CACHEMAP_FLAGS_OBJECT_LOCALFREE) ? TRUE : FALSE;
-    pObCacheMap->pm = ObMap_New(OB_MAP_FLAGS_OBJECT_VOID);
+    pObCacheMap->pm = ObMap_New(H, OB_MAP_FLAGS_OBJECT_VOID);
     if(!pObCacheMap->pm) {
         Ob_DECREF(pObCacheMap);
         return NULL;

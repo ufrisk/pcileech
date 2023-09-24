@@ -53,7 +53,11 @@ typedef struct tdFNLX { // VOID definitions for LINUX functions (used in main co
 	QWORD _ioremap_nocache;
 	QWORD getnstimeofday64;			// do_gettimeofday alternative if export is missing.
 	QWORD alloc_pages;
-	QWORD ReservedFutureUse[18];
+	QWORD set_memory_nx;			// 6.4+ kernels
+	QWORD set_memory_rox;			// 6.4+ kernels
+	QWORD set_memory_rw;			// 6.4+ kernels
+	QWORD _wincall_asm_callback;	// linux ksh-module specific callback address (settable by ksh module). [offset: 0x88 / 0x388]
+	QWORD ReservedFutureUse[14];
 } FNLX, *PFNLX;
 
 #define KMDDATA_OPERATING_SYSTEM_LINUX			0x02
@@ -193,6 +197,7 @@ BOOL LookupFunctionsEx(PKMDDATA pk)
 //    size of memory operation
 VOID stage3_c_EntryPoint(PKMDDATA pk)
 {
+	BOOL fROX;
 	QWORD pStructPages, qwMM, qw;
 	TIMEVAL timeLast, timeCurrent;
 	// 0: set up symbols and kmd data
@@ -202,13 +207,16 @@ VOID stage3_c_EntryPoint(PKMDDATA pk)
 		pk->_status = 0xf0000001;
 		return;
 	}
+	fROX = pk->fn.set_memory_rox && pk->fn.set_memory_rw && pk->fn.set_memory_nx;
 	// 1: allocate memory
 	if(0 == (pStructPages = AllocateMemoryDma(pk, TRUE))) {
 		pk->_status = 0xf0000002;
 		return;
 	}
 	pk->DMAAddrVirtual = m_phys_to_virt(pk->AddrKallsymsLookupName, pk->DMAAddrPhysical);
-	SysVCall(pk->fn.set_memory_x, pk->DMAAddrVirtual, pk->DMASizeBuffer / 4096);
+	if(!fROX) {
+		SysVCall(pk->fn.set_memory_x, pk->DMAAddrVirtual, pk->DMASizeBuffer / 4096);
+	}
 	// 2: main dump loop
 	SysVCall(pk->fn.do_gettimeofday, &timeLast);
 	while(TRUE) {
@@ -242,8 +250,15 @@ VOID stage3_c_EntryPoint(PKMDDATA pk)
 			CacheFlush();
 		}
 		if(KMD_CMD_EXEC == pk->_op) { // EXEC at start of buffer
+			if(fROX) {
+				SysVCall(pk->fn.set_memory_rox, pk->DMAAddrVirtual, 0x80);
+			}
 			((VOID(*)(PKMDDATA pk, PQWORD dataIn, PQWORD dataOut))pk->DMAAddrVirtual)(pk, pk->dataIn, pk->dataOut);
 			pk->_result = TRUE;
+			if(fROX) {
+				SysVCall(pk->fn.set_memory_nx, pk->DMAAddrVirtual, 0x80);
+				SysVCall(pk->fn.set_memory_rw, pk->DMAAddrVirtual, 0x80);
+			}
 		}
 		if(KMD_CMD_READ == pk->_op || KMD_CMD_WRITE == pk->_op) { // PHYSICAL MEMORY READ/WRITE
 			// qw :: 0 [all in range], 1 [some in range], 0xffffffff [none in range]

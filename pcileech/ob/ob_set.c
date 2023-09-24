@@ -9,7 +9,7 @@
 // iterations of the set with ObSet_Get/ObSet_GetNext may fail.
 // The ObSet is an object manager object and must be DECREF'ed when required.
 //
-// (c) Ulf Frisk, 2019-2022
+// (c) Ulf Frisk, 2019-2023
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "ob.h"
@@ -18,6 +18,13 @@
 #define OB_SET_ENTRIES_DIRECTORY        0x100
 #define OB_SET_ENTRIES_TABLE            0x80
 #define OB_SET_ENTRIES_STORE            0x200
+#define OB_SET_IS_VALID(p)              (p && (p->ObHdr._magic2 == OB_HEADER_MAGIC) && (p->ObHdr._magic1 == OB_HEADER_MAGIC) && (p->ObHdr._tag == OB_TAG_CORE_SET))
+#define OB_SET_TABLE_MAX_CAPACITY       OB_SET_ENTRIES_DIRECTORY * OB_SET_ENTRIES_TABLE * OB_SET_ENTRIES_STORE
+#define OB_SET_HASH_FUNCTION(v)         (13 * (v + _rotr16((WORD)v, 9) + _rotr((DWORD)v, 17) + _rotr64(v, 31)))
+
+#define OB_SET_INDEX_DIRECTORY(i)       ((i >> 16) & (OB_SET_ENTRIES_DIRECTORY - 1))
+#define OB_SET_INDEX_TABLE(i)           ((i >> 9) & (OB_SET_ENTRIES_TABLE - 1))
+#define OB_SET_INDEX_STORE(i)           (i & (OB_SET_ENTRIES_STORE - 1))
 
 typedef struct tdOB_SET_TABLE_ENTRY {
     union {
@@ -48,10 +55,6 @@ typedef struct tdOB_SET {
     OB_SET_TABLE_ENTRY pTable0[OB_SET_ENTRIES_TABLE];
     QWORD pStore00[OB_SET_ENTRIES_STORE];
 } OB_SET, *POB_SET;
-
-#define OB_SET_IS_VALID(p)          (p && (p->ObHdr._magic == OB_HEADER_MAGIC) && (p->ObHdr._tag == OB_TAG_CORE_SET))
-#define TABLE_MAX_CAPACITY          OB_SET_ENTRIES_DIRECTORY * OB_SET_ENTRIES_TABLE * OB_SET_ENTRIES_STORE
-#define HASH_FUNCTION(v)            (13 * (v + _rotr16((WORD)v, 9) + _rotr((DWORD)v, 17) + _rotr64(v, 31)))
 
 #define OB_SET_CALL_SYNCHRONIZED_IMPLEMENTATION_WRITE(pvs, RetTp, RetValFail, fn) {     \
     if(!OB_SET_IS_VALID(pvs)) { return RetValFail; }                                    \
@@ -106,11 +109,13 @@ VOID _ObSet_ObCloseCallback(_In_ POB_SET pObSet)
 * ways to store unique 64-bit (or smaller) numbers as a set.
 * The ObSet is an object manager object and must be DECREF'ed when required.
 * CALLER DECREF: return
+* -- H
+* -- hHeap
 * -- return
 */
-POB_SET ObSet_New()
+POB_SET ObSet_New(_In_opt_ VMM_HANDLE H)
 {
-    POB_SET pObSet = Ob_Alloc(OB_TAG_CORE_SET, LMEM_ZEROINIT, sizeof(OB_SET), (OB_CLEANUP_CB)_ObSet_ObCloseCallback, NULL);
+    POB_SET pObSet = Ob_AllocEx(H, OB_TAG_CORE_SET, LMEM_ZEROINIT, sizeof(OB_SET), (OB_CLEANUP_CB)_ObSet_ObCloseCallback, NULL);
     if(!pObSet) { return NULL; }
     InitializeSRWLock(&pObSet->LockSRW);
     pObSet->c = 1;     // item zero is reserved - hence the initialization of count to 1
@@ -122,20 +127,20 @@ POB_SET ObSet_New()
 
 QWORD _ObSet_GetValueFromIndex(_In_ POB_SET pvs, _In_ DWORD iValue)
 {
-    WORD iDirectory = (iValue >> 14) & (OB_SET_ENTRIES_DIRECTORY - 1);
-    WORD iTable = (iValue >> 9) & (OB_SET_ENTRIES_TABLE - 1);
-    WORD iValueStore = iValue & (OB_SET_ENTRIES_STORE - 1);
+    WORD iDirectory = OB_SET_INDEX_DIRECTORY(iValue);
+    WORD iTable = OB_SET_INDEX_TABLE(iValue);
+    WORD iValueStore = OB_SET_INDEX_STORE(iValue);
     if(!iValue || (iValue >= pvs->c)) { return 0; }
     return pvs->fLargeMode ?
-        pvs->pDirectory[iDirectory].pTable[iTable].pValues[iValueStore] :
+        pvs->pDirectory[OB_SET_INDEX_DIRECTORY(iValue)].pTable[iTable].pValues[iValueStore] :
         pvs->pTable0[iTable].pValues[iValueStore];
 }
 
 VOID _ObSet_SetValueFromIndex(_In_ POB_SET pvs, _In_ DWORD iValue, _In_ QWORD qwValue)
 {
-    WORD iDirectory = (iValue >> 14) & (OB_SET_ENTRIES_DIRECTORY - 1);
-    WORD iTable = (iValue >> 9) & (OB_SET_ENTRIES_TABLE - 1);
-    WORD iValueStore = iValue & (OB_SET_ENTRIES_STORE - 1);
+    WORD iDirectory = OB_SET_INDEX_DIRECTORY(iValue);
+    WORD iTable = OB_SET_INDEX_TABLE(iValue);
+    WORD iValueStore = OB_SET_INDEX_STORE(iValue);
     if(pvs->fLargeMode) {
         pvs->pDirectory[iDirectory].pTable[iTable].pValues[iValueStore] = qwValue;
     } else {
@@ -163,7 +168,7 @@ VOID _ObSet_InsertHash(_In_ POB_SET pvs, _In_ DWORD iValue)
     DWORD dwHashMask = pvs->cHashMax - 1;
     QWORD qwValueToHash = _ObSet_GetValueFromIndex(pvs, iValue);
     if(!qwValueToHash) { return; }
-    iHash = HASH_FUNCTION(qwValueToHash) & dwHashMask;
+    iHash = OB_SET_HASH_FUNCTION(qwValueToHash) & dwHashMask;
     while(_ObSet_GetIndexFromHash(pvs, iHash)) {
         iHash = (iHash + 1) & dwHashMask;
     }
@@ -182,7 +187,7 @@ VOID _ObSet_RemoveHash(_In_ POB_SET pvs, _In_ DWORD iHash)
         iNextHash = (iNextHash + 1) & dwHashMask;
         iNextEntry = _ObSet_GetIndexFromHash(pvs, iNextHash);
         if(0 == iNextEntry) { return; }
-        iNextHashPreferred = HASH_FUNCTION(_ObSet_GetValueFromIndex(pvs, iNextEntry)) & dwHashMask;
+        iNextHashPreferred = OB_SET_HASH_FUNCTION(_ObSet_GetValueFromIndex(pvs, iNextEntry)) & dwHashMask;
         if(iNextHash == iNextHashPreferred) { continue; }
         if(pvs->fLargeMode) {
             pvs->pHashMapLarge[iNextHash] = 0;
@@ -198,7 +203,7 @@ BOOL _ObSet_GetIndexFromValue(_In_ POB_SET pvs, _In_ QWORD v, _Out_opt_ PDWORD p
 {
     DWORD dwIndex;
     DWORD dwHashMask = pvs->cHashMax - 1;
-    DWORD dwHash = HASH_FUNCTION(v) & dwHashMask;
+    DWORD dwHash = OB_SET_HASH_FUNCTION(v) & dwHashMask;
     // scan hash table to find entry
     while(TRUE) {
         dwIndex = _ObSet_GetIndexFromHash(pvs, dwHash);
@@ -253,6 +258,16 @@ QWORD _ObSet_GetNext(_In_ POB_SET pvs, _In_ QWORD value)
     return _ObSet_GetValueFromIndex(pvs, iValue + 1);
 }
 
+QWORD _ObSet_GetNextByIndex(_In_ POB_SET pvs, _Inout_ PDWORD pdwIndex)
+{
+    if(*pdwIndex == 0) {
+        *pdwIndex = pvs->c - 1;
+    } else {
+        *pdwIndex = *pdwIndex - 1;
+    }
+    return _ObSet_GetValueFromIndex(pvs, *pdwIndex);
+}
+
 /*
 * Retrieve the next value given a value. The start value and end value are the
 * ZERO value (which is a special reserved non-valid value).
@@ -268,11 +283,28 @@ QWORD ObSet_GetNext(_In_opt_ POB_SET pvs, _In_ QWORD value)
     OB_SET_CALL_SYNCHRONIZED_IMPLEMENTATION_READ(pvs, QWORD, 0, _ObSet_GetNext(pvs, value))
 }
 
+/*
+* Retrieve the given an index. To start iterating, use index 0. When no more
+* items are available, the function will return 0.
+* Add/Remove rules:
+*  - Added values are ok - but will not be iterated over.
+*  - Removal of current value and already iterated values are ok.
+*  - Removal of values not yet iterated is FORBIDDEN. It causes the iterator
+*    fail by returning the same value multiple times or skipping values.
+* -- pvs
+* -- pdwIndex
+* -- return
+*/
+QWORD ObSet_GetNextByIndex(_In_opt_ POB_SET pvs, _Inout_ PDWORD pdwIndex)
+{
+    OB_SET_CALL_SYNCHRONIZED_IMPLEMENTATION_READ(pvs, QWORD, 0, _ObSet_GetNextByIndex(pvs, pdwIndex))
+}
+
 POB_DATA _ObSet_GetAll(_In_ POB_SET pvs)
 {
     DWORD iValue;
     POB_DATA pObData;
-    if(!(pObData = Ob_Alloc(OB_TAG_CORE_DATA, 0, sizeof(OB) + (pvs->c - 1) * sizeof(QWORD), NULL, NULL))) { return NULL; }
+    if(!(pObData = Ob_AllocEx(pvs->ObHdr.H, OB_TAG_CORE_DATA, 0, sizeof(OB) + (pvs->c - 1) * sizeof(QWORD), NULL, NULL))) { return NULL; }
     for(iValue = pvs->c - 1; iValue; iValue--) {
         pObData->pqw[iValue - 1] = _ObSet_GetValueFromIndex(pvs, iValue);
     }
@@ -403,11 +435,11 @@ BOOL _ObSet_Push(_In_ POB_SET pvs, _In_ QWORD value)
 {
     POB_SET_TABLE_ENTRY pTable = NULL;
     DWORD iValue = pvs->c;
-    WORD iDirectory = (iValue >> 14) & (OB_SET_ENTRIES_DIRECTORY - 1);
-    WORD iTable = (iValue >> 9) & (OB_SET_ENTRIES_TABLE - 1);
-    WORD iValueStore = iValue & (OB_SET_ENTRIES_STORE - 1);
+    WORD iDirectory = OB_SET_INDEX_DIRECTORY(iValue);
+    WORD iTable = OB_SET_INDEX_TABLE(iValue);
+    WORD iValueStore = OB_SET_INDEX_STORE(iValue);
     if((value == 0) || _ObSet_Exists(pvs, value)) { return FALSE; }
-    if(iValue == OB_SET_ENTRIES_DIRECTORY * OB_SET_ENTRIES_TABLE * OB_SET_ENTRIES_STORE) { return FALSE; }
+    if(iValue == OB_SET_TABLE_MAX_CAPACITY) { return FALSE; }
     if(iValue == pvs->cHashGrowThreshold) {
         if(!_ObSet_Grow(pvs)) {
             return FALSE;

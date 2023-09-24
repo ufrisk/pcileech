@@ -60,7 +60,6 @@ Please find a summary of the supported hardware based memory acquisition methods
 | [NeTV2/UDP](https://github.com/ufrisk/LeechCore/wiki/Device_RawUDP)            | [FPGA](https://github.com/ufrisk/pcileech-fpga/tree/master/NeTV2)        | UDP   |   7MB/s | Yes | Yes | No  |    |
 | [USB3380-EVB](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)         | USB3380 | USB3 | 150MB/s | No  | No  | No  |    |
 | [PP3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)              | USB3380 | USB3 | 150MB/s | No  | No  | No  |    |
-| [SP605/TCP](https://github.com/ufrisk/LeechCore/wiki/Device_SP605TCP)          | FPGA    | TCP  | 100kB/s | Yes | Yes | Yes |    |
 | [DMA patched HP iLO](https://github.com/ufrisk/LeechCore/wiki/Device_RawTCP)   | BMC | TCP |  1MB/s | Yes | No  | Yes |     |    |
 
 ### Software based memory aqusition methods:
@@ -168,7 +167,7 @@ PCILeech, MemProcFS and LeechCore are open source but not open contribution. PCI
 Links:
 ======
 * Twitter: [![Twitter](https://img.shields.io/twitter/follow/UlfFrisk?label=UlfFrisk&style=social)](https://twitter.com/intent/follow?screen_name=UlfFrisk)
-* Discord: [![Discord | Porchetta Industries](https://img.shields.io/discord/736724457258745996.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/sEkn3aa)
+* Discord: [![Discord - PCILeech/MemProcFS](https://img.shields.io/discord/1155439643395883128.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)](https://discord.gg/BCmfBhDPXX)
 * PCILeech: https://github.com/ufrisk/pcileech
 * PCILeech FPGA: https://github.com/ufrisk/pcileech-fpga
 * LeechCore: https://github.com/ufrisk/LeechCore
@@ -287,7 +286,10 @@ v4.1
 * Command `none` added.
 * Options `-bar-ro` and `-bar-rw` added.
 
-Latest:
+[v4.17](https://github.com/ufrisk/pcileech/releases/tag/v4.17)
 * I/O BAR support.
-* Linux KMD signature update (LINUX_X64_48) to support latest Ubuntu kernels.
-* New linux kernel module: lx64_exec_root.
+* Linux improvements:
+  - KMD signature update (LINUX_X64_48) to support latest Ubuntu kernels.
+  - Update of kernel modules to support latest kernels.
+  - New KMD signature - LINUX_X64_MAP - specify target system kernel System.map in -in option.
+  - New kernel module: lx64_exec_root.

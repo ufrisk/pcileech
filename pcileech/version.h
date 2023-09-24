@@ -2,9 +2,9 @@
 #define STRINGIZE(s) STRINGIZE2(s)
 
 #define VERSION_MAJOR               4
-#define VERSION_MINOR               16
-#define VERSION_REVISION            3
-#define VERSION_BUILD               40
+#define VERSION_MINOR               17
+#define VERSION_REVISION            0
+#define VERSION_BUILD               41
 
 #define VER_FILE_DESCRIPTION_STR    "The PCILeech Direct Memory Access Attack Toolkit"
 #define VER_FILE_VERSION            VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION, VERSION_BUILD

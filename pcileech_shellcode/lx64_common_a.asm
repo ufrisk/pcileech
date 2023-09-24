@@ -22,6 +22,9 @@ EXTRN c_EntryPoint:NEAR
 .CODE
 
 main PROC
+	PUSH rcx					; PKMDDATA
+	MOV rax, 0f00ff0011337fed5h	; magic
+	PUSH rax					; magic
 	PUSH rsi
 	MOV rsi, rsp
 	AND rsp, 0FFFFFFFFFFFFFFF0h
@@ -29,6 +32,8 @@ main PROC
 	CALL c_EntryPoint
 	MOV rsp, rsi
 	POP rsi
+	POP rax
+	POP rax
 	RET
 main ENDP
 
@@ -114,18 +119,35 @@ SysVCall PROC
 SysVCall ENDP
 
 ; ------------------------------------------------------------------
-; WinCall callback function pointer.
+; Fetch the address of PKMDDATA from the stack by looking for the
+; magic value 0f00ff0011337fed5h.
 ; ------------------------------------------------------------------
-data_wincall_fnptr dq 0
+KMDDATA_FromStackMagic PROC
+	PUSH rcx
+	PUSH rdx
+	XOR rax, rax
+	MOV rdx, 0f00ff0011337fed5h
+	KMDDATA_FromStack_Loop:
+	MOV rcx, [rsp + 8 * rax]
+	INC rax
+	CMP rcx, rdx
+	JNE KMDDATA_FromStack_Loop
+	MOV rax, [rsp + 8 * rax]
+	POP rdx
+	POP rcx
+	RET
+KMDDATA_FromStackMagic ENDP
 
 ; ------------------------------------------------------------------
 ; Set the (windows x64 calling convention compatible) callback function
-; to forward callbacks sent to WinCall to.
-; NB! This requires the memory to be RWX.
-; rcx -> address of kallsyms_lookup_name
+; to forward callbacks sent to WinCall to. Address is saved in:
+; KMDDATA->fn._wincall_asm_callback
+; rcx <- address of callback function
 ; ------------------------------------------------------------------
 WinCallSetFunction PROC
-	MOV [data_wincall_fnptr], rcx
+	CALL KMDDATA_FromStackMagic
+	ADD rax, 388h
+	MOV [rax], rcx
 	RET
 WinCallSetFunction ENDP
 
@@ -134,7 +156,7 @@ WinCallSetFunction ENDP
 ; to the Windows Windows X64 calling convention.
 ; Function typically called by the Linux kernel as a callback function.
 ; The address of the Windows X64 function to forward the call to is
-; set by 'WinCallSetFunction'.
+; set by 'WinCallSetFunction' (KMDDATA->fn._wincall_asm_callback).
 ; A maximum of six (6) parameters are supported.
 ; rdi -> rcx
 ; rsi -> rdx
@@ -156,7 +178,10 @@ WinCall PROC
 	MOV rdx, rsi
 	MOV rcx, rdi
 
-	MOV rax, [data_wincall_fnptr]
+	CALL KMDDATA_FromStackMagic		; KMDDATA->fn._wincall_asm_callback
+	ADD rax, 388h
+	MOV rax, [rax]
+
 	CALL rax
 	MOV rsp, r15
 	POP r15

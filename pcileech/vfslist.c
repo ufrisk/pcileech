@@ -307,12 +307,13 @@ BOOL VfsList_ListDirectoryW(_In_ LPWSTR wszPath, _In_opt_ PVOID ctx, _In_opt_ PF
 
 /*
 * Evaluate whether a given cachemap entry is still valid time wise.
+* -- H = not used
 * -- qwContext
 * -- qwKey
 * -- pvObject
 * -- return
 */
-BOOL VfsList_ValidEntry(_Inout_ PQWORD qwContext, _In_ QWORD qwKey, _In_ PVFSLISTOB_DIRECTORY pvObject)
+BOOL VfsList_ValidEntry(_In_opt_ VMM_HANDLE H, _Inout_ PQWORD qwContext, _In_ QWORD qwKey, _In_ PVFSLISTOB_DIRECTORY pvObject)
 {
     UNREFERENCED_PARAMETER(qwContext);
     UNREFERENCED_PARAMETER(qwKey);
@@ -343,8 +344,9 @@ _Success_(return)
 BOOL VfsList_Initialize(_In_ VFS_LIST_U_PFN pfnVfsListU, _In_ DWORD dwCacheValidMs, _In_ DWORD cCacheMaxEntries, _In_ BOOL fSingleThread)
 {
     g_ctxVfsList.pcm = ObCacheMap_New(
+        NULL,
         cCacheMaxEntries,
-        (BOOL(*)(PQWORD, QWORD, PVOID))VfsList_ValidEntry,
+        (BOOL(*)(VMM_HANDLE, PQWORD, QWORD, PVOID))VfsList_ValidEntry,
         OB_CACHEMAP_FLAGS_OBJECT_OB
     );
     if(!g_ctxVfsList.pcm) { return FALSE; }

@@ -345,6 +345,37 @@ BOOL KMD_LinuxFindFunctionAddrTBL_RelativeSymTabSearch(_In_ PBYTE pb, _In_ DWORD
     return FALSE;
 }
 
+QWORD KMD_LinuxFindFunctionAddrTBL_FromSystemMap_GetAddressFromName(_In_ LPSTR sz)
+{
+    CHAR szNeedle[MAX_PATH], *szFind;
+    if(_snprintf_s(szNeedle, sizeof(szNeedle), _TRUNCATE, " T %s\n", sz) <= 0) { return 0; }
+    szFind = strstr((LPSTR)ctxMain->cfg.pbIn + 16, szNeedle);
+    if(!szFind) { return 0; }
+    return strtoull(szFind - 16, NULL, 16);
+}
+
+VOID KMD_LinuxFindFunctionAddrTBL_FromSystemMap(_In_ PBYTE pb, _In_ DWORD cb, _Inout_updates_(cS) PKERNELSEEKER pS, _In_ DWORD cS, _In_ QWORD vaBase)
+{
+    QWORD i, o, va_startup_64, va;
+    if(ctxMain->cfg.cbIn < 32) { return; }
+    ctxMain->cfg.pbIn[ctxMain->cfg.cbIn - 1] = 0;
+    va_startup_64 = KMD_LinuxFindFunctionAddrTBL_FromSystemMap_GetAddressFromName("startup_64") & 0xFFFFFFFFFFE00000;
+    if(!va_startup_64) { return; }
+    for(i = 0; i < cS; i++) {
+        if(pS[i].cbSeek > 1) {
+            va = KMD_LinuxFindFunctionAddrTBL_FromSystemMap_GetAddressFromName(pS[i].pbSeek + 1);
+            if((va <= va_startup_64) || (va & 0xf)) { continue; }
+            o = va - va_startup_64;
+            if(!o || (o > cb)) { continue; }
+            if((pb[o - 1] != 0xcc) && (pb[o - 1] != 0x90)) { continue; }
+            pS[i].aFn = (DWORD)o;
+            pS[i].vaFn = vaBase + o;
+            if(!pS[i].aSeek) { pS[i].aSeek = (DWORD)o; }
+            pS[i].vaSeek = vaBase + pS[i].aSeek;
+        }
+    }
+}
+
 /*
 * Locate function addresses in symtab with relative addressing.
 */
@@ -364,7 +395,11 @@ VOID KMD_LinuxFindFunctionAddrTBL_Relative(_In_ PBYTE pb, _In_ DWORD cb, _Inout_
     if(vaBase == (QWORD)-1) {
         return;
     }
-    // 2: Locate relative addresses of functions from symtab and fix virtual addresses
+    // 2: Locate from user-supplied System.map file (if any):
+    if(0 == _stricmp(ctxMain->cfg.szKMDName, "LINUX_X64_MAP")) {
+        KMD_LinuxFindFunctionAddrTBL_FromSystemMap(pb, cb, pS, cS, vaBase);
+    }
+    // 3: Locate relative addresses of functions from symtab and fix virtual addresses
     for(i = 0; i < cS; i++) {
         if(!pS[i].aSeek || pS[i].vaSeek) { continue; }
         if(!KMD_LinuxFindFunctionAddrTBL_RelativeSymTabSearch(pb, cb, ((pS[i].aSeek & ~0xf) - 0x00100000), pS + i)) { continue; }
@@ -1426,7 +1461,7 @@ BOOL KMDOpen_MemoryScan()
             goto fail;
         }
         pSignature = &pSignatures[0];
-    } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "LINUX_X64_48")) {
+    } else if((0 == _stricmp(ctxMain->cfg.szKMDName, "LINUX_X64_48")) || (0 == _stricmp(ctxMain->cfg.szKMDName, "LINUX_X64_MAP"))) {
         if(!KMD_Linux48KernelSeekSignature(&pSignatures[0])) {
             printf("KMD: Failed. Error locating generic linux kernel signature.\n");
             goto fail;
@@ -1469,6 +1504,10 @@ BOOL KMDOpen_MemoryScan()
     ph2->qwPageAddr = pSignature->chunk[1].qwAddress;
     ph1->dwPageOffset = 0xfff & pSignature->chunk[2].cbOffset;
     ph2->dwPageOffset = 0xfff & pSignature->chunk[3].cbOffset;
+    if(ph2->dwPageOffset + pSignature->chunk[2].cb > 0x1000) {
+        printf("KMD: Failed. Stage #2 too large.\n");
+        goto fail;
+    }
     DeviceReadDMA_Retry(ctxMain->hLC, ph1->qwPageAddr, 4096, ph1->pbOrig);
     DeviceReadDMA_Retry(ctxMain->hLC, ph2->qwPageAddr, 4096, ph2->pbOrig);
     memcpy(ph1->pbPatch, ph1->pbOrig, 4096);

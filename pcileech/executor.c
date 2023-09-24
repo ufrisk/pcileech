@@ -206,34 +206,26 @@ VOID Exec_CallbackClose(_In_opt_ HANDLE hCallback)
 _Success_(return)
 BOOL Exec_ExecSilent(_In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbIn, _Out_opt_ PBYTE *ppbOut, _Out_opt_ PQWORD pcbOut)
 {
-    PKMDDATA pk = ctxMain->pk;
     BOOL result = FALSE;
-    DWORD cbBuffer;
-    PBYTE pbBuffer = NULL;
+    PKMDDATA pk = ctxMain->pk;
     PKMDEXEC pKmdExec = NULL;
     //------------------------------------------------
     // 1: Setup and initial validity checks.
     //------------------------------------------------
     if(pcbOut) { *pcbOut = 0; }
-    if(!ctxMain->phKMD) { goto fail; }
-    result = Util_LoadKmdExecShellcode(szShellcodeName, &pKmdExec);
-    if(!result) { goto fail; }
-    cbBuffer = SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode) + SIZE_PAGE_ALIGN_4K(cbIn);
-    if(!result || (ctxMain->pk->DMASizeBuffer < cbBuffer)) { result = FALSE;  goto fail; }
-    pbBuffer = LocalAlloc(LMEM_ZEROINIT, cbBuffer);
-    if(!pbBuffer) { result = FALSE;  goto fail; }
+    if(ppbOut) { *ppbOut = NULL; }
+    if(!ctxMain->phKMD || (ctxMain->pk->DMASizeBuffer < 0x80000 + SIZE_PAGE_ALIGN_4K(cbIn))) { goto fail; }
+    if(!Util_LoadKmdExecShellcode(szShellcodeName, &pKmdExec) || (pKmdExec->cbShellcode > 0x80000)) { goto fail; }
     //------------------------------------------------
     // 2: Set up shellcode and indata and write to target memory.
     //    X, Y = page aligned.
     //    [0 , Y       [ = shellcode
-    //    [Y , X       [ = data in (to target computer)
+    //    [0x80000 , X [ = data in (to target computer)
     //    [X , buf_max [ = data out (from target computer)
     //------------------------------------------------
-    memcpy(pbBuffer, pKmdExec->pbShellcode, (SIZE_T)pKmdExec->cbShellcode);
-    memcpy(pbBuffer + SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode), pbIn, (SIZE_T)cbIn);
-    result = DeviceWriteDMA_Retry(ctxMain->hLC, pk->DMAAddrPhysical, cbBuffer, pbBuffer);
-    if(!result) { goto fail; }
-    pk->dataInExtraOffset = SIZE_PAGE_ALIGN_4K(pKmdExec->cbShellcode);
+    if(!DeviceWriteDMA_Retry(ctxMain->hLC, pk->DMAAddrPhysical, (DWORD)pKmdExec->cbShellcode, pKmdExec->pbShellcode)) { goto fail; }
+    if(cbIn && !DeviceWriteDMA_Retry(ctxMain->hLC, pk->DMAAddrPhysical + 0x80000, (DWORD)cbIn, pbIn)) { goto fail; }
+    pk->dataInExtraOffset = 0x80000;    // first 0x80 pages are reserved for shellcode (RX section) in Linux 6.4+.
     pk->dataInExtraLength = cbIn;
     pk->dataInExtraLengthMax = SIZE_PAGE_ALIGN_4K(cbIn);
     pk->dataOutExtraOffset = pk->dataInExtraOffset + pk->dataInExtraLengthMax;
@@ -259,7 +251,6 @@ BOOL Exec_ExecSilent(_In_ LPSTR szShellcodeName, _In_ PBYTE pbIn, _In_ QWORD cbI
     }
 fail:
     LocalFree(pKmdExec);
-    LocalFree(pbBuffer);
     return result;
 }
 

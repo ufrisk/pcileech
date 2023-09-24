@@ -120,18 +120,7 @@ setup PROC
 	CALL m_phys_to_virt
 	MOV r12, rax
 	; ----------------------------------------------------
-	; 2: SET CODE PAGE TO EXECUTABLE
-	; ----------------------------------------------------
-	LEA rax, main
-	LEA rdi, str_set_memory_x
-	CALL r14
-	TEST rax, rax
-	JZ error
-	MOV rdi, r12
-	MOV rsi, 2
-	CALL rax
-	; ----------------------------------------------------
-	; 3: CLEAR AND COPY STAGE3 PRE BINARY TO AREA
+	; 2: CLEAR AND COPY STAGE3 PRE BINARY TO AREA
 	; ----------------------------------------------------
 	MOV rdi, r12
 	CALL clear_8k
@@ -146,6 +135,22 @@ setup PROC
 	MOV [rsi], rax
 	TEST rdi, rdi
 	JNZ copy_stage3_pre_loop
+	; ----------------------------------------------------
+	; 3: SET CODE PAGE TO EXECUTABLE
+	; ----------------------------------------------------
+	LEA rdi, str_set_memory_rox
+	CALL r14
+	TEST rax, rax
+	JNZ set_memory_exec
+	LEA rdi, str_set_memory_x
+	CALL r14
+	TEST rax, rax
+	JZ error
+	set_memory_exec:
+	MOV rdi, r12
+	ADD rdi, 1000h
+	MOV rsi, 1
+	CALL rax
 	; ----------------------------------------------------
 	; 4: CREATE THREAD & SET UP DATA AREA
 	; (try kthread_create_on_node 1st, kthread_create 2nd)
@@ -295,6 +300,7 @@ str_kthread_create			db 'kthread_create', 0
 str_kthread_create_on_node	db 'kthread_create_on_node', 0
 str_alloc_pages_current		db 'alloc_pages_current', 0
 str_alloc_pages				db 'alloc_pages', 0
+str_set_memory_rox			db 'set_memory_rox', 0
 str_set_memory_x			db 'set_memory_x', 0
 str_wake_up_process			db 'wake_up_process', 0
 str_page_offset_base		db 'page_offset_base', 0

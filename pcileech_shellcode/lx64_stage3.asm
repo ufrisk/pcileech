@@ -59,7 +59,7 @@ LookupFunctions PROC
 	PUSH r13
 	MOV r15, rcx				; address of kallsyms_lookup_name
 	MOV r14, rdx				; ptr to FNLX struct 
-	MOV r13, 14*8				; num functions * 8
+	MOV r13, 17*8				; num functions * 8
 	; ----------------------------------------------------
 	; 1: PUSH FUNCTION NAME POINTERS ON STACK
 	; ----------------------------------------------------
@@ -90,6 +90,12 @@ LookupFunctions PROC
 	LEA rax, str_getnstimeofday64
 	PUSH rax
 	LEA rax, str_alloc_pages
+	PUSH rax
+	LEA rax, str_set_memory_nx
+	PUSH rax
+	LEA rax, str_set_memory_rox
+	PUSH rax
+	LEA rax, str_set_memory_rw
 	PUSH rax
 	; ----------------------------------------------------
 	; 2: LOOKUP FUNCTION POINTERS BY NAME
@@ -130,6 +136,9 @@ LookupFunctions PROC
 LookupFunctions ENDP
 
 str_alloc_pages_current			db		'alloc_pages_current', 0
+str_set_memory_nx				db		'set_memory_nx', 0
+str_set_memory_rox				db		'set_memory_rox', 0
+str_set_memory_rw				db		'set_memory_rw', 0
 str_set_memory_x				db		'set_memory_x', 0
 str__free_pages					db		'__free_pages', 0
 str_memcpy						db		'memcpy', 0

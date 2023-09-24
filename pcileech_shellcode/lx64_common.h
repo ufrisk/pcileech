@@ -34,6 +34,29 @@ extern QWORD m_phys_to_virt(QWORD p1);
 extern QWORD m_page_to_phys(QWORD p1);
 extern VOID CacheFlush();
 
+typedef struct tdFNLX { // VOID definitions for LINUX functions (used in main control program)
+	QWORD msleep;
+	QWORD alloc_pages_current;
+	QWORD set_memory_x;
+	QWORD __free_pages;
+	QWORD memcpy;
+	QWORD schedule;
+	QWORD do_gettimeofday;
+	QWORD walk_system_ram_range;
+	QWORD iounmap;
+	QWORD ioremap;
+	// optional values below - do not use
+	QWORD ktime_get_real_ts64;      // do_gettimeofday alternative if export is missing.
+	QWORD _ioremap_nocache;
+	QWORD getnstimeofday64;			// do_gettimeofday alternative if export is missing.
+	QWORD alloc_pages;
+	QWORD set_memory_nx;			// 6.4+ kernels
+	QWORD set_memory_rox;			// 6.4+ kernels
+	QWORD set_memory_rw;			// 6.4+ kernels
+	QWORD _wincall_asm_callback;	// linux ksh-module specific callback address (settable by ksh module). [offset: 0x88 / 0x388]
+	QWORD ReservedFutureUse[14];
+} FNLX, *PFNLX;
+
 /*
 * KMD DATA struct. This struct must be contained in a 4096 byte section (page).
 * This page/struct is used to communicate between the inserted kernel code and
@@ -64,7 +87,10 @@ typedef struct tdKMDDATA {
 	QWORD dataOutExtraLengthMax;	// [0x210] maximum length of extra out-data. 
 	QWORD dataOutConsoleBuffer;		// [0x218] physical address of 1-page console buffer.
 	QWORD dataOut[28];				// [0x220]
-	PVOID fn[32];					// [0x300] used by shellcode to store function pointers.
+	union {
+		FNLX fnlx;                  // [0x300] used by shellcode to store function pointers.
+		PVOID fn[32];				// [0x300] used by shellcode to store function pointers.
+	};
 	CHAR dataInStr[MAX_PATH];		// [0x400] string in-data
 	CHAR ReservedFutureUse2[252];
 	CHAR dataOutStr[MAX_PATH];		// [0x600] string out-data

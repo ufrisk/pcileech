@@ -153,6 +153,7 @@ VOID Help_ShowGeneral()
         "             WIN10_X64_3                                                       \n" \
         "             LINUX_X64_46        (NB! Kernels 2.6.33 - 4.6)                    \n" \
         "             LINUX_X64_48        (NB! Kernels 4.8+)                            \n" \
+        "             LINUX_X64_MAP       (NB! Linux systems with System.map in -in arg)\n" \
         "             LINUX_X64_EFI       (NB! UEFI booted systems only)                \n" \
         "             FREEBSD_X64                                                       \n" \
         "             MACOS                                                             \n" \
@@ -174,7 +175,7 @@ VOID Help_ShowInfo()
 {
     printf(
         " PCILEECH INFORMATION                                                          \n" \
-        " PCILeech (c) 2016-2022 Ulf Frisk                                              \n" \
+        " PCILeech (c) 2016-2023 Ulf Frisk                                              \n" \
         " Version: " \
         VER_FILE_VERSION_STR "\n" \
         "                                                                               \n" \
@@ -212,26 +213,9 @@ VOID Help_ShowInfo()
         "   To be able to use the 'mount' functionality for filesystem browsing PCILeech\n" \
         "   requires Dokany to be installed for virtual file system support. Download   \n" \
         "   and install Dokany on your computer before using the mount functionality.   \n" \
-        " Driver information (USB3380/Linux):                                           \n" \
+        " Driver information (USB3380/FPGA/FT601/Linux):                                \n" \
         "   PCILeech on Linux requires that libusb is installed. Libusb is most probably\n" \
         "   installed by default, if not install by running:apt-get install libusb-1.0-0\n" \
-        " Driver information (FPGA/FT601/Linux):                                        \n" \
-        "   The PCILeech programmed FPGA board with FT601 USB3 requires drivers for USB.\n" \
-        "   The driver is a small kernel driver found in the drivers/ft60x folder in the\n" \
-        "   PCIe Injector Github repository. Once loaded the driver will expose a device\n" \
-        "   named /dev/ft60x[0-3] Please note that this device file must be read/write  \n" \
-        "   for the current user for PCILeech to find and use it automatically.         \n" \
-        " ----------------                                                              \n" \
-        " Notes about the PCILeech USB3380 device:                                      \n" \
-        " Usage: connect USB3380 device to target computer and USB cable to the computer\n" \
-        " executing pcileech. If all memory reads fail try to re-insert the device.     \n" \
-        " - It is only possible to access the lower 4GB of RAM (32-bit) with DMA.       \n" \
-        " - It may not be possible to access RAM if OS configured IOMMU (VT-d).         \n" \
-        "   macOS defaults to VT-d. Windows 10 may, if configured, also use VT-d.       \n" \
-        " - No drivers are needed on the target! Memory acquisition is all in hardware! \n" \
-        " - Confirmed working with PCIe/mPCIe/ExpressCard/Thunderbolt.                  \n" \
-        " - If kernel module is successfully inserted in lower 4GB RAM more RAM will be \n" \
-        "   possible to read. Extended funtionality will also be made available.        \n" \
         " ----------------                                                              \n");
     Help_ShowGeneral();
 }
@@ -367,12 +351,9 @@ VOID Help_ShowDetailed()
             " Mount the target system live ram and file system as the drive letter specified\n" \
             " in the -mount option.  If the -mount option is not specified PCILeech will try\n" \
             " to mount the target file system as the K: drive letter.                       \n" \
-            " File system comes with two main functionalities, mount target system files if \n" \
-            " hardware device is used, and mount memory process file system (in read-only   \n" \
-            " mode when dump file is used, in read-write mode when hardware device is used).\n" \
             " ------------------------------------------------------------------------------\n" \
-            " File system mount is currently supported for: macOS, Windows and Linux.  There\n" \
-            " are limitations that are important to know, please see below. Use at own risk!\n" \
+            " File system mount is currently supported for Windows and Linux.               \n" \
+            " See important limitations below. Use at own risk!                             \n" \
             "  - Create file: not implemented.                                              \n" \
             "  - Write to files may be buggy and may in rare cases corrupt the target file. \n" \
             "  - Delete file will most often work, but with errors.                         \n" \

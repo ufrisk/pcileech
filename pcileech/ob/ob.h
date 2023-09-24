@@ -1,6 +1,6 @@
 // ob.h : definitions related to the object manager and object manager collections.
 //
-// (c) Ulf Frisk, 2018-2021
+// (c) Ulf Frisk, 2018-2023
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __OB_H__
@@ -13,8 +13,13 @@ typedef unsigned __int64                QWORD, *PQWORD;
 #include "../oscompatibility.h"
 #endif /* _WIN32 */
 
+// OB_DEBUG is not working (as currently coded) with arm32 due to alignment issues.
+#if _WIN32 || _WIN64 || __i386__ || __amd64__ || __aarch64__
 #define OB_DEBUG
+//#define OB_DEBUG_MEMZERO
+#endif /* _WIN32 || _WIN64 || __i386__ || __amd64__ || __aarch64__ */
 #define OB_HEADER_MAGIC                 0x0c0efefe
+typedef struct tdVMM_HANDLE             *VMM_HANDLE;
 
 #define OB_TAG_CORE_CONTAINER           'ObCo'
 #define OB_TAG_CORE_COMPRESSED          'ObCp'
@@ -25,6 +30,7 @@ typedef unsigned __int64                QWORD, *PQWORD;
 #define OB_TAG_CORE_MEMFILE             'ObMF'
 #define OB_TAG_CORE_CACHEMAP            'ObMc'
 #define OB_TAG_CORE_STRMAP              'ObMs'
+#define OB_TAG_CORE_BYTEQUEUE           'ObBq'
 
 // ----------------------------------------------------------------------------
 // OBJECT MANAGER CORE FUNCTIONALITY BELOW:
@@ -46,9 +52,9 @@ typedef unsigned __int64                QWORD, *PQWORD;
 
 typedef struct tdOB {
     // internal object manager functionality below: (= do not use unless absolutely necessary)
-    DWORD _magic;                           // magic value - OB_HEADER_MAGIC
+    DWORD _magic1;                          // magic value - OB_HEADER_MAGIC
     union {
-        DWORD _tag;                         // tag - 2 chars, no null terminator
+        DWORD _tag;                         // tag - 4 chars, no null terminator
         CHAR _tagCh[4];
     };
     union {
@@ -59,12 +65,29 @@ typedef struct tdOB {
         VOID(*_pfnRef_1)(_In_ PVOID pOb);   // callback - when object reach refcount 1 (not initial)
         QWORD _Filler2;
     };
+    DWORD _Filler3[5];
     DWORD _count;                           // reference count
     // external object manager functionality below: (= ok to use)
-    DWORD cbData;
+    union { VMM_HANDLE H; QWORD _Filler4; };// vmm user handle (supplied at alloc)
+    DWORD cbData;                           // data byte count (excl. OB header)
+    DWORD _magic2;                          // magic value - OB_HEADER_MAGIC
 } OB, *POB;
 
 typedef VOID(*OB_CLEANUP_CB)(_In_ PVOID pOb);
+
+/*
+* Allocate a new object manager memory object.
+* -- H = an optional handle to embed as OB.H in the header.
+* -- tag = tag identifying the type of object.
+* -- uFlags = flags as given by LocalAlloc.
+* -- uBytes = bytes of object (_including_ object headers).
+* -- pfnRef_0 = optional callback for cleanup o be called before object is destroyed.
+*               (if object contains objects which references should be decremented
+                 before destruction of this 'parent' object).
+* -- pfnRef_1 = optional callback for when object reach refcount = 1 at DECREF.
+* -- return = allocated object on success, with refcount = 1, - NULL on fail.
+*/
+PVOID Ob_AllocEx(_In_opt_ VMM_HANDLE H, _In_ DWORD tag, _In_ UINT uFlags, _In_ SIZE_T uBytes, _In_opt_ OB_CLEANUP_CB pfnRef_0, _In_opt_ OB_CLEANUP_CB pfnRef_1);
 
 /*
 * Allocate a new object manager memory object.
@@ -77,7 +100,10 @@ typedef VOID(*OB_CLEANUP_CB)(_In_ PVOID pOb);
 * -- pfnRef_1 = optional callback for when object reach refcount = 1 at DECREF.
 * -- return = allocated object on success, with refcount = 1, - NULL on fail.
 */
-PVOID Ob_Alloc(_In_ DWORD tag, _In_ UINT uFlags, _In_ SIZE_T uBytes, _In_opt_ OB_CLEANUP_CB pfnRef_0, _In_opt_ OB_CLEANUP_CB pfnRef_1);
+inline PVOID Ob_Alloc(_In_ DWORD tag, _In_ UINT uFlags, _In_ SIZE_T uBytes, _In_opt_ OB_CLEANUP_CB pfnRef_0, _In_opt_ OB_CLEANUP_CB pfnRef_1)
+{
+    return Ob_AllocEx(NULL, tag, uFlags, uBytes, pfnRef_0, pfnRef_1);
+}
 
 /*
 * Increase the reference count of a object by one.
@@ -98,8 +124,8 @@ PVOID Ob_XDECREF(_In_opt_ PVOID pOb);
 #define Ob_DECREF(pOb)          (Ob_XDECREF((PVOID)pOb))
 
 /*
-* Decrease the reference count of a object manager object. If the reference
-* count reaches zero the object will be cleaned up.
+* Decrease the reference count of a object manager object.
+* If the reference count reaches zero the object will be cleaned up.
 * Also set the incoming pointer to NULL.
 * -- ppOb
 */
@@ -136,12 +162,13 @@ typedef struct tdOB_DATA {
 * to the number of bytes in the data buffer supplied to this function.
 * May also be created with Ob_Alloc with size: sizeof(OB_HDR) + length of data.
 * CALLER DECREF: return
+* -- H
 * -- pb
 * -- cb
 * -- return
 */
 _Success_(return != NULL)
-POB_DATA ObData_New(_In_ PBYTE pb, _In_ DWORD cb);
+POB_DATA ObData_New(_In_opt_ VMM_HANDLE H, _In_ PBYTE pb, _In_ DWORD cb);
 
 
 
@@ -158,7 +185,7 @@ POB_DATA ObData_New(_In_ PBYTE pb, _In_ DWORD cb);
 
 typedef struct tdOB_CONTAINER {
     OB ObHdr;
-    CRITICAL_SECTION Lock;
+    SRWLOCK LockSRW;
     POB pOb;
 } OB_CONTAINER, *POB_CONTAINER;
 
@@ -216,9 +243,10 @@ typedef struct tdOB_SET *POB_SET;
 * ways to store unique 64-bit (or smaller) numbers as a set.
 * The ObSet is an object manager object and must be DECREF'ed when required.
 * CALLER DECREF: return
+* -- H
 * -- return
 */
-POB_SET ObSet_New();
+POB_SET ObSet_New(_In_opt_ VMM_HANDLE H);
 
 /*
 * Retrieve the number of items in the given ObSet.
@@ -312,6 +340,20 @@ QWORD ObSet_Pop(_In_opt_ POB_SET pvs);
 QWORD ObSet_GetNext(_In_opt_ POB_SET pvs, _In_ QWORD value);
 
 /*
+* Retrieve the given an index. To start iterating, use index 0. When no more
+* items are available, the function will return 0.
+* Add/Remove rules:
+*  - Added values are ok - but will not be iterated over.
+*  - Removal of current value and already iterated values are ok.
+*  - Removal of values not yet iterated is FORBIDDEN. It causes the iterator
+*    fail by returning the same value multiple times or skipping values.
+* -- pvs
+* -- pdwIndex
+* -- return
+*/
+QWORD ObSet_GetNextByIndex(_In_opt_ POB_SET pvs, _Inout_ PDWORD pdwIndex);
+
+/*
 * Retrieve a value given a value index (which is less than the amount of items
 * in the Set).
 * NB! Correctness of the Get/GetNext functionality is _NOT- guaranteed if the
@@ -357,15 +399,21 @@ typedef struct tdOB_MAP *POB_MAP;
 #define OB_MAP_FLAGS_OBJECT_LOCALFREE   0x02
 #define OB_MAP_FLAGS_NOKEY              0x04
 
+typedef struct tdOB_MAP_ENTRY {
+    QWORD k;
+    union { PVOID v; QWORD _Filler; };
+} OB_MAP_ENTRY, *POB_MAP_ENTRY, **PPOB_MAP_ENTRY;
+
 /*
 * Create a new map. A map (ObMap) provides atomic map operations and ways
 * to optionally map key values to values, pointers or object manager objects.
 * The ObMap is an object manager object and must be DECREF'ed when required.
 * CALLER DECREF: return
+* -- H
 * -- flags = defined by OB_MAP_FLAGS_*
 * -- return
 */
-POB_MAP ObMap_New(_In_ QWORD flags);
+POB_MAP ObMap_New(_In_opt_ VMM_HANDLE H, _In_ QWORD flags);
 
 /*
 * Retrieve the number of objects in the ObMap.
@@ -432,7 +480,7 @@ PVOID ObMap_Pop(_In_opt_ POB_MAP pm);
 * -- return = success: object, fail: NULL.
 */
 _Success_(return != NULL)
-PVOID ObMap_PopWithKey(_In_opt_ POB_MAP pm, _Out_ PQWORD pKey);
+PVOID ObMap_PopWithKey(_In_opt_ POB_MAP pm, _Out_opt_ PQWORD pKey);
 
 /*
 * Remove an object from the ObMap.
@@ -509,6 +557,39 @@ PVOID ObMap_GetNext(_In_opt_ POB_MAP pm, _In_opt_ PVOID pvObject);
 PVOID ObMap_GetNextByKey(_In_opt_ POB_MAP pm, _In_ QWORD qwKey, _In_opt_ PVOID pvObject);
 
 /*
+* Retrieve the next object given a key in a map sorted by key. If the key isn't
+* found the next object with a larger key will be returned. To start iterating
+* supply zero (0) in the qwKey parameter. When no more objects are found NULL
+* will be returned.
+* NB! Correctness is only guarateed if the map is sorted by key ascending.
+* FUNCTION DECREF(if OB): pvObject
+* CALLER DECREF(if OB): return
+* -- pm
+* -- qwKey
+* -- pvObject
+* -- return
+*/
+PVOID ObMap_GetNextByKeySorted(_In_opt_ POB_MAP pm, _In_ QWORD qwKey, _In_opt_ PVOID pvObject);
+
+/*
+* Iterate over objects in reversed index order. To start iterating supply NULL
+* in the pvObject parameter (this overrides pdwIndex). When no more objects
+* are found NULL will be returned.
+* Add/Remove rules:
+*  - Added objects are ok - but will not be iterated over.
+*  - Removal of current object and already iterated objects are ok.
+*  - Removal of objects not yet iterated is FORBIDDEN. It causes the iterator
+*    fail by returning the same object multiple times or skipping objects.
+* FUNCTION DECREF(if OB): pvObject
+* CALLER DECREF(if OB): return
+* -- pm
+* -- pdwIndex
+* -- pvObject
+* -- return
+*/
+PVOID ObMap_GetNextByIndex(_In_opt_ POB_MAP pm, _Inout_ PDWORD pdwIndex, _In_opt_ PVOID pvObject);
+
+/*
 * Retrieve a value given a key.
 * CALLER DECREF(if OB): return
 * -- pm
@@ -540,37 +621,80 @@ _Success_(return != 0)
 QWORD ObMap_GetKey(_In_opt_ POB_MAP pm, _In_ PVOID pvObject);
 
 /*
+* Callback function for ObMap_Filter which converts a ObMap to an arbitrary context.
+*/
+typedef VOID(*OB_MAP_FILTER_PFN_CB)(_In_opt_ PVOID ctx, _In_ QWORD k, _In_ PVOID v);
+
+/*
+* Callback function for ObMap_FilterSet which converts an ObMap to an ObSet.
+*/
+typedef VOID(*OB_MAP_FILTERSET_PFN_CB)(_In_opt_ PVOID ctx, _In_ POB_SET ps, _In_ QWORD k, _In_ PVOID v);
+
+/*
+* Callback function for ObMap_RemoveByFilter which removes objects from an ObMap.
+*/
+typedef BOOL(*OB_MAP_FILTER_REMOVE_PFN_CB)(_In_opt_ PVOID ctx, _In_ QWORD k, _In_ PVOID v);
+
+/*
 * Common filter function related to ObMap_FilterSet.
 */
-VOID ObMap_FilterSet_FilterAllKey(_In_ QWORD k, _In_ PVOID v, _Inout_ POB_SET ps);
+VOID ObMap_FilterSet_FilterAllKey(_In_opt_ PVOID ctx, _In_ POB_SET ps, _In_ QWORD k, _In_ PVOID v);
 
 /*
 * Filter map objects into a generic context by using a user-supplied filter function.
 * -- pm
 * -- ctx = optional context to pass on to the filter function.
-* -- pfnFilter
+* -- pfnFilterCB = filter callback function. NULL = fail.
 * -- return
 */
 _Success_(return)
-BOOL ObMap_Filter(_In_opt_ POB_MAP pm, _Inout_opt_ PVOID ctx, _In_opt_ VOID(*pfnFilter)(_In_ QWORD k, _In_ PVOID v, _Inout_opt_ PVOID ctx));
+BOOL ObMap_Filter(_In_opt_ POB_MAP pm, _In_opt_ PVOID ctx, _In_opt_ OB_MAP_FILTER_PFN_CB pfnFilterCB);
 
 /*
 * Filter map objects into a POB_SET by using a user-supplied filter function.
 * CALLER DECREF: return
 * -- pm
-* -- pfnFilter
+* -- ctx = optional context to pass on to the filter function.
+* -- pfnFilterSetCB = filter callback function. NULL = fail.
 * -- return = POB_SET consisting of values gathered by the pfnFilter function.
 */
 _Success_(return != NULL)
-POB_SET ObMap_FilterSet(_In_opt_ POB_MAP pm, _In_opt_ VOID(*pfnFilter)(_In_ QWORD k, _In_ PVOID v, _Inout_ POB_SET ps));
+POB_SET ObMap_FilterSet(_In_opt_ POB_MAP pm, _In_opt_ PVOID ctx, _In_opt_ OB_MAP_FILTERSET_PFN_CB pfnFilterSetCB);
 
 /*
 * Remove map objects using a user-supplied filter function.
 * -- pm
-* -- pfnFilter = decision making function: [pfnFilter(k,v)->TRUE(remove)|FALSE(keep)]
+* -- ctx = optional context to pass on to the filter function.
+* -- pfnFilterRemoveCB = decision making function: [pfnFilter(ctx,k,v)->TRUE(remove)|FALSE(keep)]
 * -- return = number of entries removed.
 */
-DWORD ObMap_RemoveByFilter(_In_opt_ POB_MAP pm, _In_opt_ BOOL(*pfnFilter)(_In_ QWORD k, _In_ PVOID v));
+DWORD ObMap_RemoveByFilter(_In_opt_ POB_MAP pm, _In_opt_ PVOID ctx, _In_opt_ OB_MAP_FILTER_REMOVE_PFN_CB pfnFilterRemoveCB);
+
+/*
+* Sort compare callback function.
+*/
+typedef int(*OB_MAP_SORT_COMPARE_FUNCTION)(_In_ POB_MAP_ENTRY e1, _In_ POB_MAP_ENTRY e2);
+
+/*
+* Sort the ObMap entry index by a sort compare function.
+* NB! The items sorted by the sort function are const OB_MAP_ENTRY* objects
+*     which points to the underlying map object key/value.
+* -- pm
+* -- pfnSort = sort function callback. const void* == const OB_MAP_ENTRY*
+* -- return
+*/
+_Success_(return)
+BOOL ObMap_SortEntryIndex(_In_opt_ POB_MAP pm, _In_ OB_MAP_SORT_COMPARE_FUNCTION pfnSort);
+
+/*
+* Sort the ObMap entry index by key ascending.
+* NB! The items sorted by the sort function are const OB_MAP_ENTRY* objects
+*     which points to the underlying map object key/value.
+* -- pm
+* -- return
+*/
+_Success_(return)
+BOOL ObMap_SortEntryIndexByKey(_In_opt_ POB_MAP pm);
 
 
 
@@ -595,10 +719,25 @@ typedef struct tdOB_CACHEMAP *POB_CACHEMAP;
 #define OB_CACHEMAP_FLAGS_OBJECT_LOCALFREE   0x02
 
 /*
+* Callback function for the pfnValidEntry in ObCacheMap_New()
+* -- H
+* -- qwContext
+* -- qwKey
+* -- pbObject
+*/
+typedef BOOL(*OB_CACHEMAP_VALIDENTRY_PFN_CB)(
+    _In_opt_ VMM_HANDLE H,
+    _Inout_ PQWORD qwContext,
+    _In_ QWORD qwKey,
+    _In_ PVOID pvObject
+);
+
+/*
 * Create a new cached map. A cached map (ObCacheMap) provides atomic map
 * operations on cached objects.
 * The ObCacheMap is an object manager object and must be DECREF'ed when required.
 * CALLER DECREF: return
+* -- H
 * -- cMaxEntries = max entries in the cache, if more entries are added the
 *       least recently accessed item will be removed from the cache map.
 * -- pfnValidEntry = validation callback function (if any).
@@ -606,8 +745,9 @@ typedef struct tdOB_CACHEMAP *POB_CACHEMAP;
 * -- return
 */
 POB_CACHEMAP ObCacheMap_New(
+    _In_opt_ VMM_HANDLE H,
     _In_ DWORD cMaxEntries,
-    _In_opt_ BOOL(*pfnValidEntry)(_Inout_ PQWORD qwContext, _In_ QWORD qwKey, _In_ PVOID pvObject),
+    _In_opt_ OB_CACHEMAP_VALIDENTRY_PFN_CB pfnValidEntry,
     _In_ QWORD flags
 );
 
@@ -916,11 +1056,12 @@ BOOL ObStrMap_FinalizeBufferXUW(_In_opt_ POB_STRMAP psm, _In_ DWORD cbMultiStr, 
 * decommissioned by calling any of the ObStrMap_Finalize*() functions.
 * The ObStrMap is an object manager object and must be DECREF'ed when required.
 * CALLER DECREF: return
+* -- H
 * -- flags
 * -- return
 */
 _Success_(return != NULL)
-POB_STRMAP ObStrMap_New(_In_ QWORD flags);
+POB_STRMAP ObStrMap_New(_In_opt_ VMM_HANDLE H, _In_ QWORD flags);
 
 
 
@@ -932,24 +1073,33 @@ POB_STRMAP ObStrMap_New(_In_ QWORD flags);
 
 typedef struct tdOB_COMPRESSED *POB_COMPRESSED;
 
+#define OB_COMPRESSED_CACHED_ENTRIES_MAX        0x40
+#define OB_COMPRESSED_CACHED_ENTRIES_MAXSIZE    0x00100000
+
 /*
 * Create a new compressed buffer object from a byte buffer.
+* It's strongly recommended to supply a global cache map to use.
 * CALLER DECREF: return
+* -- H
+* -- pcmg = optional global (per VMM_HANDLE) cache map to use.
 * -- pb
 * -- cb
 * -- return
 */
 _Success_(return != NULL)
-POB_COMPRESSED ObCompressed_NewFromByte(_In_reads_(cb) PBYTE pb, _In_ DWORD cb);
+POB_COMPRESSED ObCompressed_NewFromByte(_In_opt_ VMM_HANDLE H, _In_opt_ POB_CACHEMAP pcmg, _In_reads_(cb) PBYTE pb, _In_ DWORD cb);
 
 /*
 * Create a new compressed buffer object from a zero terminated string.
+* It's strongly recommended to supply a global cache map to use.
 * CALLER DECREF: return
+* -- H
+* -- pcmg = optional global (per VMM_HANDLE) cache map to use.
 * -- sz
 * -- return
 */
 _Success_(return != NULL)
-POB_COMPRESSED ObCompress_NewFromStrA(_In_ LPSTR sz);
+POB_COMPRESSED ObCompress_NewFromStrA(_In_opt_ VMM_HANDLE H, _In_opt_ POB_CACHEMAP pcmg, _In_ LPSTR sz);
 
 /*
 * Retrieve the uncompressed size of the compressed data object.
@@ -984,11 +1134,14 @@ typedef struct tdOB_MEMFILE *POB_MEMFILE;
 
 /*
 * Create a new empty memory file.
+* It's strongly recommended to supply a global cache map to use.
 * CALLER DECREF: return
+* -- H
+* -- pcmg = optional global (per VMM_HANDLE) cache map to use.
 * -- return
 */
 _Success_(return != NULL)
-POB_MEMFILE ObMemFile_New();
+POB_MEMFILE ObMemFile_New(_In_opt_ VMM_HANDLE H, _In_opt_ POB_CACHEMAP pcmg);
 
 /*
 * Retrieve byte count of the ObMemFile.
@@ -1015,6 +1168,26 @@ BOOL ObMemFile_Append(_In_opt_ POB_MEMFILE pmf, _In_reads_(cb) PBYTE pb, _In_ QW
 */
 _Success_(return)
 BOOL ObMemFile_AppendString(_In_opt_ POB_MEMFILE pmf, _In_opt_z_ LPSTR sz);
+
+/*
+* Append a string (ansi or utf-8) to the ObMemFile.
+* -- H
+* -- uszFormat
+* -- ...
+* -- return = the number of bytes appended (excluding terminating null).
+*/
+_Success_(return != 0)
+SIZE_T ObMemFile_AppendStringEx(_In_opt_ POB_MEMFILE pmf, _In_z_ _Printf_format_string_ LPSTR uszFormat, ...);
+
+/*
+* Append a string (ansi or utf-8) to the ObMemFile.
+* -- H
+* -- uszFormat
+* -- arglist
+* -- return = the number of bytes appended (excluding terminating null).
+*/
+_Success_(return != 0)
+SIZE_T ObMemFile_AppendStringEx2(_In_opt_ POB_MEMFILE pmf, _In_z_ _Printf_format_string_ LPSTR uszFormat, _In_ va_list arglist);
 
 /*
 * Read data 'as file' from the ObMemFile.
@@ -1055,10 +1228,20 @@ typedef struct tdOB_COUNTER_ENTRY {
 * Create a new counter. A counter (ObCounter) provides atomic counting operations.
 * The ObCounter is an object manager object and must be DECREF'ed when required.
 * CALLER DECREF: return
+* -- H
 * -- flags = defined by OB_COUNTER_FLAGS_*
 * -- return
 */
-POB_COUNTER ObCounter_New(_In_ QWORD flags);
+POB_COUNTER ObCounter_New(_In_opt_ VMM_HANDLE H, _In_ QWORD flags);
+
+/*
+* Clear the ObCounter by removing all counts and keys.
+* NB! underlying allocated memory will remain unchanged.
+* -- pm
+* -- return = clear was successful - always true.
+*/
+_Success_(return)
+BOOL ObCounter_Clear(_In_opt_ POB_COUNTER pc);
 
 /*
 * Retrieve the number of counted keys the ObCounter.
@@ -1172,5 +1355,96 @@ BOOL ObCounter_GetAllSortedByKey(_In_opt_ POB_COUNTER pc, _In_ DWORD cEntries, _
 _Success_(return)
 BOOL ObCounter_GetAllSortedByCount(_In_opt_ POB_COUNTER pc, _In_ DWORD cEntries, _Out_writes_opt_(cEntries) POB_COUNTER_ENTRY pEntries);
 
+/*
+* Remove the "last" count.
+* -- pc
+* -- return = success: count, fail: 0.
+*/
+_Success_(return != 0)
+QWORD ObCounter_Pop(_In_opt_ POB_COUNTER pc);
+
+/*
+* Remove the "last" count and return it and its key.
+* -- pc
+* -- pKey
+* -- return = success: count, fail: 0.
+*/
+_Success_(return != 0)
+QWORD ObCounter_PopWithKey(_In_opt_ POB_COUNTER pc, _Out_opt_ PQWORD pKey);
+
+
+
+// ----------------------------------------------------------------------------
+// BYTE QUEUE FUNCTIONALITY BELOW
+//
+// The byte queue contains a fixed number of bytes as buffer. The queue size
+// is defined at queue creation and cannot be changed.
+// Bytes in the form of packets [pb, cb, tag] is pushed on the queue as long
+// as there is available space.
+// Bytes may be popped from the queue. This will also free up space for more
+// bytes to be pushed on the queue.
+// The bytes queue is FIFO and will always pop the oldest bytes first.
+// The ObByteQueue is an object manager object and must be DECREF'ed when required.
+// ----------------------------------------------------------------------------
+
+typedef struct tdOB_BYTEQUEUE *POB_BYTEQUEUE;
+
+/*
+* Retrieve the number of packets (not bytes) in the byte queue.
+* -- pq
+* -- return
+*/
+DWORD ObByteQueue_Size(_In_opt_ POB_BYTEQUEUE pq);
+
+/*
+* Peek data from the byte queue. The data is copied into the user-supplied buffer.
+* If the buffer is insufficient the function will return FALSE and the required
+* size will be returned in pcbRead.
+* -- pq
+* -- pqwTag
+* -- cb
+* -- pb
+* -- pcbRead
+* -- return = TRUE if there was data to peek, FALSE otherwise.
+*/
+_Success_(return)
+BOOL ObByteQueue_Peek(_In_opt_ POB_BYTEQUEUE pq, _Out_opt_ QWORD * pqwTag, _In_ SIZE_T cb, _Out_ PBYTE pb, _Out_ SIZE_T * pcbRead);
+
+/*
+* Pop data from the byte queue. The data is copied into the user-supplied buffer.
+* If the buffer is insufficient the function will return FALSE and the required
+* size will be returned in pcbRead.
+* -- pq
+* -- pqwTag
+* -- cb
+* -- pb
+* -- pcbRead
+* -- return = TRUE if there was data to pop, FALSE otherwise.
+*/
+_Success_(return)
+BOOL ObByteQueue_Pop(_In_opt_ POB_BYTEQUEUE pq, _Out_opt_ QWORD * pqwTag, _In_ SIZE_T cb, _Out_ PBYTE pb, _Out_ SIZE_T * pcbRead);
+
+/*
+* Push / Insert into the ObByteQueue. The data is copied into the queue.
+* -- pq
+* -- qwTag
+* -- cb
+* -- pb
+* -- return = TRUE on insertion, FALSE otherwise - i.e. if the byte queue
+*             is insufficient to hold the byte data.
+*/
+_Success_(return)
+BOOL ObByteQueue_Push(_In_opt_ POB_BYTEQUEUE pq, _In_opt_ QWORD qwTag, _In_ SIZE_T cb, _In_reads_bytes_(cb) PBYTE pb);
+
+/*
+* Create a new byte queue. A byte queue (ObByteQueue) provides atomic queuing
+* operations for pushing/popping bytes as packets on a FIFO queue.
+* The ObByteQueue is an object manager object and must be DECREF'ed when required.
+* CALLER DECREF: return
+* -- H
+* -- cbQueueSize = the queue size in bytes. Must be larger than 4096 bytes.
+* -- return
+*/
+POB_BYTEQUEUE ObByteQueue_New(_In_opt_ VMM_HANDLE H, _In_ DWORD cbQueueSize);
 
 #endif /* __OB_H__ */
