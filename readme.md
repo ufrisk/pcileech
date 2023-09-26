@@ -293,3 +293,4 @@ v4.1
   - Update of kernel modules to support latest kernels.
   - New KMD signature - LINUX_X64_MAP - specify target system kernel System.map in -in option.
   - New kernel module: lx64_exec_root.
+
