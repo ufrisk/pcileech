@@ -186,7 +186,7 @@ If you like what I've created with PCIleech and MemProcFS with regards to DMA, M
 
 To all my sponsors, Thank You 💖 
 
-All sponsorships are welcome, no matter how large or small. I especially wish to thank my **bronze sponsors**: [grandprixgp](https://github.com/grandprixgp).
+All sponsorships are welcome, no matter how large or small.
 
 Changelog:
 ==========
@@ -293,4 +293,4 @@ v4.1
   - Update of kernel modules to support latest kernels.
   - New KMD signature - LINUX_X64_MAP - specify target system kernel System.map in -in option.
   - New kernel module: lx64_exec_root.
-
+* Linux PCIe FPGA performance improvements.
