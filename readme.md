@@ -71,6 +71,7 @@ Please find a summary of the supported software based memory acquisition methods
 | [RAW physical memory dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)         | File             | No  | No  | Yes | No  |
 | [Full Microsoft Crash Dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)        | File             | No  | No  | Yes | No  |
 | [Full ELF Core Dump](https://github.com/ufrisk/LeechCore/wiki/Device_File)               | File             | No  | No  | Yes | No  |
+| [QEMU](https://github.com/ufrisk/LeechCore/wiki/Device_QEMU)                             | Live&nbsp;Memory | Yes | Yes | No  | No  |
 | [VMware](https://github.com/ufrisk/LeechCore/wiki/Device_VMWare)                         | Live&nbsp;Memory | Yes | Yes | No  | No  |
 | [VMware memory save file](https://github.com/ufrisk/LeechCore/wiki/Device_File)          | File             | No  | No  | Yes | No  |
 | [TotalMeltdown](https://github.com/ufrisk/LeechCore/wiki/Device_Totalmeltdown)           | CVE-2018-1038    | Yes | Yes | No  | No  |
@@ -78,6 +79,7 @@ Please find a summary of the supported software based memory acquisition methods
 | [WinPMEM](https://github.com/ufrisk/LeechCore/wiki/Device_WinPMEM)                       | Live&nbsp;Memory | Yes | No  | No  | No  |
 | [LiveKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveKd)                         | Live&nbsp;Memory | Yes | No  | No  | No  |
 | [LiveCloudKd](https://github.com/ufrisk/LeechCore/wiki/Device_LiveCloudKd)               | Live&nbsp;Memory | Yes | Yes | No  | Yes |
+| [libmicrovmi](https://github.com/ufrisk/LeechCore-plugins#leechcore_device_microvmi)     | Live&nbsp;Memory | Yes | Yes | Yes | Yes |
 | [Hyper-V Saved State](https://github.com/ufrisk/LeechCore/wiki/Device_HyperV_SavedState) | File             | No  | No  | No  | Yes |
 | [LeechAgent*](https://github.com/ufrisk/LeechCore/wiki/Device_Remote)                    | Remote           |     |     | No  | No  |
 
