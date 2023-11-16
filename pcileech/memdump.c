@@ -254,6 +254,9 @@ VOID ActionMemoryProbe()
     ctxMain->cfg.paAddrMin &= ~0xfff;
     ctxMain->cfg.paAddrMax = (ctxMain->cfg.paAddrMax + 1) & ~0xfff;
     pa = ctxMain->cfg.paAddrMin;
+    printf("WARNING: 'probe' may cause the device to stop working until a reboot on AMD or\n");
+    printf("         Thunderbolt systems and is discouraged. See link for additional info:\n");
+    printf("         https://github.com/ufrisk/LeechCore/wiki/Device_FPGA_AMD_Thunderbolt \n\n");
     PageStatInitialize(&pPageStat, ctxMain->cfg.paAddrMin, ctxMain->cfg.paAddrMax, "Probing Memory", FALSE, TRUE);
     while(pa < ctxMain->cfg.paAddrMax) {
         cPages = (DWORD)min(MEMORY_PROBE_PAGES_PER_SWEEP, (ctxMain->cfg.paAddrMax - pa) / 0x1000);

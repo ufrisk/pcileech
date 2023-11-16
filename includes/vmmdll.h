@@ -232,6 +232,7 @@ VOID VMMDLL_MemFree(_Frees_ptr_opt_ PVOID pvMem);
 
 // PROCESS OPTIONS: [LO-DWORD: Process PID]
 #define VMMDLL_OPT_PROCESS_DTB                          0x2002000100000000  // W - force set process directory table base.
+#define VMMDLL_OPT_PROCESS_DTB_FAST_LOWINTEGRITY        0x2002000200000000  // W - force set process directory table base (fast, low integrity mode, with less checks) - use at own risk!.
 
 static LPCSTR VMMDLL_MEMORYMODEL_TOSTRING[5] = { "N/A", "X86", "X86PAE", "X64", "ARM64" };
 
@@ -936,7 +937,7 @@ BOOL VMMDLL_Scatter_Prepare(_In_ VMMDLL_SCATTER_HANDLE hS, _In_ QWORD va, _In_ D
 * -- va = start address of the memory range to read.
 * -- cb = size of memory range to read.
 * -- pb = buffer to populate with read memory when calling VMMDLL_Scatter_ExecuteRead()
-* -- pcbRead = pointer to be populated with number of bytes successfully read.
+* -- pcbRead = optional pointer to be populated with number of bytes successfully read.
 * -- return
 */
 EXPORTED_FUNCTION _Success_(return)
@@ -1961,7 +1962,7 @@ typedef BOOL(*VMMYARA_SCAN_MEMORY_CALLBACK)(
     _In_ PVMMYARA_RULE_MATCH pRuleMatch,
     _In_reads_bytes_(cbBuffer) PBYTE pbBuffer,
     _In_ SIZE_T cbBuffer
-    );
+);
 
 #endif /* VMMYARA_SCAN_MEMORY_CALLBACK_DEFINED */
 // =========== END SHARED STRUCTS WITH <vmmdll.h/vmmyara.h> ===========
@@ -1969,6 +1970,21 @@ typedef BOOL(*VMMYARA_SCAN_MEMORY_CALLBACK)(
 #define VMMDLL_YARA_CONFIG_VERSION                  0xdec30001
 #define VMMDLL_YARA_MEMORY_CALLBACK_CONTEXT_VERSION 0xdec40002
 #define VMMDLL_YARA_CONFIG_MAX_RESULT               0x00010000      // max 65k results.
+
+typedef struct tdVMMDLL_YARA_CONFIG *PVMMDLL_YARA_CONFIG;           // forward declaration.
+
+/*
+* Callback function to tell whether a section of memory should be scanned or not.
+* -- ctx = pointer to PVMMDLL_YARA_CONFIG context.
+* -- pePte = pointer to PTE entry if the memory region is backed by PTE map. Otherwise NULL.
+* -- peVad = pointer to VAD entry if the memory region is backed by VAD map. Otherwise NULL.
+* -- return = return TRUE to scan the memory region, FALSE to skip it.
+*/
+typedef BOOL(*VMMYARA_SCAN_FILTER_CALLBACK)(
+    _In_ PVMMDLL_YARA_CONFIG ctx,
+    _In_opt_ PVMMDLL_MAP_PTEENTRY pePte,
+    _In_opt_ PVMMDLL_MAP_VADENTRY peVad
+);
 
 /*
 * Yara search configuration struct.
@@ -1997,7 +2013,7 @@ typedef struct tdVMMDLL_YARA_CONFIG {
     // optional filter callback function for virtual address reads:
     // for ranges inbetween vaMin:vaMax callback with pte or vad entry.
     // return: read from range(TRUE), do not read from range(FALSE).
-    BOOL(*pfnFilterOptCB)(_In_ struct tdVMMDLL_YARA_CONFIG *ctx, _In_opt_ PVMMDLL_MAP_PTEENTRY pePte, _In_opt_ PVMMDLL_MAP_VADENTRY peVad);
+    VMMYARA_SCAN_FILTER_CALLBACK pfnFilterOptCB;
     PVOID pvUserPtrOpt2;        // optional pointer set by caller (not used by MemProcFS).
     QWORD _Reserved;
 } VMMDLL_YARA_CONFIG, *PVMMDLL_YARA_CONFIG;
