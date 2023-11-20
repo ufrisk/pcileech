@@ -294,3 +294,6 @@ v4.1
   - New KMD signature - LINUX_X64_MAP - specify target system kernel System.map in -in option.
   - New kernel module: lx64_exec_root.
 * Linux PCIe FPGA performance improvements.
+
+Latest:
+* benchmark command added.
