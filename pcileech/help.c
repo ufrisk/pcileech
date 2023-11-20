@@ -61,6 +61,7 @@ VOID Help_ShowGeneral()
         "   pt_virt2phys           NATIVE,KMD [ cr3, 0 ]                                \n" \
         "   testmemread            NATIVE     [ min ]                                   \n" \
         "   testmemreadwrite       NATIVE     [ min ]                                   \n" \
+        "   benchmark              NATIVE                                               \n" \
         " Device specific commands and valid MODEs [ and options ] (and device):        \n" \
         "   tlp                    NATIVE     [ in ]         (FPGA)                     \n" \
         "   tlploop                NATIVE     [ in ]         (FPGA)                     \n" \
@@ -661,6 +662,12 @@ VOID Help_ShowDetailed()
             " EXAMPLES:      (example kernel module is loaded at address 0x7fffe000)        \n" \
             " 1) listen for TLPs and implement PCIe BAR support in read/write mode.         \n" \
             "    pcileech none -device fpga -vvv -tlpwait 10000 -bar-rw                     \n" \
+        );
+        break;
+    case BENCHMARK:
+        printf(
+            " PERFORM READ/WRITE BENCHMARKING                                               \n" \
+            " MODES   : NATIVE                                                              \n" \
         );
         break;
     case EXEC_KMD:

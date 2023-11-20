@@ -55,4 +55,9 @@ VOID Action_RegCfgReadWrite();
 */
 VOID Extra_BarReadWriteInitialize();
 
+/*
+* Run benchmarks (useful for PCIe benchmarking).
+*/
+VOID Action_Benchmark();
+
 #endif /* __EXTRA_H__ */

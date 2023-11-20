@@ -204,6 +204,7 @@ VOID LcMemFree(
 /*
 * Allocate and pre-initialize empty MEMs including a 0x1000 buffer for each
 * pMEM. The result should be freed by LcFree when its no longer needed.
+* The 0x1000-sized per-MEM memory buffers are contigious between MEMs in order.
 * -- cMEMs
 * -- pppMEMs = pointer to receive ppMEMs
 * -- return

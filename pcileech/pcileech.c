@@ -26,6 +26,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
     } ACTION;
     const struct ACTION ACTIONS[] = {
         {.tp = NONE,.sz = "none"},
+        {.tp = BENCHMARK,.sz = "benchmark"},
         {.tp = INFO,.sz = "info"},
         {.tp = DUMP,.sz = "dump" },
         {.tp = WRITE,.sz = "write" },
@@ -373,6 +374,9 @@ int main(_In_ int argc, _In_ char* argv[])
     // main dispatcher
     switch(ctxMain->cfg.tpAction) {
         case NONE:
+            break;
+        case BENCHMARK:
+            Action_Benchmark();
             break;
         case DUMP:
             ActionMemoryDump();

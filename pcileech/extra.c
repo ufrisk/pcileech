@@ -461,3 +461,64 @@ VOID Extra_BarReadWriteInitialize()
         return;
     }
 }
+
+
+
+//-----------------------------------------------------------------------------
+// PCIe BAR read/write functionality (with callback) below:
+//-----------------------------------------------------------------------------
+VOID Extra_Benchmark_ReadSingle(_In_ PPMEM_SCATTER ppMEMs, _In_ QWORD cb)
+{
+    LPSTR szcbUnit, szcbsUnit;
+    QWORD cbo, cbUnit, cbsUnit, tmStart, tmEnd, c = 0;
+    if(cb < 0x1000) {
+        szcbUnit = "B "; cbUnit = cb;
+    } else if(cb < 0x100000) {
+        szcbUnit = "kB"; cbUnit = cb / 1024;
+    } else {
+        szcbUnit = "MB"; cbUnit = cb / (1024 * 1024);
+    }
+    tmStart = GetTickCount64();
+    while((tmEnd = GetTickCount64()) - tmStart < 5000) {
+        for(cbo = 0; cbo < cb; cbo += 0x1000) {
+            ppMEMs[cbo >> 12]->cb = (DWORD)min(0x1000, cb);
+            ppMEMs[cbo >> 12]->f = FALSE;
+        }
+        LcReadScatter(ctxMain->hLC, max(1, (DWORD)(cb >> 12)), ppMEMs);
+        c++;
+    }
+    cbsUnit = cb * c / 5;
+    if(cbsUnit < 2 * 1024 * 1024) {
+        cbsUnit /= 1024;
+        szcbsUnit = "kB/s";
+    } else {
+        cbsUnit /= 1024*1024;
+        szcbsUnit = "MB/s";
+    }
+    printf("READ %3llu %s %8llu reads/s %5llu %s\n", cbUnit, szcbUnit, (c / 5), cbsUnit, szcbsUnit);
+}
+
+
+VOID Action_Benchmark()
+{
+    // Allocate 16MB memory as MEMs:
+    PPMEM_SCATTER ppMEMs = NULL;
+    DWORD i, cMEMs = 0x1000;
+    printf("================ PCILEECH BENCHMARK START ================\n");
+    if(!LcAllocScatter1(cMEMs, &ppMEMs)) {
+        printf("BENCHMARK: Error allocating memory.\n");
+        return;
+    }
+    for(i = 0; i < cMEMs; i++) {
+        ppMEMs[i]->qwA = 0x1000;
+    }
+    Extra_Benchmark_ReadSingle(ppMEMs, 8);          // 8 bytes
+    Extra_Benchmark_ReadSingle(ppMEMs, 128);        // 128 bytes
+    Extra_Benchmark_ReadSingle(ppMEMs, 512);        // 512 bytes
+    Extra_Benchmark_ReadSingle(ppMEMs, 0x1000);     // 4 KB
+    Extra_Benchmark_ReadSingle(ppMEMs, 0x10000);    // 64 KB
+    Extra_Benchmark_ReadSingle(ppMEMs, 0x100000);   // 1 MB
+    Extra_Benchmark_ReadSingle(ppMEMs, 0x1000000);  // 16 MB
+    printf("================ PCILEECH BENCHMARK FINISH ================\n");
+    LcMemFree(ppMEMs);
+}

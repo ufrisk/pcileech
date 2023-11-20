@@ -34,6 +34,7 @@ typedef struct tdPCILEECH_CONTEXT        PCILEECH_CONTEXT, *PPCILEECH_CONTEXT;
 typedef enum tdActionType {
     NA,
     NONE,
+    BENCHMARK,
     INFO,
     DUMP,
     WRITE,
