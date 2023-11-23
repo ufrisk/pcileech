@@ -467,10 +467,16 @@ VOID Extra_BarReadWriteInitialize()
 //-----------------------------------------------------------------------------
 // PCIe BAR read/write functionality (with callback) below:
 //-----------------------------------------------------------------------------
-VOID Extra_Benchmark_ReadSingle(_In_ PPMEM_SCATTER ppMEMs, _In_ QWORD cb)
+/*
+* Helper function to benchmark read speed of a certain byte size.
+* -- ppMEMs
+* -- cb
+* -- return value: bytes per second
+*/
+QWORD Extra_Benchmark_ReadSingle(_In_ PPMEM_SCATTER ppMEMs, _In_ QWORD cb)
 {
     LPSTR szcbUnit, szcbsUnit;
-    QWORD cbo, cbUnit, cbsUnit, tmStart, tmEnd, c = 0;
+    QWORD cbo, cbUnit, cbs, cbsUnit, tmStart, tmEnd, c = 0;
     if(cb < 0x1000) {
         szcbUnit = "B "; cbUnit = cb;
     } else if(cb < 0x100000) {
@@ -487,15 +493,16 @@ VOID Extra_Benchmark_ReadSingle(_In_ PPMEM_SCATTER ppMEMs, _In_ QWORD cb)
         LcReadScatter(ctxMain->hLC, max(1, (DWORD)(cb >> 12)), ppMEMs);
         c++;
     }
-    cbsUnit = cb * c / 5;
-    if(cbsUnit < 2 * 1024 * 1024) {
-        cbsUnit /= 1024;
+    cbs = cb * c / 5;
+    if(cbs < 2 * 1024 * 1024) {
+        cbsUnit = cbs / 1024;
         szcbsUnit = "kB/s";
     } else {
-        cbsUnit /= 1024*1024;
+        cbsUnit = cbs / (1024*1024);
         szcbsUnit = "MB/s";
     }
     printf("READ %3llu %s %8llu reads/s %5llu %s\n", cbUnit, szcbUnit, (c / 5), cbsUnit, szcbsUnit);
+    return cbs;
 }
 
 
@@ -504,6 +511,7 @@ VOID Action_Benchmark()
     // Allocate 16MB memory as MEMs:
     PPMEM_SCATTER ppMEMs = NULL;
     DWORD i, cMEMs = 0x1000;
+    QWORD cbs, qwTiny;
     printf("================ PCILEECH BENCHMARK START ================\n");
     if(!LcAllocScatter1(cMEMs, &ppMEMs)) {
         printf("BENCHMARK: Error allocating memory.\n");
@@ -518,7 +526,15 @@ VOID Action_Benchmark()
     Extra_Benchmark_ReadSingle(ppMEMs, 0x1000);     // 4 KB
     Extra_Benchmark_ReadSingle(ppMEMs, 0x10000);    // 64 KB
     Extra_Benchmark_ReadSingle(ppMEMs, 0x100000);   // 1 MB
-    Extra_Benchmark_ReadSingle(ppMEMs, 0x1000000);  // 16 MB
+    cbs = Extra_Benchmark_ReadSingle(ppMEMs, 0x1000000);  // 16 MB
     printf("================ PCILEECH BENCHMARK FINISH ================\n");
+    if((cbs < 45 * 1024 * 1024) && LcGetOption(ctxMain->hLC, LC_OPT_FPGA_ALGO_TINY, &qwTiny)) {
+        // This is a FPGA device - otherwise the option would not exist.
+        if(qwTiny) {
+            printf("BENCHMARK: WARNING! Read speed is slow.\n           TINY PCIe TLP algrithm auto-selected!\n");
+        } else {
+            printf("BENCHMARK: WARNING! Read speed is slow.\n           USB connection most likely at USB2 speed.\n           Check port/cable/connection for issues.");
+        }
+    }
     LcMemFree(ppMEMs);
 }
