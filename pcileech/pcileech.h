@@ -19,7 +19,7 @@ typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
 #endif /* LINUX */
 
 #define SIZE_PAGE_ALIGN_4K(x)                ((x + 0xfff) & ~0xfff)
-#define CONFIG_MAX_SIGNATURES                16
+#define CONFIG_MAX_SIGNATURES                256
 #define PCILEECH_DEVICE_EQUALS(name)         (0 == _stricmp(ctxMain->dev.szDeviceName, name))
 
 #pragma pack(push, 1) /* DISABLE STRUCT PADDINGS (REENABLE AFTER STRUCT DEFINITIONS) */

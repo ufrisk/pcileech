@@ -296,4 +296,5 @@ v4.1
 * Linux PCIe FPGA performance improvements.
 
 Latest:
-* benchmark command added.
+* Benchmark command added.
+* Unlock signatures updated.

