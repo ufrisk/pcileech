@@ -476,7 +476,7 @@ VOID Extra_BarReadWriteInitialize()
 QWORD Extra_Benchmark_ReadSingle(_In_ PPMEM_SCATTER ppMEMs, _In_ QWORD cb)
 {
     LPSTR szcbUnit, szcbsUnit;
-    QWORD cbo, cbUnit, cbs, cbsUnit, tmStart, tmEnd, c = 0;
+    QWORD cbo, cbUnit, cbs, cbsUnit, tmStart, tmEnd, c = 0, cFail = 0, pcFail;
     if(cb < 0x1000) {
         szcbUnit = "B "; cbUnit = cb;
     } else if(cb < 0x100000) {
@@ -491,9 +491,16 @@ QWORD Extra_Benchmark_ReadSingle(_In_ PPMEM_SCATTER ppMEMs, _In_ QWORD cb)
             ppMEMs[cbo >> 12]->f = FALSE;
         }
         LcReadScatter(ctxMain->hLC, max(1, (DWORD)(cb >> 12)), ppMEMs);
+        for(cbo = 0; cbo < cb; cbo += 0x1000) {
+            if(!ppMEMs[cbo >> 12]->f) {
+                cFail++;
+                break;
+            }
+        }
         c++;
     }
     cbs = cb * c / 5;
+    pcFail = (cFail * 100) / c;
     if(cbs < 2 * 1024 * 1024) {
         cbsUnit = cbs / 1024;
         szcbsUnit = "kB/s";
@@ -501,7 +508,11 @@ QWORD Extra_Benchmark_ReadSingle(_In_ PPMEM_SCATTER ppMEMs, _In_ QWORD cb)
         cbsUnit = cbs / (1024*1024);
         szcbsUnit = "MB/s";
     }
-    printf("READ %3llu %s %8llu reads/s %5llu %s\n", cbUnit, szcbUnit, (c / 5), cbsUnit, szcbsUnit);
+    if(cFail) {
+        printf("READ %3llu %s %8llu reads/s %5llu %s (failed: %llu%%)\n", cbUnit, szcbUnit, (c / 5), cbsUnit, szcbsUnit, pcFail);
+    } else {
+        printf("READ %3llu %s %8llu reads/s %5llu %s\n", cbUnit, szcbUnit, (c / 5), cbsUnit, szcbsUnit);
+    }
     return cbs;
 }
 

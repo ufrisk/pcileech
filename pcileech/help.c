@@ -188,9 +188,7 @@ VOID Help_ShowInfo()
         "   PCILeech-FPGA     - https://github.com/ufrisk/pcileech-fpga                 \n" \
         "   LeechCore         - https://github.com/ufrisk/LeechCore                     \n" \
         "   MemProcFS         - https://github.com/ufrisk/MemProcFS                     \n" \
-        "   Google USB Driver - https://developer.android.com/sdk/win-usb.html          \n" \
         "   FTDI FT601 Driver - http://www.ftdichip.com/Drivers/D3XX.htm                \n" \
-        "   PCIe Injector     - https://github.com/enjoy-digital/pcie_injector          \n" \
         "   Dokany            - https://github.com/dokan-dev/dokany/releases/latest     \n" \
         " ----------------                                                              \n" \
         "   PCILeech is free open source software. If you find it useful please         \n" \

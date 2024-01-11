@@ -92,7 +92,7 @@ Please ensure you do have the most recent version of PCILeech by visiting the PC
 Please see the [PCILeech on Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows) guide for information about running PCILeech on Windows.
 
 The Google Android USB driver have to be installed if USB3380 hardware is used. Download the Google Android USB driver from: http://developer.android.com/sdk/win-usb.html#download Unzip the driver.<br>
-FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card or PCIeScreamer. Download the 64-bit [`FTD3XX.dll`](https://www.ftdichip.com/Drivers/D3XX/FTD3XXLibrary_v1.3.0.4.zip) from FTDI and place it alongside `pcileech.exe`.<br>
+FTDI drivers have to be installed if FPGA is used with FT601 USB3 addon card or PCIeScreamer. Download the 64-bit [`FTD3XX.dll`](https://ftdichip.com/wp-content/uploads/2023/11/FTD3XXLibrary_v1.3.0.8.zip) from FTDI and place it alongside `pcileech.exe`.<br>
 To mount live ram and target file system as drive in Windows the Dokany2 file system library must be installed. Please download and install the latest stable version of Dokany2 at: https://github.com/dokan-dev/dokany/releases/latest
 
 #### Linux:
