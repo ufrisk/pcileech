@@ -1,6 +1,6 @@
 // charutil.h : definitions of various character/string utility functions.
 //
-// (c) Ulf Frisk, 2021-2023
+// (c) Ulf Frisk, 2021-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __CHARUTIL_H__
@@ -45,7 +45,7 @@ BOOL CharUtil_IsAnsiFsA(_In_ LPCSTR sz);
 */
 _Success_(return)
 BOOL CharUtil_UtoU(
-    _In_opt_ LPSTR usz,
+    _In_opt_ LPCSTR usz,
     _In_ DWORD cch,
     _Maybenull_ _Writable_bytes_(cbBuffer) PBYTE pbBuffer,
     _In_ DWORD cbBuffer,
@@ -56,7 +56,7 @@ BOOL CharUtil_UtoU(
 
 _Success_(return)
 BOOL CharUtil_AtoU(
-    _In_opt_ LPSTR sz,
+    _In_opt_ LPCSTR sz,
     _In_ DWORD cch,
     _Maybenull_ _Writable_bytes_(cbBuffer) PBYTE pbBuffer,
     _In_ DWORD cbBuffer,
@@ -67,7 +67,7 @@ BOOL CharUtil_AtoU(
 
 _Success_(return)
 BOOL CharUtil_WtoU(
-    _In_opt_ LPWSTR wsz,
+    _In_opt_ LPCWSTR wsz,
     _In_ DWORD cch,
     _Maybenull_ _Writable_bytes_(cbBuffer) PBYTE pbBuffer,
     _In_ DWORD cbBuffer,
@@ -93,7 +93,7 @@ BOOL CharUtil_WtoU(
 */
 _Success_(return)
 BOOL CharUtil_UtoW(
-    _In_opt_ LPSTR usz,
+    _In_opt_ LPCSTR usz,
     _In_ DWORD cch,
     _Maybenull_ _Writable_bytes_(cbBuffer) PBYTE pbBuffer,
     _In_ DWORD cbBuffer,
@@ -104,7 +104,7 @@ BOOL CharUtil_UtoW(
 
 _Success_(return)
 BOOL CharUtil_WtoW(
-    _In_opt_ LPWSTR wsz,
+    _In_opt_ LPCWSTR wsz,
     _In_ DWORD cch,
     _Maybenull_ _Writable_bytes_(cbBuffer) PBYTE pbBuffer,
     _In_ DWORD cbBuffer,
@@ -130,7 +130,7 @@ BOOL CharUtil_WtoW(
 */
 _Success_(return)
 BOOL CharUtil_UtoJ(
-    _In_opt_ LPSTR usz,
+    _In_opt_ LPCSTR usz,
     _In_ DWORD cch,
     _Maybenull_ _Writable_bytes_(cbBuffer) PBYTE pbBuffer,
     _In_ DWORD cbBuffer,
@@ -141,7 +141,7 @@ BOOL CharUtil_UtoJ(
 
 _Success_(return)
 BOOL CharUtil_AtoJ(
-    _In_opt_ LPSTR sz,
+    _In_opt_ LPCSTR sz,
     _In_ DWORD cch,
     _Maybenull_ _Writable_bytes_(cbBuffer) PBYTE pbBuffer,
     _In_ DWORD cbBuffer,
@@ -152,7 +152,7 @@ BOOL CharUtil_AtoJ(
 
 _Success_(return)
 BOOL CharUtil_WtoJ(
-    _In_opt_ LPWSTR wsz,
+    _In_opt_ LPCWSTR wsz,
     _In_ DWORD cch,
     _Maybenull_ _Writable_bytes_(cbBuffer) PBYTE pbBuffer,
     _In_ DWORD cbBuffer,
@@ -180,7 +180,7 @@ BOOL CharUtil_WtoJ(
 */
 _Success_(return)
 BOOL CharUtil_UtoCSV(
-    _In_opt_ LPSTR usz,
+    _In_opt_ LPCSTR usz,
     _In_ DWORD cch,
     _Maybenull_ _Writable_bytes_(cbBuffer) PBYTE pbBuffer,
     _In_ DWORD cbBuffer,
@@ -289,7 +289,20 @@ VOID CharUtil_ReplaceAllA(_Inout_ LPSTR sz, _In_ CHAR chOld, _In_ CHAR chNew);
 * -- cbu1 = byte length of usz1 buffer
 * -- return = remainder of split string.
 */
-LPSTR CharUtil_SplitFirst(_In_ LPSTR usz, _In_ CHAR ch, _Out_writes_(cbu1) LPSTR usz1, _In_ DWORD cbu1);
+LPCSTR CharUtil_SplitFirst(_In_ LPCSTR usz, _In_ CHAR ch, _Out_writes_(cbu1) LPSTR usz1, _In_ DWORD cbu1);
+
+/*
+* Split a string into two at the last character.
+* The 1st string is returned in the pusz1 caller-allocated buffer. The
+* remainder is returned as return data (is a sub-string of usz). If no
+* 2nd string is found null-terminator character is returned (NB! not as NULL).
+* -- usz = utf-8/ascii string to split.
+* -- ch = character to split at.
+* -- usz1 = buffer to receive result.
+* -- cbu1 = byte length of usz1 buffer
+* -- return = remainder of split string.
+*/
+LPCSTR CharUtil_SplitLast(_In_ LPCSTR usz, _In_ CHAR ch, _Out_writes_(cbu1) LPSTR usz1, _In_ DWORD cbu1);
 
 /*
 * Split a string into a list of strings at the delimiter characters.
@@ -302,7 +315,7 @@ LPSTR CharUtil_SplitFirst(_In_ LPSTR usz, _In_ CHAR ch, _Out_writes_(cbu1) LPSTR
 * -- return = remainder of split string.
 */
 _Success_(return)
-BOOL CharUtil_SplitList(_In_opt_ LPSTR usz, _In_ CHAR chDelimiter, _Out_ PDWORD pcArray, _Out_ LPSTR * *ppuszArray);
+BOOL CharUtil_SplitList(_Inout_opt_ LPSTR usz, _In_ CHAR chDelimiter, _Out_ PDWORD pcArray, _Out_ LPSTR **ppuszArray);
 
 /*
 * Split a "path" string into two at the first slash/backslash character.
@@ -314,7 +327,7 @@ BOOL CharUtil_SplitList(_In_opt_ LPSTR usz, _In_ CHAR chDelimiter, _Out_ PDWORD 
 * -- cbu1 = byte length of usz1 buffer
 * -- return = remainder of split string.
 */
-LPSTR CharUtil_PathSplitFirst(_In_ LPSTR usz, _Out_writes_(cbu1) LPSTR usz1, _In_ DWORD cbu1);
+LPCSTR CharUtil_PathSplitFirst(_In_ LPCSTR usz, _Out_writes_(cbu1) LPSTR usz1, _In_ DWORD cbu1);
 
 /*
 * Return the sub-string after the first (back)slash character in usz.
@@ -323,7 +336,7 @@ LPSTR CharUtil_PathSplitFirst(_In_ LPSTR usz, _Out_writes_(cbu1) LPSTR usz1, _In
 * -- usz = utf-8 or ascii string.
 * -- return
 */
-LPSTR CharUtil_PathSplitNext(_In_ LPSTR usz);
+LPCSTR CharUtil_PathSplitNext(_In_ LPCSTR usz);
 
 /*
 * Return the sub-string after the last (back)slash character in usz.
@@ -332,7 +345,7 @@ LPSTR CharUtil_PathSplitNext(_In_ LPSTR usz);
 * -- usz = utf-8 or ascii string.
 * -- return
 */
-LPSTR CharUtil_PathSplitLast(_In_ LPSTR usz);
+LPCSTR CharUtil_PathSplitLast(_In_ LPCSTR usz);
 
 /*
 * Split the string usz into two at the last (back)slash which is removed.
@@ -352,12 +365,12 @@ LPSTR CharUtil_PathSplitLastInPlace(_Inout_ LPSTR usz);
 * -- cbuPath = byte length of uszPath buffer
 * -- return = last part (i.e. file name) of usz.
 */
-LPSTR CharUtil_PathSplitLastEx(_In_ LPSTR usz, _Out_writes_(cbuPath) LPSTR uszPath, _In_ DWORD cbuPath);
+LPSTR CharUtil_PathSplitLastEx(_In_ LPCSTR usz, _Out_writes_(cbuPath) LPSTR uszPath, _In_ DWORD cbuPath);
 
 /*
 * Common typedef for a CharUtil_Str* comparison function.
 */
-typedef BOOL(*CHARUTIL_STRCMP_PFN)(_In_opt_ LPSTR usz1, _In_opt_ LPSTR usz2, _In_ BOOL fCaseInsensitive);
+typedef BOOL(*CHARUTIL_STRCMP_PFN)(_In_opt_ LPCSTR usz1, _In_opt_ LPCSTR usz2, _In_ BOOL fCaseInsensitive);
 
 /*
 * Compare multiple strings with a CharUtil_Str* compare function.
@@ -370,7 +383,7 @@ typedef BOOL(*CHARUTIL_STRCMP_PFN)(_In_opt_ LPSTR usz1, _In_opt_ LPSTR usz2, _In
 * ...
 * -- return
 */
-BOOL CharUtil_StrCmpAny(_In_opt_ CHARUTIL_STRCMP_PFN pfnStrCmp, _In_opt_ LPSTR usz1, _In_ BOOL fCaseInsensitive, _In_ DWORD cStr, ...);
+BOOL CharUtil_StrCmpAny(_In_opt_ CHARUTIL_STRCMP_PFN pfnStrCmp, _In_opt_ LPCSTR usz1, _In_ BOOL fCaseInsensitive, _In_ DWORD cStr, ...);
 
 /*
 * Compare multiple strings with a CharUtil_Str* compare function.
@@ -382,7 +395,7 @@ BOOL CharUtil_StrCmpAny(_In_opt_ CHARUTIL_STRCMP_PFN pfnStrCmp, _In_opt_ LPSTR u
 * -- pStr
 * -- return
 */
-BOOL CharUtil_StrCmpAnyEx(_In_opt_ CHARUTIL_STRCMP_PFN pfnStrCmp, _In_opt_ LPSTR usz1, _In_ BOOL fCaseInsensitive, _In_ DWORD cStr, _In_ LPSTR *pStr);
+BOOL CharUtil_StrCmpAnyEx(_In_opt_ CHARUTIL_STRCMP_PFN pfnStrCmp, _In_opt_ LPCSTR usz1, _In_ BOOL fCaseInsensitive, _In_ DWORD cStr, _In_ LPCSTR *pStr);
 
 /*
 * Compare multiple strings with a CharUtil_Str* compare function.
@@ -395,7 +408,7 @@ BOOL CharUtil_StrCmpAnyEx(_In_opt_ CHARUTIL_STRCMP_PFN pfnStrCmp, _In_opt_ LPSTR
 * ...
 * -- return
 */
-BOOL CharUtil_StrCmpAll(_In_opt_ CHARUTIL_STRCMP_PFN pfnStrCmp, _In_opt_ LPSTR usz1, _In_ BOOL fCaseInsensitive, _In_ DWORD cStr, ...);
+BOOL CharUtil_StrCmpAll(_In_opt_ CHARUTIL_STRCMP_PFN pfnStrCmp, _In_opt_ LPCSTR usz1, _In_ BOOL fCaseInsensitive, _In_ DWORD cStr, ...);
 
 /*
 * Checks if a string ends with a certain substring.
@@ -404,7 +417,7 @@ BOOL CharUtil_StrCmpAll(_In_opt_ CHARUTIL_STRCMP_PFN pfnStrCmp, _In_opt_ LPSTR u
 * -- fCaseInsensitive
 * -- return
 */
-BOOL CharUtil_StrEndsWith(_In_opt_ LPSTR usz, _In_opt_ LPSTR uszEndsWith, _In_ BOOL fCaseInsensitive);
+BOOL CharUtil_StrEndsWith(_In_opt_ LPCSTR usz, _In_opt_ LPCSTR uszEndsWith, _In_ BOOL fCaseInsensitive);
 
 /*
 * Checks if a string starts with a certain substring.
@@ -413,7 +426,7 @@ BOOL CharUtil_StrEndsWith(_In_opt_ LPSTR usz, _In_opt_ LPSTR uszEndsWith, _In_ B
 * -- fCaseInsensitive
 * -- return
 */
-BOOL CharUtil_StrStartsWith(_In_opt_ LPSTR usz, _In_opt_ LPSTR uszStartsWith, _In_ BOOL fCaseInsensitive);
+BOOL CharUtil_StrStartsWith(_In_opt_ LPCSTR usz, _In_opt_ LPCSTR uszStartsWith, _In_ BOOL fCaseInsensitive);
 
 /*
 * Checks if a string equals another string.
@@ -422,7 +435,7 @@ BOOL CharUtil_StrStartsWith(_In_opt_ LPSTR usz, _In_opt_ LPSTR uszStartsWith, _I
 * -- fCaseInsensitive
 * -- return
 */
-BOOL CharUtil_StrEquals(_In_opt_ LPSTR usz, _In_opt_ LPSTR usz2, _In_ BOOL fCaseInsensitive);
+BOOL CharUtil_StrEquals(_In_opt_ LPCSTR usz, _In_opt_ LPCSTR usz2, _In_ BOOL fCaseInsensitive);
 
 /*
 * Compare a wide-char string to a utf-8 string.
@@ -440,6 +453,6 @@ int CharUtil_CmpWU(_In_opt_ LPWSTR wsz1, _In_opt_ LPSTR usz2, _In_ BOOL fCaseIns
 * -- wsz2
 * -- return = 0 if equals, -1/1 otherwise.
 */
-int CharUtil_CmpWW(_In_opt_ LPWSTR wsz1, _In_opt_ LPWSTR wsz2, _In_ BOOL fCaseInsensitive);
+int CharUtil_CmpWW(_In_opt_ LPCWSTR wsz1, _In_opt_ LPCWSTR wsz2, _In_ BOOL fCaseInsensitive);
 
 #endif /* __CHARUTIL_H__ */

@@ -157,6 +157,16 @@ Limitations/Known Issues:
 * File system mount support only exists for Windows (Linux version is planned).
 * Remote connectivity support only exists for Windows.
 
+
+
+PCILeech and MemProcFS community:
+=========
+Find all this a bit overwhelming? Or just want to ask a quick question? Join the PCILeech and MemProcFS DMA community server at Discord!
+
+<a href="https://discord.gg/BCmfBhDPXX"><img src="https://discord.com/api/guilds/1155439643395883128/widget.png?style=banner3"/></a>
+
+
+
 Building:
 =========
 The binaries are found in the [releases section](https://github.com/ufrisk/pcileech/releases/latest) of this repository. If one wish to build an own version it is possible to do so. Please see the [PCILeech on Windows](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Windows) or [PCILeech on Linux](https://github.com/ufrisk/pcileech/wiki/PCILeech-on-Linux) for more information about building PCILeech. PCILeech is also dependant on LeechCore and optionally (for some extra functionality) on The Memory Process File System which must both be built separately.

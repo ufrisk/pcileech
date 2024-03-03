@@ -30,7 +30,7 @@ _Success_(return)
 BOOL Vmmx_Initialize(_In_ BOOL fRefresh,  _In_ BOOL fMemMapAuto)
 {
     DWORD cParams = 3;
-    LPSTR szParams[] = { "", "-device", "existing", "", "", "" };
+    LPCSTR szParams[] = { "", "-device", "existing", "", "", "" };
 
     if(!ctxMain->hVMM) {
         if(fRefresh) {

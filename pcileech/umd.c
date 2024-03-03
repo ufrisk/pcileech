@@ -21,11 +21,12 @@ int UmdCompare32(const void* a, const void* b)
 */
 VOID Action_UmdPsList()
 {
-    QWORD i, cbProcInfo, cPIDs = 0x1000;
+    SIZE_T cPIDs = 0x1000;
+    QWORD i, cbProcInfo;
     PDWORD pdwPIDs = NULL;
     PVMMDLL_PROCESS_INFORMATION pProcInfo = NULL;
     // 1: Initialize MemProcFS/vmm.dll
-    if(!(pdwPIDs = LocalAlloc(LMEM_ZEROINIT, (SIZE_T)(cPIDs * sizeof(DWORD))))) { goto fail; }
+    if(!(pdwPIDs = LocalAlloc(LMEM_ZEROINIT, cPIDs * sizeof(DWORD)))) { goto fail; }
     if(!(pProcInfo = LocalAlloc(0, sizeof(VMMDLL_PROCESS_INFORMATION)))) { goto fail; }
     if(!Vmmx_Initialize(FALSE, FALSE)) {
         printf("UMD: Failed initializing required MemProcFS/vmm.dll\n");
@@ -35,7 +36,7 @@ VOID Action_UmdPsList()
     if(!VMMDLL_PidList(ctxMain->hVMM, pdwPIDs, &cPIDs)) {
         printf("UMD: Failed list PIDs.\n");
     } else {
-        qsort(pdwPIDs, (SIZE_T)cPIDs, sizeof(DWORD), UmdCompare32);
+        qsort(pdwPIDs, cPIDs, sizeof(DWORD), UmdCompare32);
         for(i = 0; i < cPIDs; i++) {
             ZeroMemory(pProcInfo, sizeof(VMMDLL_PROCESS_INFORMATION));
             pProcInfo->magic = VMMDLL_PROCESS_INFORMATION_MAGIC;

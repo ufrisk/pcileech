@@ -8,10 +8,10 @@
 // while Linux may only access UTF-8 versions. Some functionality may also
 // be degraded or unavailable on Linux.
 //
-// (c) Ulf Frisk, 2018-2023
+// (c) Ulf Frisk, 2018-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 5.8
+// Header Version: 5.9
 //
 
 #include "leechcore.h"
@@ -44,8 +44,10 @@ typedef uint64_t                            FILETIME, *PFILETIME;
 typedef uint32_t                            DWORD, *PDWORD, *LPDWORD, BOOL, *PBOOL, NTSTATUS;
 typedef uint16_t                            WORD, *PWORD;
 typedef uint8_t                             BYTE, *PBYTE, *LPBYTE, UCHAR;
-typedef char                                CHAR, *PCHAR, *LPSTR, *LPCSTR;
-typedef uint16_t                            WCHAR, *PWCHAR, *LPWSTR, *LPCWSTR;
+typedef char                                CHAR, *PCHAR, *LPSTR;
+typedef const char                          *LPCSTR;
+typedef uint16_t                            WCHAR, *PWCHAR, *LPWSTR;
+typedef const uint16_t                      *LPCWSTR;
 #define MAX_PATH                            260
 #define _In_
 #define _In_z_
@@ -142,10 +144,10 @@ typedef BYTE                    OPAQUE_OB_HEADER[0x40];
 * -- return = VMM_HANDLE on success for usage in subsequent API calls. NULL=fail.
 */
 EXPORTED_FUNCTION _Success_(return != NULL)
-VMM_HANDLE VMMDLL_Initialize(_In_ DWORD argc, _In_ LPSTR argv[]);
+VMM_HANDLE VMMDLL_Initialize(_In_ DWORD argc, _In_ LPCSTR argv[]);
 
 EXPORTED_FUNCTION _Success_(return != NULL)
-VMM_HANDLE VMMDLL_InitializeEx(_In_ DWORD argc, _In_ LPSTR argv[], _Out_opt_ PPLC_CONFIG_ERRORINFO ppLcErrorInfo);
+VMM_HANDLE VMMDLL_InitializeEx(_In_ DWORD argc, _In_ LPCSTR argv[], _Out_opt_ PPLC_CONFIG_ERRORINFO ppLcErrorInfo);
 
 /*
 * Close an instantiated version of VMM_HANDLE and free up any resources.
@@ -368,8 +370,8 @@ typedef struct tdVMMDLL_VFS_FILELIST_EXINFO {
 
 typedef struct tdVMMDLL_VFS_FILELIST2 {
     DWORD dwVersion;
-    VOID(*pfnAddFile)     (_Inout_ HANDLE h, _In_ LPSTR uszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
-    VOID(*pfnAddDirectory)(_Inout_ HANDLE h, _In_ LPSTR uszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
+    VOID(*pfnAddFile)     (_Inout_ HANDLE h, _In_ LPCSTR uszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
+    VOID(*pfnAddDirectory)(_Inout_ HANDLE h, _In_ LPCSTR uszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
     HANDLE h;
 } VMMDLL_VFS_FILELIST2, *PVMMDLL_VFS_FILELIST2;
 
@@ -396,11 +398,11 @@ typedef struct tdVMMDLL_VFS_FILELISTBLOB {
 * Helper functions for callbacks into the VMM_VFS_FILELIST2 structure.
 */
 EXPORTED_FUNCTION
-VOID VMMDLL_VfsList_AddFile(_In_ HANDLE pFileList, _In_ LPSTR uszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
-VOID VMMDLL_VfsList_AddFileW(_In_ HANDLE pFileList, _In_ LPWSTR wszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
+VOID VMMDLL_VfsList_AddFile(_In_ HANDLE pFileList, _In_ LPCSTR uszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
+VOID VMMDLL_VfsList_AddFileW(_In_ HANDLE pFileList, _In_ LPCWSTR wszName, _In_ ULONG64 cb, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
 EXPORTED_FUNCTION
-VOID VMMDLL_VfsList_AddDirectory(_In_ HANDLE pFileList, _In_ LPSTR uszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
-VOID VMMDLL_VfsList_AddDirectoryW(_In_ HANDLE pFileList, _In_ LPWSTR wszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
+VOID VMMDLL_VfsList_AddDirectory(_In_ HANDLE pFileList, _In_ LPCSTR uszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
+VOID VMMDLL_VfsList_AddDirectoryW(_In_ HANDLE pFileList, _In_ LPCWSTR wszName, _In_opt_ PVMMDLL_VFS_FILELIST_EXINFO pExInfo);
 EXPORTED_FUNCTION BOOL VMMDLL_VfsList_IsHandleValid(_In_ HANDLE pFileList);
 
 /*
@@ -414,8 +416,8 @@ EXPORTED_FUNCTION BOOL VMMDLL_VfsList_IsHandleValid(_In_ HANDLE pFileList);
 * -- return
 */
 EXPORTED_FUNCTION
-_Success_(return) BOOL VMMDLL_VfsListU(_In_ VMM_HANDLE hVMM, _In_ LPSTR  uszPath, _Inout_ PVMMDLL_VFS_FILELIST2 pFileList);
-_Success_(return) BOOL VMMDLL_VfsListW(_In_ VMM_HANDLE hVMM, _In_ LPWSTR wszPath, _Inout_ PVMMDLL_VFS_FILELIST2 pFileList);
+_Success_(return) BOOL VMMDLL_VfsListU(_In_ VMM_HANDLE hVMM, _In_ LPCSTR  uszPath, _Inout_ PVMMDLL_VFS_FILELIST2 pFileList);
+_Success_(return) BOOL VMMDLL_VfsListW(_In_ VMM_HANDLE hVMM, _In_ LPCWSTR wszPath, _Inout_ PVMMDLL_VFS_FILELIST2 pFileList);
 
 /*
 * List a directory of files in MemProcFS and return a VMMDLL_VFS_FILELISTBLOB.
@@ -425,7 +427,7 @@ _Success_(return) BOOL VMMDLL_VfsListW(_In_ VMM_HANDLE hVMM, _In_ LPWSTR wszPath
 * -- return
 */
 EXPORTED_FUNCTION
-_Success_(return != NULL) PVMMDLL_VFS_FILELISTBLOB VMMDLL_VfsListBlobU(_In_ VMM_HANDLE hVMM, _In_ LPSTR uszPath);
+_Success_(return != NULL) PVMMDLL_VFS_FILELISTBLOB VMMDLL_VfsListBlobU(_In_ VMM_HANDLE hVMM, _In_ LPCSTR uszPath);
 
 /*
 * Read select parts of a file in MemProcFS.
@@ -439,8 +441,8 @@ _Success_(return != NULL) PVMMDLL_VFS_FILELISTBLOB VMMDLL_VfsListBlobU(_In_ VMM_
 *
 */
 EXPORTED_FUNCTION
-NTSTATUS VMMDLL_VfsReadU(_In_ VMM_HANDLE hVMM, _In_ LPSTR  uszFileName, _Out_writes_to_(cb, *pcbRead) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbRead, _In_ ULONG64 cbOffset);
-NTSTATUS VMMDLL_VfsReadW(_In_ VMM_HANDLE hVMM, _In_ LPWSTR wszFileName, _Out_writes_to_(cb, *pcbRead) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbRead, _In_ ULONG64 cbOffset);
+NTSTATUS VMMDLL_VfsReadU(_In_ VMM_HANDLE hVMM, _In_ LPCSTR  uszFileName, _Out_writes_to_(cb, *pcbRead) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbRead, _In_ ULONG64 cbOffset);
+NTSTATUS VMMDLL_VfsReadW(_In_ VMM_HANDLE hVMM, _In_ LPCWSTR wszFileName, _Out_writes_to_(cb, *pcbRead) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbRead, _In_ ULONG64 cbOffset);
 
 /*
 * Write select parts to a file in MemProcFS.
@@ -453,8 +455,8 @@ NTSTATUS VMMDLL_VfsReadW(_In_ VMM_HANDLE hVMM, _In_ LPWSTR wszFileName, _Out_wri
 * -- return
 */
 EXPORTED_FUNCTION
-NTSTATUS VMMDLL_VfsWriteU(_In_ VMM_HANDLE hVMM, _In_ LPSTR  uszFileName, _In_reads_(cb) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ ULONG64 cbOffset);
-NTSTATUS VMMDLL_VfsWriteW(_In_ VMM_HANDLE hVMM, _In_ LPWSTR wszFileName, _In_reads_(cb) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ ULONG64 cbOffset);
+NTSTATUS VMMDLL_VfsWriteU(_In_ VMM_HANDLE hVMM, _In_ LPCSTR  uszFileName, _In_reads_(cb) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ ULONG64 cbOffset);
+NTSTATUS VMMDLL_VfsWriteW(_In_ VMM_HANDLE hVMM, _In_ LPCWSTR wszFileName, _In_reads_(cb) PBYTE pb, _In_ DWORD cb, _Out_ PDWORD pcbWrite, _In_ ULONG64 cbOffset);
 
 /*
 * Utility functions for MemProcFS read/write towards different underlying data
@@ -648,8 +650,8 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
             _In_ VMM_HANDLE H,
             _In_opt_ PVOID ctxfc,
             _In_ HANDLE hTimeline,
-            _In_ VOID(*pfnAddEntry)(_In_ VMM_HANDLE H, _In_ HANDLE hTimeline, _In_ QWORD ft, _In_ DWORD dwAction, _In_ DWORD dwPID, _In_ DWORD dwData32, _In_ QWORD qwData64, _In_ LPSTR uszText),
-            _In_ VOID(*pfnEntryAddBySql)(_In_ VMM_HANDLE H, _In_ HANDLE hTimeline, _In_ DWORD cEntrySql, _In_ LPSTR *pszEntrySql));
+            _In_ VOID(*pfnAddEntry)(_In_ VMM_HANDLE H, _In_ HANDLE hTimeline, _In_ QWORD ft, _In_ DWORD dwAction, _In_ DWORD dwPID, _In_ DWORD dwData32, _In_ QWORD qwData64, _In_ LPCSTR uszText),
+            _In_ VOID(*pfnEntryAddBySql)(_In_ VMM_HANDLE H, _In_ HANDLE hTimeline, _In_ DWORD cEntrySql, _In_ LPCSTR *pszEntrySql));
         VOID(*pfnIngestObject)(_In_ VMM_HANDLE H, _In_opt_ PVOID ctxfc, _In_ PVMMDLL_FORENSIC_INGEST_OBJECT pIngestObject);
         VOID(*pfnIngestPhysmem)(_In_ VMM_HANDLE H, _In_opt_ PVOID ctxfc, _In_ PVMMDLL_FORENSIC_INGEST_PHYSMEM pIngestPhysmem);
         VOID(*pfnIngestVirtmem)(_In_ VMM_HANDLE H, _In_opt_ PVOID ctxfc, _In_ PVMMDLL_FORENSIC_INGEST_VIRTMEM pIngestVirtmem);
@@ -687,8 +689,8 @@ typedef struct tdVMMDLL_PLUGIN_REGINFO {
 EXPORTED_FUNCTION _Success_(return != 0)
 SIZE_T VMMDLL_ForensicFileAppend(
     _In_ VMM_HANDLE H,
-    _In_ LPSTR uszFileName,
-    _In_z_ _Printf_format_string_ LPSTR uszFormat,
+    _In_ LPCSTR uszFileName,
+    _In_z_ _Printf_format_string_ LPCSTR uszFormat,
     ...
 );
 
@@ -725,7 +727,7 @@ VOID VMMDLL_Log(
     _In_ VMM_HANDLE hVMM,
     _In_opt_ VMMDLL_MODULE_ID MID,
     _In_ VMMDLL_LOGLEVEL dwLogLevel,
-    _In_z_ _Printf_format_string_ LPSTR uszFormat,
+    _In_z_ _Printf_format_string_ LPCSTR uszFormat,
     ...
 );
 
@@ -744,7 +746,7 @@ VOID VMMDLL_LogEx(
     _In_ VMM_HANDLE hVMM,
     _In_opt_ VMMDLL_MODULE_ID MID,
     _In_ VMMDLL_LOGLEVEL dwLogLevel,
-    _In_z_ _Printf_format_string_ LPSTR uszFormat,
+    _In_z_ _Printf_format_string_ LPCSTR uszFormat,
     va_list arglist
 );
 
@@ -1667,8 +1669,8 @@ _Success_(return) BOOL VMMDLL_Map_GetModuleW(_In_ VMM_HANDLE hVMM, _In_ DWORD dw
 * -- return = success/fail.
 */
 EXPORTED_FUNCTION
-_Success_(return) BOOL VMMDLL_Map_GetModuleFromNameU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_opt_ LPSTR  uszModuleName, _Out_ PVMMDLL_MAP_MODULEENTRY *ppModuleMapEntry, _In_ DWORD flags);
-_Success_(return) BOOL VMMDLL_Map_GetModuleFromNameW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_opt_ LPWSTR wszModuleName, _Out_ PVMMDLL_MAP_MODULEENTRY *ppModuleMapEntry, _In_ DWORD flags);
+_Success_(return) BOOL VMMDLL_Map_GetModuleFromNameU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_opt_ LPCSTR  uszModuleName, _Out_ PVMMDLL_MAP_MODULEENTRY *ppModuleMapEntry, _In_ DWORD flags);
+_Success_(return) BOOL VMMDLL_Map_GetModuleFromNameW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_opt_ LPCWSTR wszModuleName, _Out_ PVMMDLL_MAP_MODULEENTRY *ppModuleMapEntry, _In_ DWORD flags);
 
 /*
 * Retrieve the unloaded modules (.dll/.sys) for the specified process.
@@ -1692,8 +1694,8 @@ _Success_(return) BOOL VMMDLL_Map_GetUnloadedModuleW(_In_ VMM_HANDLE hVMM, _In_ 
 * -- return = success/fail.
 */
 EXPORTED_FUNCTION
-_Success_(return) BOOL VMMDLL_Map_GetEATU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPSTR  uszModuleName, _Out_ PVMMDLL_MAP_EAT *ppEatMap);
-_Success_(return) BOOL VMMDLL_Map_GetEATW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _Out_ PVMMDLL_MAP_EAT *ppEatMap);
+_Success_(return) BOOL VMMDLL_Map_GetEATU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCSTR  uszModuleName, _Out_ PVMMDLL_MAP_EAT *ppEatMap);
+_Success_(return) BOOL VMMDLL_Map_GetEATW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCWSTR wszModuleName, _Out_ PVMMDLL_MAP_EAT *ppEatMap);
 
 /*
 * Retrieve the module imported functions from the import address table (IAT).
@@ -1705,8 +1707,8 @@ _Success_(return) BOOL VMMDLL_Map_GetEATW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID
 * -- return = success/fail.
 */
 EXPORTED_FUNCTION
-_Success_(return) BOOL VMMDLL_Map_GetIATU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPSTR  uszModuleName, _Out_ PVMMDLL_MAP_IAT *ppIatMap);
-_Success_(return) BOOL VMMDLL_Map_GetIATW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _Out_ PVMMDLL_MAP_IAT *ppIatMap);
+_Success_(return) BOOL VMMDLL_Map_GetIATU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCSTR  uszModuleName, _Out_ PVMMDLL_MAP_IAT *ppIatMap);
+_Success_(return) BOOL VMMDLL_Map_GetIATW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCWSTR wszModuleName, _Out_ PVMMDLL_MAP_IAT *ppIatMap);
 
 /*
 * Retrieve the heaps for the specified process.
@@ -2194,7 +2196,7 @@ BOOL VMMDLL_Map_GetPfnEx(
 * -- return
 */
 EXPORTED_FUNCTION _Success_(return)
-BOOL VMMDLL_PidGetFromName(_In_ VMM_HANDLE hVMM, _In_ LPSTR szProcName, _Out_ PDWORD pdwPID);
+BOOL VMMDLL_PidGetFromName(_In_ VMM_HANDLE hVMM, _In_ LPCSTR szProcName, _Out_ PDWORD pdwPID);
 
 /*
 * List the PIDs in the system.
@@ -2312,11 +2314,11 @@ LPSTR VMMDLL_ProcessGetInformationString(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID,
 * -- return = success/fail.
 */
 EXPORTED_FUNCTION
-_Success_(return) BOOL VMMDLL_ProcessGetDirectoriesU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPSTR  uszModule, _Out_writes_(16) PIMAGE_DATA_DIRECTORY pDataDirectories);
-_Success_(return) BOOL VMMDLL_ProcessGetDirectoriesW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPWSTR wszModule, _Out_writes_(16) PIMAGE_DATA_DIRECTORY pDataDirectories);
+_Success_(return) BOOL VMMDLL_ProcessGetDirectoriesU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCSTR  uszModule, _Out_writes_(16) PIMAGE_DATA_DIRECTORY pDataDirectories);
+_Success_(return) BOOL VMMDLL_ProcessGetDirectoriesW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCWSTR wszModule, _Out_writes_(16) PIMAGE_DATA_DIRECTORY pDataDirectories);
 EXPORTED_FUNCTION
-_Success_(return) BOOL VMMDLL_ProcessGetSectionsU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPSTR  uszModule, _Out_writes_opt_(cSections) PIMAGE_SECTION_HEADER pSections, _In_ DWORD cSections, _Out_ PDWORD pcSections);
-_Success_(return) BOOL VMMDLL_ProcessGetSectionsW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPWSTR wszModule, _Out_writes_opt_(cSections) PIMAGE_SECTION_HEADER pSections, _In_ DWORD cSections, _Out_ PDWORD pcSections);
+_Success_(return) BOOL VMMDLL_ProcessGetSectionsU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCSTR  uszModule, _Out_writes_opt_(cSections) PIMAGE_SECTION_HEADER pSections, _In_ DWORD cSections, _Out_ PDWORD pcSections);
+_Success_(return) BOOL VMMDLL_ProcessGetSectionsW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCWSTR wszModule, _Out_writes_opt_(cSections) PIMAGE_SECTION_HEADER pSections, _In_ DWORD cSections, _Out_ PDWORD pcSections);
 
 /*
 * Retrieve the virtual address of a given function inside a process/module.
@@ -2327,8 +2329,8 @@ _Success_(return) BOOL VMMDLL_ProcessGetSectionsW(_In_ VMM_HANDLE hVMM, _In_ DWO
 * -- return = virtual address of function, zero on fail.
 */
 EXPORTED_FUNCTION
-_Success_(return != 0) ULONG64 VMMDLL_ProcessGetProcAddressU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPSTR  uszModuleName, _In_ LPSTR szFunctionName);
-_Success_(return != 0) ULONG64 VMMDLL_ProcessGetProcAddressW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_ LPSTR szFunctionName);
+_Success_(return != 0) ULONG64 VMMDLL_ProcessGetProcAddressU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCSTR  uszModuleName, _In_ LPCSTR szFunctionName);
+_Success_(return != 0) ULONG64 VMMDLL_ProcessGetProcAddressW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCWSTR wszModuleName, _In_ LPCSTR szFunctionName);
 
 /*
 * Retrieve the base address of a given module.
@@ -2338,8 +2340,8 @@ _Success_(return != 0) ULONG64 VMMDLL_ProcessGetProcAddressW(_In_ VMM_HANDLE hVM
 * -- return = virtual address of module base, zero on fail.
 */
 EXPORTED_FUNCTION
-_Success_(return != 0) ULONG64 VMMDLL_ProcessGetModuleBaseU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPSTR  uszModuleName);
-_Success_(return != 0) ULONG64 VMMDLL_ProcessGetModuleBaseW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPWSTR wszModuleName);
+_Success_(return != 0) ULONG64 VMMDLL_ProcessGetModuleBaseU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCSTR  uszModuleName);
+_Success_(return != 0) ULONG64 VMMDLL_ProcessGetModuleBaseW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCWSTR wszModuleName);
 
 
 
@@ -2377,7 +2379,7 @@ BOOL VMMDLL_PdbLoad(
 EXPORTED_FUNCTION _Success_(return)
 BOOL VMMDLL_PdbSymbolName(
     _In_ VMM_HANDLE hVMM,
-    _In_ LPSTR szModule,
+    _In_ LPCSTR szModule,
     _In_ QWORD cbSymbolAddressOrOffset,
     _Out_writes_(MAX_PATH) LPSTR szSymbolName,
     _Out_opt_ PDWORD pdwSymbolDisplacement
@@ -2396,8 +2398,8 @@ BOOL VMMDLL_PdbSymbolName(
 EXPORTED_FUNCTION _Success_(return)
 BOOL VMMDLL_PdbSymbolAddress(
     _In_ VMM_HANDLE hVMM,
-    _In_ LPSTR szModule,
-    _In_ LPSTR szSymbolName,
+    _In_ LPCSTR szModule,
+    _In_ LPCSTR szSymbolName,
     _Out_ PULONG64 pvaSymbolAddress
 );
 
@@ -2414,8 +2416,8 @@ BOOL VMMDLL_PdbSymbolAddress(
 EXPORTED_FUNCTION _Success_(return)
 BOOL VMMDLL_PdbTypeSize(
     _In_ VMM_HANDLE hVMM,
-    _In_ LPSTR szModule,
-    _In_ LPSTR szTypeName,
+    _In_ LPCSTR szModule,
+    _In_ LPCSTR szTypeName,
     _Out_ PDWORD pcbTypeSize
 );
 
@@ -2433,9 +2435,9 @@ BOOL VMMDLL_PdbTypeSize(
 EXPORTED_FUNCTION _Success_(return)
 BOOL VMMDLL_PdbTypeChildOffset(
     _In_ VMM_HANDLE hVMM,
-    _In_ LPSTR szModule,
-    _In_ LPSTR uszTypeName,
-    _In_ LPSTR uszTypeChildName,
+    _In_ LPCSTR szModule,
+    _In_ LPCSTR uszTypeName,
+    _In_ LPCSTR uszTypeChildName,
     _Out_ PDWORD pcbTypeChildOffset
 );
 
@@ -2541,7 +2543,7 @@ BOOL VMMDLL_WinReg_HiveWrite(
 EXPORTED_FUNCTION _Success_(return)
 BOOL VMMDLL_WinReg_EnumKeyExU(
     _In_ VMM_HANDLE hVMM,
-    _In_ LPSTR uszFullPathKey,
+    _In_ LPCSTR uszFullPathKey,
     _In_ DWORD dwIndex,
     _Out_writes_opt_(*lpcchName) LPSTR lpName,
     _Inout_ LPDWORD lpcchName,
@@ -2570,7 +2572,7 @@ BOOL VMMDLL_WinReg_EnumKeyExU(
 EXPORTED_FUNCTION _Success_(return)
 BOOL VMMDLL_WinReg_EnumValueU(
     _In_ VMM_HANDLE hVMM,
-    _In_ LPSTR uszFullPathKey,
+    _In_ LPCSTR uszFullPathKey,
     _In_ DWORD dwIndex,
     _Out_writes_opt_(*lpcchValueName) LPSTR lpValueName,
     _Inout_ LPDWORD lpcchValueName,
@@ -2598,7 +2600,7 @@ BOOL VMMDLL_WinReg_EnumValueU(
 EXPORTED_FUNCTION _Success_(return)
 BOOL VMMDLL_WinReg_QueryValueExU(
     _In_ VMM_HANDLE hVMM,
-    _In_ LPSTR uszFullPathKeyValue,
+    _In_ LPCSTR uszFullPathKeyValue,
     _Out_opt_ LPDWORD lpType,
     _Out_writes_opt_(*lpcbData) LPBYTE lpData,
     _When_(lpData == NULL, _Out_opt_) _When_(lpData != NULL, _Inout_opt_) LPDWORD lpcbData
@@ -2623,7 +2625,7 @@ BOOL VMMDLL_WinReg_QueryValueExU(
 _Success_(return)
 BOOL VMMDLL_WinReg_EnumKeyExW(
     _In_ VMM_HANDLE hVMM,
-    _In_ LPWSTR wszFullPathKey,
+    _In_ LPCWSTR wszFullPathKey,
     _In_ DWORD dwIndex,
     _Out_writes_opt_(*lpcchName) LPWSTR lpName,
     _Inout_ LPDWORD lpcchName,
@@ -2652,7 +2654,7 @@ BOOL VMMDLL_WinReg_EnumKeyExW(
 _Success_(return)
 BOOL VMMDLL_WinReg_EnumValueW(
     _In_ VMM_HANDLE hVMM,
-    _In_ LPWSTR wszFullPathKey,
+    _In_ LPCWSTR wszFullPathKey,
     _In_ DWORD dwIndex,
     _Out_writes_opt_(*lpcchValueName) LPWSTR lpValueName,
     _Inout_ LPDWORD lpcchValueName,
@@ -2680,7 +2682,7 @@ BOOL VMMDLL_WinReg_EnumValueW(
 _Success_(return)
 BOOL VMMDLL_WinReg_QueryValueExW(
     _In_ VMM_HANDLE hVMM,
-    _In_ LPWSTR wszFullPathKeyValue,
+    _In_ LPCWSTR wszFullPathKeyValue,
     _Out_opt_ LPDWORD lpType,
     _Out_writes_opt_(*lpcbData) LPBYTE lpData,
     _When_(lpData == NULL, _Out_opt_) _When_(lpData != NULL, _Inout_opt_) LPDWORD lpcbData
@@ -2714,8 +2716,8 @@ typedef struct tdVMMDLL_WIN_THUNKINFO_IAT {
 * -- return
 */
 EXPORTED_FUNCTION
-_Success_(return) BOOL VMMDLL_WinGetThunkInfoIATU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPSTR  uszModuleName, _In_ LPSTR szImportModuleName, _In_ LPSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT);
-_Success_(return) BOOL VMMDLL_WinGetThunkInfoIATW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPWSTR wszModuleName, _In_ LPSTR szImportModuleName, _In_ LPSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT);
+_Success_(return) BOOL VMMDLL_WinGetThunkInfoIATU(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCSTR  uszModuleName, _In_ LPCSTR szImportModuleName, _In_ LPCSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT);
+_Success_(return) BOOL VMMDLL_WinGetThunkInfoIATW(_In_ VMM_HANDLE hVMM, _In_ DWORD dwPID, _In_ LPCWSTR wszModuleName, _In_ LPCSTR szImportModuleName, _In_ LPCSTR szImportFunctionName, _Out_ PVMMDLL_WIN_THUNKINFO_IAT pThunkInfoIAT);
 
 
 
