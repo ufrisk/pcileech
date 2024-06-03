@@ -14,7 +14,7 @@
 // (c) Ulf Frisk, 2020-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.17
+// Header Version: 2.18.4
 //
 
 #ifndef __LEECHCORE_H__
@@ -565,6 +565,26 @@ typedef VOID(*PLC_TLP_FUNCTION_CALLBACK)(
 
 #define LC_TLP_FUNCTION_CALLBACK_DISABLE        (PLC_TLP_FUNCTION_CALLBACK)(NULL)
 #define LC_TLP_FUNCTION_CALLBACK_DUMMY          (PLC_TLP_FUNCTION_CALLBACK)(-1)
+
+
+
+//-----------------------------------------------------------------------------
+// VMM (VM) LOOPBACK SUPPORT:
+// Functionality is used to create a VMM loopback device which is used by VMM
+// to read and write memory to/from a virtual machine. See VMM for an example.
+// Struct is passed in the 'hlcvmm' parameter to LcCreate() and will be copied.
+//-----------------------------------------------------------------------------
+
+#define LC_VMM_VERSION                          0x1eef0001
+
+typedef struct tdLC_VMM {
+    DWORD dwVersion;
+    HANDLE hVMM;
+    HANDLE hVMMVM;
+    PVOID pfnVMMDLL_ConfigGet;
+    PVOID pfnVMMDLL_VmMemReadScatter;
+    PVOID pfnVMMDLL_VmMemWriteScatter;
+} LC_VMM, *PLC_VMM;
 
 
 

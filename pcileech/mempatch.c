@@ -217,7 +217,6 @@ VOID ActionPatchAndSearchVirtual()
     SEARCH_INTERNAL_CONTEXT ctxi = { 0 };
     VMMDLL_MEM_SEARCH_CONTEXT ctxs = { 0 };
 
-
     // initialize ctxi (internal context) & allocate memory
     ctxi.dwPID = ctxMain->cfg.dwPID;
     ctxi.isModePatch = (ctxMain->cfg.tpAction == PATCH);
@@ -252,9 +251,11 @@ VOID ActionPatchAndSearchVirtual()
     ctxs.cSearch = ctxi.cSignatures;
     ctxs.vaMin = ctxMain->cfg.vaAddrMin;
     ctxs.vaMax = ctxMain->cfg.vaAddrMax;
+    ctxs.pSearch = LocalAlloc(LMEM_ZEROINIT, ctxs.cSearch * sizeof(VMMDLL_MEM_SEARCH_CONTEXT_SEARCHENTRY));
+    if(!ctxs.pSearch) { goto cleanup; }
     for(i = 0; i < ctxi.cSignatures; i++) {
-        ctxs.search[i].cb = min(ctxi.pSignatures[i].chunk[0].cb, sizeof(ctxs.search[i].pb));
-        memcpy(ctxs.search[i].pb, ctxi.pSignatures[i].chunk[0].pb, ctxs.search[i].cb);
+        ctxs.pSearch[i].cb = min(ctxi.pSignatures[i].chunk[0].cb, sizeof(ctxs.pSearch[i].pb));
+        memcpy(ctxs.pSearch[i].pb, ctxi.pSignatures[i].chunk[0].pb, ctxs.pSearch[i].cb);
     }
     ctxs.pvUserPtrOpt = &ctxi;
     ctxs.pfnResultOptCB = ActionPatchAndSearchVirtual_ResultCB;
@@ -273,4 +274,5 @@ cleanup:
         printf("%s: Failed. No signature found.\n", ctxi.szAction);
     }
     LocalFree(ctxi.pSignatures);
+    LocalFree(ctxs.pSearch);
 }

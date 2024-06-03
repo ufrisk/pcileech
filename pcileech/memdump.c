@@ -143,6 +143,7 @@ fail:
 */
 VOID ActionMemoryDump_KMD_USB3380()
 {
+    BOOL fPartialSuccess;
     QWORD paCurrent, paMin, paMax;
     PMEMDUMP_FILEWRITE_DATA pd;
     PMEMDUMP_FILEWRITE pfw = NULL;
@@ -170,9 +171,10 @@ VOID ActionMemoryDump_KMD_USB3380()
         InterlockedIncrement64(&pfw->iWrite);
         paCurrent += pd->cb;
     }
+    fPartialSuccess = pStat->cPageSuccess > 0;
     PageStatClose(&pStat);
     if(!pfw->fTerminated) {
-        printf("Memory Dump: Successful.\n");
+        printf("Memory Dump: %s.\n", fPartialSuccess ? "Successful" : "Failed");
     }
 fail:
     PageStatClose(&pStat);

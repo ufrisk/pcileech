@@ -11,7 +11,7 @@
 // (c) Ulf Frisk, 2018-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 5.9.8
+// Header Version: 5.9.17
 //
 
 #include "leechcore.h"
@@ -1842,8 +1842,7 @@ _Success_(return) BOOL VMMDLL_Map_GetServicesW(_In_ VMM_HANDLE hVMM, _Out_ PVMMD
 // MEMORY SEARCH FUNCTIONALITY:
 //-----------------------------------------------------------------------------
 
-#define VMMDLL_MEM_SEARCH_VERSION           0xfe3e0002
-#define VMMDLL_MEM_SEARCH_MAX               16
+#define VMMDLL_MEM_SEARCH_VERSION           0xfe3e0003
 #define VMMDLL_MEM_SEARCH_MAXLENGTH         32
 
 typedef struct tdVMMDLL_MEM_SEARCH_CONTEXT_SEARCHENTRY {
@@ -1862,7 +1861,7 @@ typedef struct tdVMMDLL_MEM_SEARCH_CONTEXT {
     BOOL fAbortRequested;       // may be set by caller to abort processing prematurely.
     DWORD cMaxResult;           // # max result entries. '0' = 1 entry. max 0x10000 entries.
     DWORD cSearch;              // number of search entries.
-    VMMDLL_MEM_SEARCH_CONTEXT_SEARCHENTRY search[VMMDLL_MEM_SEARCH_MAX];
+    PVMMDLL_MEM_SEARCH_CONTEXT_SEARCHENTRY pSearch;     // pointer to an array of cSearch entries.
     QWORD vaMin;                // min address to search (page-aligned).
     QWORD vaMax;                // max address to search (page-aligned), if 0 max memory is assumed.
     QWORD vaCurrent;            // current address (may be read by caller).
