@@ -94,9 +94,11 @@ typedef struct tdConfig {
     DWORD dwListenTlpTimeMs;
     CHAR szExternalCommandModule[MAX_PATH];
     // virtual address options
+    BOOL fModeVirtual;
     DWORD dwPID;
     QWORD vaAddrMin;
     QWORD vaAddrMax;
+    CHAR szProcessName[MAX_PATH];
     // flags below
     BOOL fPageTableScan;
     BOOL fPatchAll;

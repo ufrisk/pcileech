@@ -217,6 +217,18 @@ VOID ActionPatchAndSearchVirtual()
     SEARCH_INTERNAL_CONTEXT ctxi = { 0 };
     VMMDLL_MEM_SEARCH_CONTEXT ctxs = { 0 };
 
+    // initialize VMM/MemProcFS
+    if(!Vmmx_Initialize(TRUE, FALSE)) {
+        printf("%s: Failed. Failed to initialize vmm.\n", ctxi.szAction);
+        goto cleanup;
+    }
+    if(!ctxMain->cfg.dwPID) {
+        if(!VMMDLL_PidGetFromName(ctxMain->hVMM, ctxMain->cfg.szProcessName, &ctxMain->cfg.dwPID)) {
+            printf("%s: Failed. Failed to retrieve PID for process: %s.\n", ctxi.szAction, ctxMain->cfg.szProcessName);
+            goto cleanup;
+        }
+    }
+
     // initialize ctxi (internal context) & allocate memory
     ctxi.dwPID = ctxMain->cfg.dwPID;
     ctxi.isModePatch = (ctxMain->cfg.tpAction == PATCH);
@@ -242,9 +254,6 @@ VOID ActionPatchAndSearchVirtual()
             }
         }
     }
-
-    // initialize VMM/MemProcFS
-    if(!Vmmx_Initialize(TRUE, FALSE)) { goto cleanup; }
 
     // initialize ctxs (search context)
     ctxs.dwVersion = VMMDLL_MEM_SEARCH_VERSION;

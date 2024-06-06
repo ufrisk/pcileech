@@ -157,10 +157,14 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             ctxMain->cfg.paAddrMax = Util_GetNumeric(argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-pid")) {
             ctxMain->cfg.dwPID = (DWORD)Util_GetNumeric(argv[i + 1]);
+            ctxMain->cfg.fModeVirtual = ctxMain->cfg.dwPID ? TRUE : FALSE;
         } else if(0 == strcmp(argv[i], "-vamin")) {
             ctxMain->cfg.vaAddrMin = Util_GetNumeric(argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-vamax")) {
             ctxMain->cfg.vaAddrMax = Util_GetNumeric(argv[i + 1]);
+        } else if(0 == strcmp(argv[i], "-psname")) {
+            strcpy_s(ctxMain->cfg.szProcessName, MAX_PATH, argv[i + 1]);
+            ctxMain->cfg.fModeVirtual = ctxMain->cfg.szProcessName[0] ? TRUE : FALSE;
         } else if(0 == strcmp(argv[i], "-cr3")) {
             ctxMain->cfg.paCR3 = Util_GetNumeric(argv[i + 1]);
         } else if(0 == strcmp(argv[i], "-efibase")) {
@@ -385,7 +389,7 @@ int main(_In_ int argc, _In_ char* argv[])
             ActionMemoryWrite();
             break;
         case DISPLAY:
-            if(ctxMain->cfg.dwPID) {
+            if(ctxMain->cfg.fModeVirtual) {
                 ActionMemoryDisplayVirtual();
             } else {
                 ActionMemoryDisplayPhysical();
@@ -396,7 +400,7 @@ int main(_In_ int argc, _In_ char* argv[])
             break;
         case PATCH:
         case SEARCH:
-            if(ctxMain->cfg.dwPID) {
+            if(ctxMain->cfg.fModeVirtual) {
                 ActionPatchAndSearchVirtual();
             } else {
                 ActionPatchAndSearchPhysical();

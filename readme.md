@@ -299,6 +299,7 @@ v4.1
   - New kernel module: lx64_exec_root.
 * Linux PCIe FPGA performance improvements.
 
-Latest:
+[v4.18](https://github.com/ufrisk/pcileech/releases/tag/v4.18)
 * Benchmark command added.
 * Unlock signatures updated.
+* `-psname` option added.

@@ -323,6 +323,13 @@ VOID ActionMemoryDisplayVirtual()
         LocalFree(pb);
         return;
     }
+    if(!ctxMain->cfg.dwPID) {
+        if(!VMMDLL_PidGetFromName(ctxMain->hVMM, ctxMain->cfg.szProcessName, &ctxMain->cfg.dwPID)) {
+            printf("Memory Display: Failed to retrieve PID for process: %s.\n", ctxMain->cfg.szProcessName);
+            LocalFree(pb);
+            return;
+        }
+    }
     // read memory and display output
     if(!VMMDLL_MemRead(ctxMain->hVMM, ctxMain->cfg.dwPID, qwAddrBase, pb, (DWORD)qwSize_4kAlign)) {
         printf("Memory Display: Failed reading memory at address: 0x%016llX.\n", qwAddrBase);
@@ -336,7 +343,7 @@ VOID ActionMemoryDisplayVirtual()
 
 VOID ActionMemoryPageDisplay()
 {
-    if(ctxMain->cfg.dwPID) {
+    if(ctxMain->cfg.fModeVirtual) {
         // virtual memory (Windows only):
         ctxMain->cfg.vaAddrMin = ctxMain->cfg.vaAddrMin & 0x0fffffffffffff000;
         ctxMain->cfg.vaAddrMax = ctxMain->cfg.vaAddrMin + 0x1000;
@@ -404,11 +411,17 @@ VOID ActionMemoryWrite()
     if(ctxMain->cfg.fLoop) {
         printf("Memory Write: Starting loop write. Press CTRL+C to abort.\n");
     }
-    if(ctxMain->cfg.dwPID) {
+    if(ctxMain->cfg.fModeVirtual) {
         // virtual memory (Windows only):
         if(!Vmmx_Initialize(FALSE, FALSE)) {
             printf("Memory Write: Failed. Unable to initialize virtual memory.\n");
             return;
+        }
+        if(!ctxMain->cfg.dwPID) {
+            if(!VMMDLL_PidGetFromName(ctxMain->hVMM, ctxMain->cfg.szProcessName, &ctxMain->cfg.dwPID)) {
+                printf("Memory Write: Failed to retrieve PID for process: %s.\n", ctxMain->cfg.szProcessName);
+                return;
+            }
         }
         do {
             result = VMMDLL_MemWrite(ctxMain->hVMM, ctxMain->cfg.dwPID, ctxMain->cfg.vaAddrMin, ctxMain->cfg.pbIn, (DWORD)ctxMain->cfg.cbIn);

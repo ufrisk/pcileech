@@ -101,6 +101,8 @@ VOID Help_ShowGeneral()
         "          Option has no value. Example: -all                                   \n" \
         "   -pid : windows process id for virtual address mode for select commands.     \n" \
         "          Option has no default value. Example: -pid 4                         \n" \
+        "   -psname : windows process name for virtual address mode for select commands.\n" \
+        "          Option has no default value. Example: -psname lsass.exe              \n" \
         "   -vamin: virtual memory min address for select commands. Require -pid option.\n" \
         "          default: 0. Example: -vamin 0x10000                                  \n" \
         "   -vamax: virtual memory max address for select commands. Require -pid option.\n" \
