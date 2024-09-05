@@ -11,7 +11,7 @@
 // (c) Ulf Frisk, 2018-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 5.9.17
+// Header Version: 5.10
 //
 
 #include "leechcore.h"
@@ -1919,11 +1919,11 @@ BOOL VMMDLL_MemSearch(
 #ifndef VMMYARA_RULE_MATCH_DEFINED
 #define VMMYARA_RULE_MATCH_DEFINED
 
-#define VMMYARA_RULE_MATCH_VERSION          0xfedc0003
-#define VMMYARA_RULE_MATCH_TAG_MAX          8
-#define VMMYARA_RULE_MATCH_META_MAX         16
-#define VMMYARA_RULE_MATCH_STRING_MAX       8
-#define VMMYARA_RULE_MATCH_OFFSET_MAX       16
+#define VMMYARA_RULE_MATCH_VERSION          0xfedc0005
+#define VMMYARA_RULE_MATCH_TAG_MAX          27
+#define VMMYARA_RULE_MATCH_META_MAX         32
+#define VMMYARA_RULE_MATCH_STRING_MAX       16
+#define VMMYARA_RULE_MATCH_OFFSET_MAX       24
 
 /*
 * Struct with match information upon a match in VmmYara_RulesScanMemory().

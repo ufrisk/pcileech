@@ -216,7 +216,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
         ctxMain->cfg.pbIn = LocalAlloc(LMEM_ZEROINIT, 0x40000);
     }
     // set dummy qwAddrMax value (if possible) to disable auto-detect in LeechCore.
-    if((ctxMain->cfg.tpAction == TLP) || (ctxMain->cfg.tpAction == DISPLAY) || (ctxMain->cfg.tpAction == PAGEDISPLAY)) {
+    if((ctxMain->cfg.tpAction == TLP) || (ctxMain->cfg.tpAction == DISPLAY) || (ctxMain->cfg.tpAction == PAGEDISPLAY) || (ctxMain->cfg.tpAction == NONE) || (ctxMain->cfg.tpAction == BENCHMARK)) {
         ctxMain->cfg.paAddrMax = -1;
     }
     // disable memory auto-detect when memmap is specified
