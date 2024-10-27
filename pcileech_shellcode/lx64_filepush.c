@@ -16,6 +16,7 @@
 #define O_WRONLY        00000001
 #define O_CREAT         00000100
 #define O_TRUNC         00001000
+#define O_LARGEFILE     00100000
 
 typedef struct tdFN2 {
 	QWORD filp_close;
@@ -53,7 +54,7 @@ VOID c_EntryPoint(PKMDDATA pk)
 		return;
 	}
 	SysVCall(fn2.memcpy, pk->dataOutStr, pk->dataInStr, MAX_PATH);
-	hFile = SysVCall(fn2.filp_open, pk->dataInStr, O_WRONLY | O_CREAT | O_TRUNC, pk->dataIn[0]);
+	hFile = SysVCall(fn2.filp_open, pk->dataInStr, O_WRONLY | O_CREAT | O_TRUNC | O_LARGEFILE, pk->dataIn[0]);
 	if(hFile > 0xffffffff00000000) {
 		pk->dataOut[0] = STATUS_FAIL_FILE_CANNOT_OPEN;
 		return;

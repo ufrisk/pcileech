@@ -14,7 +14,7 @@
 // (c) Ulf Frisk, 2020-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.18.4
+// Header Version: 2.19.0
 //
 
 #ifndef __LEECHCORE_H__

@@ -11,7 +11,7 @@
 // (c) Ulf Frisk, 2018-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 5.10
+// Header Version: 5.12
 //
 
 #include "leechcore.h"
@@ -773,9 +773,10 @@ VOID VMMDLL_LogEx(
 #define VMMDLL_FLAG_NOPAGING_IO                     0x0020  // do not try to retrieve memory from paged out memory if read would incur additional I/O (even if possible).
 #define VMMDLL_FLAG_NOCACHEPUT                      0x0100  // do not write back to the data cache upon successful read from memory acquisition device.
 #define VMMDLL_FLAG_CACHE_RECENT_ONLY               0x0200  // only fetch from the most recent active cache region when reading.
-#define VMMDLL_FLAG_NO_PREDICTIVE_READ              0x0400  // do not perform additional predictive page reads (default on smaller requests).
-#define VMMDLL_FLAG_FORCECACHE_READ_DISABLE         0x0800  // disable/override any use of VMM_FLAG_FORCECACHE_READ. only recommended for local files. improves forensic artifact order.
+#define VMMDLL_FLAG_NO_PREDICTIVE_READ              0x0400  // (deprecated/unused).
+#define VMMDLL_FLAG_FORCECACHE_READ_DISABLE         0x0800  // disable/override any use of VMMDLL_FLAG_FORCECACHE_READ. only recommended for local files. improves forensic artifact order.
 #define VMMDLL_FLAG_SCATTER_PREPAREEX_NOMEMZERO     0x1000  // do not zero out the memory buffer when preparing a scatter read.
+#define VMMDLL_FLAG_NOMEMCALLBACK                   0x2000  // do not call user-set memory callback functions when reading memory (even if active).
 
 /*
 * Read memory in various non-contigious locations specified by the pointers to
@@ -1048,6 +1049,9 @@ VOID VMMDLL_Scatter_CloseHandle(_In_opt_ _Post_ptr_invalid_ VMMDLL_SCATTER_HANDL
 #define VMMDLL_MAP_THREAD_VERSION           4
 #define VMMDLL_MAP_HANDLE_VERSION           3
 #define VMMDLL_MAP_POOL_VERSION             2
+#define VMMDLL_MAP_KOBJECT_VERSION          1
+#define VMMDLL_MAP_KDRIVER_VERSION          1
+#define VMMDLL_MAP_KDEVICE_VERSION          1
 #define VMMDLL_MAP_NET_VERSION              3
 #define VMMDLL_MAP_PHYSMEM_VERSION          2
 #define VMMDLL_MAP_USER_VERSION             2
@@ -1372,6 +1376,38 @@ typedef struct tdVMMDLL_MAP_POOLENTRY {
     DWORD _Filler;
 } VMMDLL_MAP_POOLENTRY, *PVMMDLL_MAP_POOLENTRY;
 
+typedef struct tdVMMDLL_MAP_KDEVICEENTRY {
+    QWORD va;                                       // Address of this object in memory.
+    DWORD iDepth;                                   // Depth of the device object.
+    DWORD dwDeviceType;                             // Device type according to FILE_DEVICE_*
+    union { LPSTR  uszDeviceType; LPWSTR wszDeviceType; }; // Device type name.
+    QWORD vaDriverObject;                           // Address of the driver object.
+    QWORD vaAttachedDevice;                         // Address of the attached device object (if exists).
+    QWORD vaFileSystemDevice;                       // Address of the file system device object (if exists).
+    union { LPSTR  uszVolumeInfo; LPWSTR wszVolumeInfo; }; // Volume information (if exists) .
+} VMMDLL_MAP_KDEVICEENTRY, *PVMMDLL_MAP_KDEVICEENTRY;
+
+typedef struct tdVMMDLL_MAP_KDRIVERENTRY {
+    QWORD va;                                       // Address of this object in memory.
+    QWORD vaDriverStart;                            // Address of the loaded driver module in memory.
+    QWORD cbDriverSize;                             // Size of the loaded driver module in memory.
+    QWORD vaDeviceObject;                           // Address of the device object.
+    union { LPSTR  uszName; LPWSTR wszName; };      // Driver name.
+    union { LPSTR  uszPath; LPWSTR wszPath; };      // Driver path.
+    union { LPSTR  uszServiceKeyName; LPWSTR wszServiceKeyName; }; // Service key name.
+    QWORD MajorFunction[28];                        // Major function array.
+} VMMDLL_MAP_KDRIVERENTRY, *PVMMDLL_MAP_KDRIVERENTRY;
+
+typedef struct tdVMMDLL_MAP_KOBJECTENTRY {
+    QWORD va;                                       // Address of this object in memory.
+    QWORD vaParent;                                 // Address of parent object.
+    DWORD _Filler;
+    DWORD cvaChild;                                 // Number of child object addresses.
+    PQWORD pvaChild;                                // Array of child object addresses.
+    union { LPSTR uszName; LPWSTR wszName; };       // Object name.
+    union { LPSTR uszType; LPWSTR wszType; };       // Object type
+} VMMDLL_MAP_KOBJECTENTRY, *PVMMDLL_MAP_KOBJECTENTRY;
+
 typedef struct tdVMMDLL_MAP_NETENTRY {
     DWORD dwPID;
     DWORD dwState;
@@ -1562,6 +1598,33 @@ typedef struct tdVMMDLL_MAP_POOL {
     DWORD cMap;                     // # map entries.
     VMMDLL_MAP_POOLENTRY pMap[];    // map entries.
 } VMMDLL_MAP_POOL, *PVMMDLL_MAP_POOL;
+
+typedef struct tdVMMDLL_MAP_KOBJECT {
+    DWORD dwVersion;                // VMMDLL_MAP_KOBJECT_VERSION
+    DWORD _Reserved1[5];
+    PBYTE pbMultiText;              // multi-wstr pointed into by VMM_MAP_NETENTRY.wszText
+    DWORD cbMultiText;
+    DWORD cMap;                     // # map entries.
+    VMMDLL_MAP_KOBJECTENTRY pMap[]; // map entries.
+} VMMDLL_MAP_KOBJECT, *PVMMDLL_MAP_KOBJECT;
+
+typedef struct tdVMMDLL_MAP_KDRIVER {
+    DWORD dwVersion;                // VMMDLL_MAP_KDRIVER_VERSION
+    DWORD _Reserved1[5];
+    PBYTE pbMultiText;              // multi-wstr pointed into by VMM_MAP_NETENTRY.wszText
+    DWORD cbMultiText;
+    DWORD cMap;                     // # map entries.
+    VMMDLL_MAP_KDRIVERENTRY pMap[]; // map entries.
+} VMMDLL_MAP_KDRIVER, *PVMMDLL_MAP_KDRIVER;
+
+typedef struct tdVMMDLL_MAP_KDEVICE {
+    DWORD dwVersion;                // VMMDLL_MAP_KDEVICE_VERSION
+    DWORD _Reserved1[5];
+    PBYTE pbMultiText;              // multi-wstr pointed into by VMM_MAP_NETENTRY.wszText
+    DWORD cbMultiText;
+    DWORD cMap;                     // # map entries.
+    VMMDLL_MAP_KDEVICEENTRY pMap[]; // map entries.
+} VMMDLL_MAP_KDEVICE, *PVMMDLL_MAP_KDEVICE;
 
 typedef struct tdVMMDLL_MAP_NET {
     DWORD dwVersion;                // VMMDLL_MAP_NET_VERSION
@@ -1769,6 +1832,39 @@ _Success_(return) BOOL VMMDLL_Map_GetHandleW(_In_ VMM_HANDLE hVMM, _In_ DWORD dw
 */
 EXPORTED_FUNCTION
 _Success_(return) BOOL VMMDLL_Map_GetPhysMem(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_PHYSMEM *ppPhysMemMap);
+
+/*
+* Retrieve the kernel device map - consisting of kernel device objects.
+* CALLER FREE: VMMDLL_MemFree(*ppKDeviceMap)
+* -- hVMM
+* -- ppKDeviceMap = ptr to receive result on success. must be free'd with VMMDLL_MemFree().
+* -- return = success/fail.
+*/
+EXPORTED_FUNCTION
+_Success_(return) BOOL VMMDLL_Map_GetKDeviceU(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_KDEVICE *ppKDeviceMap);
+_Success_(return) BOOL VMMDLL_Map_GetKDeviceW(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_KDEVICE *ppKDeviceMap);
+
+/*
+* Retrieve the kernel driver map - consisting of kernel driver objects.
+* CALLER FREE: VMMDLL_MemFree(*ppKDriverMap)
+* -- hVMM
+* -- ppKDriverMap = ptr to receive result on success. must be free'd with VMMDLL_MemFree().
+* -- return = success/fail.
+*/
+EXPORTED_FUNCTION
+_Success_(return) BOOL VMMDLL_Map_GetKDriverU(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_KDRIVER *ppKDriverMap);
+_Success_(return) BOOL VMMDLL_Map_GetKDriverW(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_KDRIVER *ppKDriverMap);
+
+/*
+* Retrieve the kernel object map - consisting of kernel objects such as devices, drivers and other objects.
+* CALLER FREE: VMMDLL_MemFree(*ppKObjectMap)
+* -- hVMM
+* -- ppKObjectMap = ptr to receive result on success. must be free'd with VMMDLL_MemFree().
+* -- return = success/fail.
+*/
+EXPORTED_FUNCTION
+_Success_(return) BOOL VMMDLL_Map_GetKObjectU(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_KOBJECT *ppKObjectMap);
+_Success_(return) BOOL VMMDLL_Map_GetKObjectW(_In_ VMM_HANDLE hVMM, _Out_ PVMMDLL_MAP_KOBJECT *ppKObjectMap);
 
 /*
 * Retrieve the pool map - consisting of kernel allocated pool entries.

@@ -14,6 +14,7 @@
 #include "lx64_common.h"
 
 #define O_RDONLY        00000000
+#define O_LARGEFILE     00100000
 
 typedef struct tdFN2 {
 	QWORD filp_close;
@@ -48,7 +49,7 @@ VOID c_EntryPoint(PKMDDATA pk)
 		return;
 	}
 	SysVCall(fn2.memcpy, pk->dataOutStr, pk->dataInStr, MAX_PATH);
-	hFile = SysVCall(fn2.filp_open, pk->dataInStr, O_RDONLY, pk->dataIn[0]);
+	hFile = SysVCall(fn2.filp_open, pk->dataInStr, O_RDONLY | O_LARGEFILE, pk->dataIn[0]);
 	if(hFile > 0xffffffff00000000) {
 		pk->dataOut[0] = STATUS_FAIL_FILE_CANNOT_OPEN;
 		return;
