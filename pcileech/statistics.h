@@ -32,6 +32,11 @@ typedef struct tdPAGE_STATISTICS {
     QWORD cPageSuccess;
     QWORD cPageFail;
     BOOL fKMD;
+    struct {
+        BOOL fFileRead;
+        QWORD qwBaseOffset;
+        QWORD qwCurrentOffset;
+    } File;
     LPSTR szAction;
     STATISTICS_INTERNAL i;
 } PAGE_STATISTICS, *PPAGE_STATISTICS;

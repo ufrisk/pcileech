@@ -22,8 +22,10 @@ VOID Exec_ConsoleRedirect(_In_ QWORD ConsoleBufferAddr_InputStream, _In_ QWORD C
 * This will allow the kernel executable code running on the target machine to
 * communicate interactively with this executable to deliver large files.
 * -- phCallback = ptr to handle; handle must be null on first entry.
+* -- return = TRUE on success or partial failure, FALSE on fatal error.
 */
-VOID Exec_Callback(_Inout_ PHANDLE phCallback);
+_Success_(return)
+BOOL Exec_Callback(_Inout_ PHANDLE phCallback);
 
 /*
 * Close handle opened/used in Exec_Callback.

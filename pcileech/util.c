@@ -1,6 +1,6 @@
 // util.c : implementation of various utility functions.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "pcileech.h"
@@ -362,6 +362,7 @@ BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_writes_(*pcb) PBYTE pb, _In_ D
     SIZE_T i;
     FILE *pFile;
     BOOL result;
+    CHAR szPathFile[MAX_PATH] = { 0 };
     // 1: try load default
     if(0 == memcmp("DEFAULT", sz, 7)) {
         for(i = 0; i < (sizeof(SHELLCODE_DEFAULT) / sizeof(SHELLCODE_DEFAULT_STRUCT)); i++) {
@@ -377,14 +378,15 @@ BOOL Util_ParseHexFileBuiltin(_In_ LPSTR sz, _Out_writes_(*pcb) PBYTE pb, _In_ D
     if(Util_HexAsciiToBinary(sz, pb, cb, pcb)) {
         return TRUE;
     }
+    *pcb = 0;
     if(0 == memcmp("-", sz, 2)) {
-        *pcb = 0;
         return TRUE;
     }
     // 3: try load file
     i = strnlen_s(sz, MAX_PATH);
     if(i > 4 && i < MAX_PATH) { // try to load from file
-        if(fopen_s(&pFile, sz, "rb") || !pFile) { return FALSE; }
+        Util_GetFileInDirectory(szPathFile, sz);
+        if(fopen_s(&pFile, szPathFile, "rb") || !pFile) { return FALSE; }
         *pcb = (DWORD)fread(pb, 1, cb, pFile);
         result = (0 != feof(pFile));
         fclose(pFile);

@@ -63,7 +63,22 @@ VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
     if(ps->i.fMemMap) {
         _PageStatPrintMemMap(ps);
     }
-    if(ps->cPageTotal < 0x0000000fffffffff) {
+    if(ps->File.fFileRead) {
+        printf(
+            " Current Action: %s                             \n" \
+            " Access Mode:    %s                             \n" \
+            " Speed:          %llu %s                        \n" \
+            " Start offset:   0x%016llX  (%llu)              \n" \
+            " Current offset: 0x%016llX  (%llu)              \n" \
+            "                                                \n" \
+            "                                                \n",
+            ps->szAction,
+            ps->fKMD ? "KMD (kernel module assisted DMA)" : "Normal                          ",
+            (isMBs ? qwSpeed >> 10 : qwSpeed),
+            (isMBs ? "MB/s" : "kB/s"),
+            ps->File.qwBaseOffset, ps->File.qwBaseOffset,
+            ps->File.qwCurrentOffset, ps->File.qwCurrentOffset);
+    } else if(ps->cPageTotal < 0x0000000fffffffff) {
         printf(
             " Current Action: %s                             \n" \
             " Access Mode:    %s                             \n" \

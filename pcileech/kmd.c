@@ -1,6 +1,6 @@
 // kmd.c : implementation related to operating systems kernel modules functionality.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "kmd.h"
@@ -1259,6 +1259,7 @@ _Success_(return)
 BOOL KMD_SubmitCommand(_In_ QWORD op)
 {
     DWORD cFailCount;
+    BOOL fResultCB = TRUE;
     HANDLE hCallback = NULL;
     ctxMain->pk->_op = op;
     if(!LcWrite(ctxMain->hLC, ctxMain->phKMD->dwPageAddr32, 4096, ctxMain->phKMD->pbPageData)) {
@@ -1280,9 +1281,9 @@ BOOL KMD_SubmitCommand(_In_ QWORD op)
             ExitProcess(0);
         }
         if(ctxMain->pk->_op == KMD_CMD_EXEC_EXTENDED) {
-            Exec_Callback(&hCallback);
+            fResultCB = Exec_Callback(&hCallback);
         }
-    } while(((ctxMain->pk->_op != KMD_CMD_COMPLETED) || (ctxMain->pk->_status != 1)) && ctxMain->pk->_status < 0x0fffffff);
+    } while(((ctxMain->pk->_op != KMD_CMD_COMPLETED) || (ctxMain->pk->_status != 1)) && (ctxMain->pk->_status < 0x0fffffff) && fResultCB);
     if(hCallback) { Exec_CallbackClose(hCallback); }
     return TRUE;
 }
@@ -1303,12 +1304,39 @@ VOID KMD_PhysicalMemoryMapDisplay(_In_ PKMDHANDLE phKMD)
     printf("----------------------------------------------\n");
 }
 
+VOID KMD_CheckMigrationStatus()
+{
+    DWORD i;
+    // check migration:
+    for(i = 0; i < 25; i++) {
+        LcRead(ctxMain->hLC, ctxMain->phKMD->dwPageAddr32, 4096, ctxMain->phKMD->pbPageData);
+        if(ctxMain->pk->MAGIC == KMDDATA_MAGIC) { break; }
+        Sleep(10);
+    }
+    if((ctxMain->pk->OperatingSystem >> 32) == 0xffffffff) {
+        // migration to new KMDDATA buffer:
+        ctxMain->phKMD->dwPageAddr32 = (DWORD)ctxMain->pk->OperatingSystem;
+        printf("INFO: PA KMD BASE (MIGRATED):  0x%08x\n", (DWORD)ctxMain->pk->OperatingSystem);
+        for(i = 0; i < 25; i++) {
+            LcRead(ctxMain->hLC, ctxMain->phKMD->dwPageAddr32, 4096, ctxMain->phKMD->pbPageData);
+            if(ctxMain->pk->MAGIC == KMDDATA_MAGIC) { break; }
+            Sleep(10);
+        }
+    }
+}
+
 _Success_(return)
 BOOL KMD_GetPhysicalMemoryMap()
 {
     QWORD qwMaxMemoryAddress;
     KMD_SubmitCommand(KMD_CMD_MEM_INFO);
-    if(!ctxMain->pk->_result || !ctxMain->pk->_size) { return FALSE; }
+    if(!ctxMain->pk->_result || !ctxMain->pk->_size) {
+        KMD_CheckMigrationStatus();
+        KMD_SubmitCommand(KMD_CMD_MEM_INFO);
+        if(!ctxMain->pk->_result || !ctxMain->pk->_size) {
+            return FALSE;
+        }
+    }
     ctxMain->phKMD->pPhysicalMap = LocalAlloc(LMEM_ZEROINIT, (ctxMain->pk->_size + 0x1000) & 0xfffff000);
     if(!ctxMain->phKMD->pPhysicalMap) { return FALSE; }
     DeviceReadDMA(ctxMain->pk->DMAAddrPhysical, (DWORD)((ctxMain->pk->_size + 0x1000) & 0xfffff000), (PBYTE)ctxMain->phKMD->pPhysicalMap, NULL);

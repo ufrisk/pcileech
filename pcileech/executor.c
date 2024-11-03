@@ -1,6 +1,6 @@
 // executor.c : implementation related 'code execution' and 'console redirect' functionality.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "executor.h"
@@ -48,6 +48,8 @@ typedef struct tdEXEC_HANDLE {
     EXEC_IO is;
     EXEC_IO os;
 } EXEC_HANDLE, *PEXEC_HANDLE;
+
+static PPAGE_STATISTICS g_pExecPageStat = NULL;
 
 // input buffer to targeted console (outgoing info)
 // read from this console and send to targeted console
@@ -140,7 +142,8 @@ VOID Exec_ConsoleRedirect(_In_ QWORD ConsoleBufferAddr_InputStream, _In_ QWORD C
     pd->fTerminateThread = TRUE;
 }
 
-VOID Exec_Callback(_Inout_ PHANDLE phCallback)
+_Success_(return)
+BOOL Exec_Callback(_Inout_ PHANDLE phCallback)
 {
     BOOL result;
     PEXEC_HANDLE ph = *phCallback;
@@ -149,9 +152,9 @@ VOID Exec_Callback(_Inout_ PHANDLE phCallback)
     if(!*phCallback) {
         // core initialize
         ph = *phCallback = LocalAlloc(LMEM_ZEROINIT, sizeof(EXEC_HANDLE));
-        if(!ph) { return; }
+        if(!ph) { return FALSE; }
         ph->pbDMA = LocalAlloc(LMEM_ZEROINIT, (SIZE_T)ctxMain->pk->dataOutExtraLengthMax);
-        if(!ph->pbDMA) { LocalFree(ph); *phCallback = NULL; return; }
+        if(!ph->pbDMA) { LocalFree(ph); *phCallback = NULL; return FALSE; }
         ph->is.magic = EXEC_IO_MAGIC;
         // open output file
         if(!fopen_s(&ph->pFileOutput, ctxMain->cfg.szFileOut, "r") || ph->pFileOutput) {
@@ -159,22 +162,30 @@ VOID Exec_Callback(_Inout_ PHANDLE phCallback)
                 fclose(ph->pFileOutput);
             }
             printf("EXEC: Failed. File already exists: %s\n", ctxMain->cfg.szFileOut);
-            return;
+            LocalFree(ph); *phCallback = NULL;
+            return FALSE;
         }
         if(fopen_s(&ph->pFileOutput, ctxMain->cfg.szFileOut, "wb") || !ph->pFileOutput) {
             ph->is.bin.fCompletedAck = TRUE;
             LcWrite(ctxMain->hLC, ctxMain->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, 0x1000, (PBYTE)&ph->is);
             ph->fError = TRUE;
             printf("EXEC: Failed writing large outut to file: %s\n", ctxMain->cfg.szFileOut);
-            return;
+            LocalFree(ph); *phCallback = NULL;
+            return FALSE;
         }
-        printf("EXEC: Start writing large output to file: %s\n", ctxMain->cfg.szFileOut);
+        printf("EXEC: Start writing large output to file: %s\n\n", ctxMain->cfg.szFileOut);
+        if(ctxMain->cfg.fVerbose) {
+            PageStatInitialize(&g_pExecPageStat, 0, 0x0000100000000000, "Downloading large file of unknown size ...", TRUE, FALSE);
+            g_pExecPageStat->File.qwBaseOffset = 0;
+            g_pExecPageStat->File.qwCurrentOffset = 0;
+            g_pExecPageStat->File.fFileRead = TRUE;
+        }
     }
     // write to output file and ack to buffer
-    if(ph->is.bin.fCompletedAck) { return; }
+    if(ph->is.bin.fCompletedAck) { return TRUE; }
     LcRead(ctxMain->hLC, ctxMain->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_OS, 0x1000, (PBYTE)&ph->os);
-    if(ph->os.magic != EXEC_IO_MAGIC) { return; }
-    if(ph->is.bin.seqAck >= ph->os.bin.seq) { return; }
+    if(ph->os.magic != EXEC_IO_MAGIC) { return TRUE; }
+    if(ph->is.bin.seqAck >= ph->os.bin.seq) { return TRUE; }
     cbLength = 0;
     result =
         DeviceReadDMA(ctxMain->pk->DMAAddrPhysical + ctxMain->pk->dataOutExtraOffset, (DWORD)SIZE_PAGE_ALIGN_4K(ctxMain->pk->dataOutExtraLength), ph->pbDMA, NULL) &&
@@ -185,11 +196,21 @@ VOID Exec_Callback(_Inout_ PHANDLE phCallback)
     ph->is.bin.fCompletedAck = ph->is.bin.fCompletedAck || ph->os.bin.fCompleted || !result;
     ph->is.bin.seqAck = ph->os.bin.seq;
     LcWrite(ctxMain->hLC, ctxMain->pk->DMAAddrPhysical + EXEC_IO_DMAOFFSET_IS, 0x1000, (PBYTE)&ph->is);
+    if(g_pExecPageStat) {
+        g_pExecPageStat->File.qwCurrentOffset += cbLength >> 12;
+        PageStatUpdate(g_pExecPageStat, ph->qwFileWritten, cbLength >> 12, 0);
+    }
+    return TRUE;
 }
 
 VOID Exec_CallbackClose(_In_opt_ HANDLE hCallback)
 {
     PEXEC_HANDLE ph = hCallback;
+    if(g_pExecPageStat) {
+        PageStatClose(&g_pExecPageStat);
+        g_pExecPageStat = NULL;
+        Sleep(50);
+    }
     if(hCallback == NULL) { return; }
     if(ph->pFileOutput) {
         if(ph->fError) {
@@ -294,13 +315,13 @@ VOID ActionExecShellcode()
     //    [0x000000, 0x080000[ = shellcode
     //    [0x080000          ] = (shellcode initiated com buffer for console and data transfer (input  to   implant) [IS])
     //    [0x081000          ] = (shellcode initiated com buffer for console and data transfer (output from implant) [OS])
-    //    [0x082000, X       [ = data in (to target computer); X = max(0x100000, cb_in)
+    //    [0x082000, X       [ = data in (to target computer); X = max(0x040000, cb_in)
     //    [X       , buf_max [ = data out (from target computer)
     //------------------------------------------------
     LcWrite(ctxMain->hLC, pk->DMAAddrPhysical + 0x080000, 0x2000, pbZeroPage2);
     pk->dataInExtraOffset = 0x082000;
     pk->dataInExtraLength = ctxMain->cfg.cbIn;
-    pk->dataInExtraLengthMax = max(0x100000, SIZE_PAGE_ALIGN_4K(ctxMain->cfg.cbIn));
+    pk->dataInExtraLengthMax = max(0x040000, SIZE_PAGE_ALIGN_4K(ctxMain->cfg.cbIn));
     pk->dataOutExtraOffset = pk->dataInExtraOffset + pk->dataInExtraLengthMax;
     pk->dataOutExtraLength = 0;
     pk->dataOutExtraLengthMax = pk->DMASizeBuffer - pk->dataOutExtraOffset;

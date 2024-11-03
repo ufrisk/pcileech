@@ -1,6 +1,6 @@
 // pcileech.c : implementation of core pcileech functionality.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2024
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "pcileech.h"
@@ -346,6 +346,9 @@ int main(_In_ int argc, _In_ char* argv[])
         PCILeechFreeContext();
         return 0;
     }
+    // enable ctrl+c event handler if remote (to circumvent blocking thread)
+    PCILeechCtrlHandlerInitialize();
+    // initialize device connection
     result = DeviceOpen();
     if(!result) {
         printf("PCILEECH: Failed to connect to the device.\n");
@@ -373,8 +376,6 @@ int main(_In_ int argc, _In_ char* argv[])
     if(ctxMain->cfg.paAddrMax == 0) {
         LcGetOption(ctxMain->hLC, LC_OPT_CORE_ADDR_MAX, &ctxMain->cfg.paAddrMax);
     }
-    // enable ctrl+c event handler if remote (to circumvent blocking thread)
-	PCILeechCtrlHandlerInitialize();
     // main dispatcher
     switch(ctxMain->cfg.tpAction) {
         case NONE:

