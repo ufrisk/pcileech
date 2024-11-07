@@ -564,7 +564,7 @@ VOID Util_CreateSignatureLinuxGeneric(_In_ QWORD paBase,
     Util_ParseHexFileBuiltin("DEFAULT_LINUX_X64_STAGE2", pSignature->chunk[3].pb, 4096, &pSignature->chunk[3].cb);
     Util_ParseHexFileBuiltin("DEFAULT_LINUX_X64_STAGE3", pSignature->chunk[4].pb, 4096, &pSignature->chunk[4].cb);
     pSignature->chunk[2].cbOffset = (DWORD)(dwBaseFnHijack2M + (vaFnHijack & 0x1fffff));
-    pSignature->chunk[3].cbOffset = 0xcc0;
+    pSignature->chunk[3].cbOffset = 0x1000 - ((pSignature->chunk[3].cb + 0x10) & 0xff0);
     pSignature->chunk[4].cbOffset = (DWORD)(dwBaseKallsyms2M + (vaFnKallsyms & 0x1fffff));
     pSignature->chunk[0].qwAddress = paBase + dwBaseFnHijack2M + (vaFnHijack & 0x1ff000);
     pSignature->chunk[1].qwAddress = paBase;
