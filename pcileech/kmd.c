@@ -458,7 +458,7 @@ QWORD KMD_Linux48KernelBaseSeek()
 {
     PPAGE_STATISTICS pPageStat = NULL;
     BYTE pb[0x1000], pbCMPcc[0x400], pbCMP90[0x400], pbCMP00[0x100];
-    QWORD qwA, qwAddrMax, i, paKernelBaseLowQuality = 0;
+    QWORD qwA, qwAddrMax, i, paKernelBaseLowQuality = 0, paKernelBaseMediumQuality = 0;
     BOOL isAuthenticAMD, isGenuineIntel, isOK;
     memset(pbCMPcc, 0xcc, 0x400);
     memset(pbCMP90, 0x90, 0x400);
@@ -471,11 +471,20 @@ QWORD KMD_Linux48KernelBaseSeek()
     // assumed to end with 0x100 0x00's.
     for(; qwA <= qwAddrMax; qwA += 0x00200000) {
         pPageStat->qwAddr = qwA;
-        if(!LcRead(ctxMain->hLC, qwA, 0x400, pb)) {
+        if(!LcRead(ctxMain->hLC, qwA, 0x1000, pb)) {
             PageStatUpdate(pPageStat, qwA, 0, 512);
             continue;
         }
         PageStatUpdate(pPageStat, qwA, 512, 0);
+        // Search for head.S byte pattern.
+        isGenuineIntel = isAuthenticAMD = FALSE;
+        for(i = 4; i < 0xff8; i++) {
+            if((0xbfd08ec08ed88e00 == *(PQWORD)(pb + i)) && (i >= 4)) {
+                if((0x000018b8 == *(PDWORD)(pb + i - 4)) || (0x000010b8 == *(PDWORD)(pb + i - 4))) {
+                    paKernelBaseMediumQuality = qwA;
+                }
+            }
+        }
         // Search for GenuineIntel and AuthenticAMD strings.
         isGenuineIntel = isAuthenticAMD = FALSE;
         for(i = 0; i < 0x400; i++) {
@@ -502,7 +511,7 @@ QWORD KMD_Linux48KernelBaseSeek()
         }
     }
     PageStatClose(&pPageStat);
-    return paKernelBaseLowQuality;
+    return paKernelBaseMediumQuality ? paKernelBaseMediumQuality : paKernelBaseLowQuality;
 }
 
 #define KMD_LINUX48SEEK_MAX_BYTES       0x03000000      // 48MB

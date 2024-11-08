@@ -94,7 +94,7 @@ LookupFunctions PROC
 	PUSH r13
 	MOV r15, rcx				; address of kallsyms_lookup_name
 	MOV r14, rdx				; ptr to FNLX struct 
-	MOV r13, 24*8				; num functions * 8
+	MOV r13, 25*8				; num functions * 8
 	; ----------------------------------------------------
 	; 1: PUSH FUNCTION NAME POINTERS ON STACK
 	; ----------------------------------------------------
@@ -146,6 +146,8 @@ LookupFunctions PROC
 	PUSH rax
 	LEA rax, str_memset
 	PUSH rax
+	LEA rax, str_alloc_pages_noprof
+	PUSH rax
 	; ----------------------------------------------------
 	; 2: LOOKUP FUNCTION POINTERS BY NAME
 	; ----------------------------------------------------
@@ -167,13 +169,18 @@ LookupFunctions PROC
 	MOV [r14+9*8], rax
 	lookup_finish_ioremap:
 	; ----------------------------------------------------
-	; 4: IF 'alloc_pages_current' DOES NOT EXIST FALLBACK TO 'alloc_pages'
+	; 4: IF 'alloc_pages_current' DOES NOT EXIST FALLBACK TO 'alloc_pages' or 'alloc_pages_noprof'
 	; ----------------------------------------------------
 	MOV rax, [r14+1*8]
 	TEST rax, rax
 	JNZ lookup_finish_alloc_pages
-	MOV rax, [r14+13*8]
+	MOV rax, [r14+13*8]				; 'alloc_pages'
 	MOV [r14+1*8], rax
+	TEST rax, rax
+	JNZ lookup_finish_alloc_pages
+	MOV rax, [r14+24*8]				; 'alloc_pages_noprof'
+	MOV [r14+1*8], rax
+	TEST rax, rax
 	lookup_finish_alloc_pages:
 	; ----------------------------------------------------
 	; 5: RESTORE NV REGISTERS AND RETURN
@@ -221,6 +228,7 @@ str_platform_device_put			db		'platform_device_put', 0
 str_dma_alloc_attrs				db		'dma_alloc_attrs', 0
 str_dma_free_attrs				db      'dma_free_attrs', 0
 str_memset						db		'memset', 0
+str_alloc_pages_noprof			db      'alloc_pages_noprof', 0
 str_dummy						db		0
 
 ; ------------------------------------------------------------------

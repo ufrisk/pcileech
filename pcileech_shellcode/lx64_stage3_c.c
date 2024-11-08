@@ -63,7 +63,8 @@ typedef struct tdFNLX { // VOID definitions for LINUX functions (used in main co
 	QWORD platform_device_put;
 	QWORD dma_alloc_attrs;
 	QWORD memset;
-	QWORD ReservedFutureUse[8];
+	QWORD alloc_pages_noprof;
+	QWORD ReservedFutureUse[7];
 } FNLX, *PFNLX;
 
 #define KMDDATA_OPERATING_SYSTEM_LINUX          0x02

@@ -123,6 +123,10 @@ setup PROC
 	LEA rdi, str_alloc_pages
 	CALL r14
 	TEST rax, rax
+	JNZ alloc_pages_ok
+	LEA rdi, str_alloc_pages_noprof
+	CALL r14
+	TEST rax, rax
 	JZ error
     alloc_pages_ok:
 	MOV rdi, 0cc4h
@@ -330,6 +334,7 @@ str_kthread_create			db 'kthread_create', 0
 str_kthread_create_on_node	db 'kthread_create_on_node', 0
 str_alloc_pages_current		db 'alloc_pages_current', 0
 str_alloc_pages				db 'alloc_pages', 0
+str_alloc_pages_noprof		db 'alloc_pages_noprof', 0
 str_set_memory_rox			db 'set_memory_rox', 0
 str_set_memory_x			db 'set_memory_x', 0
 str_set_memory_rw			db 'set_memory_rw', 0
