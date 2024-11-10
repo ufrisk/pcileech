@@ -305,4 +305,4 @@ v4.1
 * `-psname` option added.
 
 Latest:
-* Linux stability improvements.
+* Linux stability improvements and kernel module loading enhancements.

@@ -4,10 +4,12 @@
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "kmd.h"
+#include "charutil.h"
 #include "device.h"
 #include "util.h"
 #include "executor.h"
 #include "vmmx.h"
+#include "ob/ob.h"
 
 typedef struct tdKMDHANDLE_S12 {
     QWORD qwPageAddr;
@@ -284,6 +286,342 @@ error:
     return FALSE;
 }
 
+
+
+//-------------------------------------------------------------------------------
+// LINUX COMPRESSED SYMBOL TABLE (KALLSYMS) BELOW:
+// loosely based on the algorithmic descriptions given by:
+// https://github.com/marin-m/vmlinux-to-elf/blob/master/vmlinux_to_elf/kallsyms_finder.py
+//-------------------------------------------------------------------------------
+
+typedef struct tdKALLSYMS_SYMBOL {
+    QWORD va;
+    CHAR tp;
+    CHAR sz[];
+} KALLSYMS_SYMBOL, *PKALLSYMS_SYMBOL;
+
+/*
+* Collect the symbols their addresses from the kallsyms table.
+* CALLER DECREF: return
+*/
+_Success_(return != 0)
+POB_MAP KMD_Kallsyms_Collect(_In_reads_bytes_(cb) PBYTE pb, _In_ DWORD cb, _In_ QWORD vaKernelBase, _In_reads_(256) LPSTR *aszTokens, _In_ DWORD cSymbols, _In_ DWORD cboOffsets, _In_ DWORD cboNames, _In_ DWORD cboNamesMax)
+{
+    QWORD va, qwKey;
+    BYTE cTok, bTok, oT;
+    PKALLSYMS_SYMBOL pSym;
+    POB_MAP pmObSymbols = NULL;
+    CHAR ch, sz[MAX_PATH] = { 0 };
+    DWORD iSymbol = 0, cbo, osz, cboAddr;
+    if(!(pSym = LocalAlloc(0, sizeof(KALLSYMS_SYMBOL) + MAX_PATH))) {
+        return FALSE;
+    }
+    if(!(pmObSymbols = ObMap_New(NULL, OB_MAP_FLAGS_OBJECT_LOCALFREE))) {
+        LocalFree(pSym);
+        return FALSE;
+    }
+    cbo = cboNames;
+    while((iSymbol < cSymbols) && (cbo < cboNamesMax)) {
+        // address:
+        cboAddr = *(PDWORD)(pb + cboOffsets + iSymbol * 4);
+        if(cboAddr >> 31) {
+            va = vaKernelBase + (DWORD)(0xffffffff - cboAddr);
+        } else {
+            va = cboAddr;
+        }
+        // symbol token length:
+        cTok = pb[cbo++];
+        // symbol type and name from token table:
+        osz = 0;
+        while(cTok) {
+            cTok--;
+            bTok = pb[cbo++];
+            oT = 0;
+            ch = 0xff;
+            while(ch && (osz < MAX_PATH - 1)) {
+                ch = aszTokens[bTok][oT++];
+                sz[osz++] = ch;
+            }
+            osz--;
+        }
+        // push symbol to result map:
+        if(osz > 1) {
+            pSym->va = va;
+            memcpy((PBYTE)pSym + 8, sz, osz + 1);
+            qwKey = CharUtil_Hash64A(pSym->sz, FALSE);
+            ObMap_PushCopy(pmObSymbols, qwKey, pSym, 8 + osz + 1);
+        }
+        //printf("%04x %016llx %c %s\n", iSymbol, va, sz[0], sz + 1);
+        iSymbol++;
+    }
+    LocalFree(pSym);
+    if(ObMap_Size(pmObSymbols) < 0x10) {
+        Ob_DECREF_NULL(&pmObSymbols);
+    }
+    return pmObSymbols;
+}
+
+/*
+* Locate the start of the kallsyms offsets table.
+* Table is sorted by increasing addresses/offsets.
+*/
+_Success_(return)
+BOOL KMD_Kallsyms_FindOffsets(_In_reads_bytes_(cb) PBYTE pb, _In_ DWORD cb, _In_ DWORD cboNames, _In_ DWORD cboBase, _In_ DWORD cSym, _Out_ PDWORD pcboStart, _Out_ PQWORD pvaKernelBase)
+{
+    DWORD i, cbo = 0, o1, o2;
+    if(cSym < 0x10) { return FALSE; }
+    if(!cboBase) {
+        if(cSym * 4 + 8 > cboNames) { return FALSE; }
+        cboBase = cboNames - 0x10 - ((cSym + 1) & ~1) * 4;
+    }
+    *pcboStart = cboBase;
+    // verify that the offsets are in increasing address order
+    if((cboBase > cb - 0x100) || (cSym < 0x10)) { return FALSE; }
+    o1 = *(PDWORD)(pb + cboBase);
+    for(i = 1; i < cSym; i++) {
+        cbo = cboBase + i * 4;
+        if(cbo > cb - 4) { return FALSE; }
+        o2 = *(PDWORD)(pb + cbo);
+        if(((o2 > o1) && (o1 >> 31) && (o2 >> 31)) || (!(o2 >> 31) && (o2 < o1))) {
+            return FALSE;
+        }
+        o1 = o2;
+    }
+    *pvaKernelBase = *(PQWORD)(pb + ((cbo + 8) & ~7));
+    return TRUE;
+}
+
+/*
+* Locate the start of the kallsyms compressed name table. Use the last marker
+* offset as a stating point and scan backwards for the start of the table.
+* The start of the table contains a QWORD value with the length of the table.
+*/
+_Success_(return)
+BOOL KMD_Kallsyms_FindNames(_In_reads_bytes_(cb) PBYTE pb, _In_ DWORD cb, _In_ DWORD cboMarkers, _In_ DWORD cboMarkersMaxNameOffset, _Out_ PDWORD pcboStart, _Out_ PDWORD pcSymbols)
+{
+    QWORD cSymbols;
+    DWORD cbo, cboStart;
+    if(cboMarkersMaxNameOffset > cboMarkers) { return FALSE; }
+    cboStart = (cboMarkers - cboMarkersMaxNameOffset) & ~7;
+    cbo = cboStart;
+    while(cbo && (cbo + 0x10000 > cboStart)) {
+        cSymbols = *(PQWORD)(pb + cbo);
+        if(cSymbols < 0x00100000) {
+            *pcSymbols = (DWORD)cSymbols;
+            *pcboStart = cbo + 8;
+            return TRUE;
+        }
+        cbo -= 8;
+    }
+    return FALSE;
+}
+
+/*
+* The kallsyms 'marker' table is a table of offsets into the kallsyms token
+* table for each 256 entries. The table is sorted by address and thus isn't
+* usable for pcileech, but the start offset is still important, as well as
+* the topmost marker containing the maximum marked name offset.
+* The token table can be either of 8-byte or 4-byte entries depending on
+* kernel version.
+*/
+_Success_(return)
+BOOL KMD_Kallsyms_FindMarkers(_In_reads_bytes_(cb) PBYTE pb, _In_ DWORD cb, _In_ DWORD cboTokenTable, _Out_ PDWORD pcboStart, _Out_ PDWORD pcboMarkersMaxNameOffset)
+{
+    BOOL fResult = FALSE;
+    DWORD cbo, cbo8, cbe = 4, cMarkers = 0;
+    QWORD qw1, qw2;
+    cbo = (cboTokenTable - 0x10) & ~0xf;
+    while(cbo) {
+        if(0 == *(PDWORD)(pb + cbo)) {
+            cbo8 = (cbo + 3) & ~7;
+            if(0 == *(PQWORD)(pb + cbo8)) {
+                qw1 = *(PQWORD)(pb + cbo8 + 8);
+                qw2 = *(PQWORD)(pb + cbo8 + 16);
+                if(qw1 && qw2 && (qw1 < qw2) && (qw2 < 0x01000000)) {
+                    cbo = cbo8;
+                    cbe = 8;
+                    break;
+                }
+            } else {
+                qw1 = *(PDWORD)(pb + cbo + 4);
+                qw2 = *(PDWORD)(pb + cbo + 8);
+                if(qw1 && qw2 && (qw1 < qw2) && (qw2 < 0x01000000)) {
+                    break;
+                }
+            }
+        }
+        cbo -= 4;
+    }
+    *pcboStart = cbo;
+    while(cbo < cboTokenTable - 0x10) {
+        if(cbe == 4) {
+            qw1 = *(PDWORD)(pb + cbo);
+            qw2 = *(PDWORD)(pb + cbo + 4);
+        } else {
+            qw1 = *(PQWORD)(pb + cbo);
+            qw2 = *(PQWORD)(pb + cbo + 8);
+        }
+        if(!qw2 || (qw1 >= qw2) || (qw2 >= 0x01000000)) {
+            break;
+        }
+        cMarkers++;
+        cbo += cbe;
+    }
+    *pcboMarkersMaxNameOffset = *(PDWORD)(pb + *pcboStart + cMarkers * cbe);
+    return (cMarkers > 0x10) && (*pcboMarkersMaxNameOffset < 0x01000000);
+}
+
+/*
+* The kallsyms token table is a table of 256 string fragments. Entries for 0-9,
+* A-Z and a-z are stored at the matching position for their ascii value.
+* An initial quick-check is done for the pattern '0123' & '4567' and then an
+* attempt to parse the entire table is done.
+* Following the tables there is the index table consisting of 256 WORDs with
+* token table string offsets. Verify this as well.
+*/
+_Success_(return)
+BOOL KMD_Kallsyms_FindTokenTable(_In_reads_bytes_(cb) PBYTE pb, _In_ DWORD cb, _Out_writes_(256) LPSTR *pszTokenTable, _Out_ PDWORD pcboStart, _Out_ PDWORD pcboEnd)
+{
+    CHAR c;
+    DWORD t;
+    DWORD o1, o2, o3;
+    o1 = 0x4000;
+    while(o1 < cb - 0x1000) {
+scan_next:
+        o1++;
+        if((0x0033003200310030 == *(PQWORD)(pb + o1)) && (0x0037003600350034 == *(PQWORD)(pb + o1 + 8))) {
+            // potential match:
+            // scan back to find start of table:
+            t = '0';
+            o2 = o1;
+            while(TRUE) {
+                o3 = 0;
+                while(TRUE) {
+                    o2--;
+                    c = pb[o2];
+                    if(!c) { break; }
+                    if(!t && ((c < 0x10) || (c > 'z'))) { break; }
+                    o3++;
+                    if(o3 > 0x40) { goto scan_next; }
+                }
+                if(!t) { break; }
+                t--;
+            }
+            o2++;
+            if(o2 & 3) { goto scan_next; }
+            *pcboStart = o2;
+            // scan forward to match char sequences incl. 0-9, A-Z, a-z
+            for(t = 0; t < 256; t++) {
+                if(o2 + 512 > cb) { return FALSE; }
+                pszTokenTable[t] = (LPSTR)(pb + o2);
+                // char is in range 0-9, A-Z, a-z:
+                if(((t >= '0') && (t <= '9')) || ((t >= 'A') && (t <= 'Z')) || ((t >= 'a') && (t <= 'z'))) {
+                    if((t != pb[o2]) || pb[o2 + 1]) { goto scan_next; }
+                    o2 += 2;
+                    continue;
+                }
+                // other char sequence:
+                o3 = 0;
+                while(TRUE) {
+                    c = pb[o2 + o3];
+                    if(c == 0) {
+                        if(o3 == 0) { goto scan_next; }
+                        o2 += o3 + 1;
+                        break;
+                    }
+                    if((c < 0x10) || (o3 > 0x40)) { goto scan_next; }
+                    o3++;
+                }
+            }
+            o2 = (o2 + 7) & ~7;
+            *pcboEnd = o2;
+            // verify token index table:
+            if(o2 + 512 > cb) { return FALSE; }
+            for(t = 0; t < 256; t++) {
+                if(*(PWORD)(pb + *pcboEnd + (t * 2)) != (DWORD)((SIZE_T)pszTokenTable[t] - (SIZE_T)pb - *pcboStart)) {
+                    goto scan_next;
+                }
+            }
+            *pcboEnd += 256 * sizeof(WORD);
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/*
+* Retrieve the symbols and addresses from the compressed kallsyms table.
+* The result is a map of 'KALLSYMS_SYMBOL' with the symbol name hash as key.
+* CALLER DECREF: return
+*/
+_Success_(return != NULL)
+POB_MAP KMD_Kallsyms(_In_reads_bytes_(cb) PBYTE pb, _In_ DWORD cb)
+{
+    QWORD vaKernelBase;
+    DWORD cboTokenTableStart, cboTokenTableEnd, cboMarkersStart, cboMarkersMaxNameOffset, cboNamesStart, cSymbols, cboOffsets, cboEnd;
+    LPSTR aszTokenTable[256] = { 0 };
+    if(cb < 0x10000) {
+        return NULL;
+    }
+    if(!KMD_Kallsyms_FindTokenTable(pb, cb, aszTokenTable, &cboTokenTableStart, &cboTokenTableEnd)) {
+        return NULL;
+    }
+    if(!KMD_Kallsyms_FindMarkers(pb, cb, cboTokenTableStart, &cboMarkersStart, &cboMarkersMaxNameOffset)) {
+        return NULL;
+    }
+    if(!KMD_Kallsyms_FindNames(pb, cb, cboMarkersStart, cboMarkersMaxNameOffset, &cboNamesStart, &cSymbols)) {
+        return NULL;
+    }
+    if(!KMD_Kallsyms_FindOffsets(pb, cb, cboNamesStart, 0, cSymbols, &cboOffsets, &vaKernelBase)) {
+        // more recent kernels have the offset table after the token table instead of before the names table.
+        // -> try again with the offset table at the end of the token table.
+        cboEnd = cboTokenTableEnd + cSymbols * 4 + 0x20;
+        if((cboEnd > cb) || !KMD_Kallsyms_FindOffsets(pb, cb, 0, (cboTokenTableEnd + 7) & ~7, cSymbols, &cboOffsets, &vaKernelBase)) {
+            return NULL;
+        }
+    }
+    return KMD_Kallsyms_Collect(pb, cb, vaKernelBase, aszTokenTable, cSymbols, cboOffsets, cboNamesStart, cboMarkersStart);
+}
+
+/*
+* Resolve symbols from the compressed kallsyms table.
+*/
+VOID KMD_LinuxFindFunctionAddrTBL_FromKallsyms(_In_ PBYTE pb, _In_ DWORD cb, _In_ PKERNELSEEKER pS, _In_ DWORD cS)
+{
+    DWORD i;
+    QWORD vaBase;
+    DWORD cResolve;
+    PKALLSYMS_SYMBOL pSym;
+    POB_MAP pmObSymbols = NULL;
+    // 1: skip if all symbols are resolved:
+    cResolve = 0;
+    for(i = 0; i < cS; i++) {
+        if(pS[i].vaFn) {
+            cResolve++;
+        }
+    }
+    if(cS == cResolve) { return; }
+    // 2: resolve symbols from compressed kallsyms:
+    cResolve = 0;
+    if((pmObSymbols = KMD_Kallsyms(pb, cb))) {
+        pSym = ObMap_GetByKey(pmObSymbols, CharUtil_Hash64A("startup_64", FALSE));
+        if(pSym) {
+            vaBase = pSym->va;
+            for(i = 0; i < cS; i++) {
+                pSym = ObMap_GetByKey(pmObSymbols, CharUtil_Hash64A((LPSTR)(pS[i].pbSeek + 1), FALSE));
+                if(pSym && !pS[i].vaFn) {
+                    pS[i].aFn = pS[i].aSeek = (DWORD)(pSym->va - vaBase);
+                    pS[i].vaFn = pS[i].vaSeek = pSym->va;
+                    cResolve++;
+                }
+            }
+        }
+        Ob_DECREF(pmObSymbols);
+    }
+}
+
+
+
 //-------------------------------------------------------------------------------
 // LINUX generic kernel seek below. Comes in two versions:
 // 4.6- version that works with 32 and 64-bit addressing
@@ -554,9 +892,13 @@ BOOL KMD_Linux48KernelSeekSignature(_Out_ PSIGNATURE pSignature)
     if(!PageStatInitialize(&pPageStat, paKernelBase, paKernelBase + KMD_LINUX48SEEK_MAX_BYTES, "Verifying Linux kernel base", FALSE, FALSE)) { goto fail; }
     PageStatUpdate(pPageStat, paKernelBase, 0, 0);
     DeviceReadDMA(paKernelBase, KMD_LINUX48SEEK_MAX_BYTES, pb, pPageStat);
-    KMD_LinuxFindFunctionAddr(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 4);
-    KMD_LinuxFindFunctionAddrTBL_Absolute(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 4);
-    KMD_LinuxFindFunctionAddrTBL_Relative(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 4);
+    KMD_LinuxFindFunctionAddrTBL_FromKallsyms(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 4);
+    if((!ks[0].vaFn && !ks[2].vaFn) || (!ks[1].vaFn && !ks[3].vaFn)) {
+        printf("                                            !! COMPRESSED SYMBOL TABLE EXPORTS NOT FOUND - FALL BACK TO ORIGINAL APPROACH!\n");
+        KMD_LinuxFindFunctionAddr(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 4);
+        KMD_LinuxFindFunctionAddrTBL_Absolute(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 4);
+        KMD_LinuxFindFunctionAddrTBL_Relative(pb, KMD_LINUX48SEEK_MAX_BYTES, ks, 4);
+    }
     if(!ks[0].vaFn && ks[2].vaFn) { // kdbgetsymval exists; but not kallsyms_lookup_name not located
         KMD_Linux48KernelSeekSignature_KallsymsFromKDBGetSym(pb, &ks[2], &ks[0]);
     }
