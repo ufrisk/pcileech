@@ -8,7 +8,7 @@
 # 2.1 patch: pcileech patch -sig wx64_unlock_win10.sig -all
 #
 # Syntax: see signature_info.txt for more information.
-# Generated on 2024-06-03 23:55:07
+# Generated on 2024-12-09 18:16:15
 #
 #
 # Signature for Windows 10 x64 [NtlmShared.dll 10.0.10240.16384 / 2015-07-10]

@@ -8,7 +8,7 @@
 # 2.1 patch: pcileech patch -sig wx64_unlock_win11.sig -all
 #
 # Syntax: see signature_info.txt for more information.
-# Generated on 2024-06-03 23:55:07
+# Generated on 2024-12-09 18:16:15
 #
 #
 # Signature for Windows 11 x64 [NtlmShared.dll 10.0.20348.1668 / 2023-03-30]
@@ -30,3 +30,11 @@ F8B,488BCB48FF1563230000,F9D,0F84B2FAFFFF,F9D,0F85
 # Signature for Windows 11 x64 [NtlmShared.dll 10.0.22621.2506 / 2023-10-19]
 # Signature for Windows 11 x64 [NtlmShared.dll 10.0.22621.2567 / 2023-10-14]
 FC9,488D4B1048FF152C230000,FDC,0F85C4FAFFFF,FDC,909090909090
+#
+# Signature for Windows 11 x64 [NtlmShared.dll 10.0.26100.1 / 2024-04-01]
+# Signature for Windows 11 x64 [NtlmShared.dll 10.0.26100.1150 / 2024-07-03]
+# Signature for Windows 11 x64 [NtlmShared.dll 10.0.26100.1591 / 2024-08-21]
+# Signature for Windows 11 x64 [NtlmShared.dll 10.0.26100.1882 / 2024-09-28]
+# Signature for Windows 11 x64 [NtlmShared.dll 10.0.26100.2454 / 2024-11-16]
+# Signature for Windows 11 x64 [NtlmShared.dll 10.0.26100.712 / 2024-05-16]
+B31,4D2BF575EF84D2740A32C0EB09,B3A,32C0,B3A,B001
