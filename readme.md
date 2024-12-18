@@ -49,7 +49,7 @@ Please find a summary of the supported hardware based memory acquisition methods
 | Device                                                                         | Type | Interface | Speed | 64-bit memory access | PCIe TLP access | Project<br>Sponsor |
 | -------------------------------------------------------------------------------| ---- | --------- | ----- | -------------------- | --------------- | ------------------ |
 | [Screamer PCIe Squirrel](https://github.com/ufrisk/pcileech-fpga/tree/master/PCIeSquirrel) | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA) | USB-C | 190MB/s  | Yes | Yes | 💖 |
-| [ZDMA](https://github.com/ufrisk/pcileech-fpga-dev/blob/master/ZDMA)              | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)   | Thunderbolt3 | 1000MB/s | Yes | Yes | 💖 |
+| [ZDMA](https://github.com/ufrisk/pcileech-fpga/tree/master/ZDMA)              | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)   | Thunderbolt3 | 1000MB/s | Yes | Yes | 💖 |
 | [LeetDMA](https://github.com/ufrisk/pcileech-fpga)                                | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | USB-C | 190MB/s  | Yes | Yes | 💖 |
 | [AC701/FT601](https://github.com/ufrisk/pcileech-fpga/tree/master/ac701_ft601)    | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | USB3  | 190MB/s  | Yes | Yes |    |
 | USB3380-EVB                                                                       | [USB3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)    | USB3  | 150MB/s  | No  | No  |    |
