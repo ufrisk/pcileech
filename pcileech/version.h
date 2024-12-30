@@ -3,8 +3,8 @@
 
 #define VERSION_MAJOR               4
 #define VERSION_MINOR               18
-#define VERSION_REVISION            6
-#define VERSION_BUILD               56
+#define VERSION_REVISION            7
+#define VERSION_BUILD               57
 
 #define VER_FILE_DESCRIPTION_STR    "The PCILeech Direct Memory Access Attack Toolkit"
 #define VER_FILE_VERSION            VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION, VERSION_BUILD

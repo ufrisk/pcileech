@@ -271,7 +271,7 @@ VOID Action_TlpTxLoop()
     }
     LcGetOption(ctxMain->hLC, LC_OPT_FPGA_VERSION_MAJOR, &qwFpgaVersionMajor);
     LcGetOption(ctxMain->hLC, LC_OPT_FPGA_VERSION_MINOR, &qwFpgaVersionMinor);
-    if((qwFpgaVersionMajor < 4) || ((qwFpgaVersionMajor == 4) && (qwFpgaVersionMajor < 2))) {
+    if((qwFpgaVersionMajor < 4) || ((qwFpgaVersionMajor == 4) && (qwFpgaVersionMinor < 2))) {
         printf("Action_TlpTxLoop: FPGA version not supported (bitstream v4.2 or later required).\n");
         return;
     }
