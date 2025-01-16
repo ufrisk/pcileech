@@ -1,6 +1,6 @@
 // mempatch.c : implementation related to operating systems unlock/patch functionality.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "mempatch.h"

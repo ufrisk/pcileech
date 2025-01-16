@@ -1,6 +1,6 @@
 // vmmx.h : implementation of external memory process file system functionality.
 //
-// (c) Ulf Frisk, 2020-2022
+// (c) Ulf Frisk, 2020-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include <stdio.h>

@@ -1,6 +1,6 @@
 // extra.h : definitions related to various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __EXTRA_H__

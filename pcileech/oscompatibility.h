@@ -1,6 +1,6 @@
 // oscompatibility.h : pcileech windows/linux compatibility layer.
 //
-// (c) Ulf Frisk, 2017-2022
+// (c) Ulf Frisk, 2017-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __OSCOMPATIBILITY_H__
@@ -28,9 +28,17 @@ typedef unsigned __int64                    QWORD, *PQWORD;
 VOID usleep(_In_ DWORD us);
 
 #endif /* _WIN32 */
-#ifdef LINUX
 
-#include <byteswap.h>
+#ifdef LINUX
+#define PCILEECH_LIBRARY_FILETYPE           ".so"
+#endif /* LINUX */
+
+#ifdef MACOS
+#define PCILEECH_LIBRARY_FILETYPE           ".dylib"
+#endif /* MACOS */
+
+#if defined(LINUX) || defined(MACOS)
+
 #include <ctype.h>
 #include <dirent.h>
 #include <dlfcn.h>
@@ -45,7 +53,6 @@ VOID usleep(_In_ DWORD us);
 #include <pthread.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/eventfd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -103,14 +110,15 @@ typedef int(*_CoreCrtNonSecureSearchSortCompareFunction)(void const*, void const
 #define WINUSB_INTERFACE_HANDLE             libusb_device_handle*
 #define PIPE_TRANSFER_TIMEOUT               0x03
 #define CONSOLE_SCREEN_BUFFER_INFO          PVOID    // TODO: remove this dummy
-#define PCILEECH_LIBRARY_FILETYPE           ".so"
 #define SOCKET                              int
 #define INVALID_SOCKET	                    -1
 #define SOCKET_ERROR	                    -1
 #define WSAEWOULDBLOCK                      10035L
-#define WAIT_OBJECT_0                       (0x00000000UL)
-#define INFINITE                            (0xFFFFFFFFUL)
 #define MAXIMUM_WAIT_OBJECTS                64
+#define WAIT_OBJECT_0                       (0x00000000UL)
+#define WAIT_FAILED                         (0xFFFFFFFFUL)
+#define WAIT_TIMEOUT                        (258L)
+#define INFINITE                            (0xFFFFFFFFUL)
 #define SID_MAX_SUB_AUTHORITIES             (15)
 #define SECURITY_MAX_SID_SIZE               (sizeof(SID) - sizeof(DWORD) + (SID_MAX_SUB_AUTHORITIES * sizeof(DWORD)))
 #define CP_ACP                              0
@@ -167,9 +175,9 @@ typedef int(*_CoreCrtNonSecureSearchSortCompareFunction)(void const*, void const
 
 #define max(a, b)                           (((a) > (b)) ? (a) : (b))
 #define min(a, b)                           (((a) < (b)) ? (a) : (b))
-#define _byteswap_ushort(v)                 (bswap_16(v))
-#define _byteswap_ulong(v)                  (bswap_32(v))
-#define _byteswap_uint64(v)                 (bswap_64(v))
+#define _byteswap_ushort(v)                 (__builtin_bswap16(v))
+#define _byteswap_ulong(v)                  (__builtin_bswap32(v))
+#define _byteswap_uint64(v)                 (__builtin_bswap64(v))
 #ifndef _rotr
 #define _rotr(v,c)                          ((((DWORD)v) >> ((DWORD)c) | (DWORD)((DWORD)v) << (32 - (DWORD)c)))
 #endif /* _rotr */
@@ -193,14 +201,13 @@ typedef int(*_CoreCrtNonSecureSearchSortCompareFunction)(void const*, void const
 #define ExitThread(dwExitCode)              (pthread_exit(dwExitCode))
 #define ExitProcess(c)                      (exit(c ? EXIT_SUCCESS : EXIT_FAILURE))
 #define Sleep(dwMilliseconds)               (usleep(1000*dwMilliseconds))
-#define fopen_s(ppFile, szFile, szAttr)     ((*ppFile = fopen64(szFile, szAttr)) ? 0 : 1)
-#define GetModuleFileNameA(m, f, l)         (readlink("/proc/self/exe", f, l))
+#define fopen_s(ppFile, szFile, szAttr)     ((*ppFile = fopen(szFile, szAttr)) ? 0 : 1)
 #define ZeroMemory(pb, cb)                  (memset(pb, 0, cb))
 #define WinUsb_SetPipePolicy(h, p, t, cb, pb)   // TODO: implement this for better USB2 performance.
 #define CloseHandle(h)                          // TODO: remove this dummy implementation & replace with WARN.
-#define _ftelli64(f)                        (ftello64(f))
-#define _fseeki64(f, o, w)                  (fseeko64(f, o, w))
-#define _chsize_s(fd, cb)                   (ftruncate64(fd, cb))
+#define _ftelli64(f)                        (ftello(f))
+#define _fseeki64(f, o, w)                  (fseeko(f, o, w))
+#define _chsize_s(fd, cb)                   (ftruncate(fd, cb))
 #define _fileno(f)                          (fileno(f))
 #define InterlockedAdd64(p, v)              (__sync_add_and_fetch(p, v))
 #define InterlockedIncrement64(p)           (__sync_add_and_fetch(p, 1))
@@ -237,6 +244,7 @@ HANDLE FindFirstFileA(LPSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
 BOOL FindNextFileA(HANDLE hFindFile, LPWIN32_FIND_DATAA lpFindFileData);
 HANDLE LocalAlloc(DWORD uFlags, SIZE_T uBytes);
 VOID LocalFree(HANDLE hMem);
+DWORD GetModuleFileNameA(_In_opt_ HMODULE hModule, _Out_ LPSTR lpFilename, _In_ DWORD nSize);
 QWORD GetTickCount64();
 BOOL QueryPerformanceFrequency(_Out_ LARGE_INTEGER *lpFrequency);
 BOOL QueryPerformanceCounter(_Out_ LARGE_INTEGER *lpPerformanceCount);
@@ -264,16 +272,28 @@ FARPROC GetProcAddress(HMODULE hModule, LPSTR lpProcName);
 BOOL _kbhit();
 
 // SRWLOCK
+#ifdef LINUX
 typedef struct tdSRWLOCK {
     uint32_t xchg;
     int c;
 } SRWLOCK, *PSRWLOCK;
-VOID InitializeSRWLock(PSRWLOCK SRWLock);
-VOID AcquireSRWLockExclusive(_Inout_ PSRWLOCK SRWLock);
-VOID ReleaseSRWLockExclusive(_Inout_ PSRWLOCK SRWLock);
+#endif /* LINUX */
+#ifdef MACOS
+#include <dispatch/dispatch.h>
+typedef struct tdSRWLOCK {
+    union {
+        QWORD valid;
+        dispatch_semaphore_t sem;
+    };
+} SRWLOCK, *PSRWLOCK;
+#endif /* MACOS */
+VOID InitializeSRWLock(PSRWLOCK pSRWLock);
+VOID AcquireSRWLockExclusive(_Inout_ PSRWLOCK pSRWLock);
+VOID ReleaseSRWLockExclusive(_Inout_ PSRWLOCK pSRWLock);
 #define AcquireSRWLockShared    AcquireSRWLockExclusive
 #define ReleaseSRWLockShared    ReleaseSRWLockExclusive
+#define SRWLOCK_INIT            { 0 }
 
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
 
 #endif /* __OSCOMPATIBILITY_H__ */

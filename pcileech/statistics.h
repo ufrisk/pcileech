@@ -1,6 +1,6 @@
 // statistics.h : definitions of statistics related functionality.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __STATISTICS_H__

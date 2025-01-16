@@ -1,6 +1,6 @@
 // vfslist.h : definitions related to virtual file system support.
 //
-// (c) Ulf Frisk, 2018-2022
+// (c) Ulf Frisk, 2018-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __VFSLIST_H__

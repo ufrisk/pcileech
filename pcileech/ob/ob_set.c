@@ -9,7 +9,7 @@
 // iterations of the set with ObSet_Get/ObSet_GetNext may fail.
 // The ObSet is an object manager object and must be DECREF'ed when required.
 //
-// (c) Ulf Frisk, 2019-2023
+// (c) Ulf Frisk, 2019-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "ob.h"

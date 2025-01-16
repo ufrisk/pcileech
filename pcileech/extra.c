@@ -1,6 +1,6 @@
 // extra.c : implementation related various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "extra.h"
@@ -62,9 +62,9 @@ BOOL Extra_MacFVRecover_Analyze(_In_ PBYTE pb512M)
 #ifdef _WIN32
                     printf("MAC_FVRECOVER: PASSWORD CANDIDATE: %S\n", (LPWSTR)(pb + dwCandidate));
 #endif /* _WIN32 */
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
                     printf("MAC_FVRECOVER: PASSWORD CANDIDATE (hex8): %llx\n", *(PQWORD)(pb + dwCandidate));
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
                 }
                 break;
             }

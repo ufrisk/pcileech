@@ -8,10 +8,10 @@
 // while Linux may only access UTF-8 versions. Some functionality may also
 // be degraded or unavailable on Linux.
 //
-// (c) Ulf Frisk, 2018-2024
+// (c) Ulf Frisk, 2018-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 5.13
+// Header Version: 5.14
 //
 
 #include "leechcore.h"
@@ -30,7 +30,7 @@ extern "C" {
 typedef unsigned __int64                    QWORD, *PQWORD;
 
 #endif /* _WIN32 */
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
 
 #include <inttypes.h>
 #include <stdarg.h>
@@ -72,7 +72,7 @@ typedef const uint16_t                      *LPCWSTR;
 #define _Printf_format_string_
 #define _Success_(x)
 
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
 
 typedef struct tdVMM_HANDLE     *VMM_HANDLE;
 typedef struct tdVMMVM_HANDLE   *VMMVM_HANDLE;
@@ -296,7 +296,7 @@ typedef struct tdVMMDLL_MAP_PFN *PVMMDLL_MAP_PFN;
 //-----------------------------------------------------------------------------
 // LINUX SPECIFIC DEFINES:
 //-----------------------------------------------------------------------------
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
 
 #define IMAGE_SIZEOF_SHORT_NAME              8
 
@@ -330,7 +330,7 @@ typedef struct _SERVICE_STATUS {
     DWORD   dwCheckPoint;
     DWORD   dwWaitHint;
 } SERVICE_STATUS, *LPSERVICE_STATUS;
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
 
 
 

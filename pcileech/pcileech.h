@@ -1,9 +1,7 @@
 // pcileech.h : definitions for pcileech - dump memory and unlock computers with a USB3380 device using DMA.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
-//
-// Header Version: 4.14
 //
 #ifndef __PCILEECH_H__
 #define __PCILEECH_H__
@@ -12,11 +10,11 @@
 #ifdef _WIN32
 typedef unsigned __int64                    QWORD, *PQWORD;
 #endif /* _WIN32 */
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
 #define WINAPI
 typedef uint16_t                            WORD, *PWORD, USHORT, *PUSHORT;
 typedef long long unsigned int              QWORD, *PQWORD, ULONG64, *PULONG64;
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
 
 #define SIZE_PAGE_ALIGN_4K(x)                ((x + 0xfff) & ~0xfff)
 #define CONFIG_MAX_SIGNATURES                256

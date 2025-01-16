@@ -1,7 +1,7 @@
 // umd.c : implementation related to various user-mode functionality supported
 //         by MemProcFS / vmm.dll integration.
 //
-// (c) Ulf Frisk, 2019-2022
+// (c) Ulf Frisk, 2019-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "umd.h"

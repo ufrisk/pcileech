@@ -1,0 +1,35 @@
+CC=clang
+CFLAGS += -I. -I../includes -D MACOS -D _GNU_SOURCE -D _FILE_OFFSET_BITS=64 -pthread
+CFLAGS += -fPIE -fPIC -fstack-protector -D_FORTIFY_SOURCE=2 -O1
+CFLAGS += -Wall -Wno-enum-compare -Wno-pointer-sign -Wno-multichar -Wno-unused-variable -Wno-unused-value
+CFLAGS += -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
+CFLAGS += -mmacosx-version-min=11.0
+# DEBUG FLAGS BELOW
+#CFLAGS += -O0
+#CFLAGS += -fsanitize=address
+# DEBUG FLAGS ABOVE
+LDFLAGS += -ldl -L. ./leechcore.dylib ./vmm.dylib
+LDFLAGS += -Wl,-rpath,@loader_path
+LDFLAGS += -mmacosx-version-min=11.0
+DEPS = pcileech.h
+OBJ  = oscompatibility.o charutil.o device.o pcileech.o executor.o extra.o help.o kmd.o memdump.o mempatch.o statistics.o umd.o util.o vfslist.o vfs.o vmmx.o ob/ob_cachemap.o ob/ob_core.o ob/ob_map.o ob/ob_set.o
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+pcileech: $(OBJ)
+	cp ../files/vmm.dylib . || cp ../../MemProcFS*/files/vmm.dylib . || true
+	cp ../files/leechcore.dylib . || cp ../../LeechCore*/files/leechcore.dylib . || true
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
+	mv pcileech ../files/ |true
+	mv vmm.dylib ../files/ |true
+	mv leechcore.dylib ../files/ |true
+	rm -f *.o || true
+	rm -f */*.o || true
+	rm -f *.dylib || true
+	true
+
+clean:
+	rm -f *.o || true
+	rm -f */*.o || true
+	rm -f *.dylib || true

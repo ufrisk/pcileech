@@ -1,6 +1,6 @@
 // vfs.c : implementation of functions related to virtual file system support.
 //
-// (c) Ulf Frisk, 2017-2022
+// (c) Ulf Frisk, 2017-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "vfs.h"
@@ -17,11 +17,11 @@
 #include <dokan.h>
 #pragma warning( pop )
 #endif /* WIN32 */
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
 #define FUSE_USE_VERSION 30
 #include <fuse.h>
 #include "oscompatibility.h"
-#endif /* LINUX */
+#endif /* LINUX || LINUX */
 
 
 
@@ -582,7 +582,7 @@ fail:
 
 
 
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
 
 //-------------------------------------------------------------------------------
 // LINUX-ONLY functions including FUSE CALLBACK functions.
@@ -752,11 +752,23 @@ void vfs_initialize_and_mount_displayinfo()
         goto fail;
     }
     // dynamically load fuse (to avoid runtime dependency)
+#ifdef LINUX
     hlibfuse2 = dlopen("libfuse.so.2", RTLD_NOW);
     if(!hlibfuse2) {
         printf("MOUNT: Unable to load required FUSE file system library libfuse.so.2\n");
         goto fail;
     }
+#endif /* LINUX */
+#ifdef MACOS
+    hlibfuse2 = dlopen("libfuse.2.dylib", RTLD_NOW);
+    if(!hlibfuse2) {
+        hlibfuse2 = dlopen("/usr/local/lib/libfuse.2.dylib", RTLD_NOW);
+    }
+    if(!hlibfuse2) {
+        printf("MOUNT: Unable to load required FUSE file system library libfuse.2.dylib\n");
+        goto fail;
+    }
+#endif /* MACOS */
     pfn_fuse_main_real = dlsym(hlibfuse2, "fuse_main_real");
     if(!pfn_fuse_main_real) {
         printf("MOUNT: Unable to load fetch required function pfn_fuse_main_real from FUSE file system library\n");
@@ -779,8 +791,14 @@ void vfs_initialize_and_mount_displayinfo()
     }
     printf("MOUNT: Mounting at path '%s'\n", ctxMain->cfg.szMount);
     // hand over control to FUSE.
+#ifdef LINUX
     LPSTR szArgListFuse[] = { ctxMain->argv[0], ctxMain->cfg.szMount, "-f" };
-    pfn_fuse_main_real(3, szArgListFuse, &vfs_operations, sizeof(vfs_operations), NULL);
+#endif /* LINUX */
+#ifdef MACOS
+    LPSTR szArgListFuse[] = { ctxMain->argv[0], ctxMain->cfg.szMount, "-f", "-o", "local,volname=PCILeech", "-o", "volicon=pcileech.icns" };
+#endif /* MACOS */
+    int cArgListFuse = sizeof(szArgListFuse) / sizeof(LPSTR);
+    pfn_fuse_main_real(cArgListFuse, szArgListFuse, &vfs_operations, sizeof(vfs_operations), NULL);
 fail:
     g_vfs = NULL;
     if(pVfsState) {
@@ -802,4 +820,4 @@ VOID ActionMount()
     vfs_initialize_and_mount_displayinfo();
 }
 
-#endif /* LINUX */
+#endif /* LINUX || MACOS */

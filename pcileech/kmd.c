@@ -1,6 +1,6 @@
 // kmd.c : implementation related to operating systems kernel modules functionality.
 //
-// (c) Ulf Frisk, 2016-2024
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "kmd.h"

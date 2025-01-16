@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile" />
+    <None Include="Makefile.macos" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="pcileech.rc" />

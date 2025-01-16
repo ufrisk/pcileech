@@ -1,6 +1,6 @@
 // help.c : implementation related to displaying help texts.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "help.h"

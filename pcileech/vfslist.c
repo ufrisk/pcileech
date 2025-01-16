@@ -1,6 +1,6 @@
 // vfslist.h : definitions related to vfs directory listings.
 //
-// (c) Ulf Frisk, 2021-2022
+// (c) Ulf Frisk, 2021-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "vfslist.h"

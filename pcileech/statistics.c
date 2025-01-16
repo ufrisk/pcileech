@@ -1,6 +1,6 @@
 // statistics.c : implementation of statistics related functionality.
 //
-// (c) Ulf Frisk, 2016-2022
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "statistics.h"
@@ -56,9 +56,9 @@ VOID _PageStatShowUpdate(_Inout_ PPAGE_STATISTICS ps)
         consoleInfo.dwCursorPosition.Y -= ps->i.fMemMap ? 9 : 7;
         SetConsoleCursorPosition(hConsole, consoleInfo.dwCursorPosition);
 #endif /* WIN32 */
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
         printf(ps->i.fMemMap ? "\033[9A" : "\033[7A"); // move cursor up 7/9 positions
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
     }
     if(ps->i.fMemMap) {
         _PageStatPrintMemMap(ps);
@@ -201,9 +201,9 @@ VOID StatSearch_ShowUpdate(_Inout_ PSTATISTICS_SEARCH ps)
         consoleInfo.dwCursorPosition.Y -= 8;
         SetConsoleCursorPosition(hConsole, consoleInfo.dwCursorPosition);
 #endif /* WIN32 */
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
         printf("\033[8A"); // move cursor up 8 positions
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
     }
     printf(
         " Current Action:  %s                    \n" \

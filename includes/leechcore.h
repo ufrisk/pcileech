@@ -11,10 +11,10 @@
 // - README: https://github.com/ufrisk/LeechCore
 // - GUIDE:  https://github.com/ufrisk/LeechCore/wiki
 //
-// (c) Ulf Frisk, 2020-2024
+// (c) Ulf Frisk, 2020-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 2.19.0
+// Header Version: 2.20.0
 //
 
 #ifndef __LEECHCORE_H__
@@ -34,7 +34,7 @@ extern "C" {
 typedef unsigned __int64                    QWORD, *PQWORD;
 
 #endif /* _WIN32 */
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
 
 #include <inttypes.h>
 #include <stdlib.h>
@@ -75,7 +75,7 @@ typedef const uint16_t                      *LPCWSTR;
 #define _Printf_format_string_
 #define _Success_(x)
 
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
 
 
 

@@ -1,6 +1,6 @@
 // executor.c : implementation related 'code execution' and 'console redirect' functionality.
 //
-// (c) Ulf Frisk, 2016-2024
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "executor.h"
@@ -618,11 +618,11 @@ fail:
 }
 
 #endif /* _WIN32 */
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
 
 VOID ActionAgentForensic()
 {
     printf("Command 'agent-elastic' is only supported on Windows.\n");
 }
 
-#endif /* LINUX */
+#endif /* LINUX || MACOS */

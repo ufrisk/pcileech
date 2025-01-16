@@ -27,6 +27,9 @@
     <None Include="Makefile">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="Makefile.macos">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="pcileech.rc">

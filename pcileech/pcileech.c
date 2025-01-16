@@ -1,6 +1,6 @@
 // pcileech.c : implementation of core pcileech functionality.
 //
-// (c) Ulf Frisk, 2016-2024
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "pcileech.h"
@@ -302,12 +302,12 @@ VOID PCILeechCtrlHandlerInitialize()
 }
 #endif /* _WIN32 */
 
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
 VOID PCILeechCtrlHandlerInitialize()
 {
 	return;
 }
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
 
 int main(_In_ int argc, _In_ char* argv[])
 {
@@ -491,12 +491,12 @@ int main(_In_ int argc, _In_ char* argv[])
         LcCommand(ctxMain->hLC, LC_CMD_FPGA_TLP_FUNCTION_CALLBACK, 0, (PBYTE)LC_TLP_FUNCTION_CALLBACK_DISABLE, NULL, NULL);
     }
     PCILeechFreeContext();
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
     ExitProcess(0);
-#else /* LINUX */
+#else /* LINUX || MACOS */
     __try {
         ExitProcess(0);
     } __except(EXCEPTION_EXECUTE_HANDLER) { ; }
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
     return 0;
 }

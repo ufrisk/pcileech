@@ -1,6 +1,6 @@
 // util.c : implementation of various utility functions.
 //
-// (c) Ulf Frisk, 2016-2024
+// (c) Ulf Frisk, 2016-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "pcileech.h"
@@ -463,10 +463,12 @@ fail:
 
 VOID Util_GetFileInDirectory(_Out_writes_(MAX_PATH) LPSTR szPath, _In_ LPSTR szFileName)
 {
-    SIZE_T i, cchFileName = strlen(szFileName);
+    SIZE_T i, cchPath, cchFileName = strlen(szFileName);
     ZeroMemory(szPath, MAX_PATH);
     GetModuleFileNameA(NULL, (LPSTR)szPath, (DWORD)(MAX_PATH - cchFileName - 4));
-    for(i = strlen(szPath) - 1; i > 0; i--) {
+    cchPath = strlen(szPath);
+    if(!cchPath) { return; }
+    for(i = cchPath - 1; i > 0; i--) {
         if(szPath[i] == '/' || szPath[i] == '\\') {
             strcpy_s(&szPath[i + 1], MAX_PATH - i - 5, szFileName);
             return;
@@ -828,10 +830,10 @@ VOID Util_GetPathExe(_Out_writes_(MAX_PATH) PCHAR szPath)
 #ifdef _WIN32
     GetModuleFileNameA(NULL, szPath, MAX_PATH - 4);
 #endif /* _WIN32 */
-#ifdef LINUX
+#if defined(LINUX) || defined(MACOS)
     i = readlink("/proc/self/exe", szPath, MAX_PATH - 4);
     if(i == (SIZE_T)-1) { return; }
-#endif /* LINUX */
+#endif /* LINUX || MACOS */
     for(i = strlen(szPath) - 1; i > 0; i--) {
         if(szPath[i] == '/' || szPath[i] == '\\') {
             szPath[i + 1] = '\0';

@@ -53,7 +53,6 @@ Please find a summary of the supported hardware based memory acquisition methods
 | [LeetDMA](https://github.com/ufrisk/pcileech-fpga)                                | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | USB-C | 190MB/s  | Yes | Yes | 💖 |
 | [AC701/FT601](https://github.com/ufrisk/pcileech-fpga/tree/master/ac701_ft601)    | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | USB3  | 190MB/s  | Yes | Yes |    |
 | USB3380-EVB                                                                       | [USB3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)    | USB3  | 150MB/s  | No  | No  |    |
-| PP3380                                                                            | [USB3380](https://github.com/ufrisk/LeechCore/wiki/Device_USB3380)    | USB3  | 150MB/s  | No  | No  |    |
 | DMA patched HP iLO                                                                | [BMC](https://github.com/ufrisk/LeechCore/wiki/Device_RawTCP)         | TCP   |  1MB/s   | Yes | No  |    |
 
 ### Software based memory aqusition methods:
@@ -303,6 +302,7 @@ v4.1
 * Unlock signatures updated.
 * `-psname` option added.
 
-Latest:
+[v4.19](https://github.com/ufrisk/pcileech/releases/tag/v4.19)
 * Linux stability improvements and kernel module loading enhancements.
 * Linux clang compilation support.
+* macOS support.

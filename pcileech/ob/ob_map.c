@@ -12,7 +12,7 @@
 // of the set with ObMap_Get/ObMap_GetNext may fail.
 // The ObMap is an object manager object and must be DECREF'ed when required.
 //
-// (c) Ulf Frisk, 2019-2023
+// (c) Ulf Frisk, 2019-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "ob.h"

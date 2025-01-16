@@ -14,3 +14,4 @@
 *.obj
 *.so
 *.zip
+*.dylib
