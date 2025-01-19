@@ -11,25 +11,48 @@ CFLAGS += -mmacosx-version-min=11.0
 LDFLAGS += -ldl -L. ./leechcore.dylib ./vmm.dylib
 LDFLAGS += -Wl,-rpath,@loader_path
 LDFLAGS += -mmacosx-version-min=11.0
+
 DEPS = pcileech.h
 OBJ  = oscompatibility.o charutil.o device.o pcileech.o executor.o extra.o help.o kmd.o memdump.o mempatch.o statistics.o umd.o util.o vfslist.o vfs.o vmmx.o ob/ob_cachemap.o ob/ob_core.o ob/ob_map.o ob/ob_set.o
 
-%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+# ARCH SPECIFIC FLAGS:
+CFLAGS_X86_64  = $(CFLAGS) -arch x86_64
+CFLAGS_ARM64   = $(CFLAGS) -arch arm64
+LDFLAGS_X86_64 = $(LDFLAGS) -arch x86_64
+LDFLAGS_ARM64  = $(LDFLAGS) -arch arm64
+OBJ_X86_64 = $(OBJ:.o=.o.x86_64)
+OBJ_ARM64  = $(OBJ:.o=.o.arm64)
 
-pcileech: $(OBJ)
+all: pcileech
+
+%.o.x86_64: %.c $(DEPS)
+	$(CC) $(CFLAGS_X86_64) -c -o $@ $<
+
+%.o.arm64: %.c $(DEPS)
+	$(CC) $(CFLAGS_ARM64) -c -o $@ $<
+
+pcileech_x86_64: $(OBJ_X86_64)
 	cp ../files/vmm.dylib . || cp ../../MemProcFS*/files/vmm.dylib . || true
 	cp ../files/leechcore.dylib . || cp ../../LeechCore*/files/leechcore.dylib . || true
-	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
+	$(CC) $(LDFLAGS_X86_64) -o $@ $^
+
+pcileech_arm64: $(OBJ_ARM64)
+	cp ../files/vmm.dylib . || cp ../../MemProcFS*/files/vmm.dylib . || true
+	cp ../files/leechcore.dylib . || cp ../../LeechCore*/files/leechcore.dylib . || true
+	$(CC) $(LDFLAGS_ARM64) -o $@ $^
+
+pcileech: pcileech_x86_64 pcileech_arm64
+	lipo -create -output pcileech pcileech_x86_64 pcileech_arm64
+	install_name_tool -id @rpath/pcileech pcileech
 	mv pcileech ../files/ |true
 	mv vmm.dylib ../files/ |true
 	mv leechcore.dylib ../files/ |true
-	rm -f *.o || true
-	rm -f */*.o || true
+	rm -f *.o *.o.x86_64 *.o.arm64 || true
+	rm -f */*.o */*.o.x86_64 */*.o.arm64 || true
 	rm -f *.dylib || true
 	true
 
 clean:
-	rm -f *.o || true
-	rm -f */*.o || true
+	rm -f *.o *.o.x86_64 *.o.arm64 || true
+	rm -f */*.o */*.o.x86_64 */*.o.arm64 || true
 	rm -f *.dylib || true
