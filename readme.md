@@ -132,12 +132,6 @@ Dump remote memory from a remote LeechAgent using connection encrypted and mutua
 Execute the Python analysis script `find-rwx.py` on a remote computer using the LeechAgent embedded Python environment.
 * ` pcileech.exe agent-execpy -in find-rwx.py -device pmem -remote rpc://computer$@ad.contoso.com `
 
-Dump memory using the the reported "TotalMeltdown" [Windows 7/2008R2 x64 PML4 page table permission vulnerability](https://blog.frizk.net/2018/03/total-meltdown.html).
-* ` pcileech.exe dump -out memdump_win7.raw -device totalmeltdown -v -force `
-
-Insert a kernel module into a running Linux system remotely via a [DMA patched HP iLO](https://www.synacktiv.com/posts/exploit/using-your-bmc-as-a-dma-device-plugging-pcileech-to-hpe-ilo-4.html).
-* ` pcileech.exe kmdload -vvv -device -device RawTCP://127.0.0.1:8888 -kmd LINUX_X64_48 `
-
 Patch virtual process memory of pid 432 (lsass.exe in this example).
 * ` pcileech.exe patch -pid 432 -sig unlock_win10x64.sig `
 
@@ -145,9 +139,6 @@ Limitations/Known Issues:
 =========================
 * Does not work if the OS uses the IOMMU/VT-d. This is the default on macOS (unless disabled in recovery mode). Windows 10/11 with Virtualization based security features enabled does not work fully.
 * Recent Windows and Linux versions block DMA by default.
-* Some Linux kernels does not work. Sometimes a required symbol is not exported in the kernel and PCILeech fails.
-* File system mount support only exists for Windows (Linux version is planned).
-* Remote connectivity support only exists for Windows.
 
 
 
@@ -306,3 +297,7 @@ v4.1
 * Linux stability improvements and kernel module loading enhancements.
 * Linux clang compilation support.
 * macOS support.
+
+Latest:
+* Bug fixes.
+* Linux LeechAgent support using gRPC (LeechCore v2.21).
