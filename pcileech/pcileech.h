@@ -111,6 +111,7 @@ typedef struct tdConfig {
     BOOL fAddrKMDSetByArgument;
     BOOL fLoop;
     BOOL fUserInteract;
+    BOOL fNoKmdMem;
     BOOL fBarZeroReadOnly;
     BOOL fBarZeroReadWrite;
 } CONFIG, *PCONFIG;

@@ -75,6 +75,9 @@ BOOL DeviceOpen2_SetCustomMemMap()
     FILE *hFile = NULL;
     DWORD cb;
     PBYTE pb = NULL, pbResult = NULL;
+    if(0 == _stricmp("none", ctxMain->cfg.szMemMap)) {
+        return TRUE;
+    }
     if(!(pb = LocalAlloc(LMEM_ZEROINIT, 0x01000000))) { goto fail; }
     if(0 == _stricmp("auto", ctxMain->cfg.szMemMap)) {
         if(!Vmmx_Initialize(FALSE, TRUE)) { goto fail; }
@@ -219,7 +222,7 @@ BOOL DeviceOpen()
 _Success_(return)
 BOOL DeviceWriteMEM(_In_ QWORD qwAddr, _In_ DWORD cb, _In_reads_(cb) PBYTE pb, _In_ BOOL fRetryOnFail)
 {
-    if(ctxMain->phKMD) {
+    if(ctxMain->phKMD && !ctxMain->cfg.fNoKmdMem) {
         return KMDWriteMemory(qwAddr, pb, cb);
     }
     return LcWrite(ctxMain->hLC, qwAddr, cb, pb) || (fRetryOnFail && LcWrite(ctxMain->hLC, qwAddr, cb, pb));
@@ -228,7 +231,7 @@ BOOL DeviceWriteMEM(_In_ QWORD qwAddr, _In_ DWORD cb, _In_reads_(cb) PBYTE pb, _
 _Success_(return)
 BOOL DeviceReadMEM(_In_ QWORD qwAddr, _In_ DWORD cb, _Out_writes_(cb) PBYTE pb, _In_ BOOL fRetryOnFail)
 {
-    if(ctxMain->phKMD) {
+    if(ctxMain->phKMD && !ctxMain->cfg.fNoKmdMem) {
         return KMDReadMemory(qwAddr, pb, cb);
     }
     return LcRead(ctxMain->hLC, qwAddr, cb, pb) || (fRetryOnFail && LcRead(ctxMain->hLC, qwAddr, cb, pb));

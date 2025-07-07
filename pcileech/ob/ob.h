@@ -100,7 +100,7 @@ PVOID Ob_AllocEx(_In_opt_ VMM_HANDLE H, _In_ DWORD tag, _In_ UINT uFlags, _In_ S
 * -- pfnRef_1 = optional callback for when object reach refcount = 1 at DECREF.
 * -- return = allocated object on success, with refcount = 1, - NULL on fail.
 */
-inline PVOID Ob_Alloc(_In_ DWORD tag, _In_ UINT uFlags, _In_ SIZE_T uBytes, _In_opt_ OB_CLEANUP_CB pfnRef_0, _In_opt_ OB_CLEANUP_CB pfnRef_1)
+__forceinline PVOID Ob_Alloc(_In_ DWORD tag, _In_ UINT uFlags, _In_ SIZE_T uBytes, _In_opt_ OB_CLEANUP_CB pfnRef_0, _In_opt_ OB_CLEANUP_CB pfnRef_1)
 {
     return Ob_AllocEx(NULL, tag, uFlags, uBytes, pfnRef_0, pfnRef_1);
 }
@@ -462,6 +462,16 @@ BOOL ObMap_Push(_In_opt_ POB_MAP pm, _In_ QWORD qwKey, _In_ PVOID pvObject);
 */
 _Success_(return)
 BOOL ObMap_PushCopy(_In_opt_ POB_MAP pm, _In_ QWORD qwKey, _In_ PVOID pvObject, _In_ SIZE_T cbObject);
+
+/*
+* Push / Insert all objects in pmSrc to pmDst using the same key and value.
+* NB! only valid for OB_MAP_FLAGS_OBJECT_OB and OB_MAP_FLAGS_OBJECT_VOID maps.
+* -- pmDst
+* -- pmSrc
+* -- return = TRUE on success, FALSE otherwise.
+*/
+_Success_(return)
+BOOL ObMap_PushAll(_In_opt_ POB_MAP pmDst, _In_ POB_MAP pmSrc);
 
 /*
 * Remove the "last" object.
@@ -842,6 +852,10 @@ typedef struct tdOB_STRMAP *POB_STRMAP;
 // incompatible with OB_STRMAP_FLAGS_STR_ASSIGN_TEMPORARY option.
 #define OB_STRMAP_FLAGS_STR_ASSIGN_OFFSET      0x04
 
+// Read UNICODE OBJECT data from another process than SYSTEM (4).
+// PID is specified in flags high 32-bits.
+#define OB_STRMAP_FLAGS_WITH_PROCESS_PID       0x08
+
 //
 // STRMAP BELOW:
 //
@@ -853,7 +867,7 @@ typedef struct tdOB_STRMAP *POB_STRMAP;
 * -- return = TRUE on insertion, FALSE otherwise.
 */
 _Success_(return)
-BOOL ObStrMap_PushU(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR usz);
+BOOL ObStrMap_PushU(_In_opt_ POB_STRMAP psm, _In_opt_ LPCSTR usz);
 
 /*
 * Push / Insert into the ObStrMap.
@@ -862,7 +876,7 @@ BOOL ObStrMap_PushU(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR usz);
 * -- return = TRUE on insertion, FALSE otherwise.
 */
 _Success_(return)
-BOOL ObStrMap_PushA(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR sz);
+BOOL ObStrMap_PushA(_In_opt_ POB_STRMAP psm, _In_opt_ LPCSTR sz);
 
 /*
 * Push / Insert into the ObStrMap.
@@ -871,7 +885,7 @@ BOOL ObStrMap_PushA(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR sz);
 * -- return = TRUE on insertion, FALSE otherwise.
 */
 _Success_(return)
-BOOL ObStrMap_PushW(_In_opt_ POB_STRMAP psm, _In_opt_ LPWSTR wsz);
+BOOL ObStrMap_PushW(_In_opt_ POB_STRMAP psm, _In_opt_ LPCWSTR wsz);
 
 /*
 * Push / Insert into the ObStrMap.
@@ -882,7 +896,7 @@ BOOL ObStrMap_PushW(_In_opt_ POB_STRMAP psm, _In_opt_ LPWSTR wsz);
 * -- return = TRUE on insertion, FALSE otherwise.
 */
 _Success_(return)
-BOOL ObStrMap_PushPtrUU(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR usz, _Out_opt_ LPSTR *puszDst, _Out_opt_ PDWORD pcbuDst);
+BOOL ObStrMap_PushPtrUU(_In_opt_ POB_STRMAP psm, _In_opt_ LPCSTR usz, _Out_opt_ LPSTR *puszDst, _Out_opt_ PDWORD pcbuDst);
 
 /*
 * Push / Insert into the ObStrMap.
@@ -893,7 +907,7 @@ BOOL ObStrMap_PushPtrUU(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR usz, _Out_opt_ L
 * -- return = TRUE on insertion, FALSE otherwise.
 */
 _Success_(return)
-BOOL ObStrMap_PushPtrAU(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR sz, _Out_opt_ LPSTR *puszDst, _Out_opt_ PDWORD pcbuDst);
+BOOL ObStrMap_PushPtrAU(_In_opt_ POB_STRMAP psm, _In_opt_ LPCSTR sz, _Out_opt_ LPSTR *puszDst, _Out_opt_ PDWORD pcbuDst);
 
 /*
 * Push / Insert into the ObStrMap.
@@ -904,7 +918,7 @@ BOOL ObStrMap_PushPtrAU(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR sz, _Out_opt_ LP
 * -- return = TRUE on insertion, FALSE otherwise.
 */
 _Success_(return)
-BOOL ObStrMap_PushPtrWU(_In_opt_ POB_STRMAP psm, _In_opt_ LPWSTR wsz, _Out_opt_ LPSTR *puszDst, _Out_opt_ PDWORD pcbuDst);
+BOOL ObStrMap_PushPtrWU(_In_opt_ POB_STRMAP psm, _In_opt_ LPCWSTR wsz, _Out_opt_ LPSTR *puszDst, _Out_opt_ PDWORD pcbuDst);
 
 /*
 * Push / Insert into the ObStrMap.
@@ -915,7 +929,7 @@ BOOL ObStrMap_PushPtrWU(_In_opt_ POB_STRMAP psm, _In_opt_ LPWSTR wsz, _Out_opt_ 
 * -- return = TRUE on insertion, FALSE otherwise.
 */
 _Success_(return)
-BOOL ObStrMap_PushPtrUW(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR usz, _Out_opt_ LPWSTR *pwszDst, _Out_opt_ PDWORD pcbwDst);
+BOOL ObStrMap_PushPtrUW(_In_opt_ POB_STRMAP psm, _In_opt_ LPCSTR usz, _Out_opt_ LPWSTR *pwszDst, _Out_opt_ PDWORD pcbwDst);
 
 /*
 * Push / Insert into the ObStrMap.
@@ -926,7 +940,7 @@ BOOL ObStrMap_PushPtrUW(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR usz, _Out_opt_ L
 * -- return = TRUE on insertion, FALSE otherwise.
 */
 _Success_(return)
-BOOL ObStrMap_PushPtrWW(_In_opt_ POB_STRMAP psm, _In_opt_ LPWSTR wsz, _Out_opt_ LPWSTR *pwszDst, _Out_opt_ PDWORD pcbwDst);
+BOOL ObStrMap_PushPtrWW(_In_opt_ POB_STRMAP psm, _In_opt_ LPCWSTR wsz, _Out_opt_ LPWSTR *pwszDst, _Out_opt_ PDWORD pcbwDst);
 
 /*
 * Push / Insert into the ObStrMap. Result pointer is dependant on fWideChar flag.
@@ -938,7 +952,7 @@ BOOL ObStrMap_PushPtrWW(_In_opt_ POB_STRMAP psm, _In_opt_ LPWSTR wsz, _Out_opt_ 
 * -- return = TRUE on insertion, FALSE otherwise.
 */
 _Success_(return)
-BOOL ObStrMap_PushPtrUXUW(_In_opt_ POB_STRMAP psm, _In_opt_ LPSTR usz, _Out_opt_ LPSTR *puszDst, _Out_opt_ PDWORD pcbuDst, BOOL fWideChar);
+BOOL ObStrMap_PushPtrUXUW(_In_opt_ POB_STRMAP psm, _In_opt_ LPCSTR usz, _Out_opt_ LPSTR *puszDst, _Out_opt_ PDWORD pcbuDst, BOOL fWideChar);
 
 /*
 * Push a UNICODE_OBJECT Pointer for delayed resolve at finalize stage.
@@ -1099,7 +1113,7 @@ POB_COMPRESSED ObCompressed_NewFromByte(_In_opt_ VMM_HANDLE H, _In_opt_ POB_CACH
 * -- return
 */
 _Success_(return != NULL)
-POB_COMPRESSED ObCompress_NewFromStrA(_In_opt_ VMM_HANDLE H, _In_opt_ POB_CACHEMAP pcmg, _In_ LPSTR sz);
+POB_COMPRESSED ObCompress_NewFromStrA(_In_opt_ VMM_HANDLE H, _In_opt_ POB_CACHEMAP pcmg, _In_ LPCSTR sz);
 
 /*
 * Retrieve the uncompressed size of the compressed data object.
@@ -1167,7 +1181,7 @@ BOOL ObMemFile_Append(_In_opt_ POB_MEMFILE pmf, _In_reads_(cb) PBYTE pb, _In_ QW
 * -- return
 */
 _Success_(return)
-BOOL ObMemFile_AppendString(_In_opt_ POB_MEMFILE pmf, _In_opt_z_ LPSTR sz);
+BOOL ObMemFile_AppendString(_In_opt_ POB_MEMFILE pmf, _In_opt_z_ LPCSTR sz);
 
 /*
 * Append a string (ansi or utf-8) to the ObMemFile.
@@ -1177,7 +1191,7 @@ BOOL ObMemFile_AppendString(_In_opt_ POB_MEMFILE pmf, _In_opt_z_ LPSTR sz);
 * -- return = the number of bytes appended (excluding terminating null).
 */
 _Success_(return != 0)
-SIZE_T ObMemFile_AppendStringEx(_In_opt_ POB_MEMFILE pmf, _In_z_ _Printf_format_string_ LPSTR uszFormat, ...);
+SIZE_T ObMemFile_AppendStringEx(_In_opt_ POB_MEMFILE pmf, _In_z_ _Printf_format_string_ LPCSTR uszFormat, ...);
 
 /*
 * Append a string (ansi or utf-8) to the ObMemFile.
@@ -1187,7 +1201,7 @@ SIZE_T ObMemFile_AppendStringEx(_In_opt_ POB_MEMFILE pmf, _In_z_ _Printf_format_
 * -- return = the number of bytes appended (excluding terminating null).
 */
 _Success_(return != 0)
-SIZE_T ObMemFile_AppendStringEx2(_In_opt_ POB_MEMFILE pmf, _In_z_ _Printf_format_string_ LPSTR uszFormat, _In_ va_list arglist);
+SIZE_T ObMemFile_AppendStringEx2(_In_opt_ POB_MEMFILE pmf, _In_z_ _Printf_format_string_ LPCSTR uszFormat, _In_ va_list arglist);
 
 /*
 * Read data 'as file' from the ObMemFile.

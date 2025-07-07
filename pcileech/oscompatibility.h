@@ -170,6 +170,7 @@ typedef int(*_CoreCrtNonSecureSearchSortCompareFunction)(void const*, void const
 #define _When_(x,y)
 #define _Writable_bytes_(x)
 
+#define __forceinline                       inline __attribute__((always_inline))
 #define WINAPI
 #define UNREFERENCED_PARAMETER(x)           (void)(x)
 

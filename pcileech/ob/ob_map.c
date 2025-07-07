@@ -277,9 +277,9 @@ PVOID _ObMap_GetNextByKey(_In_ POB_MAP pm, _In_ QWORD qwKey, _In_opt_ PVOID pvOb
 PVOID _ObMap_GetNextByIndex(_In_ POB_MAP pm, _Inout_ PDWORD pdwIndex, _In_opt_ PVOID pvObject)
 {
     if(pvObject) {
-        *pdwIndex = pm->c - 1;
-    } else {
         *pdwIndex = *pdwIndex - 1;
+    } else {
+        *pdwIndex = pm->c - 1;
     }
     if(pm->fObjectsOb) { Ob_DECREF(pvObject); }
     return _ObMap_GetByEntryIndex(pm, *pdwIndex);
@@ -844,16 +844,20 @@ BOOL _ObMap_Push(_In_ POB_MAP pm, _In_ QWORD qwKey, _In_ PVOID pvObject)
     if(!pm->Directory[OB_MAP_INDEX_DIRECTORY(iEntry)][OB_MAP_INDEX_TABLE(iEntry)]) {    // allocate "store" if required
         if(!(pm->Directory[OB_MAP_INDEX_DIRECTORY(iEntry)][OB_MAP_INDEX_TABLE(iEntry)] = LocalAlloc(LMEM_ZEROINIT, sizeof(OB_MAP_ENTRY) * OB_MAP_ENTRIES_STORE))) { return FALSE; }
     }
-    if(pm->fObjectsOb) {
-        Ob_INCREF(pvObject);
-    }
     pm->c++;
-    pe = _ObMap_GetFromIndex(pm, iEntry);
-    pe->k = qwKey;
-    pe->v = pvObject;
-    _ObMap_InsertHash(pm, TRUE, iEntry);
-    _ObMap_InsertHash(pm, FALSE, iEntry);
-    return TRUE;
+    if((pe = _ObMap_GetFromIndex(pm, iEntry))) {
+        if(pm->fObjectsOb) {
+            Ob_INCREF(pvObject);
+        }
+        pe->k = qwKey;
+        pe->v = pvObject;
+        _ObMap_InsertHash(pm, TRUE, iEntry);
+        _ObMap_InsertHash(pm, FALSE, iEntry);
+        return TRUE;
+    } else {
+        pm->c--;
+        return FALSE;
+    }
 }
 
 _Success_(return)
@@ -866,6 +870,21 @@ BOOL _ObMap_PushCopy(_In_ POB_MAP pm, _In_ QWORD qwKey, _In_ PVOID pvObject, _In
     if(_ObMap_Push(pm, qwKey, pvObjectCopy)) { return TRUE; }
     LocalFree(pvObjectCopy);
     return FALSE;
+}
+
+_Success_(return)
+BOOL _ObMap_PushAll(_In_ POB_MAP pm, _In_ POB_MAP pmSrc)
+{
+    DWORD i;
+    POB_MAP_ENTRY pe;
+    if(!pmSrc || (pm == pmSrc) || (pm->fObjectsOb != pmSrc->fObjectsOb) || pm->fObjectsLocalFree || pmSrc->fObjectsLocalFree) { return FALSE; }
+    AcquireSRWLockShared(&pmSrc->LockSRW);
+    for(i = 1; i < pmSrc->c; i++) {
+        pe = _ObMap_GetFromIndex(pmSrc, i);
+        _ObMap_Push(pm, pe->k, pe->v);
+    }
+    ReleaseSRWLockShared(&pmSrc->LockSRW);
+    return TRUE;
 }
 
 /*
@@ -896,6 +915,19 @@ _Success_(return)
 BOOL ObMap_PushCopy(_In_opt_ POB_MAP pm, _In_ QWORD qwKey, _In_ PVOID pvObject, _In_ SIZE_T cbObject)
 {
     OB_MAP_CALL_SYNCHRONIZED_IMPLEMENTATION_WRITE(pm, BOOL, FALSE, _ObMap_PushCopy(pm, qwKey, pvObject, cbObject))
+}
+
+/*
+* Push / Insert all objects in pmSrc to pmDst using the same key and value.
+* NB! only valid for OB_MAP_FLAGS_OBJECT_OB and OB_MAP_FLAGS_OBJECT_VOID maps.
+* -- pmDst
+* -- pmSrc
+* -- return = TRUE on success, FALSE otherwise.
+*/
+_Success_(return)
+BOOL ObMap_PushAll(_In_opt_ POB_MAP pmDst, _In_ POB_MAP pmSrc)
+{
+    OB_MAP_CALL_SYNCHRONIZED_IMPLEMENTATION_WRITE(pmDst, BOOL, FALSE, _ObMap_PushAll(pmDst, pmSrc))
 }
 
 /*

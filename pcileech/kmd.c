@@ -2123,7 +2123,7 @@ BOOL KMDOpen()
         return KMDOpen_HalHijack();
     } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "WIN10_X64_2")) {
         return KMDOpen_WINX64_2_VMM();
-    } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "WIN10_X64_3")) {
+    } else if((0 == _stricmp(ctxMain->cfg.szKMDName, "WIN10_X64_3")) || (0 == _stricmp(ctxMain->cfg.szKMDName, "WIN11_X64"))) {
         return KMDOpen_WINX64_3_VMM();
     } else if(0 == _stricmp(ctxMain->cfg.szKMDName, "LINUX_X64_EFI")) {
         return KMDOpen_LinuxEfiRuntimeServicesHijack();

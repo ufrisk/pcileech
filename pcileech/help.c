@@ -148,12 +148,16 @@ VOID Help_ShowGeneral()
         "          to use MemProcFS (Windows required on target&host)                   \n" \
         "          example: -memmap c:\\temp\\my_custom_memory_map.txt                  \n" \
         "          example: -memmap auto                                                \n" \
+        "   -no-kmd-mem : do not proxy memory reads/writes through an inserted KMD even \n" \
+        "          if inserted. This may somtimes increase stability and performance.   \n" \
+        "          Option has no value. Example: -no-kmd-mem                            \n" \
         "   -kmd : address of already loaded kernel module helper (KMD).                \n" \
         "          ALTERNATIVELY                                                        \n" \
         "          kernel module to use, see list below for choices:                    \n" \
         "             WIN10_X64                                                         \n" \
         "             WIN10_X64_2                                                       \n" \
         "             WIN10_X64_3                                                       \n" \
+        "             WIN11_X64                                                         \n" \
         "             LINUX_X64_46        (NB! Kernels 2.6.33 - 4.6)                    \n" \
         "             LINUX_X64_48        (NB! Kernels 4.8+)                            \n" \
         "             LINUX_X64_MAP       (NB! Linux systems with System.map in -in arg)\n" \

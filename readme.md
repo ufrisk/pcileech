@@ -301,3 +301,5 @@ v4.1
 Latest:
 * Bug fixes.
 * Linux LeechAgent support using gRPC (LeechCore v2.21).
+* Add: `-no-kmd-mem` option to optionally disable KMD memory access when KMD is loaded (may be useful for stability reasons in some cases).
+* Add: `-kmd WIN11_X64` - Windows 11 KMD signature (alias for WIN10_X64_3).

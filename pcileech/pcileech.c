@@ -149,6 +149,10 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             ctxMain->cfg.fUserInteract = FALSE;
             i++;
             continue;
+        } else if(0 == strcmp(argv[i], "-no-kmd-mem")) {
+            ctxMain->cfg.fNoKmdMem = TRUE;
+            i++;
+            continue;
         } else if(i + 1 >= argc) {
             return FALSE;
         } else if(0 == strcmp(argv[i], "-min")) {
@@ -495,6 +499,7 @@ int main(_In_ int argc, _In_ char* argv[])
     ExitProcess(0);
 #else /* LINUX || MACOS */
     __try {
+
         ExitProcess(0);
     } __except(EXCEPTION_EXECUTE_HANDLER) { ; }
 #endif /* LINUX || MACOS */
