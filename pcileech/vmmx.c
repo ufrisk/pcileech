@@ -31,8 +31,18 @@ BOOL Vmmx_Initialize(_In_ BOOL fRefresh,  _In_ BOOL fMemMapAuto)
 {
     DWORD cParams = 3;
     LPCSTR szParams[] = { "", "-device", "existing", "", "", "" };
+    LPSTR uszLicensedTo = NULL;
+    BOOL fGPL;
 
     if(!ctxMain->hVMM) {
+        uszLicensedTo = VMMDLL_LicensedTo();
+        fGPL = uszLicensedTo && strstr(uszLicensedTo, "General Public License") != NULL;
+        VMMDLL_MemFree(uszLicensedTo);
+        if(!fGPL) {
+            printf("[CRITICAL] License mis-match. Terminating.\n");
+            exit(1);
+            return FALSE;
+        }
         if(fRefresh) {
             szParams[cParams++] = "-norefresh";
         }

@@ -11,7 +11,7 @@
 // (c) Ulf Frisk, 2018-2025
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 5.14
+// Header Version: 5.15
 //
 
 #include "leechcore.h"
@@ -3015,6 +3015,14 @@ BOOL VMMDLL_UtilFillHexAscii(
     _Out_writes_opt_(*pcsz) LPSTR sz,
     _Inout_ PDWORD pcsz
 );
+
+/*
+* Retrieve license information - Licensed To.
+* -- CALLER FREE: VMMDLL_MemFree(return)
+* -- return = NULL on fail, otherwise a string that must be free'd by caller.
+*/
+EXPORTED_FUNCTION _Success_(return != NULL)
+LPSTR VMMDLL_LicensedTo();
 
 
 

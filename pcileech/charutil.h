@@ -18,6 +18,7 @@ typedef unsigned __int64                QWORD, *PQWORD;
 #define CHARUTIL_FLAG_TRUNCATE                  0x0002
 #define CHARUTIL_FLAG_TRUNCATE_ONFAIL_NULLSTR   0x0006
 #define CHARUTIL_FLAG_STR_BUFONLY               0x0008
+#define CHARUTIL_FLAG_BAD_UTF8CP_SOFTFAIL       0x0010
 
 /*
 * Check whether a string is an ansi-string (only codepoints between 0-127).
@@ -271,6 +272,23 @@ DWORD CharUtil_FixFsName(
 );
 
 /*
+* Replace illegal characters in a text with a character of the users choosing.
+* The result is returned as a utf-8 string.
+* -- uszOut
+* -- cbuDst
+* -- usz
+* -- sz
+* -- wsz
+* -- cwsz
+* -- cch = number of bytes/wchars in usz/sz/wsz or _TRUNCATE
+* -- chReplace = character to replace illegal characters with.
+* -- chAllowArray = array of 0(illegal char) or 1(allowed char) for each character in the 0-127 range.
+* -- return = number of bytes written (including terminating NULL).
+*/
+_Success_(return != 0)
+DWORD CharUtil_ReplaceMultiple(_Out_writes_(cbuDst) LPSTR uszOut, _In_ DWORD cbuDst, _In_opt_ LPCSTR usz, _In_opt_ LPCSTR sz, _In_opt_ LPCWSTR wsz, _In_ DWORD cch, _In_ CHAR chAllowArray[128], _In_ CHAR chNew);
+
+/*
 * Replace all characters in a string.
 * -- sz
 * -- chOld
@@ -436,6 +454,16 @@ BOOL CharUtil_StrStartsWith(_In_opt_ LPCSTR usz, _In_opt_ LPCSTR uszStartsWith, 
 * -- return
 */
 BOOL CharUtil_StrEquals(_In_opt_ LPCSTR usz, _In_opt_ LPCSTR usz2, _In_ BOOL fCaseInsensitive);
+
+/*
+* Checks if a string contains a certain substring, if found return the pointer
+* to the 1st start of the substring in the original string.
+* -- usz
+* -- uszNeedle
+* -- fCaseInsensitive
+* -- return = pointer to the start of the substring in usz, or NULL if not found.
+*/
+LPCSTR CharUtil_StrContains(_In_opt_ LPCSTR usz, _In_opt_ LPCSTR uszSubString, _In_ BOOL fCaseInsensitive);
 
 /*
 * Compare a wide-char string to a utf-8 string.
