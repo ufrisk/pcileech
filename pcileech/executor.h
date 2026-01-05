@@ -1,6 +1,6 @@
 // executor.h : definitions related to 'code execution' and 'console redirect' functionality.
 //
-// (c) Ulf Frisk, 2016-2025
+// (c) Ulf Frisk, 2016-2026
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __EXECUTOR_H__

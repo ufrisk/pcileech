@@ -8,10 +8,10 @@
 // while Linux may only access UTF-8 versions. Some functionality may also
 // be degraded or unavailable on Linux.
 //
-// (c) Ulf Frisk, 2018-2025
+// (c) Ulf Frisk, 2018-2026
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 5.15
+// Header Version: 5.16.5
 //
 
 #include "leechcore.h"
@@ -232,6 +232,20 @@ VOID VMMDLL_MemFree(_Frees_ptr_opt_ PVOID pvMem);
 #define VMMDLL_OPT_REFRESH_FREQ_FAST                    0x2001040000000000  // W - refresh fast frequency - incl. partial process refresh
 #define VMMDLL_OPT_REFRESH_FREQ_MEDIUM                  0x2001000100000000  // W - refresh medium frequency - incl. full process refresh
 #define VMMDLL_OPT_REFRESH_FREQ_SLOW                    0x2001001000000000  // W - refresh slow frequency.
+
+#define VMMDLL_OPT_REFRESH_SPECIFIC_HEAP_ALLOC          0x2003000100000000  // W - refresh only heap allocations.
+#define VMMDLL_OPT_REFRESH_SPECIFIC_KOBJECT             0x2003000200000000  // W - refresh only kernel objects.
+#define VMMDLL_OPT_REFRESH_SPECIFIC_NET                 0x2003000300000000  // W - refresh only network connections.
+#define VMMDLL_OPT_REFRESH_SPECIFIC_PFN                 0x2003000400000000  // W - refresh only pfn database.
+#define VMMDLL_OPT_REFRESH_SPECIFIC_PHYSMEMMAP          0x2003000500000000  // W - refresh only physical memory map.
+#define VMMDLL_OPT_REFRESH_SPECIFIC_POOL                0x2003000600000000  // W - refresh only kernel pool.
+#define VMMDLL_OPT_REFRESH_SPECIFIC_REGISTRY            0x2003000700000000  // W - refresh only registry.
+#define VMMDLL_OPT_REFRESH_SPECIFIC_SERVICES            0x2003000800000000  // W - refresh only services.
+#define VMMDLL_OPT_REFRESH_SPECIFIC_THREADCS            0x2003000900000000  // W - refresh only thread callstacks.
+#define VMMDLL_OPT_REFRESH_SPECIFIC_USER                0x2003000A00000000  // W - refresh only users.
+#define VMMDLL_OPT_REFRESH_SPECIFIC_VM                  0x2003000B00000000  // W - refresh only virtual machines.
+
+#define VMMDLL_OPT_REFRESH_SPECIFIC_PROCESS             0x2002000300000000  // W - refresh only the specified process [LO-DWORD: Process PID]
 
 // PROCESS OPTIONS: [LO-DWORD: Process PID]
 #define VMMDLL_OPT_PROCESS_DTB                          0x2002000100000000  // W - force set process directory table base.
@@ -751,6 +765,30 @@ VOID VMMDLL_LogEx(
     va_list arglist
 );
 
+/*
+* Log callback function.
+* -- hVMM
+* -- MID = module id.
+* -- uszModule = module name.
+* -- dwLogLevel
+* -- uszLogMessage = log message in utf-8.
+*/
+typedef VOID(*VMMDLL_LOG_CALLBACK_PFN)(_In_ VMM_HANDLE hVMM, _In_ VMMDLL_MODULE_ID MID, _In_ LPCSTR uszModule, _In_ VMMDLL_LOGLEVEL dwLogLevel, _In_ LPCSTR uszLogMessage);
+
+/*
+* Register or unregister an optional log callback function.
+* When vmm logs an action which is visible according to current logging
+* configuration the registered callback function will be called with details.
+* To clear an already registered callback function specify NULL as pfnCB.
+* Callback logging will follow file logging configuration even if no log file
+* is specified when a callback function is registered.
+* -- hVMM
+* -- pfnCB
+* -- return = success/fail.
+*/
+EXPORTED_FUNCTION _Success_(return)
+BOOL VMMDLL_LogCallback(_In_ VMM_HANDLE hVMM, _In_opt_ VMMDLL_LOG_CALLBACK_PFN pfnCB);
+
 
 
 //-----------------------------------------------------------------------------
@@ -1057,7 +1095,7 @@ typedef enum tdVMMDLL_MEM_CALLBACK_TP {
 typedef VOID(*VMMDLL_MEM_CALLBACK_PFN)(_In_opt_ PVOID ctxUser, _In_ DWORD dwPID, _In_ DWORD cpMEMs, _In_ PPMEM_SCATTER ppMEMs);
 
 /*
-* Register or unregister am optional memory access callback function.
+* Register or unregister an optional memory access callback function.
 * It's possible to have one callback function registered for each type.
 * To clear an already registered callback function specify NULL as pfnCB.
 * -- hVMM

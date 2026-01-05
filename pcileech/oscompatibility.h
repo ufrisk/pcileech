@@ -1,6 +1,6 @@
 // oscompatibility.h : pcileech windows/linux compatibility layer.
 //
-// (c) Ulf Frisk, 2017-2025
+// (c) Ulf Frisk, 2017-2026
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __OSCOMPATIBILITY_H__

@@ -1,6 +1,6 @@
 // pcileech.h : definitions for pcileech - dump memory and unlock computers with a USB3380 device using DMA.
 //
-// (c) Ulf Frisk, 2016-2025
+// (c) Ulf Frisk, 2016-2026
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #ifndef __PCILEECH_H__

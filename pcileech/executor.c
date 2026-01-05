@@ -1,6 +1,6 @@
 // executor.c : implementation related 'code execution' and 'console redirect' functionality.
 //
-// (c) Ulf Frisk, 2016-2025
+// (c) Ulf Frisk, 2016-2026
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "executor.h"

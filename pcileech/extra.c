@@ -1,6 +1,6 @@
 // extra.c : implementation related various extra functionality such as exploits.
 //
-// (c) Ulf Frisk, 2016-2025
+// (c) Ulf Frisk, 2016-2026
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "extra.h"

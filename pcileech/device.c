@@ -1,6 +1,6 @@
 // device.c : implementation related to hardware devices.
 //
-// (c) Ulf Frisk, 2016-2025
+// (c) Ulf Frisk, 2016-2026
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include <leechcore.h>

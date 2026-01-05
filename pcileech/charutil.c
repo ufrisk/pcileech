@@ -1,6 +1,6 @@
 // charutil.c : implementation of various character/string utility functions.
 //
-// (c) Ulf Frisk, 2021-2025
+// (c) Ulf Frisk, 2021-2026
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "charutil.h"

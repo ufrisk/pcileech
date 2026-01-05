@@ -1,6 +1,6 @@
 // vfs.c : implementation of functions related to virtual file system support.
 //
-// (c) Ulf Frisk, 2017-2025
+// (c) Ulf Frisk, 2017-2026
 // Author: Ulf Frisk, pcileech@frizk.net
 //
 #include "vfs.h"
