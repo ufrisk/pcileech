@@ -52,6 +52,7 @@ Please find a summary of the supported hardware based memory acquisition methods
 | [GBOX](https://github.com/ufrisk/pcileech-fpga-dev/blob/master/GBOX)                       | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)        | OCuLink |  400MB/s | Yes | Yes | 💖 |
 | [LeetDMA](https://github.com/ufrisk/pcileech-fpga)                                         | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | USB-C | 190MB/s  | Yes | Yes | 💖 |
 | [CaptainDMA M2](https://github.com/ufrisk/pcileech-fpga)                                   | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | USB-C | 190MB/s  | Yes | Yes | 💖 |
+| [CaptainDMA&nbsp;M2&nbsp;100T](https://github.com/ufrisk/pcileech-fpga)                    | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | USB-C | 220MB/s  | Yes | Yes | 💖 |
 | [CaptainDMA 4.1th](https://github.com/ufrisk/pcileech-fpga)                                | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | USB-C | 190MB/s  | Yes | Yes | 💖 |
 | [CaptainDMA 75T](https://github.com/ufrisk/pcileech-fpga)                                  | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | USB-C | 200MB/s  | Yes | Yes | 💖 |
 | [CaptainDMA 100T](https://github.com/ufrisk/pcileech-fpga)                                 | [FPGA](https://github.com/ufrisk/LeechCore/wiki/Device_FPGA)          | USB-C | 220MB/s  | Yes | Yes | 💖 |

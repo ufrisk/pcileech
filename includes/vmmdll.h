@@ -11,7 +11,7 @@
 // (c) Ulf Frisk, 2018-2026
 // Author: Ulf Frisk, pcileech@frizk.net
 //
-// Header Version: 5.16.5
+// Header Version: 5.17
 //
 
 #include "leechcore.h"
@@ -423,7 +423,7 @@ EXPORTED_FUNCTION BOOL VMMDLL_VfsList_IsHandleValid(_In_ HANDLE pFileList);
 /*
 * List a directory of files in MemProcFS. Directories and files will be listed
 * by callbacks into functions supplied in the pFileList parameter.
-* If information of an individual file is needed it's neccessary to list all
+* If information of an individual file is needed it's necessary to list all
 * files in its directory.
 * -- hVMM
 * -- [uw]szPath
@@ -1168,7 +1168,7 @@ typedef struct tdVMMDLL_MAP_PTEENTRY {
     QWORD fPage;
     BOOL  fWoW64;
     DWORD _FutureUse1;
-    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependant
+    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependent
     DWORD _Reserved1;
     DWORD cSoftware;    // # software (non active) PTEs in region
 } VMMDLL_MAP_PTEENTRY, *PVMMDLL_MAP_PTEENTRY;
@@ -1197,7 +1197,7 @@ typedef struct tdVMMDLL_MAP_VADENTRY {
     DWORD cbPrototypePte;
     QWORD vaPrototypePte;
     QWORD vaSubsection;
-    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependant
+    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependent
     DWORD _FutureUse1;
     DWORD _Reserved1;
     QWORD vaFileObject;             // only valid if fFile/fImage _and_ after wszText is initialized
@@ -1259,10 +1259,10 @@ typedef struct tdVMMDLL_MAP_MODULEENTRY {
     QWORD vaEntry;
     DWORD cbImageSize;
     BOOL  fWoW64;
-    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependant
+    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependent
     DWORD _Reserved3;
     DWORD _Reserved4;
-    union { LPSTR  uszFullName; LPWSTR wszFullName; };      // U/W dependant
+    union { LPSTR  uszFullName; LPWSTR wszFullName; };      // U/W dependent
     VMMDLL_MODULE_TP tp;
     DWORD cbFileSizeRaw;
     DWORD cSection;
@@ -1278,7 +1278,7 @@ typedef struct tdVMMDLL_MAP_UNLOADEDMODULEENTRY {
     QWORD vaBase;
     DWORD cbImageSize;
     BOOL  fWoW64;
-    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependant
+    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependent
     DWORD _FutureUse1;
     DWORD dwCheckSum;               // user-mode only
     DWORD dwTimeDateStamp;          // user-mode only
@@ -1292,16 +1292,16 @@ typedef struct tdVMMDLL_MAP_EATENTRY {
     DWORD oFunctionsArray;          // PIMAGE_EXPORT_DIRECTORY->AddressOfFunctions[oFunctionsArray]
     DWORD oNamesArray;              // PIMAGE_EXPORT_DIRECTORY->AddressOfNames[oNamesArray]
     DWORD _FutureUse1;
-    union { LPSTR  uszFunction; LPWSTR wszFunction; };      // U/W dependant
+    union { LPSTR  uszFunction; LPWSTR wszFunction; };      // U/W dependent
     union { LPSTR  uszForwardedFunction; LPWSTR wszForwardedFunction; };    // U/W dependant (function or ordinal name if exists).
 } VMMDLL_MAP_EATENTRY, *PVMMDLL_MAP_EATENTRY;
 
 typedef struct tdVMMDLL_MAP_IATENTRY {
     QWORD vaFunction;
-    union { LPSTR  uszFunction; LPWSTR wszFunction; };      // U/W dependant
+    union { LPSTR  uszFunction; LPWSTR wszFunction; };      // U/W dependent
     DWORD _FutureUse1;
     DWORD _FutureUse2;
-    union { LPSTR  uszModule; LPWSTR wszModule; };          // U/W dependant
+    union { LPSTR  uszModule; LPWSTR wszModule; };          // U/W dependent
     struct {
         BOOL f32;
         WORD wHint;
@@ -1403,8 +1403,8 @@ typedef struct tdVMMDLL_MAP_THREAD_CALLSTACKENTRY {
     QWORD vaBaseSP;
     DWORD _FutureUse1;
     DWORD cbDisplacement;
-    union { LPSTR uszModule; LPWSTR wszModule; };           // U/W dependant
-    union { LPSTR uszFunction; LPWSTR wszFunction; };       // U/W dependant
+    union { LPSTR uszModule; LPWSTR wszModule; };           // U/W dependent
+    union { LPSTR uszFunction; LPWSTR wszFunction; };       // U/W dependent
 } VMMDLL_MAP_THREAD_CALLSTACKENTRY, *PVMMDLL_MAP_THREAD_CALLSTACKENTRY;
 
 typedef struct tdVMMDLL_MAP_HANDLEENTRY {
@@ -1416,12 +1416,12 @@ typedef struct tdVMMDLL_MAP_HANDLEENTRY {
     QWORD qwPointerCount;
     QWORD vaObjectCreateInfo;
     QWORD vaSecurityDescriptor;
-    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependant
+    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependent
     DWORD _FutureUse2;
     DWORD dwPID;
     DWORD dwPoolTag;
     DWORD _FutureUse[7];
-    union { LPSTR  uszType; LPWSTR wszType; QWORD _Pad1; }; // U/W dependant
+    union { LPSTR  uszType; LPWSTR wszType; QWORD _Pad1; }; // U/W dependent
 } VMMDLL_MAP_HANDLEENTRY, *PVMMDLL_MAP_HANDLEENTRY;
 
 typedef enum tdVMMDLL_MAP_POOL_TYPE {
@@ -1510,20 +1510,20 @@ typedef struct tdVMMDLL_MAP_NETENTRY {
         WORD _Reserved;
         WORD port;
         BYTE pbAddr[16];            // ipv4 = 1st 4 bytes, ipv6 = all bytes
-        union { LPSTR  uszText; LPWSTR wszText; };          // U/W dependant
+        union { LPSTR  uszText; LPWSTR wszText; };          // U/W dependent
     } Src;
     struct {
         BOOL fValid;
         WORD _Reserved;
         WORD port;
         BYTE pbAddr[16];            // ipv4 = 1st 4 bytes, ipv6 = all bytes
-        union { LPSTR  uszText; LPWSTR wszText; };          // U/W dependant
+        union { LPSTR  uszText; LPWSTR wszText; };          // U/W dependent
     } Dst;
     QWORD vaObj;
     QWORD ftTime;
     DWORD dwPoolTag;
     DWORD _FutureUse4;
-    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependant
+    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependent
     DWORD _FutureUse2[4];
 } VMMDLL_MAP_NETENTRY, *PVMMDLL_MAP_NETENTRY;
 
@@ -1534,9 +1534,9 @@ typedef struct tdVMMDLL_MAP_PHYSMEMENTRY {
 
 typedef struct tdVMMDLL_MAP_USERENTRY {
     DWORD _FutureUse1[2];
-    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependant
+    union { LPSTR  uszText; LPWSTR wszText; };              // U/W dependent
     ULONG64 vaRegHive;
-    union { LPSTR  uszSID; LPWSTR wszSID; };                // U/W dependant
+    union { LPSTR  uszSID; LPWSTR wszSID; };                // U/W dependent
     DWORD _FutureUse2[2];
 } VMMDLL_MAP_USERENTRY, *PVMMDLL_MAP_USERENTRY;
 
@@ -1548,7 +1548,7 @@ typedef enum tdVMMDLL_VM_TP {
 
 typedef struct tdVMMDLL_MAP_VMENTRY {
     VMMVM_HANDLE hVM;
-    union { LPSTR  uszName; LPWSTR wszName; };              // U/W dependant
+    union { LPSTR  uszName; LPWSTR wszName; };              // U/W dependent
     QWORD gpaMax;
     VMMDLL_VM_TP tp;
     BOOL fActive;
@@ -1566,12 +1566,12 @@ typedef struct tdVMMDLL_MAP_SERVICEENTRY {
     DWORD dwOrdinal;
     DWORD dwStartType;
     SERVICE_STATUS ServiceStatus;
-    union { LPSTR  uszServiceName; LPWSTR wszServiceName; QWORD _Reserved1; };  // U/W dependant
-    union { LPSTR  uszDisplayName; LPWSTR wszDisplayName; QWORD _Reserved2; };  // U/W dependant
-    union { LPSTR  uszPath;        LPWSTR wszPath;        QWORD _Reserved3; };  // U/W dependant
-    union { LPSTR  uszUserTp;      LPWSTR wszUserTp;      QWORD _Reserved4; };  // U/W dependant
-    union { LPSTR  uszUserAcct;    LPWSTR wszUserAcct;    QWORD _Reserved5; };  // U/W dependant
-    union { LPSTR  uszImagePath;   LPWSTR wszImagePath;   QWORD _Reserved6; };  // U/W dependant
+    union { LPSTR  uszServiceName; LPWSTR wszServiceName; QWORD _Reserved1; };  // U/W dependent
+    union { LPSTR  uszDisplayName; LPWSTR wszDisplayName; QWORD _Reserved2; };  // U/W dependent
+    union { LPSTR  uszPath;        LPWSTR wszPath;        QWORD _Reserved3; };  // U/W dependent
+    union { LPSTR  uszUserTp;      LPWSTR wszUserTp;      QWORD _Reserved4; };  // U/W dependent
+    union { LPSTR  uszUserAcct;    LPWSTR wszUserAcct;    QWORD _Reserved5; };  // U/W dependent
+    union { LPSTR  uszImagePath;   LPWSTR wszImagePath;   QWORD _Reserved6; };  // U/W dependent
     DWORD dwPID;
     DWORD _FutureUse1;
     QWORD _FutureUse2;
@@ -1677,7 +1677,7 @@ typedef struct tdVMMDLL_MAP_THREAD_CALLSTACK {
     DWORD dwPID;
     DWORD dwTID;
     DWORD cbText;
-    union { LPSTR  uszText; LPWSTR wszText; };  // U/W dependant
+    union { LPSTR  uszText; LPWSTR wszText; };  // U/W dependent
     PBYTE pbMultiText;              // multi-str pointed into by VMM_MAP_EATENTRY.[wszFunction|wszModule]
     DWORD cbMultiText;
     DWORD cMap;
@@ -2668,7 +2668,7 @@ BOOL VMMDLL_PdbTypeChildOffset(
 //-----------------------------------------------------------------------------
 
 #define VMMDLL_REGISTRY_HIVE_INFORMATION_MAGIC      0xc0ffee653df8d01e
-#define VMMDLL_REGISTRY_HIVE_INFORMATION_VERSION    4
+#define VMMDLL_REGISTRY_HIVE_INFORMATION_VERSION    5
 
 typedef struct td_VMMDLL_REGISTRY_HIVE_INFORMATION {
     ULONG64 magic;
@@ -2681,7 +2681,12 @@ typedef struct td_VMMDLL_REGISTRY_HIVE_INFORMATION {
     CHAR uszName[128];
     CHAR uszNameShort[32 + 1];
     CHAR uszHiveRootPath[MAX_PATH];
-    QWORD _FutureReserved[0x10];
+    struct {
+        BOOL fValid;
+        DWORD dwHandle;
+        QWORD vaFileObject;
+    } File;
+    QWORD _FutureReserved[0x0e];
 } VMMDLL_REGISTRY_HIVE_INFORMATION, *PVMMDLL_REGISTRY_HIVE_INFORMATION;
 
 /*
