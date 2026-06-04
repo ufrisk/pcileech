@@ -110,9 +110,9 @@ VOID Help_ShowGeneral()
         "   -v   : verbose option. Additional information is displayed in the output.   \n" \
         "          Affects all modes and commands. Option has no value. Example: -v     \n" \
         "   -vv  : extra verbose option. More detailed additional information is shown  \n" \
-        "          in output. Option has no value. Example: -vv                         \n" \
+        "          in output. Implies -v. Option has no value. Example: -vv             \n" \
         "   -vvv : super verbose option. Show all data transferred such as PCIe TLPs.   \n" \
-        "          Option has no value. Example: -vvv                                   \n" \
+        "          Does NOT imply -v or -vv. Option has no value. Example: -vvv         \n" \
         "   -force: force reads and writes even though target memory is marked as not   \n" \
         "          accessible. Dangerous! Affects all modes and commands.               \n" \
         "          Option has no value. Example: -force                                 \n" \

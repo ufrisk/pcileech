@@ -134,6 +134,7 @@ BOOL PCILeechConfigIntialize(_In_ DWORD argc, _In_ char* argv[])
             i++;
             continue;
         } else if(0 == _stricmp(argv[i], "-vv")) {
+            ctxMain->cfg.fVerbose = TRUE;
             ctxMain->cfg.fVerboseExtra = TRUE;
             i++;
             continue;
