@@ -14,18 +14,17 @@ OBJ  = oscompatibility.o charutil.o device.o pcileech.o executor.o extra.o help.
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 pcileech: $(OBJ)
-	cp ../files/vmm.so . || cp ../../MemProcFS*/files/vmm.so . || true
-	cp ../files/leechcore.so . || cp ../../LeechCore*/files/leechcore.so . || true
+	-cp ../files/vmm.so . || cp ../../MemProcFS*/files/vmm.so .
+	-cp ../files/leechcore.so . || cp ../../LeechCore*/files/leechcore.so .
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
-	mv pcileech ../files/ |true
-	mv vmm.so ../files/ |true
-	mv leechcore.so ../files/ |true
-	rm -f *.o || true
-	rm -f */*.o || true
-	rm -f *.so || true
-	true
+	-mv pcileech ../files/
+	-mv vmm.so ../files/
+	-mv leechcore.so ../files/
+	-rm -f *.o
+	-rm -f */*.o
+	-rm -f *.so
 
 clean:
-	rm -f *.o || true
-	rm -f */*.o || true
-	rm -f *.so || true
+	-rm -f *.o
+	-rm -f */*.o
+	-rm -f *.so
