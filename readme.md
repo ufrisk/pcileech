@@ -2,7 +2,7 @@ PCILeech Summary:
 =================
 PCILeech uses PCIe hardware devices to read and write target system memory. This is achieved by using DMA over PCIe. No drivers are needed on the target system. 
 
-<b>PCILeech also works without hardware together with a wide range of software memory acqusition methods supported by the LeechCore library - including capture of remote live memory using DumpIt or WinPmem. PCILeech also supports local capture of memory and a number of memory dump file formats.</b>
+<b>PCILeech also works without hardware together with a wide range of software memory acquisition methods supported by the LeechCore library - including capture of remote live memory using DumpIt or WinPmem. PCILeech also supports local capture of memory and a number of memory dump file formats.</b>
 
 PCILeech supports multiple memory acquisition devices. Both hardware and software based. USB3380 based hardware is only able to read 4GB of memory natively, but is able to read all memory if a kernel module (KMD) is first inserted into the target system kernel. FPGA based hardware, and software based methods, are able to read all memory.
 
@@ -40,7 +40,7 @@ Capabilities:
 
 Memory Acquisition Methods:
 ===========================
-PCILeech supports both hardware based and software based memory acqusition methods. All memory acqusition is handled by the [LeechCore](https://github.com/ufrisk/LeechCore) library.
+PCILeech supports both hardware based and software based memory acquisition methods. All memory acquisition is handled by the [LeechCore](https://github.com/ufrisk/LeechCore) library.
 
 ### Hardware based memory aqusition methods:
 
@@ -179,7 +179,7 @@ Changelog:
 <details><summary>Previous releases (click to expand):</summary>
 
 v1.0-v3.6
-* Initial release and various updates. please see individual relases for more information.
+* Initial release and various updates. please see individual releases for more information.
 
 v4.0
 * Major cleanup and internal refactorings.
